@@ -1,0 +1,4 @@
+- [ ] SMARTATTEND monorepo: Vite+React frontend, Node+Express backend, PostgreSQL, shared packages.
+- [ ] Scaffolded folder structure and README files.
+- [ ] Next: Initialize Vite app in apps/frontend and Express+TS app in apps/backend.
+- [ ] After: Add shared types/packages, connect backend to PostgreSQL, and frontend to backend API.

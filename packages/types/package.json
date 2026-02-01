@@ -1,0 +1,21 @@
+{
+  "name": "@smartattend/types",
+  "version": "1.0.0",
+  "description": "Shared types and interfaces for SmartAttend monorepo",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "smartattend",
+    "types",
+    "shared"
+  ],
+  "author": "SmartAttend Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

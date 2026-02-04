@@ -10,6 +10,7 @@ import schoolRoutes from './routes/school.js'
 import corporateRoutes from './routes/corporate.js'
 import attendanceRoutes from './routes/attendance.js'
 import userRoutes from './routes/users.js'
+import superadminRoutes from './routes/superadmin.js'
 
 dotenv.config()
 
@@ -22,12 +23,26 @@ console.log('[STARTUP] Initializing application...')
 app.use(cors())
 app.use(express.json())
 
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.path}`);
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/school', schoolRoutes)
 app.use('/api/corporate', corporateRoutes)
 app.use('/api/attendance', attendanceRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/superadmin', superadminRoutes)
+app.use('/api/v1/superadmin', superadminRoutes)
+
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[ERROR]', err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -46,15 +61,14 @@ async function startServer() {
 
     console.log(`[SERVER] Attempting to bind to port ${PORT}...`)
 
-    // Start listening on IPv6 (which enables IPv4 on most systems with ::ffff:127.0.0.1)
-    // Or explicitly listen on all interfaces
-    const host = '127.0.0.1' // Use explicit IPv4
+    // Start listening on all interfaces to be accessible from Docker host
+    const host = '0.0.0.0' // Listen on all network interfaces
     
     server.listen(PORT, host, () => {
       const addr = server.address()
       console.log(`[SERVER] ✅ LISTENING on port ${PORT}`)
       console.log(`[SERVER] Binding address:`, addr)
-      console.log(`[SERVER] ✅ Access at http://127.0.0.1:${PORT}/api/health`)
+      console.log(`[SERVER] ✅ Access at http://localhost:${PORT}/api/health`)
       console.log('[SERVER] Ready to accept requests')
     })
 

@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "setup-superadmin": "tsx setup-superadmin.ts",
+    "delete-superadmin": "tsx delete-superadmin.ts"
   },
   "dependencies": {
     "@smartattend/types": "file:../../packages/types",

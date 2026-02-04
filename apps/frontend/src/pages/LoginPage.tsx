@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
 import { SmartAttendLogo } from '../components/BrandLogo';
+import { PasswordInput } from '../components/PasswordInput';
 import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -89,20 +90,15 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Password Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <Lock className="inline w-4 h-4 mr-2" />
-                Password
-              </label>
-              <input
-                type="password"
-                className="input-field"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            <PasswordInput
+              id="password"
+              name="password"
+              label={<><Lock className="inline w-4 h-4 mr-2" />Password</>}
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mb-4"
+            />
 
             {/* Error Message */}
             {error && (

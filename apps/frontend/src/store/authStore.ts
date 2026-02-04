@@ -9,9 +9,11 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string, platform: 'school' | 'corporate') => Promise<void>;
+  superadminLogin: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName: string, platform: 'school' | 'corporate', phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
+  setToken: (token: string) => void;
   clearError: () => void;
   loadUserFromToken: () => Promise<void>;
 }
@@ -39,6 +41,40 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
     } catch (error: any) {
       const errorMessage = getUserFriendlyError(error);
+      set({ error: errorMessage, isLoading: false });
+      throw error;
+    }
+  },
+
+  superadminLogin: async (email: string, password: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login-superadmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      }).then(res => res.json());
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      localStorage.setItem('accessToken', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
+
+      set({
+        token: response.accessToken,
+        user: {
+          id: response.user.id,
+          email: response.user.email,
+          fullName: response.user.fullName,
+          role: response.user.role,
+          platform: response.user.platform || 'school',
+        },
+        isLoading: false,
+      });
+    } catch (error: any) {
+      const errorMessage = error.message || 'Superadmin login failed';
       set({ error: errorMessage, isLoading: false });
       throw error;
     }
@@ -85,6 +121,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   setUser: (user) => set({ user }),
+
+  setToken: (token: string) => {
+    localStorage.setItem('accessToken', token);
+    set({ token });
+  },
 
   clearError: () => set({ error: null }),
 

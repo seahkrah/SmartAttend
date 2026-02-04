@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserPlus, Mail, Lock, Building2, AlertCircle, Check } from 'lucide-react';
 import { SmartAttendLogo } from '../components/BrandLogo';
+import { PasswordInput } from '../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -290,36 +291,26 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             {/* Password Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <Lock className="inline w-4 h-4 mr-2" />
-                Password
-              </label>
-              <input
-                type="password"
-                className="input-field"
-                placeholder="Create a strong password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            <PasswordInput
+              id="password"
+              name="password"
+              label={<><Lock className="inline w-4 h-4 mr-2" />Password</>}
+              placeholder="Create a strong password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mb-4"
+            />
 
             {/* Confirm Password Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <Lock className="inline w-4 h-4 mr-2" />
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                className="input-field"
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
+            <PasswordInput
+              id="confirmPassword"
+              name="confirmPassword"
+              label={<><Lock className="inline w-4 h-4 mr-2" />Confirm Password</>}
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="mb-4"
+            />
 
             {/* Error Message */}
             {error && (

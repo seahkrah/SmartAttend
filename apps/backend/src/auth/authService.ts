@@ -86,7 +86,7 @@ export async function loginUser(
 ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
   // Find user by email and platform
   const result = await query(
-    `SELECT u.*, r.permissions FROM users u
+    `SELECT u.*, r.permissions, r.name as role_name FROM users u
      LEFT JOIN roles r ON u.role_id = r.id
      WHERE u.email = $1 AND u.platform_id = $2 AND u.is_active = true`,
     [email, platformId]
@@ -95,13 +95,57 @@ export async function loginUser(
   if (result.rows.length === 0) {
     // Check if email exists in other platforms
     const emailCheckResult = await query(
-      `SELECT DISTINCT platform_id FROM users WHERE email = $1 LIMIT 1`,
+      `SELECT u.id, u.email, u.full_name, u.platform_id, u.role_id, u.password_hash, u.is_active, u.phone, u.profile_image_url, u.last_login, u.created_at, u.updated_at, r.name as role_name, r.permissions, p.name as platform_name
+       FROM users u
+       LEFT JOIN roles r ON u.role_id = r.id
+       LEFT JOIN platforms p ON u.platform_id = p.id
+       WHERE u.email = $1`,
       [email]
     )
     
     if (emailCheckResult.rows.length > 0) {
-      // Email exists but in a different platform
-      throw new Error('email_registered_different_platform')
+      const userInOtherPlatform = emailCheckResult.rows[0]
+      
+      // Check if password is correct
+      const isValidPassword = await verifyPassword(password, userInOtherPlatform.password_hash)
+      
+      if (isValidPassword) {
+        // Nested if: Check if this user is a superadmin
+        if (userInOtherPlatform.role_name === 'superadmin' && userInOtherPlatform.platform_name === 'system') {
+          // Allow superadmin to login regardless of platform selection
+          const superadminUser = userInOtherPlatform
+          
+          // Verify user is active
+          if (!superadminUser.is_active) {
+            throw new Error('User account is inactive')
+          }
+          
+          // Generate tokens
+          const accessToken = generateAccessToken(superadminUser.id, superadminUser.platform_id, superadminUser.role_id)
+          const refreshToken = generateRefreshToken(superadminUser.id)
+          
+          // Update last_login
+          await query(
+            `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`,
+            [superadminUser.id]
+          )
+          
+          // Remove sensitive data and return
+          const { password_hash, ...safeUser } = superadminUser
+          
+          return {
+            user: safeUser,
+            accessToken,
+            refreshToken
+          }
+        } else {
+          // Not a superadmin, show platform mismatch error
+          throw new Error('email_registered_different_platform')
+        }
+      } else {
+        // Password is incorrect
+        throw new Error('Invalid email or password')
+      }
     }
     
     throw new Error('Invalid email or platform')
@@ -112,7 +156,7 @@ export async function loginUser(
   // Verify password
   const isValidPassword = await verifyPassword(password, user.password_hash)
   if (!isValidPassword) {
-    throw new Error('Invalid password')
+    throw new Error('Invalid email or password')
   }
   
   // Generate tokens
@@ -508,4 +552,178 @@ export async function approveOrRejectRegistration(
       message: `Registration rejected successfully`
     }
   }
+}
+
+// ===========================
+// SUPERADMIN FUNCTIONS
+// ===========================
+
+// Check if user is superadmin
+export async function isSuperadmin(userId: string): Promise<boolean> {
+  const result = await query(
+    `SELECT EXISTS(
+      SELECT 1 FROM users u
+      JOIN roles r ON u.role_id = r.id
+      JOIN platforms p ON r.platform_id = p.id
+      WHERE u.id = $1 AND r.name = 'superadmin' AND p.name = 'system'
+    ) as is_superadmin`,
+    [userId]
+  )
+  return result.rows[0]?.is_superadmin || false
+}
+
+// Get superadmin dashboard stats
+export async function getSuperadminDashboardStats(superadminUserId: string) {
+  // Verify user is superadmin
+  const isSuperAdminUser = await isSuperadmin(superadminUserId)
+  if (!isSuperAdminUser) {
+    throw new Error('Unauthorized: User is not a superadmin')
+  }
+
+  const stats = await query(
+    `SELECT 
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM school_entities) as total_schools,
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM school_entities WHERE is_active = true) as active_schools,
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM corporate_entities) as total_corporates,
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM corporate_entities WHERE is_active = true) as active_corporates,
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM users WHERE platform_id != (SELECT id FROM platforms WHERE name = 'system')) as total_users,
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM users WHERE platform_id != (SELECT id FROM platforms WHERE name = 'system') AND is_active = true) as active_users,
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM school_user_approvals WHERE status = 'pending') as pending_school_approvals,
+      (SELECT CAST(COUNT(*) AS INTEGER) FROM corporate_user_approvals WHERE status = 'pending') as pending_corporate_approvals`
+  )
+
+  return stats.rows[0]
+}
+
+// Get all entities (schools and corporate)
+export async function getSuperadminAllEntities(superadminUserId: string) {
+  const isSuperAdminUser = await isSuperadmin(superadminUserId)
+  if (!isSuperAdminUser) {
+    throw new Error('Unauthorized: User is not a superadmin')
+  }
+
+  const schools = await query(
+    `SELECT id, name, code, email, is_active, 
+            (SELECT COUNT(*) FROM school_user_associations WHERE school_entity_id = school_entities.id) as user_count,
+            (SELECT COUNT(*) FROM school_user_approvals WHERE school_entity_id = school_entities.id AND status = 'pending') as pending_approvals
+     FROM school_entities
+     ORDER BY created_at DESC`
+  )
+
+  const corporates = await query(
+    `SELECT id, name, code, email, is_active,
+            (SELECT COUNT(*) FROM corporate_user_associations WHERE corporate_entity_id = corporate_entities.id) as user_count,
+            (SELECT COUNT(*) FROM corporate_user_approvals WHERE corporate_entity_id = corporate_entities.id AND status = 'pending') as pending_approvals
+     FROM corporate_entities
+     ORDER BY created_at DESC`
+  )
+
+  return {
+    schools: schools.rows,
+    corporates: corporates.rows
+  }
+}
+
+// Get all pending approvals across all entities
+export async function getSuperadminAllPendingApprovals(superadminUserId: string) {
+  const isSuperAdminUser = await isSuperadmin(superadminUserId)
+  if (!isSuperAdminUser) {
+    throw new Error('Unauthorized: User is not a superadmin')
+  }
+
+  const approvals = await query(
+    `SELECT * FROM superadmin_all_pending_approvals ORDER BY requested_at DESC`
+  )
+
+  return approvals.rows
+}
+
+// Get superadmin action logs
+export async function getSuperadminActionLogs(superadminUserId: string, limit: number = 100, offset: number = 0) {
+  const isSuperAdminUser = await isSuperadmin(superadminUserId)
+  if (!isSuperAdminUser) {
+    throw new Error('Unauthorized: User is not a superadmin')
+  }
+
+  const logs = await query(
+    `SELECT id, superadmin_user_id, action, entity_type, entity_id, details, created_at
+     FROM superadmin_action_logs
+     ORDER BY created_at DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  )
+
+  const countResult = await query(`SELECT COUNT(*) as total FROM superadmin_action_logs`)
+  const total = countResult.rows[0].total
+
+  return {
+    logs: logs.rows,
+    total,
+    limit,
+    offset
+  }
+}
+
+// Log superadmin action
+export async function logSuperadminAction(
+  superadminUserId: string,
+  action: string,
+  entityType?: string,
+  entityId?: string,
+  details?: any,
+  ipAddress?: string
+) {
+  await query(
+    `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, details, ip_address)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [superadminUserId, action, entityType || null, entityId || null, details ? JSON.stringify(details) : null, ipAddress || null]
+  )
+}
+
+// Get user statistics by platform
+export async function getSuperadminUserStatistics(superadminUserId: string) {
+  const isSuperAdminUser = await isSuperadmin(superadminUserId)
+  if (!isSuperAdminUser) {
+    throw new Error('Unauthorized: User is not a superadmin')
+  }
+
+  const stats = await query(
+    `SELECT * FROM superadmin_user_statistics ORDER BY platform_name`
+  )
+
+  return stats.rows
+}
+
+// Get entity-specific users (superadmin view)
+export async function getSuperadminEntityUsers(superadminUserId: string, entityType: 'school' | 'corporate', entityId: string) {
+  const isSuperAdminUser = await isSuperadmin(superadminUserId)
+  if (!isSuperAdminUser) {
+    throw new Error('Unauthorized: User is not a superadmin')
+  }
+
+  if (entityType === 'school') {
+    const users = await query(
+      `SELECT u.id, u.email, u.full_name, r.name as role, sua.status, sua.assigned_at
+       FROM users u
+       JOIN roles r ON u.role_id = r.id
+       JOIN school_user_associations sua ON u.id = sua.user_id
+       WHERE sua.school_entity_id = $1
+       ORDER BY u.created_at DESC`,
+      [entityId]
+    )
+    return users.rows
+  } else if (entityType === 'corporate') {
+    const users = await query(
+      `SELECT u.id, u.email, u.full_name, r.name as role, cua.status, cua.assigned_at
+       FROM users u
+       JOIN roles r ON u.role_id = r.id
+       JOIN corporate_user_associations cua ON u.id = cua.user_id
+       WHERE cua.corporate_entity_id = $1
+       ORDER BY u.created_at DESC`,
+      [entityId]
+    )
+    return users.rows
+  }
+
+  throw new Error('Invalid entity type')
 }

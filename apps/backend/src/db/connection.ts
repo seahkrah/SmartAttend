@@ -1,5 +1,6 @@
 import pg from 'pg'
 import dotenv from 'dotenv'
+import { runMigrations } from './migrations.js'
 
 dotenv.config()
 
@@ -36,8 +37,11 @@ export async function initializeDatabase() {
   try {
     const result = await query('SELECT 1')
     console.log('✅ Database connection successful')
+    
+    // Run migrations
+    await runMigrations()
   } catch (error) {
-    console.error('❌ Database connection failed:', error)
+    console.error('❌ Database initialization failed:', error)
     throw error
   }
 }

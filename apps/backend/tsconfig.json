@@ -16,5 +16,5 @@
     "moduleResolution": "node"
   },
   "include": ["src"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "dist", "src/tests", "src/routes/TENANT_INTEGRATION_PATTERNS.ts", "src/routes/ROLE_ESCALATION_PATTERNS.ts"]
 }

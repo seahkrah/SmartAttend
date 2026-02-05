@@ -1,0 +1,81 @@
+# SmartAttend Commit Message Template
+# =============================================================================
+# Follow this format strictly for all commits:
+#
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+#
+# =============================================================================
+# TYPES:
+#   feat:     New feature
+#   fix:      Bug fix
+#   refactor: Code refactoring (no feature or fix)
+#   perf:     Performance improvement
+#   test:     Test additions/changes
+#   docs:     Documentation changes
+#   chore:    Build, CI/CD, dependencies, tooling
+#   security: Security-related fixes
+#   ops:      Operational changes (migrations, infrastructure)
+#
+# SCOPES (optional but recommended):
+#   backend:    Backend services (Node.js, Express, DB)
+#   frontend:   Frontend application (React, TypeScript)
+#   db:         Database schema/migrations
+#   auth:       Authentication/authorization
+#   api:        API design/contracts
+#   types:      Shared type definitions
+#   docker:     Docker/container configuration
+#   ci:         CI/CD configuration
+#   ops:        Operational/deployment
+#
+# SUBJECT:
+#   - Imperative mood ("add", "fix", "refactor", not "added", "fixed")
+#   - No period at end
+#   - Max 50 characters
+#   - lowercase
+#
+# BODY:
+#   - Wrap at 72 characters
+#   - Explain WHAT and WHY, not HOW
+#   - Include any breaking changes
+#   - Reference any related issues: "Fixes #123", "Relates to #456"
+#
+# FOOTER:
+#   - Reference issues: "Fixes #123"
+#   - Note breaking changes: "BREAKING CHANGE: ..."
+#
+# =============================================================================
+# EXAMPLES:
+#
+# feat(auth): add MFA enforcement for superadmin operations
+#
+# Implement MFA verification middleware that enforces TOTP/SMS/EMAIL
+# challenges before any destructive superadmin operations.
+#
+# Fixes #456
+#
+# ---
+#
+# fix(backend): prevent race condition in tenant lifecycle transitions
+#
+# Wrap state transition in database transaction to ensure atomicity
+# of audit log + state change. Prevents partial updates.
+#
+# Relates to #123
+#
+# ---
+#
+# refactor(api): consolidate error response format across superadmin routes
+#
+# All endpoints now return consistent ErrorContract structure with
+# code, message, recoveryHint, timestamp, and requestId fields.
+#
+# This improves client-side error handling and debugging.
+#
+# BREAKING CHANGE: Error response format has changed from field-based
+# to structured ErrorContract. Clients must update error handling.
+#
+# =============================================================================

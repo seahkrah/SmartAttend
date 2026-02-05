@@ -8,8 +8,8 @@
 -- ===========================
 
 -- First, check if we have a system platform or create one
-INSERT INTO platforms (name, description, is_active)
-VALUES ('system', 'System Management Platform', true)
+INSERT INTO platforms (name, display_name, description, is_active)
+VALUES ('system', 'System Management Platform', 'System Management Platform', true)
 ON CONFLICT (name) DO NOTHING;
 
 -- Add superadmin role to system platform

@@ -13,8 +13,14 @@ const router = express.Router()
 // Apply middleware in order: audit context -> IP allowlist -> MFA -> rate limiting
 router.use(auditContextMiddleware)
 router.use(ipAllowlistMiddleware)
-router.use(warnIfIpExpiringSoon(7) as any) // Async middleware
-router.use(authenticateToken, verifySuperadmin)
+// warnIfIpExpiringSoon is async function that returns middleware, so we need to handle it separately
+let ipWarningMiddleware: any = null
+warnIfIpExpiringSoon(7).then(m => { ipWarningMiddleware = m })
+router.use((req, res, next) => {
+  if (!ipWarningMiddleware) return next()
+  ipWarningMiddleware(req, res, next).catch(next)
+})
+router.use(authenticateToken, (req, res, next) => verifySuperadmin(req, res, next))
 
 // ===========================
 // MIDDLEWARE: VERIFY SUPERADMIN ACCESS
@@ -49,7 +55,7 @@ async function verifySuperadmin(req: Request, res: Response, next: Function) {
 // ===========================
 
 // GET: List all tenants (schools + corporates)
-router.get('/tenants', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {
+router.get('/tenants', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const superadminId = req.user!.userId
 
@@ -113,7 +119,7 @@ router.get('/tenants', authenticateToken, verifySuperadmin, async (req: Request,
 })
 
 // GET: Get specific tenant details
-router.get('/tenants/:tenantId', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {
+router.get('/tenants/:tenantId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params
     const superadminId = req.user!.userId
@@ -191,7 +197,7 @@ interface LockTenantRequest extends Request {
   }
 }
 
-router.post('/tenants/lock', authenticateToken, verifySuperadmin, async (req: LockTenantRequest, res: Response) => {
+router.post('/tenants/lock', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: LockTenantRequest, res: Response) => {
   try {
     const { tenantId, reason } = req.body
     const superadminId = req.user!.userId
@@ -256,7 +262,7 @@ interface UnlockTenantRequest extends Request {
   }
 }
 
-router.post('/tenants/unlock', authenticateToken, verifySuperadmin, async (req: UnlockTenantRequest, res: Response) => {
+router.post('/tenants/unlock', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: UnlockTenantRequest, res: Response) => {
   try {
     const { lockEventId, reason } = req.body
     const superadminId = req.user!.userId
@@ -309,7 +315,7 @@ router.post('/tenants/unlock', authenticateToken, verifySuperadmin, async (req: 
 // ===========================
 
 // GET: List incidents
-router.get('/incidents', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {
+router.get('/incidents', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const { status, severity } = req.query
     const superadminId = req.user!.userId
@@ -373,7 +379,7 @@ interface CreateIncidentRequest extends Request {
   }
 }
 
-router.post('/incidents', authenticateToken, verifySuperadmin, async (req: CreateIncidentRequest, res: Response) => {
+router.post('/incidents', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: CreateIncidentRequest, res: Response) => {
   try {
     const { title, description, incidentType, severity, affectedTenantId, rootCause } = req.body
     const superadminId = req.user!.userId
@@ -445,7 +451,7 @@ interface UpdateIncidentRequest extends Request {
   }
 }
 
-router.put('/incidents/:incidentId', authenticateToken, verifySuperadmin, async (req: UpdateIncidentRequest, res: Response) => {
+router.put('/incidents/:incidentId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: UpdateIncidentRequest, res: Response) => {
   const { incidentId } = req.params
   const { status, resolutionNotes, rootCause } = req.body
   const superadminId = req.user!.userId
@@ -540,7 +546,7 @@ router.put('/incidents/:incidentId', authenticateToken, verifySuperadmin, async 
 // ===========================
 
 // GET: View audit logs
-router.get('/audit-logs', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {
+router.get('/audit-logs', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const { limit = '50', offset = '0' } = req.query
     const superadminId = req.user!.userId
@@ -579,7 +585,7 @@ router.get('/audit-logs', authenticateToken, verifySuperadmin, async (req: Reque
 })
 
 // GET: View system health
-router.get('/health', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {
+router.get('/health', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const healthResult = await query(
       `SELECT service_name, status, response_time_ms, error_rate_percent, last_checked_at
@@ -615,7 +621,7 @@ interface CreateConfirmationRequest extends Request {
   }
 }
 
-router.post('/confirmation-tokens', authenticateToken, verifySuperadmin, async (req: CreateConfirmationRequest, res: Response) => {
+router.post('/confirmation-tokens', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: CreateConfirmationRequest, res: Response) => {
   try {
     const { operationType, operationContext, ttlSeconds = 900 } = req.body
     const superadminId = req.user!.userId
@@ -696,7 +702,7 @@ interface TenantLifecycleRequest extends Request {
   }
 }
 
-router.post('/tenants/:tenantId/lifecycle', authenticateToken, verifySuperadmin, async (req: TenantLifecycleRequest, res: Response) => {
+router.post('/tenants/:tenantId/lifecycle', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: TenantLifecycleRequest, res: Response) => {
   const { tenantId } = req.params
   const { newState, justification, dryRun = false, confirmationToken } = req.body
   const superadminId = req.user!.userId
@@ -816,7 +822,7 @@ interface InvalidateSessionsRequest extends Request {
   }
 }
 
-router.post('/sessions/invalidate', authenticateToken, verifySuperadmin, async (req: InvalidateSessionsRequest, res: Response) => {
+router.post('/sessions/invalidate', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: InvalidateSessionsRequest, res: Response) => {
   try {
     const { tenantId, reason } = req.body
     const superadminId = req.user!.userId
@@ -868,7 +874,7 @@ interface ClockDriftRequest extends Request {
   }
 }
 
-router.post('/clock-drift', authenticateToken, verifySuperadmin, async (req: ClockDriftRequest, res: Response) => {
+router.post('/clock-drift', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: ClockDriftRequest, res: Response) => {
   try {
     const { tenantId, userId, clientTimestamp, requestId } = req.body
 
@@ -904,7 +910,7 @@ router.post('/clock-drift', authenticateToken, verifySuperadmin, async (req: Clo
 })
 
 // GET: List attendance flags (optionally by tenant)
-router.get('/attendance/flags', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {
+router.get('/attendance/flags', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.query
     let q = `SELECT * FROM attendance_integrity_flags WHERE 1=1`
@@ -937,7 +943,7 @@ interface CreateFlagRequest extends Request {
   }
 }
 
-router.post('/attendance/flags', authenticateToken, verifySuperadmin, async (req: CreateFlagRequest, res: Response) => {
+router.post('/attendance/flags', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: CreateFlagRequest, res: Response) => {
   try {
     const { tenantId, attendanceRecordId, flagType, severity, flagReason } = req.body
     const superadminId = req.user!.userId
@@ -997,7 +1003,7 @@ interface MfaChallengeStartRequest extends Request {
   }
 }
 
-router.post('/mfa/challenge', authenticateToken, verifySuperadmin, async (req: MfaChallengeStartRequest, res: Response) => {
+router.post('/mfa/challenge', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: MfaChallengeStartRequest, res: Response) => {
   try {
     const { method } = req.body
     const superadminId = req.user!.userId
@@ -1056,7 +1062,7 @@ router.post('/mfa/verify', async (req: MfaChallengeVerifyRequest, res: Response)
 // ===========================
 
 // GET: List allowlisted IPs for current user
-router.get('/ip-allowlist', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {
+router.get('/ip-allowlist', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const superadminId = req.user!.userId
 
@@ -1081,7 +1087,7 @@ interface AddIpRequest extends Request {
   }
 }
 
-router.post('/ip-allowlist', authenticateToken, verifySuperadmin, rateLimitMiddleware('ADD_IP_ALLOWLIST') as any, async (req: AddIpRequest, res: Response) => {
+router.post('/ip-allowlist', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), rateLimitMiddleware('ADD_IP_ALLOWLIST') as any, async (req: AddIpRequest, res: Response) => {
   try {
     const { ipAddress, description, expiresAt } = req.body
     const superadminId = req.user!.userId

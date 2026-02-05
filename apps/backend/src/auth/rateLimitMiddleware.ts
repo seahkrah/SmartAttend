@@ -42,7 +42,7 @@ setInterval(() => {
 /**
  * Check rate limit for destructive operations
  */
-export async function rateLimitMiddleware(
+export function rateLimitMiddleware(
   actionType?: string,
   config: RateLimitConfig = DEFAULT_CONFIG
 ) {

@@ -1,0 +1,199 @@
+# =============================================================================
+# ROOT .gitignore — SmartAttend Platform
+# =============================================================================
+# Enforces strict repository hygiene: only source code, configs, and lockfiles
+# System must be 100% reproducible from lockfiles, manifests, and Docker config
+
+# =============================================================================
+# RUNTIME ARTIFACTS (STRICTLY FORBIDDEN)
+# =============================================================================
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+lerna-debug.log
+.npm/
+.yarn/cache/
+.yarn/install-state.gz
+
+# Python
+__pycache__/
+.venv/
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Package Manager Lock Artifacts (only .lock files allowed, not cache)
+.pnp
+.pnp.js
+
+# =============================================================================
+# BUILD OUTPUTS (auto-generated, must not be committed)
+# =============================================================================
+
+dist/
+build/
+*.o
+*.so
+*.dylib
+
+# Frontend builds
+apps/frontend/dist/
+apps/frontend/.next/
+apps/frontend/out/
+apps/frontend/build/
+
+# Backend builds  
+apps/backend/dist/
+apps/backend/build/
+
+# =============================================================================
+# LOGS & RUNTIME DATA (STRICTLY FORBIDDEN)
+# =============================================================================
+
+*.log
+*.logs
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+backend.log
+frontend.log
+server.log
+**/.DS_Store
+
+# =============================================================================
+# ENVIRONMENT & SECRETS (STRICTLY FORBIDDEN)
+# =============================================================================
+
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+.env.*.private
+.env.*.secret
+
+# =============================================================================
+# IDE & EDITOR ARTIFACTS
+# =============================================================================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-workspace
+*.sublime-project
+.eslintcache
+.stylelintcache
+
+# =============================================================================
+# OS ARTIFACTS
+# =============================================================================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+desktop.ini
+Thumbs.db
+
+# =============================================================================
+# TEMPORARY & DEBUG FILES
+# =============================================================================
+
+*.tmp
+*.temp
+.test/
+.coverage/
+coverage/
+.nyc_output/
+.jest-cache/
+.turbo/
+*.bak
+*.swp
+*.swo
+*~
+tmp/
+temp/
+
+# =============================================================================
+# PLATFORM-SPECIFIC
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+
+# =============================================================================
+# DOCKER & CONTAINER ARTIFACTS
+# =============================================================================
+
+.dockerignore
+docker-compose.override.yml
+
+# =============================================================================
+# DEPENDENCY VERIFICATION
+# =============================================================================
+# Only the following files are allowed in version control:
+# - package.json (manifest)
+# - package-lock.json (lockfile)
+# - pnpm-lock.yaml (lockfile)
+# - yarn.lock (lockfile)
+# - requirements.txt (Python manifest)
+# - Pipfile / Pipfile.lock (Python lockfiles)
+# - tsconfig.json (TypeScript config)
+# - Dockerfile (reproducible builds)
+# - docker-compose.yml (orchestration)
+
+# Explicitly ALLOW lockfiles
+!package-lock.json
+!pnpm-lock.yaml
+!yarn.lock
+!Pipfile.lock
+!requirements.txt
+
+# Explicitly ALLOW configs
+!tsconfig.json
+!Dockerfile
+!docker-compose.yml
+!.dockerignore

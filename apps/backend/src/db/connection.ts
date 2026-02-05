@@ -1,10 +1,19 @@
 import pg from 'pg'
 import dotenv from 'dotenv'
 import { runMigrations } from './migrations.js'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 
-dotenv.config()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// Load .env from backend root
+dotenv.config({ path: join(__dirname, '..', '..', '.env') })
 
 const { Pool } = pg
+
+console.log('[DB] DATABASE_URL:', process.env.DATABASE_URL ? '***configured***' : '***NOT SET***')
+console.log('[DB] NODE_ENV:', process.env.NODE_ENV)
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

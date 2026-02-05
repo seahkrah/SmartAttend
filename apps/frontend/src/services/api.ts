@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { frontendConfig } from '../config/environment';
 import {
   AuthResponse,
   RegisterRequest,
@@ -6,7 +7,7 @@ import {
   AttendanceStats,
 } from '@smartattend/types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = frontendConfig.apiBaseUrl;
 
 class ApiClient {
   private client: AxiosInstance;

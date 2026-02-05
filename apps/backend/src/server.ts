@@ -11,6 +11,18 @@ import corporateRoutes from './routes/corporate.js'
 import attendanceRoutes from './routes/attendance.js'
 import userRoutes from './routes/users.js'
 import superadminRoutes from './routes/superadmin.js'
+import incidentsRoutes from './routes/incidents.js'
+import correctionsRoutes from './routes/corrections.js'
+import metricsRoutes from './routes/metrics.js'
+import simulationsRoutes from './routes/simulations.js'
+import {
+  apiLatencyTrackingMiddleware,
+  tenantIdExtractorMiddleware,
+} from './middleware/latencyTrackingMiddleware.js'
+import {
+  errorToIncidentHandler,
+  setupUncaughtHandlers,
+} from './middleware/errorToIncidentMiddleware.js'
 
 dotenv.config()
 
@@ -19,9 +31,18 @@ const app = express()
 
 console.log('[STARTUP] Initializing application...')
 
+// Setup uncaught exception handlers
+setupUncaughtHandlers()
+
 // Middleware
 app.use(cors())
 app.use(express.json())
+
+// Tenant ID extraction (before latency tracking)
+app.use(tenantIdExtractorMiddleware)
+
+// API latency tracking middleware
+app.use(apiLatencyTrackingMiddleware)
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -37,12 +58,13 @@ app.use('/api/attendance', attendanceRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/superadmin', superadminRoutes)
 app.use('/api/v1/superadmin', superadminRoutes)
+app.use('/api/incidents', incidentsRoutes)
+app.use('/api/corrections', correctionsRoutes)
+app.use('/api/metrics', metricsRoutes)
+app.use('/api/simulations', simulationsRoutes)
 
-// Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[ERROR]', err);
-  res.status(500).json({ error: err.message || 'Internal server error' });
-});
+// Error handling middleware (MUST be last)
+app.use(errorToIncidentHandler)
 
 // Health check
 app.get('/api/health', (req, res) => {

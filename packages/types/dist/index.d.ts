@@ -6,4 +6,5 @@ export * from './attendance';
 export * from './school';
 export * from './corporate';
 export * from './common';
+export * as Infrastructure from './infrastructure';
 //# sourceMappingURL=index.d.ts.map

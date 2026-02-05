@@ -45,17 +45,44 @@ export function extractAuditContext(req: Request, actionType: string, actionScop
 }
 
 /**
- * Log an audit entry (append-only)
- * Returns the audit ID for correlation
+ * IMMUTABILITY GUARD: Prevent any mutation attempts on audit logs
+ * 
+ * Phase 10.2: Enforce append-only at service layer
+ * No UPDATE or DELETE operations permitted
  */
-export async function logAuditEntry(context: AuditContext, overrides?: Partial<AuditContext>): Promise<string> {
+export function preventUpdateAttempt(operation: 'UPDATE' | 'DELETE'): never {
+  throw new Error(
+    `[AUDIT IMMUTABILITY] ${operation} operation attempted on audit logs. ` +
+    'This operation is prohibited by design. ' +
+    'Audit logs must be append-only and immutable. ' +
+    'If you need to correct an audit record, create a new explanatory log entry instead.'
+  );
+}
+
+/**
+ * Log an audit entry (append-only, no mutations)
+ * Returns the audit ID for correlation
+ * 
+ * Phase 10.2: Updated to capture before/after state at creation time
+ * All data must be provided upfront; no post-hoc updates allowed
+ */
+export async function logAuditEntry(
+  context: AuditContext,
+  overrides?: Partial<AuditContext>,
+  stateCapture?: {
+    beforeState?: any
+    afterState?: any
+  }
+): Promise<string> {
   const finalContext = { ...context, ...overrides }
 
   try {
     const result = await query(
       `INSERT INTO superadmin_audit_log 
-       (actor_id, actor_platform, action_type, action_scope, target_entity_type, target_entity_id, justification, confirmation_token, ip_address, user_agent, request_id, result)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       (actor_id, actor_platform, action_type, action_scope, target_entity_type, target_entity_id, 
+        justification, confirmation_token, ip_address, user_agent, request_id, result, 
+        before_state, after_state, actor_role, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
        RETURNING id`,
       [
         finalContext.actorId,
@@ -69,7 +96,10 @@ export async function logAuditEntry(context: AuditContext, overrides?: Partial<A
         finalContext.ipAddress || null,
         finalContext.userAgent || null,
         finalContext.requestId,
-        finalContext.dryRun ? 'DRY_RUN' : 'PENDING'
+        finalContext.dryRun ? 'DRY_RUN' : 'SUCCESS',
+        stateCapture?.beforeState ? JSON.stringify(stateCapture.beforeState) : null,
+        stateCapture?.afterState ? JSON.stringify(stateCapture.afterState) : null,
+        'superadmin'
       ]
     )
 
@@ -81,90 +111,65 @@ export async function logAuditEntry(context: AuditContext, overrides?: Partial<A
 }
 
 /**
- * Update an audit entry with before/after state and result
+ * DEPRECATED & REMOVED: updateAuditEntry()
+ * 
+ * Phase 10.2: This function has been removed to enforce immutability
+ * 
+ * Original purpose: Update audit log after execution
+ * Problem: Allowed rewriting history after the fact
+ * Solution: Capture all data (before/after state, result) at creation time
+ * 
+ * Migration path:
+ * - If you need to update audit logs, you have a design problem
+ * - Create a NEW audit entry explaining the correction instead
+ * - Immutable logging provides legal defensibility
+ * 
+ * @deprecated - Use logAuditEntry with stateCapture parameter instead
+ * @throws - Always throws error directing to immutable pattern
  */
-export async function updateAuditEntry(
-  auditId: string,
-  result: 'SUCCESS' | 'FAILURE' | 'PARTIAL',
-  beforeState?: any,
-  afterState?: any,
-  errorMessage?: string
-): Promise<void> {
-  try {
-    await query(
-      `UPDATE superadmin_audit_log 
-       SET before_state = $1, after_state = $2, result = $3, error_message = $4
-       WHERE id = $5`,
-      [
-        beforeState ? JSON.stringify(beforeState) : null,
-        afterState ? JSON.stringify(afterState) : null,
-        result,
-        errorMessage || null,
-        auditId
-      ]
-    )
-  } catch (error) {
-    console.error('[AUDIT] Failed to update audit entry:', error)
-    throw error
-  }
+export function updateAuditEntry(): never {
+  preventUpdateAttempt('UPDATE');
 }
 
 /**
- * Convenience wrapper: log an operation with automatic before/after state tracking
+ * DEPRECATED & REMOVED: auditOperation()
+ * 
+ * Phase 10.2: This function has been removed to enforce immutability
+ * 
+ * Original purpose: Log operation with automatic state tracking
+ * Problem: Updated logs after execution (violated immutability)
+ * Solution: Capture state before execution, log once with all data
+ * 
+ * Migration path:
+ * 1. Capture beforeState before operation
+ * 2. Execute operation
+ * 3. Capture afterState after operation
+ * 4. Call logAuditEntry with stateCapture once (immutable)
+ * 
+ * @deprecated - Use sequential: captureBeforeState -> execute -> logAuditEntry
+ * @throws - Always throws error directing to immutable pattern
  */
-export async function auditOperation(
-  context: AuditContext,
-  operation: () => Promise<any>,
-  options?: {
-    captureBeforeState?: () => Promise<any>
-    captureAfterState?: (result: any) => Promise<any>
-  }
-): Promise<any> {
-  let auditId: string = 'unknown'
-  let beforeState: any
-  let operationResult: any
-
-  try {
-    // Capture before state if requested
-    if (options?.captureBeforeState) {
-      beforeState = await options.captureBeforeState()
-    }
-
-    // Log audit entry with PENDING result
-    auditId = await logAuditEntry(context)
-
-    // Execute the operation
-    operationResult = await operation()
-
-    // Capture after state if requested
-    let afterState: any
-    if (options?.captureAfterState) {
-      afterState = await options.captureAfterState(operationResult)
-    }
-
-    // Update audit entry with success result
-    await updateAuditEntry(auditId, 'SUCCESS', beforeState, afterState)
-
-    return operationResult
-  } catch (error: any) {
-    // Update audit entry with failure result
-    if (auditId !== 'unknown') {
-      await updateAuditEntry(auditId, 'FAILURE', beforeState, undefined, error.message)
-    }
-    throw error
-  }
+export function auditOperation(): never {
+  preventUpdateAttempt('UPDATE');
 }
 
 /**
- * Log a dry-run operation
+ * DEPRECATED & REMOVED: auditDryRun()
+ * 
+ * Phase 10.2: This function has been removed to enforce immutability
+ * 
+ * Original purpose: Log a dry-run with simulated result
+ * Problem: Updated logs after execution (violated immutability)
+ * Solution: Log once with dryRun flag and result provided upfront
+ * 
+ * Migration path:
+ * Call logAuditEntry with context.dryRun = true and stateCapture.afterState set
+ * 
+ * @deprecated - Use logAuditEntry with dryRun flag instead
+ * @throws - Always throws error directing to immutable pattern
  */
-export async function auditDryRun(
-  context: AuditContext,
-  simulatedResult: any
-): Promise<void> {
-  const dryContext = { ...context, dryRun: true }
-  const auditId = await logAuditEntry(dryContext)
-  await updateAuditEntry(auditId, 'SUCCESS', undefined, simulatedResult)
+export function auditDryRun(): never {
+  preventUpdateAttempt('UPDATE');
 }
 
 /**

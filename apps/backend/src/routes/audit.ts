@@ -10,6 +10,12 @@ import {
   getAuditLogsForPeriod,
   testImmutabilityConstraint
 } from '../services/domainAuditService.js'
+import {
+  queryAuditLogsWithAccessControl,
+  enforceAuditAccess,
+  logAuditAccess,
+  AUDIT_ACCESS_RULES
+} from '../auth/auditAccessControl.js'
 
 const router = express.Router()
 
@@ -28,6 +34,11 @@ router.use(authenticateToken)
  * GET /api/audit/logs
  * Query audit logs with optional filters
  * 
+ * PHASE 10.2: Role-based access control enforced
+ * - Superadmin: Can read all logs (GLOBAL, TENANT, USER)
+ * - Tenant admin: Can read TENANT and USER scope logs
+ * - User: Can only read their own USER scope logs
+ * 
  * Query Parameters:
  * - actorId: Filter by actor ID
  * - actionType: Filter by action type (e.g., 'CREATE', 'UPDATE', 'DELETE')
@@ -40,24 +51,31 @@ router.use(authenticateToken)
  * - offset: Pagination offset (default 0)
  * 
  * Response:
- * - 200: Array of audit log entries
- * - 403: Insufficient permissions
+ * - 200: Array of audit log entries (filtered by role-based access control)
+ * - 403: Insufficient permissions to access requested scope
+ * - 400: Invalid parameters
  * - 500: Server error
  */
 router.get('/logs', async (req: Request, res: Response) => {
   try {
     const user = req.user as any
-    const isSuperadmin = user?.role === 'superadmin'
+    const requestedScope = req.query.actionScope ? String(req.query.actionScope) : undefined
 
-    // Non-superadmin users can only view their own audit logs
-    const actorIdFilter = isSuperadmin
-      ? req.query.actorId ? String(req.query.actorId) : undefined
-      : user?.userId
+    // Phase 10.2: Enforce access control
+    try {
+      await enforceAuditAccess(req, requestedScope as any)
+    } catch (accessError: any) {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions',
+        message: accessError.message
+      })
+    }
 
+    // Build filters
     const filters = {
-      actorId: actorIdFilter,
       actionType: req.query.actionType ? String(req.query.actionType) : undefined,
-      actionScope: req.query.actionScope as 'GLOBAL' | 'TENANT' | 'USER' | undefined,
+      actionScope: requestedScope,
       resourceType: req.query.resourceType ? String(req.query.resourceType) : undefined,
       resourceId: req.query.resourceId ? String(req.query.resourceId) : undefined,
       startTime: req.query.startTime ? new Date(String(req.query.startTime)) : undefined,
@@ -66,17 +84,28 @@ router.get('/logs', async (req: Request, res: Response) => {
       offset: req.query.offset ? parseInt(String(req.query.offset)) : 0
     }
 
-    const logs = await queryAuditLogs(filters, isSuperadmin)
+    // Query with access control enforcement
+    const logs = await queryAuditLogsWithAccessControl(req, filters)
 
     res.json({
       success: true,
       count: logs.length,
-      filters,
+      userRole: user?.role,
+      filters: {
+        actionScope: requestedScope,
+        actionType: filters.actionType,
+        resourceType: filters.resourceType,
+        resourceId: filters.resourceId
+      },
       logs
     })
   } catch (error: any) {
     console.error('[AUDIT_API] Failed to query logs:', error)
-    res.status(500).json({ error: 'Failed to query audit logs', message: error.message })
+    res.status(500).json({
+      success: false,
+      error: 'Failed to query audit logs',
+      message: error.message
+    })
   }
 })
 
@@ -344,6 +373,142 @@ router.post('/test-immutability', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[AUDIT_API] Failed to test immutability:', error)
     res.status(500).json({ error: 'Failed to test immutability', message: error.message })
+  }
+})
+
+/**
+ * GET /api/audit/access-log
+ * Audit the auditors: View who accessed audit logs
+ * Superadmin only
+ * 
+ * Query Parameters:
+ * - actorRole: Filter by role (superadmin, tenant_admin, user)
+ * - accessType: Filter by access type
+ * - startTime: ISO 8601 start timestamp
+ * - endTime: ISO 8601 end timestamp
+ * - limit: Max results (default 100, max 10000)
+ * - offset: Pagination offset (default 0)
+ * 
+ * Response:
+ * - 200: Array of audit access log entries
+ * - 403: Insufficient permissions
+ * - 500: Server error
+ */
+router.get('/access-log', async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any
+
+    if (user?.role !== 'superadmin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Superadmin access required',
+        message: 'Only superadmin can view audit access logs'
+      })
+    }
+
+    // Build query filters
+    let sql = 'SELECT * FROM audit_access_log WHERE 1=1'
+    const params: any[] = []
+    let paramNum = 1
+
+    if (req.query.actorRole) {
+      sql += ` AND actor_role = $${paramNum}`
+      params.push(String(req.query.actorRole))
+      paramNum++
+    }
+
+    if (req.query.accessType) {
+      sql += ` AND access_type = $${paramNum}`
+      params.push(String(req.query.accessType))
+      paramNum++
+    }
+
+    if (req.query.startTime) {
+      const startTime = new Date(String(req.query.startTime))
+      if (!isNaN(startTime.getTime())) {
+        sql += ` AND access_timestamp >= $${paramNum}`
+        params.push(startTime)
+        paramNum++
+      }
+    }
+
+    if (req.query.endTime) {
+      const endTime = new Date(String(req.query.endTime))
+      if (!isNaN(endTime.getTime())) {
+        sql += ` AND access_timestamp <= $${paramNum}`
+        params.push(endTime)
+        paramNum++
+      }
+    }
+
+    // Pagination
+    const limit = Math.min(req.query.limit ? parseInt(String(req.query.limit)) : 100, 10000)
+    const offset = req.query.offset ? parseInt(String(req.query.offset)) : 0
+
+    sql += ` ORDER BY access_timestamp DESC LIMIT $${paramNum} OFFSET $${paramNum + 1}`
+    params.push(limit, offset)
+
+    // Execute query
+    const { query: dbQuery } = await import('../db/connection.js')
+    const result = await dbQuery(sql, params)
+
+    res.json({
+      success: true,
+      count: result.rows.length,
+      filters: {
+        actorRole: req.query.actorRole,
+        accessType: req.query.accessType,
+        startTime: req.query.startTime,
+        endTime: req.query.endTime
+      },
+      accessLogs: result.rows
+    })
+  } catch (error: any) {
+    console.error('[AUDIT_API] Failed to query access logs:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to query audit access logs',
+      message: error.message
+    })
+  }
+})
+
+/**
+ * GET /api/audit/access-patterns
+ * View access patterns: Who accessed what, when
+ * Superadmin only
+ * Useful for security monitoring and compliance
+ * 
+ * Response:
+ * - 200: Access pattern statistics
+ * - 403: Insufficient permissions
+ * - 500: Server error
+ */
+router.get('/access-patterns', async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any
+
+    if (user?.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' })
+    }
+
+    const { query: dbQuery } = await import('../db/connection.js')
+
+    // Get access patterns view
+    const result = await dbQuery('SELECT * FROM superadmin_access_patterns')
+
+    res.json({
+      success: true,
+      patternCount: result.rows.length,
+      patterns: result.rows
+    })
+  } catch (error: any) {
+    console.error('[AUDIT_API] Failed to get access patterns:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve access patterns',
+      message: error.message
+    })
   }
 })
 

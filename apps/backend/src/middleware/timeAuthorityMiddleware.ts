@@ -87,7 +87,8 @@ export async function timeAuthorityMiddleware(
     })
 
     // Attach to request for downstream handlers
-    (req as any).timeAuthority = timeAuthResult
+    const timeAuth = timeAuthResult;
+    (req as any).timeAuthority = timeAuth
 
     // If critical drift, log warning but allow to proceed (decision is per-endpoint)
     if (timeAuthResult.drift.category === 'CRITICAL') {
@@ -96,7 +97,7 @@ export async function timeAuthorityMiddleware(
       )
     }
 
-    next()
+    return next()
   } catch (error) {
     console.error('[TIME_AUTHORITY] Middleware error:', error)
     // Continue anyway - time authority shouldn't break requests

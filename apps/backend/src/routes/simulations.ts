@@ -27,7 +27,7 @@ const router = Router();
  */
 router.post('/time-drift', authenticateToken, async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId = req.tenantId;
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
@@ -62,7 +62,7 @@ router.post('/time-drift', authenticateToken, async (req: ExtendedRequest, res: 
  */
 router.post('/partial-outage', authenticateToken, async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId = req.tenantId;
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
@@ -99,7 +99,7 @@ router.post('/partial-outage', authenticateToken, async (req: ExtendedRequest, r
  */
 router.post('/duplicate-storm', authenticateToken, async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId = req.tenantId;
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
@@ -138,7 +138,7 @@ router.post('/duplicate-storm', authenticateToken, async (req: ExtendedRequest, 
  */
 router.post('/network-instability', authenticateToken, async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId = req.tenantId;
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
@@ -180,7 +180,7 @@ router.post('/network-instability', authenticateToken, async (req: ExtendedReque
  */
 router.post('/comprehensive', authenticateToken, async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId = req.tenantId;
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
@@ -210,7 +210,7 @@ router.post('/comprehensive', authenticateToken, async (req: ExtendedRequest, re
  */
 router.post('/stress-test', authenticateToken, async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId = req.tenantId;
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
@@ -273,7 +273,7 @@ router.post('/stress-test', authenticateToken, async (req: ExtendedRequest, res:
  */
 router.get('/status', authenticateToken, async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId = req.tenantId;
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }

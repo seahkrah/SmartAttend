@@ -340,12 +340,8 @@ CREATE INDEX IF NOT EXISTS idx_faculty_department_id ON faculty(department_id);
 CREATE INDEX IF NOT EXISTS idx_school_face_embeddings_user_id ON school_face_embeddings(user_id);
 CREATE INDEX IF NOT EXISTS idx_school_profile_picture_user_id ON school_profile_picture_embeddings(user_id);
 
-CREATE INDEX IF NOT EXISTS idx_school_attendance_course_id ON school_attendance(course_id);
-CREATE INDEX IF NOT EXISTS idx_school_attendance_student_id ON school_attendance(student_id);
-CREATE INDEX IF NOT EXISTS idx_school_attendance_date ON school_attendance(attendance_date);
-
-CREATE INDEX IF NOT EXISTS idx_enrollments_course_id ON enrollments(course_id);
-CREATE INDEX IF NOT EXISTS idx_enrollments_student_id ON enrollments(student_id);
+-- Indexes removed: school_attendance and enrollments are dropped in migration 002
+-- These tables get recreated with different schemas, so indexes moved to migration 002
 
 -- Corporate Indexes
 CREATE INDEX IF NOT EXISTS idx_employees_user_id ON employees(user_id);

@@ -123,6 +123,14 @@ export interface PlatformHealthStatus {
   last_updated: Date;
 }
 
+export interface EarlyWarningSignals {
+  open_critical_incidents: number;
+  overdue_incidents_1h: number;
+  incident_escalations_24h: number;
+  privilege_escalations_open: number;
+  role_violations_24h: number;
+}
+
 // Core metric collection functions
 export async function recordAPILatency(metric: APILatencyMetric): Promise<MetricRecord> {
   const hourBucket = new Date(Math.floor(Date.now() / (60 * 60 * 1000)) * (60 * 60 * 1000));
@@ -437,6 +445,67 @@ export async function getPlatformHealthStatus(tenantId: string): Promise<Platfor
 
   const result: QueryResult<PlatformHealthStatus> = await pool.query(query, [tenantId]);
   return result.rows[0] || null;
+}
+
+/**
+ * High-signal, tenant-aware early warning indicators.
+ *
+ * These derive from existing incident / escalation / role security tables rather than raw logs,
+ * so operators can use them as direct inputs into runbooks.
+ */
+export async function getEarlyWarningSignals(
+  tenantId: string
+): Promise<EarlyWarningSignals> {
+  const query = `
+    SELECT
+      -- Open critical incidents for this tenant
+      COALESCE((
+        SELECT COUNT(*)::INTEGER
+        FROM open_incidents oi
+        JOIN incidents i ON oi.id = i.id
+        WHERE i.created_from_tenant_id = $1
+          AND oi.severity = 'CRITICAL'
+      ), 0)                                                       AS open_critical_incidents,
+
+      -- Overdue incidents (> 1 hour without ACK) for this tenant
+      COALESCE((
+        SELECT COUNT(*)::INTEGER
+        FROM overdue_incidents oi
+        JOIN incidents i ON oi.id = i.id
+        WHERE i.created_from_tenant_id = $1
+          AND oi.hours_since_creation >= 1
+      ), 0)                                                       AS overdue_incidents_1h,
+
+      -- Incident escalations in the last 24 hours for this tenant
+      COALESCE((
+        SELECT COUNT(*)::INTEGER
+        FROM incident_escalations ie
+        JOIN incidents i ON ie.incident_id = i.id
+        WHERE i.created_from_tenant_id = $1
+          AND ie.escalated_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+      ), 0)                                                       AS incident_escalations_24h,
+
+      -- Open privilege escalation events whose affected users belong to this tenant
+      COALESCE((
+        SELECT COUNT(*)::INTEGER
+        FROM privilege_escalation_events pee
+        JOIN users u ON pee.affected_user_id = u.id
+        WHERE u.platform_id = $1
+          AND pee.status = 'OPEN'
+      ), 0)                                                       AS privilege_escalations_open,
+
+      -- Role boundary violations in the last 24 hours for this tenant
+      COALESCE((
+        SELECT COUNT(*)::INTEGER
+        FROM role_boundary_violations rbv
+        JOIN users u ON rbv.user_id = u.id
+        WHERE u.platform_id = $1
+          AND rbv.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+      ), 0)                                                       AS role_violations_24h
+  `;
+
+  const result: QueryResult<EarlyWarningSignals> = await pool.query(query, [tenantId]);
+  return result.rows[0];
 }
 
 export async function getMetricsSummaryByCategory(

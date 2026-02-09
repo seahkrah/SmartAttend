@@ -27,8 +27,10 @@ const MIGRATIONS: string[] = [
   // Phase 6: Attendance State Machine
   '010_attendance_state_machine_6_1.sql',
   '011_immutable_correction_history_6_2.sql',
-  // Phase 7.1: Platform Metrics (disabled - reference table pending)
-  // '012_platform_metrics_7_1.sql',
+  // Phase 7.1: Platform Metrics
+  '012_platform_metrics_7_1.sql',
+  // Phase 8: Face Recognition & Sessions (Attendance-First) - TEMPORARILY DISABLED
+  // '017_face_recognition_and_sessions.sql',
 ]
 
 // Parse SQL statements properly, handling dollar-quoted strings

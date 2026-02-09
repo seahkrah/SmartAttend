@@ -70,12 +70,14 @@ CREATE TABLE IF NOT EXISTS attendance_corrections (
 );
 
 -- IMMUTABILITY: Prevent deletion of corrections
+DROP TRIGGER IF EXISTS prevent_correction_deletion ON attendance_corrections;
 CREATE TRIGGER prevent_correction_deletion
 BEFORE DELETE ON attendance_corrections
 FOR EACH ROW
 EXECUTE FUNCTION prevent_table_deletion();
 
 -- IMMUTABILITY: Allow only specific fields to be updated (revert_only)
+DROP TRIGGER IF EXISTS allow_only_revert_updates ON attendance_corrections;
 CREATE TRIGGER allow_only_revert_updates
 BEFORE UPDATE ON attendance_corrections
 FOR EACH ROW

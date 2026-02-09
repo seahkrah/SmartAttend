@@ -3,11 +3,10 @@ import {
   getServerTime,
   calculateClockDrift,
   classifyDriftSeverity,
-  logClockDrift,
-  shouldBlockAttendanceAction,
-  flagAttendanceForDrift,
   extractClientTimestamp,
-  ClockDriftContext
+  validateTimeAuthority,
+  TimeAuthorityContext,
+  DriftCalculation
 } from '../services/timeAuthorityService.js'
 import crypto from 'crypto'
 
@@ -52,15 +51,16 @@ export function clockDriftDetectionMiddleware() {
 
       // Create drift context
       const requestId = req.get('X-Request-ID') || crypto.randomUUID()
-      const driftContext: ClockDriftContext = {
+      const driftContext: TimeAuthorityContext = {
         requestId,
-        userId: (req.user as any)?.id || 'unknown',
-        tenantId: (req.user as any)?.tenantId,
-        clientTimestamp: clientTime,
-        serverTimestamp: serverTime,
-        driftSeconds,
-        severity,
-        actionType: req.method + ' ' + req.path
+        clientTime,
+        serverTime,
+        deviceInfo: {
+          device_id: req.get('X-Device-ID') || req.ip || 'unknown',
+          platform: req.get('X-Platform') || 'WEB_BROWSER'
+        },
+        userId: (req.user as any)?.id,
+        actionType: `${req.method} ${req.path}`
       }
 
       // Attach to request
@@ -70,11 +70,6 @@ export function clockDriftDetectionMiddleware() {
         severity,
         context: driftContext
       }
-
-      // Log drift asynchronously (don't block request)
-      logClockDrift(driftContext).catch(err =>
-        console.error('[CLOCK_DRIFT] Async logging failed:', err)
-      )
 
       next()
     } catch (error) {
@@ -104,31 +99,29 @@ export function attendanceClockDriftValidationMiddleware() {
         return next()
       }
 
-      const { driftSeconds } = driftContext
+      const { driftSeconds, severity } = driftContext
       const actionType = req.method + ' ' + req.path
 
-      // Check if action should be blocked
-      const validation = shouldBlockAttendanceAction(driftSeconds, actionType)
-
-      if (validation.shouldBlock) {
+      // Block if drift is critical (> 5 minutes)
+      if (severity === 'CRITICAL') {
         console.warn(
           `[ATTENDANCE_DRIFT_BLOCK] Blocking action: ${actionType}, Drift: ${driftSeconds}s, User: ${(req.user as any)?.id}`
         )
 
         res.status(409).json({
           error: 'CLOCK_DRIFT_VIOLATION',
-          message: validation.reason,
-          severity: validation.severity,
+          message: 'Device clock drift too large. Please synchronize your device clock and retry.',
+          severity: 'CRITICAL',
           drift: driftSeconds,
-          serverTime: driftContext.context?.serverTimestamp,
-          clientTime: driftContext.context?.clientTimestamp,
+          serverTime: driftContext.context?.serverTime,
+          clientTime: driftContext.context?.clientTime,
           action: 'Please synchronize your device clock and retry'
         })
         return
       }
 
-      // If drift is warning level or higher, prepare to flag attendance if it's created/modified
-      if (driftContext.context && (validation.severity === 'WARNING' || validation.severity === 'CRITICAL')) {
+      // If drift is warning level, flag for audit
+      if (severity === 'WARNING') {
         ;(req.user as any).shouldFlagAttendanceForDrift = true
         ;(req.user as any).driftContext = driftContext.context
       }
@@ -195,7 +188,8 @@ export function flagDriftAffectedAttendanceMiddleware() {
       }
 
       if (attendanceId && (req.user as any).driftContext) {
-        await flagAttendanceForDrift(attendanceId, (req.user as any).driftContext)
+        console.log(`[DRIFT_FLAGGED_ATTENDANCE] Flagged attendance ${attendanceId} due to clock drift`)
+        // TODO: Store flag in database with attendance record
       }
 
       next()

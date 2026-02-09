@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, XCircle, Clock, User, Building2 } from 'lucide-react';
 import axios from 'axios';
+import { HIERARCHY } from '../utils/visualHierarchy';
 
 interface PendingApproval {
   id: string;

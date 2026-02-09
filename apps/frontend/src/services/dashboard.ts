@@ -25,6 +25,34 @@ class DashboardService {
     }
   }
 
+  /**
+   * Tenant-level early warning signals (for admin/HR views).
+   * Thin wrapper over /metrics/early-signals.
+   */
+  async getEarlyWarningSignals() {
+    try {
+      const response = await apiClient.getEarlyWarningSignals();
+      return response;
+    } catch (error) {
+      console.error('Failed to fetch early warning signals:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Tenant-level metrics dashboard (failure rates, drift, latency, etc.).
+   * Thin wrapper over /metrics/dashboard.
+   */
+  async getTenantMetricsDashboard() {
+    try {
+      const response = await apiClient.getMetricsDashboard();
+      return response;
+    } catch (error) {
+      console.error('Failed to fetch tenant metrics dashboard:', error);
+      return null;
+    }
+  }
+
   async getAttendanceHistory(userId: string, limit = 10) {
     try {
       const history = await apiClient.getAttendanceHistory(userId, undefined, undefined, limit);

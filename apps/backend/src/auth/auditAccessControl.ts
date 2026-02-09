@@ -112,10 +112,13 @@ export function buildAccessControlWhere(
     // Superadmin can see all actors
     // No additional filtering unless specifically requested
   } else if (userRole === 'tenant_admin') {
-    // Tenant admin can only see logs from their tenant
-    // This would need tenant mapping logic in practice
-    whereConditions.push(`actor_id = $${paramNum} OR tenant_id = $${paramNum}`);
-    params.push(tenantId || userId);
+    // Tenant admin can only see logs from their tenant.
+    // Enforce strict tenant-based filtering using tenant_id.
+    if (!tenantId) {
+      throw new Error('Tenant ID required for tenant_admin audit access');
+    }
+    whereConditions.push(`tenant_id = $${paramNum}`);
+    params.push(tenantId);
     paramNum++;
   } else {
     // Regular user can only see their own logs

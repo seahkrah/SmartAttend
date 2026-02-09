@@ -1,13 +1,22 @@
 import React from 'react';
-import { BarChart3, Users, Clock, TrendingUp, AlertCircle } from 'lucide-react';
+import { BarChart3, Users, Clock, TrendingUp, AlertCircle, Activity, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Sidebar, Topbar } from '../components/Navigation';
 import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { dashboardService, DashboardStats } from '../services/dashboard';
 
+interface EarlySignals {
+  open_critical_incidents: number;
+  overdue_incidents_1h: number;
+  incident_escalations_24h: number;
+  privilege_escalations_open: number;
+  role_violations_24h: number;
+}
+
 export const DashboardPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
+  const [earlySignals, setEarlySignals] = React.useState<EarlySignals | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const { user, logout } = useAuthStore();
@@ -19,8 +28,20 @@ export const DashboardPage: React.FC = () => {
       
       try {
         setLoading(true);
-        const data = await dashboardService.getDashboardStats(user.id);
-        setStats(data);
+        const [attendanceStats, signals] = await Promise.all([
+          dashboardService.getDashboardStats(user.id),
+          // Only fetch early signals for operator-like roles
+          ['admin', 'hr'].includes(user.role?.toLowerCase())
+            ? dashboardService.getEarlyWarningSignals()
+            : Promise.resolve(null),
+        ]);
+
+        setStats(attendanceStats);
+        if (signals?.signals) {
+          setEarlySignals(signals.signals as EarlySignals);
+        } else {
+          setEarlySignals(null);
+        }
         setError(null);
       } catch (err: any) {
         setError(err.message || 'Failed to load dashboard data');
@@ -73,6 +94,8 @@ export const DashboardPage: React.FC = () => {
       color: 'from-emerald-500 to-emerald-600',
     },
   ];
+
+  const isTenantOperator = ['admin', 'hr'].includes(user.role?.toLowerCase());
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
@@ -131,6 +154,91 @@ export const DashboardPage: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Tenant operator early warning signals */}
+            {!loading && isTenantOperator && earlySignals && (
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Open critical incidents */}
+                <div className="card border border-red-500/40 bg-red-950/40">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="w-5 h-5 text-red-400" />
+                      <h2 className="text-sm font-semibold text-red-100">
+                        Open Critical Incidents
+                      </h2>
+                    </div>
+                    <span className="text-xs uppercase tracking-wide text-red-300">
+                      Tenant-wide
+                    </span>
+                  </div>
+                  <p className="text-3xl font-extrabold text-red-200">
+                    {earlySignals.open_critical_incidents}
+                  </p>
+                  <p className="mt-2 text-xs text-red-100/80">
+                    If this is above 0, follow the Incident Management Runbook.
+                  </p>
+                </div>
+
+                {/* Overdue incidents */}
+                <div className="card border border-amber-500/40 bg-amber-950/40">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-amber-300" />
+                      <h2 className="text-sm font-semibold text-amber-100">
+                        Incidents Overdue &gt; 1h
+                      </h2>
+                    </div>
+                    <span className="text-xs uppercase tracking-wide text-amber-200">
+                      ACK required
+                    </span>
+                  </div>
+                  <p className="text-3xl font-extrabold text-amber-100">
+                    {earlySignals.overdue_incidents_1h}
+                  </p>
+                  <p className="mt-2 text-xs text-amber-100/80">
+                    Overdue incidents must be acknowledged and investigated using the incident runbook.
+                  </p>
+                </div>
+
+                {/* Privilege & role safety */}
+                <div className="card border border-cyan-500/40 bg-cyan-950/40">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-cyan-300" />
+                      <h2 className="text-sm font-semibold text-cyan-100">
+                        Access Safety Signals
+                      </h2>
+                    </div>
+                    <span className="text-xs uppercase tracking-wide text-cyan-200">
+                      Last 24h
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-sm text-cyan-50/90">
+                    <div className="flex justify-between">
+                      <span>Open privilege escalations</span>
+                      <span className="font-semibold">
+                        {earlySignals.privilege_escalations_open}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Role boundary violations</span>
+                      <span className="font-semibold">
+                        {earlySignals.role_violations_24h}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Incident escalations</span>
+                      <span className="font-semibold">
+                        {earlySignals.incident_escalations_24h}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-cyan-100/80">
+                    Use the Role & Privilege and Incident runbooks to investigate spikes here.
+                  </p>
+                </div>
               </div>
             )}
 

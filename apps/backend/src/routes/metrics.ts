@@ -17,6 +17,7 @@ import {
   getTopFailureReasons,
   getAPILatencyByEndpoint,
   getMostProblematicAttendanceRecords,
+  getEarlyWarningSignals,
 } from '../services/metricsService.js';
 
 const router = Router();
@@ -339,6 +340,37 @@ router.get('/dashboard', authenticateToken, async (req: ExtendedRequest, res: Re
   } catch (error) {
     console.error('Error fetching metrics dashboard:', error);
     return res.status(500).json({ error: 'Failed to fetch dashboard data' });
+  }
+});
+
+/**
+ * GET /api/metrics/early-signals
+ * High-signal, tenant-aware early warning indicators.
+ *
+ * Designed to power alerts and runbooks:
+ * - open_critical_incidents: current critical incidents for this tenant
+ * - overdue_incidents_1h: incidents older than 1h without ACK
+ * - incident_escalations_24h: escalations in last 24h
+ * - privilege_escalations_open: open privilege escalation events
+ * - role_violations_24h: role boundary violations in last 24h
+ */
+router.get('/early-signals', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+  try {
+    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    const signals = await getEarlyWarningSignals(tenantId);
+
+    return res.status(200).json({
+      tenant_id: tenantId,
+      signals,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching early warning signals:', error);
+    return res.status(500).json({ error: 'Failed to fetch early warning signals' });
   }
 });
 

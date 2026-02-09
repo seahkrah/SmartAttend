@@ -684,10 +684,14 @@ router.post('/refresh', async (req: RefreshRequest, res: Response) => {
 router.get('/me', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
+      console.log('[/auth/me] No user in request');
       return res.status(401).json({ error: 'User not authenticated' })
     }
 
+    console.log('[/auth/me] Request from user:', req.user.userId);
+
     const user = await getUserWithRole(req.user.userId)
+    console.log('[/auth/me] User data retrieved:', { id: user.id, email: user.email, role_name: user.role_name });
 
     // Get platform name
     const platformResult = await query(
@@ -695,9 +699,15 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
       [user.platform_id]
     )
 
-    const platformName = platformResult.rows[0].name
+    if (platformResult.rows.length === 0) {
+      console.log('[/auth/me] Platform not found for ID:', user.platform_id);
+      return res.status(500).json({ error: 'Platform not found' });
+    }
 
-    return res.json({
+    const platformName = platformResult.rows[0].name
+    console.log('[/auth/me] Platform name:', platformName);
+
+    const responseData = {
       user: {
         id: user.id,
         email: user.email,
@@ -710,9 +720,12 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
         isActive: user.is_active,
         lastLogin: user.last_login
       }
-    })
+    };
+    
+    console.log('[/auth/me] Returning user response:', responseData.user);
+    return res.json(responseData);
   } catch (error: any) {
-    console.error('Get user error:', error)
+    console.error('[/auth/me] Get user error:', error)
     return res.status(500).json({ error: error.message || 'Failed to get user' })
   }
 })

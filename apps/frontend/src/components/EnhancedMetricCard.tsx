@@ -40,6 +40,9 @@ const EnhancedMetricCard: React.FC<MetricCardProps> = ({
 }) => {
   const trendIcon = trend === 'up' ? '📈' : trend === 'down' ? '📉' : '→'
   const changeColor = change?.isPositive ? 'text-green-400' : 'text-red-400'
+  
+  // Safe value rendering - handle NaN and undefined
+  const displayValue = typeof value === 'number' && !isNaN(value) ? value : (value || '—')
 
   return (
     <motion.div
@@ -52,7 +55,7 @@ const EnhancedMetricCard: React.FC<MetricCardProps> = ({
           <p className="text-slate-400 text-sm font-medium mb-2">{label}</p>
           <p className="text-3xl font-bold text-white group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text transition-all"
              style={{backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))`}}>
-            {value}
+            {displayValue}
           </p>
         </div>
         {icon && <div className="text-3xl opacity-20 group-hover:opacity-30 transition-opacity">{icon}</div>}

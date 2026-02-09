@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ShieldAlert, Activity, ShieldCheck, Users, AlertTriangle, TrendingUp } from 'lucide-react'
 import TenantActionsModal from './TenantActionsModal'
 import IncidentCreationModal from './IncidentCreationModal'
 import EnhancedMetricCard from './EnhancedMetricCard'
@@ -10,6 +11,8 @@ import AlertPanel, { Alert } from './AlertPanel'
 import DataTable from './DataTable'
 import PerformanceMetrics from './PerformanceMetrics'
 import IncidentsList from './IncidentsList'
+import { apiClient } from '../services/api'
+import { HIERARCHY } from '../utils/visualHierarchy'
 
 interface DashboardStats {
   total_schools: number
@@ -63,19 +66,59 @@ interface ActionLog {
   created_at: string
 }
 
+interface AdminMapping {
+  admin_id: string
+  admin_email: string
+  admin_name: string
+  platforms: Array<{
+    platform_name: string
+    platform_id: string
+    tenant_id: string | null
+    tenant_name: string | null
+    tenant_type: 'school' | 'corporate' | null
+  }>
+  is_cross_platform: boolean
+}
+
+interface TenantEarlySignals {
+  tenant_id: string
+  tenant_name: string
+  platform_type: string
+  open_critical_incidents: number
+  overdue_incidents_1h: number
+  privilege_escalations_open: number
+  role_violations_24h: number
+}
+
+interface AggregatedSignals {
+  total_tenants: number
+  tenants_with_critical_incidents: number
+  tenants_with_overdue_incidents: number
+  tenants_with_privilege_escalations: number
+  tenants_with_role_violations: number
+  total_critical_incidents: number
+  total_overdue_incidents: number
+  total_privilege_escalations: number
+  total_role_violations: number
+  tenant_details: TenantEarlySignals[]
+}
+
 const SuperadminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [entities, setEntities] = useState<{ schools: Entity[]; corporates: Entity[] }>({ schools: [], corporates: [] })
   const [pendingApprovals, setPendingApprovals] = useState<Approval[]>([])
   const [userStats, setUserStats] = useState<UserStats[]>([])
   const [actionLogs, setActionLogs] = useState<ActionLog[]>([])
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'entities' | 'approvals' | 'incidents' | 'users' | 'logs'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'entities' | 'approvals' | 'incidents' | 'users' | 'logs' | 'admins'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tenantActionsModal, setTenantActionsModal] = useState<{ isOpen: boolean; tenant: Entity | null; type: 'school' | 'corporate' }>({ isOpen: false, tenant: null, type: 'school' })
   const [showIncidentModal, setShowIncidentModal] = useState(false)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+  const [adminMapping, setAdminMapping] = useState<{ admins: AdminMapping[], total_admins: number, cross_platform_count: number, single_platform_count: number } | null>(null)
+  const [aggregatedSignals, setAggregatedSignals] = useState<AggregatedSignals | null>(null)
+  const [incidentStats, setIncidentStats] = useState<any>(null)
 
   useEffect(() => {
     fetchDashboardData()
@@ -86,6 +129,7 @@ const SuperadminDashboard: React.FC = () => {
       setLoading(true)
       const token = localStorage.getItem('accessToken')
       
+      // Fetch main dashboard data
       const response = await axios.get('/api/auth/superadmin/dashboard', { 
         headers: { Authorization: `Bearer ${token}` } 
       })
@@ -96,6 +140,30 @@ const SuperadminDashboard: React.FC = () => {
       setPendingApprovals(dashboardData.pendingApprovals.list || [])
       setUserStats(dashboardData.userStatistics || [])
       setActionLogs(dashboardData.recentActions || [])
+
+      // Fetch admin mapping
+      try {
+        const adminMappingResponse = await apiClient.getAdminMapping()
+        setAdminMapping(adminMappingResponse.data)
+      } catch (err) {
+        console.warn('Failed to fetch admin mapping:', err)
+      }
+
+      // Fetch aggregated early signals
+      try {
+        const signalsResponse = await apiClient.getTenantsEarlySignals()
+        setAggregatedSignals(signalsResponse.data)
+      } catch (err) {
+        console.warn('Failed to fetch aggregated signals:', err)
+      }
+
+      // Fetch incident stats
+      try {
+        const incidentStatsResponse = await apiClient.getAdminIncidentStats()
+        setIncidentStats(incidentStatsResponse.data)
+      } catch (err) {
+        console.warn('Failed to fetch incident stats:', err)
+      }
 
       // Generate alerts based on data
       const newAlerts: Alert[] = []
@@ -169,15 +237,15 @@ const SuperadminDashboard: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+          <h1 className={`${HIERARCHY.PRIMARY.className} bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-2`}>
             Superadmin Dashboard
           </h1>
-          <p className="text-slate-400">Platform-wide system overview and management</p>
+          <p className={HIERARCHY.SECONDARY.className}>Platform-wide system overview and management</p>
         </motion.div>
 
         {/* Tab Navigation */}
         <div className="flex flex-wrap gap-2 mb-8 border-b border-slate-700 pb-4 overflow-x-auto">
-          {(['overview', 'analytics', 'entities', 'approvals', 'incidents', 'users', 'logs'] as const).map(tab => (
+          {(['overview', 'analytics', 'entities', 'approvals', 'incidents', 'users', 'admins', 'logs'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -193,6 +261,7 @@ const SuperadminDashboard: React.FC = () => {
               {tab === 'approvals' && '✓'}
               {tab === 'incidents' && '🚨'}
               {tab === 'users' && '👥'}
+              {tab === 'admins' && '👤'}
               {tab === 'logs' && '📝'}
               {' ' + tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -344,6 +413,134 @@ const SuperadminDashboard: React.FC = () => {
                   </ResponsiveContainer>
                 </motion.div>
               </div>
+
+              {/* Aggregated Early Signals Across All Tenants */}
+              {aggregatedSignals && (
+                <div className="mt-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                      <ShieldAlert className="w-6 h-6 text-red-400" />
+                      System-Wide Early Warning Signals
+                    </h2>
+                    <a
+                      href="/PHASE_8_OPERATOR_RUNBOOK_INCIDENT_MANAGEMENT.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 underline"
+                    >
+                      View Incident Runbook →
+                    </a>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="card border border-red-500/40 bg-red-950/40">
+                      <div className="flex items-center justify-between mb-2">
+                        <ShieldAlert className="w-5 h-5 text-red-400" />
+                        <span className="text-xs uppercase tracking-wide text-red-300">Critical</span>
+                      </div>
+                      <p className="text-3xl font-extrabold text-red-200">
+                        {aggregatedSignals.total_critical_incidents}
+                      </p>
+                      <p className="mt-1 text-xs text-red-100/80">
+                        {aggregatedSignals.tenants_with_critical_incidents} tenant{aggregatedSignals.tenants_with_critical_incidents !== 1 ? 's' : ''} affected
+                      </p>
+                    </div>
+                    <div className="card border border-amber-500/40 bg-amber-950/40">
+                      <div className="flex items-center justify-between mb-2">
+                        <Activity className="w-5 h-5 text-amber-300" />
+                        <span className="text-xs uppercase tracking-wide text-amber-200">Overdue</span>
+                      </div>
+                      <p className="text-3xl font-extrabold text-amber-100">
+                        {aggregatedSignals.total_overdue_incidents}
+                      </p>
+                      <p className="mt-1 text-xs text-amber-100/80">
+                        {aggregatedSignals.tenants_with_overdue_incidents} tenant{aggregatedSignals.tenants_with_overdue_incidents !== 1 ? 's' : ''} need attention
+                      </p>
+                    </div>
+                    <div className="card border border-cyan-500/40 bg-cyan-950/40">
+                      <div className="flex items-center justify-between mb-2">
+                        <ShieldCheck className="w-5 h-5 text-cyan-300" />
+                        <span className="text-xs uppercase tracking-wide text-cyan-200">Escalations</span>
+                      </div>
+                      <p className="text-3xl font-extrabold text-cyan-200">
+                        {aggregatedSignals.total_privilege_escalations}
+                      </p>
+                      <p className="mt-1 text-xs text-cyan-100/80">
+                        {aggregatedSignals.tenants_with_privilege_escalations} tenant{aggregatedSignals.tenants_with_privilege_escalations !== 1 ? 's' : ''} with open escalations
+                      </p>
+                    </div>
+                    <div className="card border border-purple-500/40 bg-purple-950/40">
+                      <div className="flex items-center justify-between mb-2">
+                        <AlertTriangle className="w-5 h-5 text-purple-300" />
+                        <span className="text-xs uppercase tracking-wide text-purple-200">Violations</span>
+                      </div>
+                      <p className="text-3xl font-extrabold text-purple-200">
+                        {aggregatedSignals.total_role_violations}
+                      </p>
+                      <p className="mt-1 text-xs text-purple-100/80">
+                        {aggregatedSignals.tenants_with_role_violations} tenant{aggregatedSignals.tenants_with_role_violations !== 1 ? 's' : ''} with violations (24h)
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Top tenants with issues */}
+                  {aggregatedSignals.tenant_details.filter(t => 
+                    t.open_critical_incidents > 0 || 
+                    t.overdue_incidents_1h > 0 || 
+                    t.privilege_escalations_open > 0 || 
+                    t.role_violations_24h > 0
+                  ).length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-lg font-semibold mb-3 text-slate-300">Tenants Requiring Attention</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {aggregatedSignals.tenant_details
+                          .filter(t => 
+                            t.open_critical_incidents > 0 || 
+                            t.overdue_incidents_1h > 0 || 
+                            t.privilege_escalations_open > 0 || 
+                            t.role_violations_24h > 0
+                          )
+                          .slice(0, 6)
+                          .map((tenant) => (
+                            <div key={tenant.tenant_id} className="p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="font-semibold text-sm">{tenant.tenant_name}</h4>
+                                <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300">
+                                  {tenant.platform_type}
+                                </span>
+                              </div>
+                              <div className="space-y-1 text-xs">
+                                {tenant.open_critical_incidents > 0 && (
+                                  <div className="flex justify-between text-red-300">
+                                    <span>Critical incidents:</span>
+                                    <span className="font-bold">{tenant.open_critical_incidents}</span>
+                                  </div>
+                                )}
+                                {tenant.overdue_incidents_1h > 0 && (
+                                  <div className="flex justify-between text-amber-300">
+                                    <span>Overdue:</span>
+                                    <span className="font-bold">{tenant.overdue_incidents_1h}</span>
+                                  </div>
+                                )}
+                                {tenant.privilege_escalations_open > 0 && (
+                                  <div className="flex justify-between text-cyan-300">
+                                    <span>Escalations:</span>
+                                    <span className="font-bold">{tenant.privilege_escalations_open}</span>
+                                  </div>
+                                )}
+                                {tenant.role_violations_24h > 0 && (
+                                  <div className="flex justify-between text-purple-300">
+                                    <span>Violations:</span>
+                                    <span className="font-bold">{tenant.role_violations_24h}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -555,26 +752,215 @@ const SuperadminDashboard: React.FC = () => {
                   className="p-4 rounded-lg bg-red-900/20 border border-red-600"
                 >
                   <p className="text-sm text-slate-400">🔴 Critical</p>
-                  <p className="text-3xl font-bold text-red-300">—</p>
+                  <p className="text-3xl font-bold text-red-300">
+                    {incidentStats?.by_severity?.CRITICAL || aggregatedSignals?.total_critical_incidents || 0}
+                  </p>
+                  {aggregatedSignals && aggregatedSignals.total_critical_incidents > 0 && (
+                    <p className="text-xs text-red-300 mt-1">
+                      {aggregatedSignals.tenants_with_critical_incidents} tenant{aggregatedSignals.tenants_with_critical_incidents !== 1 ? 's' : ''} affected
+                    </p>
+                  )}
                 </motion.div>
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   className="p-4 rounded-lg bg-orange-900/20 border border-orange-600"
                 >
                   <p className="text-sm text-slate-400">🟠 High</p>
-                  <p className="text-3xl font-bold text-orange-300">—</p>
+                  <p className="text-3xl font-bold text-orange-300">
+                    {incidentStats?.by_severity?.HIGH || 0}
+                  </p>
                 </motion.div>
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   className="p-4 rounded-lg bg-amber-900/20 border border-amber-600"
                 >
                   <p className="text-sm text-slate-400">🟡 Open</p>
-                  <p className="text-3xl font-bold text-amber-300">—</p>
+                  <p className="text-3xl font-bold text-amber-300">
+                    {incidentStats?.open_count || 0}
+                  </p>
+                  {incidentStats?.overdue_count > 0 && (
+                    <p className="text-xs text-amber-300 mt-1">
+                      {incidentStats.overdue_count} overdue
+                    </p>
+                  )}
                 </motion.div>
               </div>
+              
+              {aggregatedSignals && (aggregatedSignals.total_privilege_escalations > 0 || aggregatedSignals.total_role_violations > 0) && (
+                <div className="mb-6 p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                      Access Safety Signals (24h)
+                    </h3>
+                    <a
+                      href="/PHASE_8_OPERATOR_RUNBOOK_INCIDENT_MANAGEMENT.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 underline"
+                    >
+                      View Runbooks →
+                    </a>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-3 rounded bg-cyan-950/40 border border-cyan-500/40">
+                      <div>
+                        <p className="text-sm text-cyan-200">Open Privilege Escalations</p>
+                        <p className="text-xs text-cyan-300/80 mt-1">
+                          {aggregatedSignals.tenants_with_privilege_escalations} tenant{aggregatedSignals.tenants_with_privilege_escalations !== 1 ? 's' : ''} affected
+                        </p>
+                      </div>
+                      <p className="text-2xl font-bold text-cyan-300">
+                        {aggregatedSignals.total_privilege_escalations}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded bg-purple-950/40 border border-purple-500/40">
+                      <div>
+                        <p className="text-sm text-purple-200">Role Boundary Violations</p>
+                        <p className="text-xs text-purple-300/80 mt-1">
+                          {aggregatedSignals.tenants_with_role_violations} tenant{aggregatedSignals.tenants_with_role_violations !== 1 ? 's' : ''} affected
+                        </p>
+                      </div>
+                      <p className="text-2xl font-bold text-purple-300">
+                        {aggregatedSignals.total_role_violations}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="p-6 rounded-xl bg-slate-800/50 border border-slate-700">
                 <IncidentsList compact={false} />
+              </div>
+            </motion.div>
+          )}
+
+          {/* Admins Tab */}
+          {activeTab === 'admins' && adminMapping && (
+            <motion.div
+              key="admins"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-8"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Users className="w-6 h-6" />
+                    Admin-to-Tenant Mapping
+                  </h2>
+                  <p className="text-slate-400 mt-1">
+                    View which admins operate on which platforms and tenants
+                  </p>
+                </div>
+                <a
+                  href="/PHASE_8_OPERATOR_RUNBOOK_TENANT_LIFECYCLE.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-400 hover:text-blue-300 underline"
+                >
+                  View Tenant Runbook →
+                </a>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="card border border-blue-500/40 bg-blue-950/40">
+                  <div className="flex items-center justify-between mb-2">
+                    <Users className="w-5 h-5 text-blue-400" />
+                    <span className="text-xs uppercase tracking-wide text-blue-300">Total Admins</span>
+                  </div>
+                  <p className="text-3xl font-extrabold text-blue-200">
+                    {adminMapping.total_admins}
+                  </p>
+                </div>
+                <div className="card border border-green-500/40 bg-green-950/40">
+                  <div className="flex items-center justify-between mb-2">
+                    <TrendingUp className="w-5 h-5 text-green-400" />
+                    <span className="text-xs uppercase tracking-wide text-green-300">Cross-Platform</span>
+                  </div>
+                  <p className="text-3xl font-extrabold text-green-200">
+                    {adminMapping.cross_platform_count}
+                  </p>
+                  <p className="mt-1 text-xs text-green-100/80">
+                    Operating on multiple platforms
+                  </p>
+                </div>
+                <div className="card border border-cyan-500/40 bg-cyan-950/40">
+                  <div className="flex items-center justify-between mb-2">
+                    <Users className="w-5 h-5 text-cyan-400" />
+                    <span className="text-xs uppercase tracking-wide text-cyan-300">Single-Platform</span>
+                  </div>
+                  <p className="text-3xl font-extrabold text-cyan-200">
+                    {adminMapping.single_platform_count}
+                  </p>
+                  <p className="mt-1 text-xs text-cyan-100/80">
+                    Operating on one platform
+                  </p>
+                </div>
+              </div>
+
+              {/* Admin List */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold">All Admins</h3>
+                <div className="space-y-3">
+                  {adminMapping.admins.map((admin) => (
+                    <motion.div
+                      key={admin.admin_id}
+                      whileHover={{ scale: 1.01 }}
+                      className={`p-4 rounded-lg border ${
+                        admin.is_cross_platform
+                          ? 'bg-green-950/30 border-green-600/50'
+                          : 'bg-slate-800/50 border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-lg font-semibold">{admin.admin_name || admin.admin_email}</h4>
+                            {admin.is_cross_platform && (
+                              <span className="px-2 py-1 text-xs rounded-full bg-green-600/30 text-green-300 font-semibold">
+                                Cross-Platform
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-400">{admin.admin_email}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <p className="text-sm font-semibold text-slate-300 mb-2">
+                          Platforms & Tenants:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {admin.platforms.map((platform, idx) => (
+                            <div
+                              key={idx}
+                              className="p-2 rounded bg-slate-900/50 border border-slate-700"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-blue-300 capitalize">
+                                  {platform.platform_name}
+                                </span>
+                                {platform.tenant_name && (
+                                  <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300">
+                                    {platform.tenant_name}
+                                  </span>
+                                )}
+                              </div>
+                              {platform.tenant_type && (
+                                <p className="text-xs text-slate-400 mt-1">
+                                  Type: {platform.tenant_type}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}

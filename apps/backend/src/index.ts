@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js'
 import schoolRoutes from './routes/school.js'
 import corporateRoutes from './routes/corporate.js'
 import attendanceRoutes from './routes/attendance.js'
+import faceVerificationRoutes from './routes/faceVerification.js'
 import userRoutes from './routes/users.js'
 import auditRoutes from './routes/audit.js'
 import timeRoutes from './routes/time.js'
@@ -80,6 +81,10 @@ console.log('[INIT] ✓ Time authority routes mounted')
 app.use('/api/attendance', attendanceClockDriftValidationMiddleware())
 app.use('/api/attendance', attendanceRoutes)
 console.log('[INIT] ✓ Attendance routes mounted with drift validation')
+
+// Face verification routes (no additional drift validation needed)
+app.use('/api/face', faceVerificationRoutes)
+console.log('[INIT] ✓ Face verification routes mounted')
 
 app.use('/api/users', userRoutes)
 app.use('/api/audit', auditRoutes)

@@ -4,6 +4,7 @@ import http from 'http'
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import { enforceTenantBoundaries } from './auth/tenantEnforcementMiddleware.js'
 import { initializeDatabase } from './db/connection.js'
 import authRoutes from './routes/auth.js'
 import schoolRoutes from './routes/school.js'
@@ -12,9 +13,11 @@ import attendanceRoutes from './routes/attendance.js'
 import userRoutes from './routes/users.js'
 import superadminRoutes from './routes/superadmin.js'
 import incidentsRoutes from './routes/incidents.js'
+import incidentAdminRoutes from './routes/incidentAdminRoutes.js'
 import correctionsRoutes from './routes/corrections.js'
 import metricsRoutes from './routes/metrics.js'
 import simulationsRoutes from './routes/simulations.js'
+import validationRoutes from './routes/validation.js'
 import {
   apiLatencyTrackingMiddleware,
   tenantIdExtractorMiddleware,
@@ -52,16 +55,23 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api/auth', authRoutes)
-app.use('/api/school', schoolRoutes)
-app.use('/api/corporate', corporateRoutes)
-app.use('/api/attendance', attendanceRoutes)
-app.use('/api/users', userRoutes)
+
+// Tenant-scoped routes: enforce tenant boundaries using authenticated context.
+// This ensures all tenant-facing data access is automatically filtered by platform/tenant.
+app.use('/api/school', enforceTenantBoundaries, schoolRoutes)
+app.use('/api/corporate', enforceTenantBoundaries, corporateRoutes)
+app.use('/api/attendance', enforceTenantBoundaries, attendanceRoutes)
+app.use('/api/users', enforceTenantBoundaries, userRoutes)
+app.use('/api/metrics', enforceTenantBoundaries, metricsRoutes)
+app.use('/api/simulations', enforceTenantBoundaries, simulationsRoutes)
+
+// Superadmin/control-plane routes remain system-scoped and already have their own guards.
 app.use('/api/superadmin', superadminRoutes)
 app.use('/api/v1/superadmin', superadminRoutes)
 app.use('/api/incidents', incidentsRoutes)
+app.use('/api/admin/incidents', incidentAdminRoutes)
 app.use('/api/corrections', correctionsRoutes)
-app.use('/api/metrics', metricsRoutes)
-app.use('/api/simulations', simulationsRoutes)
+app.use('/api/validation', validationRoutes)
 
 // Error handling middleware (MUST be last)
 app.use(errorToIncidentHandler)

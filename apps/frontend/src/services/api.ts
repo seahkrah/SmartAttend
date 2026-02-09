@@ -107,8 +107,20 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await this.client.get<{ user: User }>('/auth/me');
-    return response.data.user;
+    console.log('[API] Fetching /auth/me');
+    try {
+      const response = await this.client.get<{ user: User }>('/auth/me');
+      console.log('[API] /auth/me success:', {
+        id: response.data.user.id,
+        email: response.data.user.email,
+        role: response.data.user.role,
+        platform: response.data.user.platform,
+      });
+      return response.data.user;
+    } catch (error) {
+      console.error('[API] /auth/me failed:', error);
+      throw error;
+    }
   }
 
   async logout(): Promise<void> {
@@ -247,6 +259,18 @@ class ApiClient {
     return response.data;
   }
 
+  // ===== Metrics & Observability (tenant-aware) =====
+
+  async getEarlyWarningSignals() {
+    const response = await this.client.get('/metrics/early-signals');
+    return response.data;
+  }
+
+  async getMetricsDashboard() {
+    const response = await this.client.get('/metrics/dashboard');
+    return response.data;
+  }
+
   // ===== User Management Endpoints =====
 
   async getAllUsers(limit = 20, offset = 0, platform?: 'school' | 'corporate') {
@@ -275,6 +299,79 @@ class ApiClient {
       oldPassword,
       newPassword,
     });
+    return response.data;
+  }
+
+  // ===== Superadmin Endpoints =====
+
+  async getAdminMapping() {
+    const response = await this.client.get('/superadmin/admins/mapping');
+    return response.data;
+  }
+
+  async getTenantsEarlySignals() {
+    const response = await this.client.get('/superadmin/tenants/early-signals');
+    return response.data;
+  }
+
+  async getAdminIncidents(limit = 50, offset = 0, status?: string) {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    if (status) params.append('status', status);
+    
+    const response = await this.client.get(`/admin/incidents?${params}`);
+    return response.data;
+  }
+
+  async getAdminIncidentStats() {
+    const response = await this.client.get('/admin/incidents/stats');
+    return response.data;
+  }
+
+  async getEscalationEvents(limit = 50, offset = 0, severity?: string, status?: string) {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    if (severity) params.append('severity', severity);
+    if (status) params.append('status', status);
+    
+    const response = await this.client.get(`/admin/escalation-events?${params}`);
+    return response.data;
+  }
+
+  async getRoleViolations(limit = 50, offset = 0, severity?: string) {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    if (severity) params.append('severity', severity);
+    
+    const response = await this.client.get(`/admin/role-violations?${params}`);
+    return response.data;
+  }
+
+  // ===== Tenant Admin Management =====
+
+  async createTenantAdmin(data: {
+    email: string;
+    name: string;
+    tenantId: string;
+    password: string;
+  }) {
+    const response = await this.client.post('/superadmin/tenant-admins', data);
+    return response.data;
+  }
+
+  async getTenantAdmins(tenantId: string) {
+    const response = await this.client.get(`/superadmin/tenant-admins/${tenantId}`);
+    return response.data;
+  }
+
+  async removeTenantAdmin(adminId: string) {
+    const response = await this.client.delete(`/superadmin/tenant-admins/${adminId}`);
     return response.data;
   }
 }

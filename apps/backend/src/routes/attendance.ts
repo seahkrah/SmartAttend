@@ -1,474 +1,391 @@
 /**
- * PHASE 6, STEP 6.1: Attendance State Machine Routes
- * Manage attendance/checkin state transitions with full audit trail
+ * Attendance API Routes (Face Recognition Enabled)
+ * 
+ * Endpoints:
+ * - POST /sessions - Create a course session
+ * - PUT /sessions/:id - Update session
+ * - GET /sessions/:id - Get session details
+ * - GET /courses/:courseId/sessions - Get all sessions for course
+ * 
+ * - POST /face/enroll - Enroll student face (faculty-initiated)
+ * - POST /face/verify - Faculty verifies enrollment
+ * - GET /face/enrollment-status/:studentId - Check enrollment status
+ * 
+ * - POST /attendance/mark-with-face - Mark attendance with face verification
+ * - GET /sessions/:sessionId/attendance - Get attendance for session
+ * - GET /students/:studentId/courses/:courseId/attendance - Get student attendance for course
  */
 
-import { Router, Response } from 'express'
-import type { ExtendedRequest } from '../types/auth.js'
+import { Router, Request, Response } from 'express'
+import { authenticateToken, requireRole } from '../auth/middleware.js'
 import {
-  changeSchoolAttendanceState,
-  changeCorporateCheckinState,
-  getAttendanceStateHistory,
-  getFlaggedAttendanceByStudent,
-  getFlaggedAttendanceByEmployee,
-  getStateStatistics,
-  auditStateCompliance,
-  isValidTransition,
-  getValidTransitions,
-  AttendanceState,
-} from '../services/attendanceStateService.js'
-import { recordAttendanceFailure } from '../services/metricsService.js'
+  createSession,
+  updateSession,
+  getSession,
+  getCourseSessions,
+  markAttendanceWithFace,
+  getSessionAttendance,
+  getStudentCourseAttendance,
+} from '../services/attendanceService.js'
+import {
+  enrollStudentFace,
+  verifyEnrollment,
+  getEnrollmentStatus,
+} from '../services/faceRecognitionService.js'
+import { CreateSessionRequest, UpdateSessionRequest, MarkAttendanceWithFaceRequest } from '@smartattend/types'
 
 const router = Router()
 
-// Helper to get tenant ID from request
-function getTenantId(req: ExtendedRequest): string {
-  return req.tenantId || (req.headers['x-tenant-id'] as string) || 'system'
-}
+// ===========================
+// SESSION MANAGEMENT ENDPOINTS
+// ===========================
 
 /**
- * POST /api/attendance/:attendanceId/verify
- * Verify school attendance record
+ * POST /api/attendance/sessions
+ * Create a course session (Faculty only)
  */
-router.post(
-  '/:attendanceId/verify',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'faculty', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions to verify attendance',
-        })
-        return
-      }
+router.post('/sessions', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+  try {
+    const { courseId, ...sessionData } = req.body as CreateSessionRequest & { courseId: string }
 
-      await changeSchoolAttendanceState(req.params.attendanceId, {
-        newState: 'VERIFIED',
-        reason: req.body.reason || 'Manual verification',
-        changedByUserId: (req.user as any)?.id,
-        auditNotes: req.body.auditNotes,
-      })
-
-      res.json({
-        success: true,
-        message: 'Attendance verified',
-        recordId: req.params.attendanceId,
-      })
-    } catch (error: any) {
-      // Record failure metric
-      recordAttendanceFailure({
-        tenant_id: getTenantId(req),
-        platform_type: 'school',
-        attendance_record_id: req.params.attendanceId,
-        student_or_employee_id: req.query.student_id as string || 'unknown',
-        failure_reason: error.message || 'Verification failed',
-        created_by_user_id: (req.user as any)?.id,
-      }).catch((err) => console.error('Failed to record metric:', err));
-
+    if (!courseId || !sessionData.sessionNumber || !sessionData.sessionDate) {
       res.status(400).json({
-        success: false,
-        error: error.message || 'Failed to verify attendance',
+        error: 'Missing required fields: courseId, sessionNumber, sessionDate',
       })
+      return
     }
+
+    const session = await createSession(courseId, sessionData as CreateSessionRequest)
+
+    res.status(201).json({
+      success: true,
+      data: session,
+      message: 'Session created successfully',
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Create session error:', error)
+    res.status(500).json({
+      error: 'Failed to create session',
+      details: error.message,
+    })
   }
-)
+})
 
 /**
- * POST /api/attendance/:attendanceId/flag
- * Flag school attendance record as suspicious
+ * PUT /api/attendance/sessions/:sessionId
+ * Update session (Faculty only)
  */
-router.post(
-  '/:attendanceId/flag',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions to flag attendance',
-        })
-        return
-      }
+router.put('/sessions/:sessionId', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params
+    const updates = req.body as UpdateSessionRequest
 
-      if (!req.body.reason) {
-        res.status(400).json({
-          success: false,
-          error: 'Reason is required to flag attendance',
-        })
-        return
-      }
+    const session = await updateSession(sessionId, updates)
 
-      await changeSchoolAttendanceState(req.params.attendanceId, {
-        newState: 'FLAGGED',
-        reason: req.body.reason,
-        changedByUserId: (req.user as any)?.id,
-        auditNotes: req.body.auditNotes,
-      })
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
 
-      res.json({
-        success: true,
-        message: 'Attendance flagged for review',
-        recordId: req.params.attendanceId,
-      })
-    } catch (error: any) {
-      // Record failure metric
-      recordAttendanceFailure({
-        tenant_id: getTenantId(req),
-        platform_type: 'school',
-        attendance_record_id: req.params.attendanceId,
-        student_or_employee_id: req.query.student_id as string || 'unknown',
-        failure_reason: error.message || 'Flag attendance failed',
-        created_by_user_id: (req.user as any)?.id,
-      }).catch((err) => console.error('Failed to record metric:', err));
+    res.json({
+      success: true,
+      data: session,
+      message: 'Session updated successfully',
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Update session error:', error)
+    res.status(500).json({
+      error: 'Failed to update session',
+      details: error.message,
+    })
+  }
+})
 
+/**
+ * GET /api/attendance/sessions/:sessionId
+ * Get session details
+ */
+router.get('/sessions/:sessionId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params
+
+    const session = await getSession(sessionId)
+
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
+
+    res.json({
+      success: true,
+      data: session,
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Get session error:', error)
+    res.status(500).json({
+      error: 'Failed to get session',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * GET /api/attendance/courses/:courseId/sessions
+ * Get all sessions for a course
+ */
+router.get('/courses/:courseId/sessions', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.params
+    const { status } = req.query
+
+    const sessions = await getCourseSessions(courseId, status as string | undefined)
+
+    res.json({
+      success: true,
+      data: sessions,
+      total: sessions.length,
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Get course sessions error:', error)
+    res.status(500).json({
+      error: 'Failed to get sessions',
+      details: error.message,
+    })
+  }
+})
+
+// ===========================
+// FACE ENROLLMENT ENDPOINTS
+// ===========================
+
+/**
+ * POST /api/attendance/face/enroll
+ * Enroll a student's face (Faculty-initiated)
+ */
+router.post('/face/enroll', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+  try {
+    const { studentId, faceEncoding, encodingDimension, faceConfidence, enrollmentQualityScore } = req.body
+
+    if (!studentId || !faceEncoding || !encodingDimension || faceConfidence === undefined) {
       res.status(400).json({
-        success: false,
-        error: error.message || 'Failed to flag attendance',
+        error: 'Missing required fields: studentId, faceEncoding, encodingDimension, faceConfidence',
       })
+      return
     }
-  }
-)
 
-/**
- * POST /api/attendance/:attendanceId/revoke
- * Revoke school attendance record
- */
-router.post(
-  '/:attendanceId/revoke',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions to revoke attendance',
-        })
-        return
-      }
-
-      if (!req.body.reason) {
-        res.status(400).json({
-          success: false,
-          error: 'Reason is required to revoke attendance',
-        })
-        return
-      }
-
-      await changeSchoolAttendanceState(req.params.attendanceId, {
-        newState: 'REVOKED',
-        reason: req.body.reason,
-        changedByUserId: (req.user as any)?.id,
-        auditNotes: req.body.auditNotes,
-      })
-
-      res.json({
-        success: true,
-        message: 'Attendance revoked',
-        recordId: req.params.attendanceId,
-      })
-    } catch (error: any) {
-      // Record failure metric
-      recordAttendanceFailure({
-        tenant_id: getTenantId(req),
-        platform_type: 'school',
-        attendance_record_id: req.params.attendanceId,
-        student_or_employee_id: req.query.student_id as string || 'unknown',
-        failure_reason: error.message || 'Revoke attendance failed',
-        created_by_user_id: (req.user as any)?.id,
-      }).catch((err) => console.error('Failed to record metric:', err));
+    if (!Array.isArray(faceEncoding) || faceEncoding.length !== encodingDimension) {
       res.status(400).json({
-        success: false,
-        error: error.message || 'Failed to revoke attendance',
+        error: `Face encoding must be an array of length ${encodingDimension}`,
+      })
+      return
+    }
+
+    const user = (req as any).user
+    const platformId = user.platformId || user.platform_id
+
+    const enrollResult = await enrollStudentFace(
+      studentId,
+      platformId,
+      faceEncoding,
+      encodingDimension,
+      faceConfidence,
+      user.id,
+      enrollmentQualityScore
+    )
+
+    if (!enrollResult.success) {
+      res.status(400).json(enrollResult)
+      return
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        enrollmentId: enrollResult.enrollmentId,
+        requiresVerification: enrollResult.requiresVerification,
+      },
+      message: enrollResult.message,
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Enroll face error:', error)
+    res.status(500).json({
+      error: 'Failed to enroll face',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * POST /api/attendance/face/verify
+ * Verify an enrollment (Faculty-initiated)
+ */
+router.post('/face/verify', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+  try {
+    const { enrollmentId } = req.body
+
+    if (!enrollmentId) {
+      res.status(400).json({ error: 'Missing required field: enrollmentId' })
+      return
+    }
+
+    const user = (req as any).user
+
+    const verifyResult = await verifyEnrollment(enrollmentId, user.id)
+
+    if (!verifyResult.success) {
+      res.status(400).json(verifyResult)
+      return
+    }
+
+    res.json({
+      success: true,
+      message: verifyResult.message,
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Verify enrollment error:', error)
+    res.status(500).json({
+      error: 'Failed to verify enrollment',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * GET /api/attendance/face/enrollment-status/:studentId
+ * Get student face enrollment status
+ */
+router.get(
+  '/face/enrollment-status/:studentId',
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { studentId } = req.params
+      const user = (req as any).user
+      const platformId = user.platformId || user.platform_id
+
+      const status = await getEnrollmentStatus(studentId, platformId)
+
+      if (!status) {
+        res.status(404).json({ error: 'Student not found' })
+        return
+      }
+
+      res.json({
+        success: true,
+        data: status,
+      })
+    } catch (error: any) {
+      console.error('[attendanceRoutes] Get enrollment status error:', error)
+      res.status(500).json({
+        error: 'Failed to get enrollment status',
+        details: error.message,
       })
     }
   }
 )
 
+// ===========================
+// ATTENDANCE MARKING ENDPOINTS
+// ===========================
+
 /**
- * POST /api/attendance/:attendanceId/override
- * Manual override of attendance state
+ * POST /api/attendance/mark-with-face
+ * Mark attendance with face verification
  */
-router.post(
-  '/:attendanceId/override',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Only administrators can manually override attendance',
-        })
-        return
-      }
+router.post('/mark-with-face', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+  try {
+    const attendanceReq = req.body as MarkAttendanceWithFaceRequest
 
-      if (!req.body.reason) {
-        res.status(400).json({
-          success: false,
-          error: 'Reason is required for manual override',
-        })
-        return
-      }
-
-      await changeSchoolAttendanceState(req.params.attendanceId, {
-        newState: 'MANUAL_OVERRIDE',
-        reason: req.body.reason,
-        changedByUserId: (req.user as any)?.id,
-        auditNotes: req.body.auditNotes,
-      })
-
-      res.json({
-        success: true,
-        message: 'Attendance manually overridden',
-        recordId: req.params.attendanceId,
-      })
-    } catch (error: any) {
+    if (!attendanceReq.studentId || !attendanceReq.sessionId || !attendanceReq.verificationMethod) {
       res.status(400).json({
-        success: false,
-        error: error.message || 'Failed to override attendance',
+        error: 'Missing required fields: studentId, sessionId, verificationMethod',
       })
+      return
     }
+
+    const user = (req as any).user
+
+    const markResult = await markAttendanceWithFace(attendanceReq, user.id)
+
+    if (!markResult.success) {
+      res.status(400).json(markResult)
+      return
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        attendanceId: markResult.attendanceId,
+        status: markResult.status,
+        verificationMethod: markResult.verificationMethod,
+        faceVerified: markResult.faceVerified,
+      },
+      message: markResult.message,
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Mark attendance error:', error)
+    res.status(500).json({
+      error: 'Failed to mark attendance',
+      details: error.message,
+    })
   }
-)
+})
+
+// ===========================
+// ATTENDANCE REPORT ENDPOINTS
+// ===========================
 
 /**
- * GET /api/attendance/:attendanceId/history
- * Get state change history for attendance record
+ * GET /api/attendance/sessions/:sessionId/attendance
+ * Get attendance report for a session
+ */
+router.get('/sessions/:sessionId/attendance', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params
+
+    const attendance = await getSessionAttendance(sessionId)
+
+    res.json({
+      success: true,
+      data: attendance,
+      total: attendance.length,
+    })
+  } catch (error: any) {
+    console.error('[attendanceRoutes] Get session attendance error:', error)
+    res.status(500).json({
+      error: 'Failed to get attendance',
+      details: error.message,
+    })
+  }
+})
+
+/**
+ * GET /api/attendance/students/:studentId/courses/:courseId/attendance
+ * Get student attendance for a course
  */
 router.get(
-  '/:attendanceId/history',
-  async (req: ExtendedRequest, res: Response) => {
+  '/students/:studentId/courses/:courseId/attendance',
+  authenticateToken,
+  async (req: Request, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'faculty', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions to view history',
-        })
-        return
-      }
+      const { studentId, courseId } = req.params
 
-      const recordType = req.query.type as 'school_attendance' | 'corporate_checkins' || 'school_attendance'
-      const history = await getAttendanceStateHistory(req.params.attendanceId, recordType)
+      const attendance = await getStudentCourseAttendance(studentId, courseId)
 
       res.json({
         success: true,
-        data: {
-          recordId: req.params.attendanceId,
-          history,
-          count: history.length,
-        },
+        data: attendance,
+        total: attendance.length,
       })
     } catch (error: any) {
+      console.error('[attendanceRoutes] Get student course attendance error:', error)
       res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to retrieve history',
-      })
-    }
-  }
-)
-
-/**
- * GET /api/attendance/student/:studentId/flagged
- * Get flagged attendance for student
- */
-router.get(
-  '/student/:studentId/flagged',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'faculty', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions',
-        })
-        return
-      }
-
-      const flaggedRecords = await getFlaggedAttendanceByStudent(
-        req.params.studentId,
-        req.query.startDate as string,
-        req.query.endDate as string
-      )
-
-      res.json({
-        success: true,
-        data: {
-          studentId: req.params.studentId,
-          flaggedRecords,
-          count: flaggedRecords.length,
-        },
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to retrieve flagged records',
-      })
-    }
-  }
-)
-
-/**
- * GET /api/attendance/employee/:employeeId/flagged
- * Get flagged checkins for employee
- */
-router.get(
-  '/employee/:employeeId/flagged',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions',
-        })
-        return
-      }
-
-      const flaggedRecords = await getFlaggedAttendanceByEmployee(
-        req.params.employeeId,
-        req.query.startDate as string,
-        req.query.endDate as string
-      )
-
-      res.json({
-        success: true,
-        data: {
-          employeeId: req.params.employeeId,
-          flaggedRecords,
-          count: flaggedRecords.length,
-        },
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to retrieve flagged records',
-      })
-    }
-  }
-)
-
-/**
- * GET /api/attendance/statistics
- * Get state statistics for date range
- */
-router.get(
-  '/statistics',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions',
-        })
-        return
-      }
-
-      if (!req.query.startDate || !req.query.endDate) {
-        res.status(400).json({
-          success: false,
-          error: 'startDate and endDate are required',
-        })
-        return
-      }
-
-      const stats = await getStateStatistics(
-        req.query.startDate as string,
-        req.query.endDate as string
-      )
-
-      res.json({
-        success: true,
-        data: stats,
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to retrieve statistics',
-      })
-    }
-  }
-)
-
-/**
- * GET /api/attendance/compliance
- * Audit state compliance for date range
- */
-router.get(
-  '/compliance',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'superadmin'].includes(userRole)) {
-        res.status(403).json({
-          success: false,
-          error: 'Insufficient permissions',
-        })
-        return
-      }
-
-      if (!req.query.startDate || !req.query.endDate) {
-        res.status(400).json({
-          success: false,
-          error: 'startDate and endDate are required',
-        })
-        return
-      }
-
-      const compliance = await auditStateCompliance(
-        req.query.startDate as string,
-        req.query.endDate as string
-      )
-
-      res.json({
-        success: true,
-        data: compliance,
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to audit compliance',
-      })
-    }
-  }
-)
-
-/**
- * GET /api/attendance/states/valid-transitions/:currentState
- * Get valid state transitions for current state
- */
-router.get(
-  '/states/valid-transitions/:currentState',
-  async (req: ExtendedRequest, res: Response) => {
-    try {
-      const currentState = req.params.currentState as AttendanceState
-      const validStates = ['VERIFIED', 'FLAGGED', 'REVOKED', 'MANUAL_OVERRIDE']
-
-      if (!validStates.includes(currentState)) {
-        res.status(400).json({
-          success: false,
-          error: `Invalid state. Must be one of: ${validStates.join(', ')}`,
-        })
-        return
-      }
-
-      const transitions = getValidTransitions(currentState)
-
-      res.json({
-        success: true,
-        data: {
-          currentState,
-          validTransitions: transitions,
-        },
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to retrieve transitions',
+        error: 'Failed to get attendance',
+        details: error.message,
       })
     }
   }
 )
 
 export default router
+

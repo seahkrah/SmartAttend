@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Edit2, Trash2, Lock, Unlock, Plus, X } from 'lucide-react'
 import axios from 'axios'
 import SuperadminLayout from '../components/SuperadminLayout'
@@ -97,11 +96,7 @@ const SuperadminTenantsPage: React.FC = () => {
     onToggle: (id: string, status: boolean) => void
     onDelete: (id: string) => void
   }) => (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors group"
-    >
+    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors group">
       <div className="flex items-center justify-between mb-3">
         <div className="flex-1">
           <h4 className="font-bold text-white">{tenant.name}</h4>
@@ -151,7 +146,7 @@ const SuperadminTenantsPage: React.FC = () => {
           Delete
         </button>
       </div>
-    </motion.div>
+    </div>
   )
 
   if (loading) {
@@ -168,26 +163,20 @@ const SuperadminTenantsPage: React.FC = () => {
     <SuperadminLayout currentPage="tenants">
       <div className="space-y-6">
         {/* Add Tenant Button */}
-        <motion.button
+        <button
           onClick={() => setShowForm(!showForm)}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
           className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all shadow-lg"
         >
           {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           {showForm ? 'Cancel' : 'Add New Tenant'}
-        </motion.button>
+        </button>
 
         {/* Add Tenant Form */}
-        <AnimatePresence>
-          {showForm && (
-            <motion.form
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              onSubmit={handleAddTenant}
-              className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
-            >
+        {showForm && (
+          <form
+            onSubmit={handleAddTenant}
+            className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
+          >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Tenant Name</label>
@@ -253,9 +242,8 @@ const SuperadminTenantsPage: React.FC = () => {
                   Cancel
                 </button>
               </div>
-            </motion.form>
+            </form>
           )}
-        </AnimatePresence>
 
         {/* Schools Section */}
         <div>
@@ -276,9 +264,9 @@ const SuperadminTenantsPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <motion.div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
+            <div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
               <p className="text-slate-400">No schools found</p>
-            </motion.div>
+            </div>
           )}
         </div>
 
@@ -301,9 +289,9 @@ const SuperadminTenantsPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <motion.div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
+            <div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
               <p className="text-slate-400">No corporates found</p>
-            </motion.div>
+            </div>
           )}
         </div>
       </div>

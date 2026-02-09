@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { Users, Mail, CheckCircle, AlertCircle } from 'lucide-react'
 import axios from 'axios'
 import SuperadminLayout from '../components/SuperadminLayout'
@@ -44,11 +43,7 @@ const SuperadminEntitiesPage: React.FC = () => {
   }
 
   const EntityCard = ({ entity }: { entity: Entity }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors"
-    >
+    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <h4 className="text-white font-bold text-lg">{entity.name}</h4>
@@ -86,7 +81,7 @@ const SuperadminEntitiesPage: React.FC = () => {
           </span>
         )}
       </div>
-    </motion.div>
+    </div>
   )
 
   if (loading) {
@@ -104,98 +99,62 @@ const SuperadminEntitiesPage: React.FC = () => {
       <div className="space-y-8">
         {/* Schools Section */}
         <div>
-          <motion.h3
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-2xl font-bold text-white mb-4 flex items-center gap-2"
-          >
+          <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
             <span className="w-1 h-8 bg-blue-500 rounded-full" />
             Schools ({schools.length})
-          </motion.h3>
+          </h3>
           {schools.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {schools.map((school, idx) => (
-                <motion.div
-                  key={school.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                >
+              {schools.map((school) => (
+                <div key={school.id}>
                   <EntityCard entity={school} />
-                </motion.div>
+                </div>
               ))}
             </div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700"
-            >
+            <div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
               <p className="text-slate-400">No schools found</p>
-            </motion.div>
+            </div>
           )}
         </div>
 
         {/* Corporates Section */}
         <div>
-          <motion.h3
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-2xl font-bold text-white mb-4 flex items-center gap-2"
-          >
+          <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
             <span className="w-1 h-8 bg-purple-500 rounded-full" />
             Corporates ({corporates.length})
-          </motion.h3>
+          </h3>
           {corporates.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {corporates.map((corporate, idx) => (
-                <motion.div
-                  key={corporate.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + idx * 0.05 }}
-                >
+              {corporates.map((corporate) => (
+                <div key={corporate.id}>
                   <EntityCard entity={corporate} />
-                </motion.div>
+                </div>
               ))}
             </div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700"
-            >
+            <div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
               <p className="text-slate-400">No corporates found</p>
-            </motion.div>
+            </div>
           )}
         </div>
 
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-6 rounded-xl bg-slate-800/50 border border-slate-700"
-          >
+          <div className="p-6 rounded-xl bg-slate-800/50 border border-slate-700">
             <p className="text-slate-400 text-sm">Total Schools</p>
             <p className="text-4xl font-bold text-blue-400 mt-2">{schools.length}</p>
             <p className="text-xs text-slate-500 mt-2">
               {schools.filter(s => s.is_active).length} active · {schools.filter(s => !s.is_active).length} inactive
             </p>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="p-6 rounded-xl bg-slate-800/50 border border-slate-700"
-          >
+          </div>
+          <div className="p-6 rounded-xl bg-slate-800/50 border border-slate-700">
             <p className="text-slate-400 text-sm">Total Corporates</p>
             <p className="text-4xl font-bold text-purple-400 mt-2">{corporates.length}</p>
             <p className="text-xs text-slate-500 mt-2">
               {corporates.filter(c => c.is_active).length} active · {corporates.filter(c => !c.is_active).length} inactive
             </p>
-          </motion.div>
+          </div>
         </div>
       </div>
     </SuperadminLayout>

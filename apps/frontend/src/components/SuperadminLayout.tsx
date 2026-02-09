@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart3, Building2, Users, AlertTriangle, Settings, LogOut, Menu, X,
   Home, Bell, ArrowLeft, Shield
@@ -61,48 +60,41 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
   return (
     <div className="flex h-screen bg-slate-950">
       {/* Sidebar */}
-      <motion.div
-        initial={false}
-        animate={{ width: sidebarOpen ? 280 : 80 }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className="relative bg-slate-900 border-r border-slate-800 flex flex-col"
+      <div
+        className={`relative bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 ease-in-out ${
+          sidebarOpen ? 'w-72' : 'w-20'
+        }`}
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-700 flex items-center justify-between">
-          <AnimatePresence>
-            {sidebarOpen && (
-              <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                className="flex items-center gap-3"
-              >
-                <img
-                  src="/logos/platform-logo.png"
-                  alt="SmartAttend"
-                  className="w-10 h-10 rounded-lg object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                    const fallback = e.currentTarget.nextElementSibling as HTMLElement
-                    if (fallback) {
-                      fallback.classList.remove('hidden')
-                      fallback.classList.add('flex', 'items-center', 'justify-center')
-                    }
-                  }}
-                />
-                <div className="hidden">
-                  <Shield className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-white">SmartAttend</h1>
-                  <p className="text-xs text-slate-400">Console</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+          {sidebarOpen && (
+            <div className="flex items-center gap-3 min-w-0">
+              <img
+                src="/logos/platform-logo.png"
+                alt="SmartAttend"
+                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement
+                  if (fallback) {
+                    fallback.classList.remove('hidden')
+                    fallback.classList.add('flex', 'items-center', 'justify-center')
+                  }
+                }}
+              />
+              <div className="hidden">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div className="truncate">
+                <h1 className="text-sm font-bold text-white truncate">SmartAttend</h1>
+                <p className="text-xs text-slate-400">Console</p>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            className="flex-shrink-0 p-2 hover:bg-slate-800 rounded-lg transition-colors ml-auto"
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -110,26 +102,20 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
 
         {/* User Profile */}
         {sidebarOpen && user && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="p-4 m-4 rounded-lg bg-slate-800/50 border border-slate-700"
-          >
+          <div className="p-3 m-3 rounded-lg bg-slate-800/50 border border-slate-700 text-sm">
             <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Logged in as</p>
-            <p className="text-sm font-semibold text-white truncate">{user.email}</p>
+            <p className="text-xs font-semibold text-white truncate">{user.email}</p>
             <p className="text-xs text-blue-400 mt-1">👤 Superadmin</p>
-          </motion.div>
+          </div>
         )}
 
         {/* Navigation */}
-        <nav className="p-4 space-y-2 flex-1">
+        <nav className="p-2 space-y-1 flex-1 overflow-y-auto">
           {SIDEBAR_ITEMS.map((item) => (
-            <motion.button
+            <button
               key={item.id}
               onClick={() => handleNavigate(item.id)}
-              whileHover={{ x: 4 }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 relative ${
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 relative group ${
                 currentPage === item.id
                   ? `bg-gradient-to-r ${item.color} text-white shadow-lg`
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -137,51 +123,29 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
               title={item.label}
             >
               <item.icon className="w-5 h-5 flex-shrink-0" />
-              <AnimatePresence>
-                {sidebarOpen && (
-                  <motion.span
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    className="font-medium text-sm"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              {currentPage === item.id && (
-                <motion.div
-                  layoutId="activeIndicator"
-                  className="ml-auto w-2 h-2 rounded-full bg-white"
-                />
+              {sidebarOpen && (
+                <span className="text-sm font-medium truncate">{item.label}</span>
               )}
-            </motion.button>
+              {currentPage === item.id && (
+                <div className="ml-auto w-2 h-2 rounded-full bg-white flex-shrink-0" />
+              )}
+            </button>
           ))}
         </nav>
 
         {/* Logout */}
-        <div className="p-4 border-t border-slate-700">
-          <motion.button
+        <div className="p-2 border-t border-slate-700">
+          <button
             onClick={handleLogout}
-            whileHover={{ scale: 1.02 }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm"
             title="Logout"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            <AnimatePresence>
-              {sidebarOpen && (
-                <motion.span
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                >
-                  Logout
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
+            {sidebarOpen && <span>Logout</span>}
+          </button>
         </div>
-      </motion.div>
+
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -189,15 +153,13 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
         <div className="bg-slate-900 border-b border-slate-800 px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {showBackButton && onBack && (
-              <motion.button
+              <button
                 onClick={onBack}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
                 className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
                 title="Go back"
               >
                 <ArrowLeft className="w-6 h-6 text-slate-400 hover:text-white" />
-              </motion.button>
+              </button>
             )}
             <h2 className="text-2xl font-bold text-white">{currentPageLabel}</h2>
           </div>
@@ -208,14 +170,9 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
 
         {/* Page Content */}
         <div className="flex-1 overflow-auto p-8">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
+          <div key={currentPage}>
             {children}
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>

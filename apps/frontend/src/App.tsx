@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
@@ -27,7 +27,6 @@ import EmployeeSelfServiceAttendancePage from './pages/EmployeeSelfServiceAttend
 import HREmployeeAttendanceDashboard from './pages/HREmployeeAttendanceDashboard';
 
 // Components
-import SuperadminDashboard from './components/SuperadminDashboard';
 import { RoleRoute, ProtectedRoute } from './components/routing/RoleRoute';
 import { ToastContainer } from './components/Toast';
 

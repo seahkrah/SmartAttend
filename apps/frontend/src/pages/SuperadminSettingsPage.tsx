@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
 import { Bell, Shield, Database, Save } from 'lucide-react'
 import SuperadminLayout from '../components/SuperadminLayout'
 
@@ -49,11 +48,7 @@ const SuperadminSettingsPage: React.FC = () => {
     value: boolean
     onChange: () => void
   }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 flex items-center justify-between group hover:border-slate-600 transition-colors"
-    >
+    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 flex items-center justify-between group hover:border-slate-600 transition-colors">
       <div className="flex items-center gap-4">
         <div className="p-3 rounded-lg bg-slate-900/50">{Icon}</div>
         <div>
@@ -68,14 +63,12 @@ const SuperadminSettingsPage: React.FC = () => {
           value ? 'bg-blue-600' : 'bg-slate-700'
         }`}
       >
-        <motion.div
-          initial={false}
-          animate={{ x: value ? 28 : 4 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 120 }}
-          className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-lg"
+        <div
+          style={{ transform: value ? 'translateX(28px)' : 'translateX(4px)' }}
+          className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-lg transition-transform"
         />
       </button>
-    </motion.div>
+    </div>
   )
 
   return (
@@ -83,14 +76,10 @@ const SuperadminSettingsPage: React.FC = () => {
       <div className="space-y-8 max-w-3xl">
         {/* Security Settings */}
         <div>
-          <motion.h3
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-xl font-bold text-white mb-4 flex items-center gap-2"
-          >
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Shield className="w-6 h-6 text-blue-400" />
             Security Settings
-          </motion.h3>
+          </h3>
 
           <div className="space-y-3">
             <SettingToggle
@@ -121,23 +110,13 @@ const SuperadminSettingsPage: React.FC = () => {
 
         {/* Backup & Maintenance */}
         <div>
-          <motion.h3
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-xl font-bold text-white mb-4 flex items-center gap-2"
-          >
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Database className="w-6 h-6 text-purple-400" />
             Backup & Maintenance
-          </motion.h3>
+          </h3>
 
           <div className="space-y-3">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="p-4 rounded-lg bg-slate-800/50 border border-slate-700"
-            >
+            <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Backup Policy
               </label>
@@ -155,7 +134,7 @@ const SuperadminSettingsPage: React.FC = () => {
                 {settings.backupPolicy === 'daily' && 'Backups daily at 2 AM UTC'}
                 {settings.backupPolicy === 'weekly' && 'Backups every Sunday at 2 AM UTC'}
               </p>
-            </motion.div>
+            </div>
 
             <SettingToggle
               title="Maintenance Mode"
@@ -169,15 +148,10 @@ const SuperadminSettingsPage: React.FC = () => {
 
         {/* Notifications */}
         <div>
-          <motion.h3
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-xl font-bold text-white mb-4 flex items-center gap-2"
-          >
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Bell className="w-6 h-6 text-green-400" />
             Notifications
-          </motion.h3>
+          </h3>
 
           <div className="space-y-3">
             <SettingToggle
@@ -191,12 +165,7 @@ const SuperadminSettingsPage: React.FC = () => {
         </div>
 
         {/* System Information */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="p-6 rounded-lg bg-slate-800/50 border border-slate-700"
-        >
+        <div className="p-6 rounded-lg bg-slate-800/50 border border-slate-700">
           <h4 className="font-semibold text-white mb-4">System Information</h4>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -221,29 +190,22 @@ const SuperadminSettingsPage: React.FC = () => {
               </span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Save Button */}
         <div className="flex gap-3">
-          <motion.button
+          <button
             onClick={handleSave}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all shadow-lg font-medium"
           >
             <Save className="w-5 h-5" />
             Save Changes
-          </motion.button>
+          </button>
 
           {saved && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              className="flex items-center gap-2 px-4 py-3 bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg"
-            >
+            <div className="flex items-center gap-2 px-4 py-3 bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg">
               <span>✓ Settings saved successfully</span>
-            </motion.div>
+            </div>
           )}
         </div>
       </div>

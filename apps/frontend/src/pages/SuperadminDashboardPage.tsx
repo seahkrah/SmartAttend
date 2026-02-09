@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { TrendingUp, AlertTriangle } from 'lucide-react'
 import { ResponsiveContainer, BarChart, PieChart as PieChartRechart, Bar, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import axios from 'axios'
@@ -16,24 +15,6 @@ interface DashboardStats {
   pending_corporate_approvals: number
 }
 
-interface Alert {
-  id: string
-  type: 'critical' | 'warning' | 'info' | 'success'
-  title: string
-  message: string
-  timestamp: Date
-}
-
-interface Entity {
-  id: string
-  name: string
-  code: string
-  email: string
-  is_active: boolean
-  user_count: number
-  pending_approvals: number
-}
-
 const SuperadminDashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     total_schools: 0,
@@ -45,7 +26,6 @@ const SuperadminDashboardPage: React.FC = () => {
     pending_school_approvals: 0,
     pending_corporate_approvals: 0,
   })
-  const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -83,9 +63,7 @@ const SuperadminDashboardPage: React.FC = () => {
   ]
 
   const KPICard = ({ title, value, trend, icon: Icon, color }: any) => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
       className={`p-6 rounded-xl bg-gradient-to-br ${color} border border-slate-700 shadow-lg`}
     >
       <div className="flex justify-between items-start mb-4">
@@ -101,7 +79,7 @@ const SuperadminDashboardPage: React.FC = () => {
           <span className="text-green-400 text-sm font-semibold">{trend}% this month</span>
         </div>
       )}
-    </motion.div>
+    </div>
   )
 
   if (loading) {
@@ -152,9 +130,7 @@ const SuperadminDashboardPage: React.FC = () => {
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Entity Distribution */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+          <div
             className="p-6 rounded-xl bg-slate-800/50 border border-slate-700"
           >
             <h3 className="text-lg font-bold text-white mb-4">Entity Distribution</h3>
@@ -194,12 +170,10 @@ const SuperadminDashboardPage: React.FC = () => {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
 
           {/* Activity Overview */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+          <div
             className="p-6 rounded-xl bg-slate-800/50 border border-slate-700"
           >
             <h3 className="text-lg font-bold text-white mb-4">Activity Overview</h3>
@@ -218,31 +192,10 @@ const SuperadminDashboardPage: React.FC = () => {
                 <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </motion.div>
+          </div>
         </div>
 
         {/* Critical Alerts */}
-        {alerts.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-6 rounded-xl bg-red-500/10 border border-red-500/30"
-          >
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-              Critical Alerts
-            </h3>
-            <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="p-4 bg-slate-800/50 rounded-lg">
-                  <p className="text-white font-semibold">{alert.title}</p>
-                  <p className="text-slate-300 text-sm mt-1">{alert.message}</p>
-                  <p className="text-slate-500 text-xs mt-2">{new Date(alert.timestamp).toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
       </div>
     </SuperadminLayout>
   )

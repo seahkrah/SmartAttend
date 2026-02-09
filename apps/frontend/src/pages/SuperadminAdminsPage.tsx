@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Mail, Building2, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import SuperadminLayout from '../components/SuperadminLayout'
@@ -106,26 +105,20 @@ const SuperadminAdminsPage: React.FC = () => {
     <SuperadminLayout currentPage="admins">
       <div className="space-y-6">
         {/* Add Admin Button */}
-        <motion.button
+        <button
           onClick={() => setShowForm(!showForm)}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
           className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg transition-all shadow-lg"
         >
           {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
           {showForm ? 'Cancel' : 'Create Tenant Admin'}
-        </motion.button>
+        </button>
 
         {/* Add Admin Form */}
-        <AnimatePresence>
-          {showForm && (
-            <motion.form
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              onSubmit={handleAddAdmin}
-              className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
-            >
+        {showForm && (
+          <form
+            onSubmit={handleAddAdmin}
+            className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
+          >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Full Name</label>
@@ -196,18 +189,15 @@ const SuperadminAdminsPage: React.FC = () => {
                   Cancel
                 </button>
               </div>
-            </motion.form>
+            </form>
           )}
-        </AnimatePresence>
 
         {/* Admins Grid */}
         {admins.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {admins.map((admin) => (
-              <motion.div
+              <div
                 key={admin.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
                 className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors group"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -215,14 +205,12 @@ const SuperadminAdminsPage: React.FC = () => {
                     <h4 className="font-bold text-white text-lg">{admin.fullName}</h4>
                     <p className="text-sm text-slate-400 mt-1">Admin</p>
                   </div>
-                  <motion.button
+                  <button
                     onClick={() => handleDeleteAdmin(admin.id)}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
                     className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </motion.button>
+                  </button>
                 </div>
 
                 <div className="space-y-2 mb-4">
@@ -241,18 +229,14 @@ const SuperadminAdminsPage: React.FC = () => {
                     Created {new Date(admin.created_at).toLocaleDateString()}
                   </p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="p-12 text-center rounded-xl bg-slate-800/30 border border-dashed border-slate-700"
-          >
+          <div className="p-12 text-center rounded-xl bg-slate-800/30 border border-dashed border-slate-700">
             <p className="text-slate-400 text-lg">No tenant admins yet</p>
             <p className="text-slate-500 text-sm mt-2">Create one to manage tenant operations</p>
-          </motion.div>
+          </div>
         )}
       </div>
     </SuperadminLayout>

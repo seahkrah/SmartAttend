@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+
 import { FileText, Search } from 'lucide-react'
 import axios from 'axios'
 import SuperadminLayout from '../components/SuperadminLayout'
@@ -80,11 +80,7 @@ const SuperadminAuditLogsPage: React.FC = () => {
     <SuperadminLayout currentPage="audit">
       <div className="space-y-6">
         {/* Search Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative"
-        >
+        <div className="relative">
           <Search className="absolute left-4 top-3 w-5 h-5 text-slate-500" />
           <input
             type="text"
@@ -93,22 +89,15 @@ const SuperadminAuditLogsPage: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 outline-none transition-colors"
           />
-        </motion.div>
+        </div>
 
         {/* Audit Logs Table */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="overflow-x-auto"
-        >
+        <div className="overflow-x-auto">
           {filteredLogs.length > 0 ? (
             <div className="space-y-3">
-              {filteredLogs.map((log, idx) => (
-                <motion.div
+              {filteredLogs.map((log) => (
+                <div
                   key={log.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.02 }}
                   className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors"
                 >
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
@@ -151,31 +140,22 @@ const SuperadminAuditLogsPage: React.FC = () => {
                       </details>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-12 text-center rounded-xl bg-slate-800/30 border border-dashed border-slate-700"
-            >
+            <div className="p-12 text-center rounded-xl bg-slate-800/30 border border-dashed border-slate-700">
               <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
               <p className="text-slate-400 text-lg">
                 {searchTerm ? 'No audit logs match your search' : 'No audit logs found'}
               </p>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
 
         {/* Stats */}
         {logs.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-4"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
               <p className="text-sm text-slate-400">Total Logs</p>
               <p className="text-2xl font-bold text-white mt-1">{logs.length}</p>
@@ -194,7 +174,7 @@ const SuperadminAuditLogsPage: React.FC = () => {
                 {logs[0] ? new Date(logs[0].timestamp).toLocaleString() : 'N/A'}
               </p>
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
     </SuperadminLayout>

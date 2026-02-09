@@ -10,8 +10,17 @@ import { SuperadminLoginPage } from './pages/SuperadminLoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import IncidentDetailPage from './pages/IncidentDetailPage';
 
-// Phase 9 Page Wrappers (with HIERARCHY tokens + error/loading states)
+// Superadmin Pages
 import SuperadminConsolePage from './pages/SuperadminConsolePage';
+import SuperadminDashboardPage from './pages/SuperadminDashboardPage';
+import SuperadminAnalyticsPage from './pages/SuperadminAnalyticsPage';
+import SuperadminEntitiesPage from './pages/SuperadminEntitiesPage';
+import SuperadminTenantsPage from './pages/SuperadminTenantsPage';
+import SuperadminAdminsPage from './pages/SuperadminAdminsPage';
+import SuperadminAuditLogsPage from './pages/SuperadminAuditLogsPage';
+import SuperadminSettingsPage from './pages/SuperadminSettingsPage';
+
+// Phase 9 Page Wrappers (with HIERARCHY tokens + error/loading states)
 import AdminTenantPanelPage from './pages/AdminTenantPanelPage';
 import FacultyAttendanceWorkflowPage from './pages/FacultyAttendanceWorkflowPage';
 import EmployeeSelfServiceAttendancePage from './pages/EmployeeSelfServiceAttendancePage';
@@ -80,6 +89,13 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<SuperadminConsolePage />} />
                   <Route path="/console" element={<SuperadminConsolePage />} />
+                  <Route path="/dashboard" element={<SuperadminDashboardPage />} />
+                  <Route path="/analytics" element={<SuperadminAnalyticsPage />} />
+                  <Route path="/entities" element={<SuperadminEntitiesPage />} />
+                  <Route path="/tenants" element={<SuperadminTenantsPage />} />
+                  <Route path="/admins" element={<SuperadminAdminsPage />} />
+                  <Route path="/audit" element={<SuperadminAuditLogsPage />} />
+                  <Route path="/settings" element={<SuperadminSettingsPage />} />
                   <Route path="/incident/:incidentId" element={<IncidentDetailPage />} />
                 </Routes>
               </RoleRoute>

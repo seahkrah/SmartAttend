@@ -28,6 +28,7 @@ import {
   UserCheck,
   UserPlus,
   ClipboardList,
+  FolderTree,
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -54,7 +55,10 @@ const SCHOOL_SIDEBAR_ITEMS: SidebarItem[] = [
 
 const CORPORATE_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'from-indigo-500 to-indigo-600' },
-  { id: 'users', label: 'Users', icon: Users, color: 'from-teal-500 to-teal-600' },
+  { id: 'employees', label: 'Employees', icon: Users, color: 'from-teal-500 to-teal-600' },
+  { id: 'departments', label: 'Departments', icon: FolderTree, color: 'from-cyan-500 to-cyan-600' },
+  { id: 'attendance', label: 'Attendance', icon: ClipboardList, color: 'from-violet-500 to-violet-600' },
+  { id: 'reports', label: 'Reports', icon: BarChart3, color: 'from-green-500 to-green-600' },
   { id: 'approvals', label: 'Approvals', icon: ClipboardCheck, color: 'from-orange-500 to-orange-600' },
   { id: 'settings', label: 'Settings', icon: Settings, color: 'from-slate-500 to-slate-600' },
 ]
@@ -76,7 +80,10 @@ const SCHOOL_PAGE_ROUTES: Record<string, string> = {
 
 const CORPORATE_PAGE_ROUTES: Record<string, string> = {
   dashboard: '/admin/corporate',
-  users: '/admin/corporate/users',
+  employees: '/admin/corporate/employees',
+  departments: '/admin/corporate/departments',
+  attendance: '/admin/corporate/attendance',
+  reports: '/admin/corporate/reports',
   approvals: '/admin/corporate/approvals',
   settings: '/admin/corporate/settings',
 }

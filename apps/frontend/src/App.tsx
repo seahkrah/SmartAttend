@@ -60,6 +60,9 @@ import CorporateAdminDashboardPage from './pages/CorporateAdminDashboardPage';
 import CorporateAdminUsersPage from './pages/CorporateAdminUsersPage';
 import CorporateAdminApprovalsPage from './pages/CorporateAdminApprovalsPage';
 import CorporateAdminSettingsPage from './pages/CorporateAdminSettingsPage';
+import CorporateAdminDepartmentsPage from './pages/CorporateAdminDepartmentsPage';
+import CorporateAdminAttendancePage from './pages/CorporateAdminAttendancePage';
+import CorporateAdminReportsPage from './pages/CorporateAdminReportsPage';
 
 // Components
 import { RoleRoute, ProtectedRoute } from './components/routing/RoleRoute';
@@ -174,7 +177,10 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Navigate to="/admin/corporate/dashboard" replace />} />
                   <Route path="/dashboard" element={<CorporateAdminDashboardPage />} />
-                  <Route path="/users" element={<CorporateAdminUsersPage />} />
+                  <Route path="/employees" element={<CorporateAdminUsersPage />} />
+                  <Route path="/departments" element={<CorporateAdminDepartmentsPage />} />
+                  <Route path="/attendance" element={<CorporateAdminAttendancePage />} />
+                  <Route path="/reports" element={<CorporateAdminReportsPage />} />
                   <Route path="/approvals" element={<CorporateAdminApprovalsPage />} />
                   <Route path="/settings" element={<CorporateAdminSettingsPage />} />
                 </Routes>

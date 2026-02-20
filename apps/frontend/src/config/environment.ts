@@ -13,7 +13,7 @@ export interface FrontendConfig {
 }
 
 export const frontendConfig: FrontendConfig = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api',
   isDevelopment: import.meta.env.MODE === 'development',
   isProduction: import.meta.env.MODE === 'production',
   isStaging: import.meta.env.MODE === 'staging',

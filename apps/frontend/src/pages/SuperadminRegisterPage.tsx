@@ -3,7 +3,7 @@ import { LogIn, Lock, Mail, User } from 'lucide-react';
 import { SmartAttendLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiClient } from '../services/api';
 import { motion } from 'framer-motion';
 
 export const SuperadminRegisterPage: React.FC = () => {
@@ -39,7 +39,7 @@ export const SuperadminRegisterPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await axios.post('http://localhost:5000/api/auth/register-superadmin', {
+      await apiClient.post('/auth/register-superadmin', {
         fullName,
         email,
         password,

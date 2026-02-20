@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Edit2, Trash2, Lock, Unlock, Plus, X } from 'lucide-react'
-import axios from 'axios'
+import { apiClient } from '../services/api'
 import SuperadminLayout from '../components/SuperadminLayout'
 
 interface Tenant {
@@ -27,11 +27,7 @@ const SuperadminTenantsPage: React.FC = () => {
   const loadTenants = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('http://localhost:5000/api/superadmin/entities', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const response = await apiClient.get('/superadmin/entities')
       
       if (response.data) {
         setSchools(response.data.schools?.map((s: any) => ({ ...s, type: 'school' })) || [])
@@ -47,11 +43,7 @@ const SuperadminTenantsPage: React.FC = () => {
   const handleAddTenant = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await axios.post('http://localhost:5000/api/superadmin/tenants', formData, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      await apiClient.post('/superadmin/tenants', formData)
       setFormData({ name: '', code: '', email: '', type: 'school' })
       setShowForm(false)
       await loadTenants()
@@ -62,11 +54,7 @@ const SuperadminTenantsPage: React.FC = () => {
 
   const handleDeleteTenant = async (id: string) => {
     try {
-      await axios.delete(`http://localhost:5000/api/superadmin/tenants/${id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      await apiClient.delete(`/superadmin/tenants/${id}`)
       await loadTenants()
     } catch (error) {
       console.error('Error deleting tenant:', error)
@@ -75,15 +63,7 @@ const SuperadminTenantsPage: React.FC = () => {
 
   const handleToggleTenant = async (id: string, currentStatus: boolean) => {
     try {
-      await axios.patch(
-        `http://localhost:5000/api/superadmin/tenants/${id}`,
-        { is_active: !currentStatus },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-          },
-        }
-      )
+      await apiClient.patch(`/superadmin/tenants/${id}`, { is_active: !currentStatus })
       await loadTenants()
     } catch (error) {
       console.error('Error updating tenant:', error)
@@ -151,7 +131,7 @@ const SuperadminTenantsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="tenants">
+      <SuperadminLayout currentPage="management">
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading tenants...</div>
         </div>
@@ -160,7 +140,7 @@ const SuperadminTenantsPage: React.FC = () => {
   }
 
   return (
-    <SuperadminLayout currentPage="tenants">
+    <SuperadminLayout currentPage="management">
       <div className="space-y-6">
         {/* Add Tenant Button */}
         <button

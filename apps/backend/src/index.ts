@@ -1,5 +1,7 @@
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import { initializeDatabase } from './db/connection.js'
 import { config } from './config/environment.js'
@@ -8,13 +10,17 @@ import schoolRoutes from './routes/school.js'
 import corporateRoutes from './routes/corporate.js'
 import attendanceRoutes from './routes/attendance.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
-import userRoutes from './routes/users.js'
 import auditRoutes from './routes/audit.js'
 import timeRoutes from './routes/time.js'
 import superadminOperationsRoutes from './routes/superadmin-operations.js'
-import superadminSecurityRoutes from './routes/superadmin-security-hardening.js'
+// import superadminSecurityRoutes from './routes/superadmin-security-hardening.js'  // Disabled: requires MFA session flow not yet in frontend
+import superadminRoutes from './routes/superadmin.js'
+import tenantAdminRoutes from './routes/tenantAdmin.js'
+import facultyRoutes from './routes/faculty.js'
+import studentRoutes from './routes/student.js'
 import { clockDriftDetectionMiddleware, attendanceClockDriftValidationMiddleware, auditClockDriftContextMiddleware, clockDriftWarningMiddleware } from './auth/clockDriftDetectionMiddleware.js'
 import { enforceTenantBoundaries } from './auth/tenantEnforcementMiddleware.js'
+import { getUserFriendlyError, logError } from './utils/errorMessages.js'
 import {
   enforceRoleRevalidation,
   enforceRoleChangeLogging,
@@ -27,100 +33,139 @@ dotenv.config()
 const app = express()
 const PORT = config.backend.port
 
-console.log('[INIT] Setting up middleware...')
-app.use(cors())
-console.log('[INIT] ✓ CORS middleware added')
+// ─── SECURITY MIDDLEWARE ───────────────────────────────────────────
+// Helmet: sets security HTTP headers (X-Content-Type-Options, X-Frame-Options, etc.)
+app.use(helmet())
 
-app.use(express.json())
-console.log('[INIT] ✓ JSON parser middleware added')
+// CORS: restrict to known origins
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3000']
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, server-to-server)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    }
+    return callback(new Error('CORS: Origin not allowed'), false)
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}))
+
+// Trust proxy for correct client IP behind reverse proxies
+app.set('trust proxy', true)
+
+// Body parser with explicit size limit
+app.use(express.json({ limit: '10mb' }))
+
+// ─── RATE LIMITING ─────────────────────────────────────────────────
+// Global rate limit: 100 requests per minute per IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' }
+})
+app.use(globalLimiter)
+
+// Strict rate limit for auth endpoints: 10 attempts per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again in 15 minutes.' }
+})
+app.use('/api/auth/login', authLimiter)
+app.use('/api/auth/login-superadmin', authLimiter)
+app.use('/api/auth/register', authLimiter)
+app.use('/api/auth/register-with-role', authLimiter)
 
 // PHASE 2, STEP 2.2: Clock drift detection middleware
-// Applied globally to all requests for time authority enforcement
 app.use(clockDriftDetectionMiddleware())
-console.log('[INIT] ✓ Clock drift detection middleware added')
-
-// Audit clock drift context middleware
 app.use(auditClockDriftContextMiddleware())
-console.log('[INIT] ✓ Audit clock drift context middleware added')
 
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`[REQUEST] ${req.method} ${req.path}`)
-  next()
-})
-console.log('[INIT] ✓ Request logger middleware added')
+// Request logging middleware (minimal in production)
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`[REQUEST] ${req.method} ${req.path}`)
+    next()
+  })
+}
 
 // PHASE 4, STEP 4.1: Tenant boundary enforcement middleware
-// Applied to all authenticated routes to enforce tenant isolation
 app.use(enforceTenantBoundaries)
-console.log('[INIT] ✓ Tenant boundary enforcement middleware added')
 
 // PHASE 4, STEP 4.2: Role escalation detection middleware
-// Applied to all routes for role change logging, anomaly detection, and revalidation enforcement
 app.use(enforceRoleRevalidation)
-console.log('[INIT] ✓ Role revalidation enforcement middleware added')
 app.use(enforceRoleChangeLogging)
-console.log('[INIT] ✓ Role change logging middleware added')
 app.use(blockSilentRoleChanges)
-console.log('[INIT] ✓ Silent role change prevention middleware added')
 app.use(injectRoleValidationStatus)
-console.log('[INIT] ✓ Role validation status injection middleware added')
 
-console.log('[INIT] Mounting routes...')
+// ─── ROUTES ────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes)
+app.use('/api/admin', tenantAdminRoutes)
 app.use('/api/school', schoolRoutes)
+app.use('/api/faculty', facultyRoutes)
+app.use('/api/student', studentRoutes)
 app.use('/api/corporate', corporateRoutes)
 app.use('/api/time', timeRoutes)
+app.use('/api/superadmin', superadminRoutes)
 app.use('/api/superadmin', superadminOperationsRoutes)
-app.use('/api/superadmin', superadminSecurityRoutes)
-console.log('[INIT] ✓ Superadmin bootstrap & operational routes mounted')
-console.log('[INIT] ✓ Superadmin security hardening routes mounted')
-console.log('[INIT] ✓ Time authority routes mounted')
+// app.use('/api/superadmin', superadminSecurityRoutes)  // Disabled: validateSuperadminSession blocks all requests (no MFA session UI)
 
 // Attendance drift validation middleware (applied before attendance routes)
 app.use('/api/attendance', attendanceClockDriftValidationMiddleware())
 app.use('/api/attendance', attendanceRoutes)
-console.log('[INIT] ✓ Attendance routes mounted with drift validation')
 
-// Face verification routes (no additional drift validation needed)
+// Face verification routes
 app.use('/api/face', faceVerificationRoutes)
-console.log('[INIT] ✓ Face verification routes mounted')
 
-app.use('/api/users', userRoutes)
+// REMOVED: /api/users stub routes (C3 - were unprotected, served no purpose)
 app.use('/api/audit', auditRoutes)
-console.log('[INIT] ✓ All routes mounted')
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Backend is running', database: 'connected' })
 })
 
-// Error handling middleware
+// Error handling middleware (sanitized - never expose internals to client)
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[ERROR] Unhandled error:', err)
-  res.status(500).json({ error: 'Internal server error', message: err.message })
+  // Log full error internally
+  if (process.env.NODE_ENV === 'development') {
+    logError('Unhandled error', err)
+  }
+  
+  // CORS errors
+  if (err.message && err.message.includes('CORS')) {
+    return res.status(403).json({ error: 'Cross-origin request blocked' })
+  }
+  
+  // Send sanitized error to client
+  res.status(500).json({ error: 'An unexpected error occurred. Please try again.' })
 })
 
 // Initialize server
 async function start() {
   try {
-    console.log('[INIT] Initializing database...')
     await initializeDatabase()
-    console.log('[INIT] ✓ Database initialized')
     
-    console.log(`[INIT] Starting server on port ${PORT}...`)
     const server = app.listen(PORT, 'localhost', () => {
-      console.log(`✅ Server running on http://localhost:${PORT}`)
-      console.log(`[READY] Server is ready to accept requests`)
+      console.log(`Server running on http://localhost:${PORT}`)
     })
     
     server.on('error', (error: any) => {
-      console.error('[SERVER_ERROR]', error)
+      console.error('[SERVER_ERROR]', error.message)
       process.exit(1)
     })
     
-    server.on('clientError', (error: any) => {
-      console.error('[CLIENT_ERROR]', error)
+    server.on('clientError', (_error: any) => {
+      // Silently handle client errors (malformed requests, etc.)
     })
     
     // Keep the server running
@@ -157,7 +202,7 @@ process.on('uncaughtException', (error) => {
 })
 
 console.log('[INIT] Starting application...')
-start().catch((err) => {
-  console.error('[FATAL] Uncaught error in start():', err)
+start().catch((_err) => {
+  console.error('[FATAL] Failed to start server')
   process.exit(1)
 })

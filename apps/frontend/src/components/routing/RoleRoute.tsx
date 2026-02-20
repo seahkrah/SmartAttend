@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 
 interface RoleRouteProps {
@@ -77,6 +77,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
   const token = useAuthStore((state) => state.token);
+  const location = useLocation();
 
   console.log('[ProtectedRoute]', { hasUser: !!user, hasToken: !!token, isLoading });
 
@@ -93,6 +94,12 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   if (!user) {
     console.log('[ProtectedRoute] No user and no token, redirecting to /login');
     return <Navigate to="/login" replace />;
+  }
+
+  // Block access to all protected routes if password reset is required
+  if (user.mustResetPassword && location.pathname !== '/change-password') {
+    console.log('[ProtectedRoute] Password reset required, redirecting to /change-password');
+    return <Navigate to="/change-password" replace />;
   }
 
   console.log('[ProtectedRoute] User authenticated, showing protected content');

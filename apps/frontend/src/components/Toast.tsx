@@ -8,7 +8,7 @@
  * - Info (confirmation of async actions started)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { AlertCircle, CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 import { create } from 'zustand';
 
@@ -120,7 +120,7 @@ export const ToastContainer: React.FC = () => {
   const { toasts, removeToast } = useToastStore();
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-2 max-w-sm pointer-events-none">
+    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <ToastItem toast={toast} onRemove={removeToast} />
@@ -150,7 +150,7 @@ export function useSuccessToast() {
 export function useErrorToast() {
   const addToast = useToastStore((state) => state.addToast);
   return (title: string, message?: string) => {
-    addToast({ type: 'error', title, message, duration: null }); // Persistent
+    addToast({ type: 'error', title, message }); // Remove persistent duration to auto-dismiss
   };
 }
 

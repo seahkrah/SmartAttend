@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Mail, CheckCircle, AlertCircle } from 'lucide-react'
-import axios from 'axios'
+import { apiClient } from '../services/api'
 import SuperadminLayout from '../components/SuperadminLayout'
+
 
 interface Entity {
   id: string
@@ -25,11 +26,7 @@ const SuperadminEntitiesPage: React.FC = () => {
   const loadEntities = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('http://localhost:5000/api/superadmin/entities', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const response = await apiClient.get('/superadmin/entities')
       
       if (response.data) {
         setSchools(response.data.schools || [])
@@ -86,7 +83,7 @@ const SuperadminEntitiesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="entities">
+      <SuperadminLayout currentPage="management">
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading entities...</div>
         </div>
@@ -95,7 +92,7 @@ const SuperadminEntitiesPage: React.FC = () => {
   }
 
   return (
-    <SuperadminLayout currentPage="entities">
+    <SuperadminLayout currentPage="management">
       <div className="space-y-8">
         {/* Schools Section */}
         <div>

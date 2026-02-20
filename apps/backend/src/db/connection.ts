@@ -13,11 +13,10 @@ dotenv.config({ path: join(__dirname, '..', '..', '.env') })
 const { Pool } = pg
 
 console.log('[DB] DATABASE_URL:', process.env.DATABASE_URL ? '***configured***' : '***NOT SET***')
-console.log('[DB] NODE_ENV:', process.env.NODE_ENV)
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
 })
 
 pool.on('error', (err) => {
@@ -26,14 +25,14 @@ pool.on('error', (err) => {
 })
 
 export async function query(text: string, params?: any[]) {
-  const start = Date.now()
   try {
     const res = await pool.query(text, params)
-    const duration = Date.now() - start
-    console.log('Executed query', { text, duration, rows: res.rowCount })
     return res
   } catch (error) {
-    console.error('Database query error:', error)
+    // Only log query errors in development, never log query text in production
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Database query error:', { error: (error as Error).message })
+    }
     throw error
   }
 }

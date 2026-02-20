@@ -128,12 +128,7 @@ if (nodeEnv === 'production') {
   }
 }
 
-// Log environment info (redact secrets)
-console.log(`[ENVIRONMENT] Node environment: ${nodeEnv.toUpperCase()}`);
-console.log(`[ENVIRONMENT] Database: ${config.backend.databaseUrl.substring(0, 30)}...`);
-console.log(`[ENVIRONMENT] Backend port: ${config.backend.port}`);
-console.log(`[ENVIRONMENT] API Base URL: ${config.frontend.apiBaseUrl}`);
-console.log(`[ENVIRONMENT] Security: MFA=${config.security.mfaEnabled}, IP Allowlist=${config.security.ipAllowlistEnabled}`);
-console.log(`[ENVIRONMENT] Superadmin Bootstrap: Enabled=${config.superadmin.bootstrapEnabled}, Force=${config.superadmin.forceBootstrap}`);
+// Log environment info (minimal, redact secrets)
+console.log(`[ENV] ${nodeEnv.toUpperCase()} | Port: ${config.backend.port}`);
 
 export default config;

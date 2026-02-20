@@ -25,6 +25,28 @@ export function enforceTenantBoundaries(
   next: NextFunction
 ) {
   try {
+    // Skip tenant enforcement for public routes that don't require authentication
+    const publicPaths = [
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/forgot-password',
+      '/api/auth/reset-password',
+      '/api/auth/refresh',
+      '/api/health',
+      '/api/superadmin/bootstrap',
+    ]
+    
+    if (publicPaths.some(p => req.path === p || req.path.startsWith(p + '/'))) {
+      return next()
+    }
+
+    // If no user context yet (not authenticated), skip tenant enforcement
+    // The authenticateToken middleware on individual routes will handle auth
+    // Also skip if req.user exists but has no real identity (e.g., placeholder from clock drift middleware)
+    if (!req.user || !req.user.platformId) {
+      return next()
+    }
+
     // Resolve tenant context from JWT token
     const result = createTenantContext(req)
 

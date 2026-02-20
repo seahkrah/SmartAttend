@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, X, Mail, Building2, Trash2 } from 'lucide-react'
-import axios from 'axios'
+import { apiClient } from '../services/api'
 import SuperadminLayout from '../components/SuperadminLayout'
+
 
 interface TenantAdmin {
   id: string
@@ -23,7 +24,7 @@ const SuperadminAdminsPage: React.FC = () => {
   })
   const [loading, setLoading] = useState(true)
   const [tenants, setTenants] = useState<any[]>([])
-
+  const [formError, setFormError] = useState<string | null>(null)
   useEffect(() => {
     loadAdmins()
     loadTenants()
@@ -32,11 +33,7 @@ const SuperadminAdminsPage: React.FC = () => {
   const loadAdmins = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('http://localhost:5000/api/superadmin/tenant-admins', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const response = await apiClient.get('/superadmin/tenant-admins')
       setAdmins(response.data || [])
     } catch (error) {
       console.error('Error loading admins:', error)
@@ -47,11 +44,7 @@ const SuperadminAdminsPage: React.FC = () => {
 
   const loadTenants = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/superadmin/entities', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const response = await apiClient.get('/superadmin/entities')
       const allTenants = [
         ...(response.data?.schools || []),
         ...(response.data?.corporates || []),
@@ -64,29 +57,36 @@ const SuperadminAdminsPage: React.FC = () => {
 
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormError(null)
+    
+    // Validate tenant selection
+    if (!formData.tenant_id.trim()) {
+      setFormError('Please select a tenant before creating an admin. A tenant admin must be assigned to manage a specific tenant.')
+      return
+    }
+
+    if (formData.password.length < 8) {
+      setFormError('Password must be at least 8 characters.')
+      return
+    }
+    
     try {
-      await axios.post('http://localhost:5000/api/superadmin/tenant-admins', formData, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      await apiClient.post('/superadmin/tenant-admins', formData)
       setFormData({ email: '', password: '', fullName: '', tenant_id: '' })
       setShowForm(false)
+      setFormError(null)
       await loadAdmins()
-    } catch (error) {
-      console.error('Error adding admin:', error)
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Failed to create admin'
+      setFormError(msg)
     }
   }
 
   const handleDeleteAdmin = async (adminId: string) => {
     try {
-      await axios.delete(`http://localhost:5000/api/superadmin/tenant-admins/${adminId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      await apiClient.delete(`/superadmin/tenant-admins/${adminId}`)
       await loadAdmins()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting admin:', error)
     }
   }
@@ -119,6 +119,12 @@ const SuperadminAdminsPage: React.FC = () => {
             onSubmit={handleAddAdmin}
             className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
           >
+              {formError && (
+                <div className="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-400 text-sm flex items-start gap-2">
+                  <span className="text-red-400 shrink-0 mt-0.5">⚠️</span>
+                  <span>{formError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Full Name</label>
@@ -157,11 +163,17 @@ const SuperadminAdminsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Assign to Tenant</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <span className="text-orange-500">*</span> Assign to Tenant
+                  </label>
                   <select
                     value={formData.tenant_id}
                     onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-orange-500 outline-none"
+                    className={`w-full px-4 py-2 bg-slate-900 border rounded-lg text-white focus:outline-none transition-colors ${
+                      formData.tenant_id 
+                        ? 'border-orange-500 focus:border-orange-400' 
+                        : 'border-slate-700 focus:border-slate-600'
+                    }`}
                     required
                   >
                     <option value="">Select a tenant...</option>
@@ -171,6 +183,9 @@ const SuperadminAdminsPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                  <p className="text-xs text-slate-400 mt-2">
+                    ⓘ A tenant admin manages a specific tenant. Selection is mandatory.
+                  </p>
                 </div>
               </div>
 

@@ -27,10 +27,24 @@ export const LoginPage: React.FC = () => {
       // Route based on role after login
       setTimeout(() => {
         const currentUser = useAuthStore.getState().user;
+        
+        // Force password change for users with must_reset_password flag
+        if (currentUser?.mustResetPassword) {
+          navigate('/change-password');
+          return;
+        }
+        
         if (currentUser?.role === 'superadmin') {
           navigate('/superadmin');
         } else if (currentUser?.role === 'admin') {
-          navigate('/admin');
+          // Navigate to platform-specific admin dashboard
+          if (currentUser.platform === 'school') {
+            navigate('/admin/school/dashboard');
+          } else if (currentUser.platform === 'corporate') {
+            navigate('/admin/corporate/dashboard');
+          } else {
+            navigate('/admin');
+          }
         } else if (currentUser?.role === 'faculty') {
           navigate('/faculty');
         } else if (currentUser?.role === 'hr') {

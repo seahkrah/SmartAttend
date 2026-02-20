@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { generateRequestId } from '../services/auditService.js'
+import { getClientIp } from '../utils/getClientIp.js'
 
 /**
  * Audit Context Middleware
@@ -31,7 +32,7 @@ export function auditContextMiddleware(req: Request, res: Response, next: NextFu
     req.auditContext = {
       requestId: req.requestId,
       actorId: req.user.userId,
-      ipAddress: req.ip || 'unknown',
+      ipAddress: getClientIp(req),
       userAgent: req.get('user-agent')
     }
   }

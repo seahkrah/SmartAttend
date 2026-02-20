@@ -1,19 +1,14 @@
 /**
  * Superadmin Console Page
  * 
- * Wrapper for Superadmin Dashboard with state management
- * Shows: System diagnostics, tenants, locked users, audit trail
+ * Redirects to the main superadmin dashboard
  */
 
 import React from 'react';
-import EnhancedSuperadminDashboard from '../components/EnhancedSuperadminDashboard';
+import { Navigate } from 'react-router-dom';
 
 export const SuperadminConsolePage: React.FC = () => {
-  return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-950">
-      <EnhancedSuperadminDashboard />
-    </div>
-  );
+  return <Navigate to="/superadmin/dashboard" replace />;
 };
 
 export default SuperadminConsolePage;

@@ -28,6 +28,7 @@ export interface User {
   password_hash?: string
   profile_image_url?: string
   is_active: boolean
+  must_reset_password?: boolean
   last_login?: Date
   created_at: Date
   updated_at: Date
@@ -72,6 +73,10 @@ export interface Student {
   department_id?: string
   enrollment_year: number
   is_currently_enrolled: boolean
+  profile_photo_url?: string
+  phone?: string
+  address?: string
+  gender?: string
   created_at: Date
 }
 
@@ -88,6 +93,7 @@ export interface Faculty {
   specialization?: string
   office_location?: string
   office_hours?: string
+  gender?: string
   created_at: Date
 }
 

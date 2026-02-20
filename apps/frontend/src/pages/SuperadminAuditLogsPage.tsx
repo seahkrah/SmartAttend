@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react'
-
 import { FileText, Search } from 'lucide-react'
-import axios from 'axios'
+import { apiClient } from '../services/api'
 import SuperadminLayout from '../components/SuperadminLayout'
 
 interface AuditLog {
   id: string
-  timestamp: string
+  created_at: string
   action: string
   user_email: string
   ip_address: string
@@ -25,28 +24,26 @@ const SuperadminAuditLogsPage: React.FC = () => {
   const loadAuditLogs = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(
-        'http://localhost:5000/api/superadmin/audit-logs?limit=100',
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-          },
-        }
-      )
-      setLogs(response.data || [])
+      const response = await apiClient.get('/superadmin/audit-logs?limit=100')
+      // Backend returns array directly
+      const logs = Array.isArray(response.data) ? response.data : []
+      setLogs(logs)
     } catch (error) {
       console.error('Error loading audit logs:', error)
+      setLogs([])
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredLogs = logs.filter(
-    (log) =>
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.ip_address.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredLogs = Array.isArray(logs) 
+    ? logs.filter(
+        (log) =>
+          log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.ip_address.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : []
 
   const ActionBadge = ({ action }: { action: string }) => {
     const colorMap: Record<string, string> = {
@@ -105,7 +102,7 @@ const SuperadminAuditLogsPage: React.FC = () => {
                     <div>
                       <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Timestamp</p>
                       <p className="text-sm font-mono text-slate-300">
-                        {new Date(log.timestamp).toLocaleString()}
+                        {log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A'}
                       </p>
                     </div>
 
@@ -171,7 +168,7 @@ const SuperadminAuditLogsPage: React.FC = () => {
             <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
               <p className="text-sm text-slate-400">Latest Event</p>
               <p className="text-sm font-mono text-slate-300 mt-1">
-                {logs[0] ? new Date(logs[0].timestamp).toLocaleString() : 'N/A'}
+                {logs[0]?.created_at ? new Date(logs[0].created_at).toLocaleString() : 'N/A'}
               </p>
             </div>
           </div>

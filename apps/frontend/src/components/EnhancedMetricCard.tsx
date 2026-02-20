@@ -1,5 +1,4 @@
 import React from 'react'
-import { motion } from 'framer-motion'
 
 interface MetricCardProps {
   label: string
@@ -45,10 +44,9 @@ const EnhancedMetricCard: React.FC<MetricCardProps> = ({
   const displayValue = typeof value === 'number' && !isNaN(value) ? value : (value || '—')
 
   return (
-    <motion.div
-      whileHover={{ scale: 1.05, translateY: -4 }}
+    <div
       onClick={onClick}
-      className={`p-6 rounded-xl ${bgColorMap[color]} border ${borderColorMap[color]} backdrop-blur-sm transition-all cursor-pointer group`}
+      className={`p-6 rounded-xl ${bgColorMap[color]} border ${borderColorMap[color]} backdrop-blur-sm transition-all cursor-pointer group hover:scale-105 hover:-translate-y-1`}
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
@@ -70,7 +68,7 @@ const EnhancedMetricCard: React.FC<MetricCardProps> = ({
           <span className="ml-auto text-lg">{trendIcon}</span>
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }
 

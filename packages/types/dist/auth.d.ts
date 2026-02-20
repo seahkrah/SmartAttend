@@ -11,6 +11,7 @@ export interface User {
     permissions?: string[];
     isActive?: boolean;
     profileImage?: string | null;
+    mustResetPassword?: boolean;
     lastLogin?: string;
     createdAt?: string;
     updatedAt?: string;

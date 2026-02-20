@@ -28,6 +28,7 @@ import {
 import { config } from '../config/environment.js'
 import { query } from '../db/connection.js'
 import crypto from 'crypto'
+import { getClientIp } from '../utils/getClientIp.js'
 
 const router = express.Router()
 
@@ -196,7 +197,7 @@ router.post('/accounts', authenticateToken, verifySuperadmin, async (req: Create
         req.user!.userId,
         email,
         fullName,
-        req.ip || 'unknown',
+        getClientIp(req),
         auditId || 'unknown'
       )
 
@@ -294,7 +295,7 @@ router.delete('/accounts/:userId', authenticateToken, verifySuperadmin, async (r
         req.user!.userId,
         userId,
         reason,
-        req.ip || 'unknown',
+        getClientIp(req),
         auditId || 'unknown'
       )
 
@@ -383,7 +384,7 @@ router.post('/accounts/:userId/reset-password', authenticateToken, verifySuperad
       const result: SuperadminOperationResult = await resetSuperadminPassword(
         req.user!.userId,
         userId,
-        req.ip || 'unknown',
+        getClientIp(req),
         auditId || 'unknown'
       )
 

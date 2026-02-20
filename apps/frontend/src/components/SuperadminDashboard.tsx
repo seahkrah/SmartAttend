@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldAlert, Activity, ShieldCheck, Users, AlertTriangle, TrendingUp } from 'lucide-react'
 import TenantActionsModal from './TenantActionsModal'
 import IncidentCreationModal from './IncidentCreationModal'
-import EnhancedMetricCard from './EnhancedMetricCard'
 import AnalyticsPanel from './AnalyticsPanel'
 import AlertPanel, { Alert } from './AlertPanel'
 import DataTable from './DataTable'
@@ -289,42 +288,66 @@ const SuperadminDashboard: React.FC = () => {
 
               {/* Enhanced Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <EnhancedMetricCard 
-                  label="Total Schools"
-                  value={stats.total_schools}
-                  change={{ value: 12, isPositive: true }}
-                  icon="🏫"
-                  color="blue"
-                  trend="up"
+                <div 
                   onClick={() => setActiveTab('entities')}
-                />
-                <EnhancedMetricCard 
-                  label="Active Schools"
-                  value={stats.active_schools}
-                  change={{ value: 5, isPositive: true }}
-                  icon="✅"
-                  color="green"
-                  trend="up"
+                  className="p-6 rounded-xl bg-gradient-to-br from-blue-600/20 to-blue-400/20 border border-blue-500/30 hover:border-blue-400 transition-all cursor-pointer hover:scale-105"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-slate-400">Total Schools</p>
+                      <p className="text-3xl font-bold text-white">{stats.total_schools}</p>
+                    </div>
+                    <span className="text-3xl">🏫</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <span>↑ 12%</span>
+                  </div>
+                </div>
+                <div 
                   onClick={() => setActiveTab('entities')}
-                />
-                <EnhancedMetricCard 
-                  label="Total Users"
-                  value={stats.total_users}
-                  change={{ value: 8, isPositive: true }}
-                  icon="👥"
-                  color="cyan"
-                  trend="up"
+                  className="p-6 rounded-xl bg-gradient-to-br from-green-600/20 to-green-400/20 border border-green-500/30 hover:border-green-400 transition-all cursor-pointer hover:scale-105"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-slate-400">Active Schools</p>
+                      <p className="text-3xl font-bold text-white">{stats.active_schools}</p>
+                    </div>
+                    <span className="text-3xl">✅</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <span>↑ 5%</span>
+                  </div>
+                </div>
+                <div 
                   onClick={() => setActiveTab('users')}
-                />
-                <EnhancedMetricCard 
-                  label="Pending Approvals"
-                  value={stats.pending_school_approvals + stats.pending_corporate_approvals}
-                  change={{ value: -15, isPositive: false }}
-                  icon="⏳"
-                  color="amber"
-                  trend="down"
+                  className="p-6 rounded-xl bg-gradient-to-br from-cyan-600/20 to-cyan-400/20 border border-cyan-500/30 hover:border-cyan-400 transition-all cursor-pointer hover:scale-105"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-slate-400">Total Users</p>
+                      <p className="text-3xl font-bold text-white">{stats.total_users}</p>
+                    </div>
+                    <span className="text-3xl">👥</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <span>↑ 8%</span>
+                  </div>
+                </div>
+                <div 
                   onClick={() => setActiveTab('approvals')}
-                />
+                  className="p-6 rounded-xl bg-gradient-to-br from-amber-600/20 to-amber-400/20 border border-amber-500/30 hover:border-amber-400 transition-all cursor-pointer hover:scale-105"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-sm text-slate-400">Pending Approvals</p>
+                      <p className="text-3xl font-bold text-white">{stats.pending_school_approvals + stats.pending_corporate_approvals}</p>
+                    </div>
+                    <span className="text-3xl">⏳</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-red-400">
+                    <span>↓ 15%</span>
+                  </div>
+                </div>
               </div>
 
               {/* Performance Metrics */}

@@ -8,7 +8,7 @@ import { useAuthStore } from '../store/authStore'
 
 interface LayoutProps {
   children: React.ReactNode
-  currentPage: 'dashboard' | 'analytics' | 'entities' | 'tenants' | 'admins' | 'audit' | 'settings'
+  currentPage: 'dashboard' | 'analytics' | 'management' | 'admins' | 'audit' | 'settings'
   showBackButton?: boolean
   onBack?: () => void
 }
@@ -16,8 +16,7 @@ interface LayoutProps {
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, color: 'from-blue-500 to-blue-600' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, color: 'from-purple-500 to-purple-600' },
-  { id: 'entities', label: 'Entities', icon: Building2, color: 'from-green-500 to-green-600' },
-  { id: 'tenants', label: 'Manage Tenants', icon: Building2, color: 'from-indigo-500 to-indigo-600' },
+  { id: 'management', label: 'Management', icon: Building2, color: 'from-green-500 to-green-600' },
   { id: 'admins', label: 'Admin Management', icon: Users, color: 'from-orange-500 to-orange-600' },
   { id: 'audit', label: 'Audit Logs', icon: AlertTriangle, color: 'from-cyan-500 to-cyan-600' },
   { id: 'settings', label: 'Settings', icon: Settings, color: 'from-red-500 to-red-600' },
@@ -26,8 +25,7 @@ const SIDEBAR_ITEMS = [
 const PAGE_ROUTES = {
   dashboard: '/superadmin/dashboard',
   analytics: '/superadmin/analytics',
-  entities: '/superadmin/entities',
-  tenants: '/superadmin/tenants',
+  management: '/superadmin/management',
   admins: '/superadmin/admins',
   audit: '/superadmin/audit',
   settings: '/superadmin/settings',

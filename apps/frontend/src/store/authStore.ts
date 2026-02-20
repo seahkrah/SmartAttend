@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User } from '@smartattend/types';
 import { apiClient } from '../services/api';
+import { frontendConfig } from '../config/environment';
 import { getUserFriendlyError } from '../utils/errorMessages';
 import { useToastStore } from '../components/Toast';
 
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>((set) => {
             fullName: response.user.fullName,
             role: response.user.role,
             platform: response.user.platform,
+            mustResetPassword: response.user.mustResetPassword || false,
           },
           isLoading: false,
         });
@@ -69,7 +71,7 @@ export const useAuthStore = create<AuthState>((set) => {
     superadminLogin: async (email: string, password: string) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await fetch('http://localhost:5000/api/auth/login-superadmin', {
+        const response = await fetch(`${frontendConfig.apiBaseUrl}/auth/login-superadmin`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
@@ -215,6 +217,7 @@ export const useAuthStore = create<AuthState>((set) => {
             fullName: user.fullName,
             role: user.role,
             platform: user.platform,
+            mustResetPassword: user.mustResetPassword || false,
           },
           isLoading: false,
         });

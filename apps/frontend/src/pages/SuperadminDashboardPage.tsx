@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { TrendingUp, AlertTriangle } from 'lucide-react'
 import { ResponsiveContainer, BarChart, PieChart as PieChartRechart, Bar, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
-import axios from 'axios'
+import { apiClient } from '../services/api'
 import SuperadminLayout from '../components/SuperadminLayout'
+
 
 interface DashboardStats {
   total_schools: number
@@ -35,11 +36,7 @@ const SuperadminDashboardPage: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('http://localhost:5000/api/superadmin/stats', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      })
+      const response = await apiClient.get('/superadmin/stats')
       setStats(response.data || {})
     } catch (error) {
       console.error('Error loading dashboard stats:', error)

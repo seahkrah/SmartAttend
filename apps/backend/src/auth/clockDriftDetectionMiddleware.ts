@@ -31,16 +31,21 @@ export function clockDriftDetectionMiddleware() {
       const clientTime = extractClientTimestamp(req)
       
       // Store server time on request for consistency
-      if (!req.user) {
-        req.user = { userId: '', platformId: '', roleId: '' }
+      // NOTE: Do NOT create a fake req.user here — it breaks tenant enforcement.
+      // Store clock drift data on req directly instead.
+      ;(req as any)._serverTimestamp = serverTime
+      if (req.user) {
+        ;(req.user as any).serverTimestamp = serverTime
       }
-      ;(req.user as any).serverTimestamp = serverTime
 
       // If no client time provided, skip drift detection
       if (!clientTime) {
-        ;(req.user as any).clockDriftContext = {
+        ;(req as any)._clockDriftContext = {
           detected: false,
           reason: 'no_client_time'
+        }
+        if (req.user) {
+          ;(req.user as any).clockDriftContext = (req as any)._clockDriftContext
         }
         return next()
       }
@@ -63,12 +68,15 @@ export function clockDriftDetectionMiddleware() {
         actionType: `${req.method} ${req.path}`
       }
 
-      // Attach to request
-      ;(req.user as any).clockDriftContext = {
+      // Attach to request — store on req directly so it's available even before authenticateToken
+      ;(req as any)._clockDriftContext = {
         detected: true,
         driftSeconds,
         severity,
         context: driftContext
+      }
+      if (req.user) {
+        ;(req.user as any).clockDriftContext = (req as any)._clockDriftContext
       }
 
       next()
@@ -92,7 +100,7 @@ export function attendanceClockDriftValidationMiddleware() {
         return next()
       }
 
-      const driftContext = (req.user as any)?.clockDriftContext
+      const driftContext = (req as any)._clockDriftContext || (req.user as any)?.clockDriftContext
 
       // Skip if drift not detected
       if (!driftContext?.detected) {
@@ -139,9 +147,9 @@ export function attendanceClockDriftValidationMiddleware() {
  */
 export function auditClockDriftContextMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
-    const driftContext = (req.user as any)?.clockDriftContext
+    const driftContext = (req as any)._clockDriftContext || (req.user as any)?.clockDriftContext
 
-    if (driftContext?.detected) {
+    if (driftContext?.detected && req.user) {
       // Attach drift info to audit context
       ;(req.user as any).auditContext = {
         ...(req.user as any).auditContext,
@@ -207,7 +215,7 @@ export function flagDriftAffectedAttendanceMiddleware() {
  */
 export function clockDriftWarningMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
-    const driftContext = (req.user as any)?.clockDriftContext
+    const driftContext = (req as any)._clockDriftContext || (req.user as any)?.clockDriftContext
 
     if (driftContext?.detected && driftContext.severity !== 'INFO') {
       // Add warning header
@@ -224,7 +232,7 @@ export function clockDriftWarningMiddleware() {
  */
 export function strictClockDriftEnforcementMiddleware(maxDriftSeconds: number = 60) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const driftContext = (req.user as any)?.clockDriftContext
+    const driftContext = (req as any)._clockDriftContext || (req.user as any)?.clockDriftContext
 
     if (driftContext?.detected) {
       const absDrift = Math.abs(driftContext.driftSeconds)
@@ -250,8 +258,8 @@ export function strictClockDriftEnforcementMiddleware(maxDriftSeconds: number = 
  * Useful for debugging and client-side drift adjustment
  */
 export function attachClockDriftResponseHeaders(req: Request, res: Response): void {
-  const driftContext = (req.user as any)?.clockDriftContext
-  const serverTime = (req.user as any)?.serverTimestamp
+  const driftContext = (req as any)._clockDriftContext || (req.user as any)?.clockDriftContext
+  const serverTime = (req as any)._serverTimestamp || (req.user as any)?.serverTimestamp
 
   if (serverTime) {
     res.set('X-Server-Time', serverTime.toISOString())

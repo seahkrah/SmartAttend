@@ -35,9 +35,11 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        if (error.response?.status === 401) {
+        const originalRequest = error.config as any;
+        if (error.response?.status === 401 && !originalRequest?._retry) {
           const refreshToken = localStorage.getItem('refreshToken');
           if (refreshToken) {
+            originalRequest._retry = true;
             try {
               const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
                 refreshToken,
@@ -47,9 +49,9 @@ class ApiClient {
               localStorage.setItem('accessToken', newAccessToken);
               
               // Retry original request with new token
-              if (error.config) {
-                error.config.headers.Authorization = `Bearer ${newAccessToken}`;
-                return this.client(error.config);
+              if (originalRequest) {
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+                return this.client(originalRequest);
               }
             } catch (refreshError) {
               // Refresh failed, clear tokens
@@ -70,6 +72,23 @@ class ApiClient {
 
   clearToken() {
     this.token = null;
+  }
+
+  // Generic HTTP methods (use these instead of raw axios to get refresh interceptor)
+  async get<T = any>(url: string, config?: any) {
+    return this.client.get<T>(url, config);
+  }
+
+  async post<T = any>(url: string, data?: any, config?: any) {
+    return this.client.post<T>(url, data, config);
+  }
+
+  async patch<T = any>(url: string, data?: any, config?: any) {
+    return this.client.patch<T>(url, data, config);
+  }
+
+  async delete<T = any>(url: string, config?: any) {
+    return this.client.delete<T>(url, config);
   }
 
   // ===== Auth Endpoints =====

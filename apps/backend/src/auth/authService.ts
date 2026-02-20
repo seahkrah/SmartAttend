@@ -2,13 +2,29 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { query } from '../db/connection.js'
 import type { User } from '../types/database.js'
+import crypto from 'crypto'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key_change_this_in_production'
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your_super_secret_refresh_token_key'
+// SECURITY: Never use hardcoded fallback secrets. Fail hard if not configured.
+function requireEnvSecret(key: string): string {
+  const value = process.env[key]
+  if (!value) {
+    // In development, auto-generate a random secret and warn
+    if (process.env.NODE_ENV !== 'production') {
+      const generated = crypto.randomBytes(64).toString('hex')
+      console.warn(`[SECURITY] WARNING: ${key} not set. Using auto-generated secret. Set ${key} in .env for persistent sessions.`)
+      return generated
+    }
+    throw new Error(`[SECURITY] FATAL: ${key} environment variable is required in production. Server cannot start without it.`)
+  }
+  return value
+}
 
-// Hash password
+const JWT_SECRET = requireEnvSecret('JWT_SECRET')
+const REFRESH_TOKEN_SECRET = requireEnvSecret('REFRESH_TOKEN_SECRET')
+
+// Hash password (12 rounds for stronger security)
 export async function hashPassword(password: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10)
+  const salt = await bcrypt.genSalt(12)
   return bcrypt.hash(password, salt)
 }
 
@@ -17,12 +33,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
-// Generate access token (short-lived)
+// Generate access token (short-lived: 15 minutes for security)
 export function generateAccessToken(userId: string, platformId: string, roleId: string): string {
   return jwt.sign(
     { userId, platformId, roleId },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: '15m' }
   )
 }
 
@@ -86,9 +102,11 @@ export async function loginUser(
 ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
   // Find user by email and platform
   const result = await query(
-    `SELECT u.*, r.permissions, r.name as role_name FROM users u
+    `SELECT u.*, r.permissions, r.name as role_name, p.name as platform_name 
+     FROM users u
      LEFT JOIN roles r ON u.role_id = r.id
-     WHERE u.email = $1 AND u.platform_id = $2 AND u.is_active = true`,
+     LEFT JOIN platforms p ON u.platform_id = p.id
+     WHERE u.email = $1 AND u.platform_id = $2`,
     [email, platformId]
   )
   
@@ -117,7 +135,7 @@ export async function loginUser(
           
           // Verify user is active
           if (!superadminUser.is_active) {
-            throw new Error('User account is inactive')
+            throw new Error('Your account has been suspended. Please contact support.')
           }
           
           // Generate tokens
@@ -152,6 +170,52 @@ export async function loginUser(
   }
   
   const user = result.rows[0]
+  
+  // Check if user is active
+  if (!user.is_active) {
+    throw new Error('Your account has been suspended. Please contact your administrator.')
+  }
+  
+  // Check tenant status based on role and platform
+  if (user.platform_name === 'school' && user.role_name !== 'superadmin') {
+    // Check if user belongs to a school entity and if that entity is active
+    const schoolEntityCheck = await query(
+      `SELECT se.is_active, se.name as school_name
+       FROM school_user_associations sua
+       JOIN school_entities se ON sua.school_entity_id = se.id
+       WHERE sua.user_id = $1 AND sua.status = 'active'
+       LIMIT 1`,
+      [user.id]
+    )
+    
+    if (schoolEntityCheck.rows.length === 0) {
+      throw new Error('You are not assigned to any school. Please contact your administrator.')
+    }
+    
+    const schoolEntity = schoolEntityCheck.rows[0]
+    if (!schoolEntity.is_active) {
+      throw new Error(`Your school (${schoolEntity.school_name}) has been suspended. Please contact support.`)
+    }
+  } else if (user.platform_name === 'corporate' && user.role_name !== 'superadmin') {
+    // Check if user belongs to a corporate entity and if that entity is active
+    const corpEntityCheck = await query(
+      `SELECT ce.is_active, ce.name as company_name
+       FROM corporate_user_associations cua
+       JOIN corporate_entities ce ON cua.corporate_entity_id = ce.id
+       WHERE cua.user_id = $1
+       LIMIT 1`,
+      [user.id]
+    )
+    
+    if (corpEntityCheck.rows.length === 0) {
+      throw new Error('You are not assigned to any company. Please contact your administrator.')
+    }
+    
+    const corpEntity = corpEntityCheck.rows[0]
+    if (!corpEntity.is_active) {
+      throw new Error(`Your company (${corpEntity.company_name}) has been suspended. Please contact support.`)
+    }
+  }
   
   // Verify password
   const isValidPassword = await verifyPassword(password, user.password_hash)
@@ -490,6 +554,11 @@ export async function approveOrRejectRegistration(
   }
   
   if (action === 'approve') {
+    // Whitelist check for table name (defense-in-depth against SQL injection)
+    const allowedTables = ['school_user_approvals', 'corporate_user_approvals']
+    if (!allowedTables.includes(approvalTable)) {
+      throw new Error('Invalid approval table')
+    }
     // Update approval status
     await query(
       `UPDATE ${approvalTable} 

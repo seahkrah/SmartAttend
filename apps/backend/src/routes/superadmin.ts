@@ -1,5 +1,6 @@
-import express, { Request, Response } from 'express'
+﻿import express, { Request, Response } from 'express'
 import { randomBytes, createHash } from 'crypto'
+import bcrypt from 'bcryptjs'
 import { query } from '../db/connection.js'
 import { authenticateToken } from '../auth/middleware.js'
 import { auditContextMiddleware } from '../auth/auditContextMiddleware.js'
@@ -7,6 +8,7 @@ import { extractAuditContext, logAuditEntry, updateAuditEntry, auditOperation, a
 import { rateLimitMiddleware } from '../auth/rateLimitMiddleware.js'
 import { requireMfa, warnIfMfaOld, createMfaChallenge, verifyMfaChallenge } from '../auth/mfaMiddleware.js'
 import { ipAllowlistMiddleware, warnIfIpExpiringSoon, addIpToAllowlist, getAllowlistedIps } from '../auth/ipAllowlistMiddleware.js'
+import { getClientIp } from '../utils/getClientIp.js'
 
 const router = express.Router()
 
@@ -145,7 +147,7 @@ router.get('/tenants', authenticateToken, (req, res, next) => verifySuperadmin(r
     await query(
       `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
        VALUES ($1, $2, $3)`,
-      [superadminId, 'list_tenants', req.ip]
+      [superadminId, 'list_tenants', getClientIp(req)]
     ).catch(() => {}) // Non-critical
 
     return res.json({
@@ -216,7 +218,7 @@ router.get('/tenants/:tenantId', authenticateToken, (req, res, next) => verifySu
     await query(
       `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, ip_address)
        VALUES ($1, $2, $3, $4, $5)`,
-      [superadminId, 'view_tenant_details', entityType, tenantId, req.ip]
+      [superadminId, 'view_tenant_details', entityType, tenantId, getClientIp(req)]
     ).catch(() => {})
 
     return res.json({
@@ -281,7 +283,7 @@ router.post('/tenants/lock', authenticateToken, (req, res, next) => verifySupera
     await query(
       `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, details, ip_address)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [superadminId, 'lock_tenant', entityType, tenantId, { reason }, req.ip]
+      [superadminId, 'lock_tenant', entityType, tenantId, { reason }, getClientIp(req)]
     ).catch(() => {})
 
     // Optionally invalidate all sessions for this tenant
@@ -340,7 +342,7 @@ router.post('/tenants/unlock', authenticateToken, (req, res, next) => verifySupe
     await query(
       `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_id, details, ip_address)
        VALUES ($1, $2, $3, $4, $5)`,
-      [superadminId, 'unlock_tenant', lockEvent.tenant_id, { reason: reason || 'Manual unlock' }, req.ip]
+      [superadminId, 'unlock_tenant', lockEvent.tenant_id, { reason: reason || 'Manual unlock' }, getClientIp(req)]
     ).catch(() => {})
 
     return res.json({
@@ -398,7 +400,7 @@ router.get('/incidents', authenticateToken, (req, res, next) => verifySuperadmin
     await query(
       `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
        VALUES ($1, $2, $3)`,
-      [superadminId, 'list_incidents', req.ip]
+      [superadminId, 'list_incidents', getClientIp(req)]
     ).catch(() => {})
 
     return res.json({
@@ -597,16 +599,18 @@ router.get('/audit-logs', authenticateToken, (req, res, next) => verifySuperadmi
 
     const auditLogsResult = await query(
       `SELECT 
-        id,
-        superadmin_user_id,
-        action,
-        entity_type,
-        entity_id,
-        details,
-        ip_address,
-        created_at
-      FROM superadmin_action_logs
-      ORDER BY created_at DESC
+        sal.id,
+        sal.superadmin_user_id,
+        u.email as user_email,
+        sal.action,
+        sal.entity_type,
+        sal.entity_id,
+        sal.details,
+        sal.ip_address,
+        sal.created_at
+      FROM superadmin_action_logs sal
+      LEFT JOIN users u ON sal.superadmin_user_id = u.id
+      ORDER BY sal.created_at DESC
       LIMIT $1 OFFSET $2`,
       [parseInt(limit as string), parseInt(offset as string)]
     )
@@ -615,13 +619,10 @@ router.get('/audit-logs', authenticateToken, (req, res, next) => verifySuperadmi
     await query(
       `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
        VALUES ($1, $2, $3)`,
-      [superadminId, 'view_audit_logs', req.ip]
+      [superadminId, 'view_audit_logs', getClientIp(req)]
     ).catch(() => {})
 
-    return res.json({
-      success: true,
-      data: auditLogsResult.rows
-    })
+    return res.json(auditLogsResult.rows)
   } catch (error: any) {
     console.error('Error getting audit logs:', error)
     return res.status(500).json({ error: error.message || 'Failed to get audit logs' })
@@ -684,13 +685,13 @@ router.post('/confirmation-tokens', authenticateToken, (req, res, next) => verif
       `INSERT INTO confirmation_tokens (operation_type, operation_context, token_hash, requesting_superadmin_id, expires_at, ip_address)
        VALUES ($1, $2::jsonb, $3, $4, ${expiresAtQuery}, $5)
        RETURNING id, expires_at`,
-      [operationType, JSON.stringify(operationContext), tokenHash, superadminId, ttlSeconds, req.ip]
+      [operationType, JSON.stringify(operationContext), tokenHash, superadminId, ttlSeconds, getClientIp(req)]
     )
 
     return res.status(201).json({
       success: true,
       data: {
-        token, // Plain token returned only once — caller must store it securely
+        token, // Plain token returned only once â€” caller must store it securely
         id: insertResult.rows[0].id,
         expiresAt: insertResult.rows[0].expires_at
       }
@@ -799,7 +800,7 @@ router.post('/tenants/:tenantId/lifecycle', authenticateToken, (req, res, next) 
       await query(
         `INSERT INTO tenant_lifecycle_audit (tenant_id, previous_state, new_state, actor_id, actor_role, action_type, justification, ip_address)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [tenantId, currentState, newState, superadminId, 'superadmin', 'DRY_RUN_TRANSITION', justification, req.ip]
+        [tenantId, currentState, newState, superadminId, 'superadmin', 'DRY_RUN_TRANSITION', justification, getClientIp(req)]
       )
 
       // Update audit entry with success and after state
@@ -817,7 +818,7 @@ router.post('/tenants/:tenantId/lifecycle', authenticateToken, (req, res, next) 
       await query(
         `INSERT INTO tenant_lifecycle_audit (tenant_id, previous_state, new_state, actor_id, actor_role, action_type, justification, confirmation_token, ip_address)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [tenantId, currentState, newState, superadminId, 'superadmin', 'TRANSITION', justification, confirmationToken || null, req.ip]
+        [tenantId, currentState, newState, superadminId, 'superadmin', 'TRANSITION', justification, confirmationToken || null, getClientIp(req)]
       )
 
       await query(
@@ -1342,15 +1343,446 @@ router.post('/ip-allowlist', authenticateToken, (req, res, next) => verifySupera
 // TENANT ADMIN MANAGEMENT
 // ===========================
 
+// GET: List all tenant admins
+router.get('/tenant-admins', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+
+    // Get all tenant admins (users with admin role linked to a tenant via association tables)
+    const adminsResult = await query(
+      `SELECT 
+        u.id,
+        u.email,
+        u.full_name as "fullName",
+        COALESCE(sua.school_entity_id, cua.corporate_entity_id) as tenant_id,
+        COALESCE(se.name, ce.name) as tenant_name,
+        u.created_at
+      FROM users u
+      LEFT JOIN school_user_associations sua ON sua.user_id = u.id
+      LEFT JOIN school_entities se ON se.id = sua.school_entity_id
+      LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
+      LEFT JOIN corporate_entities ce ON ce.id = cua.corporate_entity_id
+      WHERE u.role_id IN (SELECT id FROM roles WHERE name = 'admin')
+        AND (sua.school_entity_id IS NOT NULL OR cua.corporate_entity_id IS NOT NULL)
+      ORDER BY u.created_at DESC`
+    )
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
+       VALUES ($1, $2, $3)`,
+      [superadminId, 'list_tenant_admins', getClientIp(req)]
+    ).catch(() => {})
+
+    return res.json(adminsResult.rows || [])
+  } catch (error: any) {
+    console.error('Error listing tenant admins:', error)
+    return res.status(500).json({ error: error.message || 'Failed to list tenant admins' })
+  }
+})
+
+// GET: Dashboard stats for superadmin
+router.get('/stats', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+  try {
+    // Count schools
+    const schoolsResult = await query(`SELECT COUNT(*) as total, COUNT(CASE WHEN is_active THEN 1 END) as active FROM school_entities`)
+    const totalSchools = parseInt(schoolsResult.rows[0].total) || 0
+    const activeSchools = parseInt(schoolsResult.rows[0].active) || 0
+
+    // Count corporates
+    const corpsResult = await query(`SELECT COUNT(*) as total, COUNT(CASE WHEN is_active THEN 1 END) as active FROM corporate_entities`)
+    const totalCorporates = parseInt(corpsResult.rows[0].total) || 0
+    const activeCorporates = parseInt(corpsResult.rows[0].active) || 0
+
+    // Count users
+    const usersResult = await query(`SELECT COUNT(*) as total, COUNT(CASE WHEN is_active THEN 1 END) as active FROM users`)
+    const totalUsers = parseInt(usersResult.rows[0].total) || 0
+    const activeUsers = parseInt(usersResult.rows[0].active) || 0
+
+    // Pending approvals
+    const schoolApprovals = await query(`SELECT COUNT(*) as cnt FROM school_user_approvals WHERE status = 'pending'`)
+    const corpApprovals = await query(`SELECT COUNT(*) as cnt FROM corporate_user_approvals WHERE status = 'pending'`)
+
+    return res.json({
+      total_schools: totalSchools,
+      active_schools: activeSchools,
+      total_corporates: totalCorporates,
+      active_corporates: activeCorporates,
+      total_users: totalUsers,
+      active_users: activeUsers,
+      pending_school_approvals: parseInt(schoolApprovals.rows[0].cnt) || 0,
+      pending_corporate_approvals: parseInt(corpApprovals.rows[0].cnt) || 0,
+    })
+  } catch (error: any) {
+    console.error('Error loading stats:', error)
+    return res.status(500).json({ error: error.message || 'Failed to load stats' })
+  }
+})
+
+// GET: List all entities (schools + corporates)
+router.get('/entities', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+
+    // Get all schools (user count via school_user_associations)
+    const schoolsResult = await query(
+      `SELECT 
+        se.id,
+        se.name,
+        se.code,
+        se.email,
+        se.phone,
+        se.address,
+        COALESCE(se.status, CASE WHEN se.is_active THEN 'active' ELSE 'disabled' END) as status,
+        'school' as entity_type,
+        se.created_at,
+        se.is_active,
+        COUNT(DISTINCT sua.user_id) as user_count,
+        COUNT(DISTINCT CASE WHEN u.is_active = true THEN sua.user_id END) as active_users,
+        COALESCE(pa.pending_count, 0) as pending_approvals
+      FROM school_entities se
+      LEFT JOIN school_user_associations sua ON sua.school_entity_id = se.id
+      LEFT JOIN users u ON u.id = sua.user_id
+      LEFT JOIN (
+        SELECT school_entity_id, COUNT(*) as pending_count
+        FROM school_user_approvals WHERE status = 'pending'
+        GROUP BY school_entity_id
+      ) pa ON pa.school_entity_id = se.id
+      GROUP BY se.id, se.name, se.code, se.email, se.phone, se.address, se.status, se.created_at, se.is_active, pa.pending_count
+      ORDER BY se.created_at DESC`
+    )
+
+    // Get all corporates (user count via corporate_user_associations)
+    const corporatesResult = await query(
+      `SELECT 
+        ce.id,
+        ce.name,
+        ce.code,
+        ce.email,
+        ce.phone,
+        ce.headquarters_address as address,
+        COALESCE(ce.status, CASE WHEN ce.is_active THEN 'active' ELSE 'disabled' END) as status,
+        'corporate' as entity_type,
+        ce.created_at,
+        ce.is_active,
+        COUNT(DISTINCT cua.user_id) as user_count,
+        COUNT(DISTINCT CASE WHEN u.is_active = true THEN cua.user_id END) as active_users,
+        COALESCE(pa.pending_count, 0) as pending_approvals
+      FROM corporate_entities ce
+      LEFT JOIN corporate_user_associations cua ON cua.corporate_entity_id = ce.id
+      LEFT JOIN users u ON u.id = cua.user_id
+      LEFT JOIN (
+        SELECT corporate_entity_id, COUNT(*) as pending_count
+        FROM corporate_user_approvals WHERE status = 'pending'
+        GROUP BY corporate_entity_id
+      ) pa ON pa.corporate_entity_id = ce.id
+      GROUP BY ce.id, ce.name, ce.code, ce.email, ce.phone, ce.headquarters_address, ce.status, ce.created_at, ce.is_active, pa.pending_count
+      ORDER BY ce.created_at DESC`
+    )
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
+       VALUES ($1, $2, $3)`,
+      [superadminId, 'list_entities', getClientIp(req)]
+    ).catch(() => {})
+
+    return res.json({
+      success: true,
+      schools: schoolsResult.rows,
+      corporates: corporatesResult.rows,
+      total: schoolsResult.rows.length + corporatesResult.rows.length
+    })
+  } catch (error: any) {
+    console.error('Error listing entities:', error)
+    return res.status(500).json({ error: error.message || 'Failed to list entities' })
+  }
+})
+
+// ===========================
+// TENANT CRUD OPERATIONS
+// ===========================
+
+// Helper: Auto-generate tenant code
+// Schools: SAS-001-SP, SAS-002-SP, ...
+// Corporate: SAS-001-CP, SAS-002-CP, ...
+async function generateTenantCode(type: 'school' | 'corporate'): Promise<string> {
+  const suffix = type === 'school' ? 'SP' : 'CP'
+  const table = type === 'school' ? 'school_entities' : 'corporate_entities'
+
+  // Find highest existing SAS-XXX-SP/CP code
+  const result = await query(
+    `SELECT code FROM ${table} WHERE code LIKE $1 ORDER BY code DESC LIMIT 1`,
+    [`SAS-%-${suffix}`]
+  )
+
+  let nextNum = 1
+  if (result.rows.length > 0) {
+    const match = result.rows[0].code.match(/SAS-(\d+)-/)
+    if (match) {
+      nextNum = parseInt(match[1], 10) + 1
+    }
+  }
+
+  const padded = String(nextNum).padStart(3, '0')
+  return `SAS-${padded}-${suffix}`
+}
+
+// POST: Create a new tenant (school or corporate entity)
+router.post('/tenants', async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+    const { name, email, type, address } = req.body
+
+    // Validate required fields
+    if (!name || !email || !type || !address) {
+      return res.status(400).json({ error: 'Missing required fields: name, email, type, and address are required' })
+    }
+
+    // Validate type
+    if (!['school', 'corporate'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid type. Must be "school" or "corporate"' })
+    }
+
+    // Auto-generate the code
+    const code = await generateTenantCode(type)
+
+    let result
+    if (type === 'school') {
+      // Check for duplicate name
+      const existing = await query(
+        `SELECT id FROM school_entities WHERE name = $1`,
+        [name]
+      )
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'A school entity with that name already exists' })
+      }
+
+      result = await query(
+        `INSERT INTO school_entities (name, code, email, address, is_active, status)
+         VALUES ($1, $2, $3, $4, true, 'active')
+         RETURNING id, name, code, email, address, is_active, status, created_at`,
+        [name, code, email, address]
+      )
+    } else {
+      // Check for duplicate name
+      const existing = await query(
+        `SELECT id FROM corporate_entities WHERE name = $1`,
+        [name]
+      )
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'A corporate entity with that name already exists' })
+      }
+
+      result = await query(
+        `INSERT INTO corporate_entities (name, code, email, headquarters_address, is_active, status)
+         VALUES ($1, $2, $3, $4, true, 'active')
+         RETURNING id, name, code, email, headquarters_address as address, is_active, status, created_at`,
+        [name, code, email, address]
+      )
+    }
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, target_entity, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [superadminId, 'create_tenant', result.rows[0].id, JSON.stringify({ name, code, type, email }), getClientIp(req)]
+    ).catch(() => {})
+
+    return res.status(201).json({
+      success: true,
+      tenant: { ...result.rows[0], type }
+    })
+  } catch (error: any) {
+    console.error('Error creating tenant:', error)
+    return res.status(500).json({ error: error.message || 'Failed to create tenant' })
+  }
+})
+
+// PATCH: Update tenant â€” supports status changes (activate, suspend, disable) and field edits
+router.patch('/tenants/:id', async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+    const { id } = req.params
+    const { action, name, email, address } = req.body
+
+    // Determine which table the tenant belongs to
+    let tenantType: 'school' | 'corporate' | null = null
+    let existing = await query(`SELECT id, name, status, is_active FROM school_entities WHERE id = $1`, [id])
+    if (existing.rows.length > 0) {
+      tenantType = 'school'
+    } else {
+      existing = await query(`SELECT id, name, status, is_active FROM corporate_entities WHERE id = $1`, [id])
+      if (existing.rows.length > 0) {
+        tenantType = 'corporate'
+      }
+    }
+
+    if (!tenantType) {
+      return res.status(404).json({ error: 'Tenant not found' })
+    }
+
+    const table = tenantType === 'school' ? 'school_entities' : 'corporate_entities'
+    const addressCol = tenantType === 'school' ? 'address' : 'headquarters_address'
+    let result
+    let logAction = 'update_tenant'
+
+    // Handle status-change actions
+    if (action === 'activate') {
+      result = await query(
+        `UPDATE ${table} SET is_active = true, status = 'active', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
+        [id]
+      )
+      logAction = 'activate_tenant'
+
+    } else if (action === 'suspend') {
+      result = await query(
+        `UPDATE ${table} SET is_active = false, status = 'suspended', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
+        [id]
+      )
+      logAction = 'suspend_tenant'
+
+    } else if (action === 'disable') {
+      result = await query(
+        `UPDATE ${table} SET is_active = false, status = 'disabled', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
+        [id]
+      )
+      logAction = 'disable_tenant'
+
+    } else if (action === 'edit') {
+      // Edit tenant details (name, email, address)
+      const updates: string[] = []
+      const values: any[] = []
+      let paramIdx = 1
+
+      if (name) {
+        updates.push(`name = $${paramIdx++}`)
+        values.push(name)
+      }
+      if (email) {
+        updates.push(`email = $${paramIdx++}`)
+        values.push(email)
+      }
+      if (address) {
+        updates.push(`${addressCol} = $${paramIdx++}`)
+        values.push(address)
+      }
+
+      if (updates.length === 0) {
+        return res.status(400).json({ error: 'No fields to update. Provide name, email, or address.' })
+      }
+
+      updates.push(`updated_at = CURRENT_TIMESTAMP`)
+      values.push(id)
+
+      result = await query(
+        `UPDATE ${table} SET ${updates.join(', ')}
+         WHERE id = $${paramIdx}
+         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
+        values
+      )
+      logAction = 'edit_tenant'
+
+    } else if (typeof req.body.is_active === 'boolean') {
+      // Backward compatibility: simple is_active toggle
+      const newStatus = req.body.is_active ? 'active' : 'disabled'
+      result = await query(
+        `UPDATE ${table} SET is_active = $1, status = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3
+         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
+        [req.body.is_active, newStatus, id]
+      )
+      logAction = req.body.is_active ? 'activate_tenant' : 'disable_tenant'
+
+    } else {
+      return res.status(400).json({ error: 'Invalid request. Provide an action (activate, suspend, disable, edit) or is_active boolean.' })
+    }
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, target_entity, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [superadminId, logAction, id, JSON.stringify({ name: result.rows[0]?.name, action }), getClientIp(req)]
+    ).catch(() => {})
+
+    return res.json({ success: true, tenant: result.rows[0] })
+  } catch (error: any) {
+    console.error('Error updating tenant:', error)
+    return res.status(500).json({ error: error.message || 'Failed to update tenant' })
+  }
+})
+
+// DELETE: Permanently delete a tenant
+router.delete('/tenants/:id', async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+    const { id } = req.params
+
+    // Check if tenant has associated users (via both association tables)
+    const userCheck = await query(
+      `SELECT
+        (SELECT COUNT(*) FROM school_user_associations WHERE school_entity_id = $1) +
+        (SELECT COUNT(*) FROM corporate_user_associations WHERE corporate_entity_id = $1)
+       AS count`,
+      [id]
+    )
+    if (parseInt(userCheck.rows[0].count) > 0) {
+      return res.status(400).json({
+        error: `Cannot delete tenant: ${userCheck.rows[0].count} user(s) are still associated. Remove or reassign them first.`
+      })
+    }
+
+    // Try deleting from school_entities first (cascades to association tables, configs, metrics, etc.)
+    let result = await query(
+      `DELETE FROM school_entities WHERE id = $1 RETURNING id, name, 'school' as type`,
+      [id]
+    )
+
+    // If not found in schools, try corporate_entities
+    if (result.rows.length === 0) {
+      result = await query(
+        `DELETE FROM corporate_entities WHERE id = $1 RETURNING id, name, 'corporate' as type`,
+        [id]
+      )
+    }
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant not found' })
+    }
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [superadminId, 'delete_tenant', result.rows[0].type, id, JSON.stringify({ name: result.rows[0].name, type: result.rows[0].type }), getClientIp(req)]
+    ).catch(() => {})
+
+    return res.json({ success: true, message: `Tenant "${result.rows[0].name}" deleted successfully` })
+  } catch (error: any) {
+    console.error('Error deleting tenant:', error)
+    return res.status(500).json({ error: error.message || 'Failed to delete tenant' })
+  }
+})
+
 // POST: Create new tenant admin
 router.post('/tenant-admins', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
   try {
     const superadminId = req.user!.userId
-    const { email, name, tenantId, password } = req.body
+    // Accept both field naming conventions from frontend
+    const email = req.body.email
+    const fullName = req.body.fullName || req.body.name
+    const tenantId = req.body.tenant_id || req.body.tenantId
+    const password = req.body.password
 
     // Validate input
-    if (!email || !name || !tenantId || !password) {
-      return res.status(400).json({ error: 'Missing required fields' })
+    if (!email || !fullName || !tenantId || !password) {
+      return res.status(400).json({ error: 'Missing required fields: email, fullName, tenant_id, password' })
     }
 
     // Validate email format
@@ -1363,7 +1795,7 @@ router.post('/tenant-admins', authenticateToken, (req, res, next) => verifySuper
       return res.status(400).json({ error: 'Password must be at least 8 characters' })
     }
 
-    // Check if tenant exists
+    // Check if tenant exists and determine type
     const tenantCheck = await query(
       `SELECT id, name, entity_type FROM (
         SELECT id, name, 'school' as entity_type FROM school_entities WHERE id = $1
@@ -1381,45 +1813,77 @@ router.post('/tenant-admins', authenticateToken, (req, res, next) => verifySuper
 
     // Check if email already exists
     const emailCheck = await query(
-      `SELECT id FROM users WHERE email = $1 AND entity_id = $2`,
-      [email.toLowerCase(), tenantId]
+      `SELECT id FROM users WHERE email = $1`,
+      [email.toLowerCase()]
     )
 
     if (emailCheck.rows.length > 0) {
-      return res.status(409).json({ error: 'Email already exists for this tenant' })
+      return res.status(409).json({ error: 'A user with this email already exists' })
     }
 
-    // Hash password
-    const crypto = require('crypto')
-    const hashedPassword = crypto
-      .createHash('sha256')
-      .update(password)
-      .digest('hex')
+    // Hash password using bcrypt (consistent with rest of the system)
+    const salt = await bcrypt.genSalt(10)
+    const hashedPassword = await bcrypt.hash(password, salt)
 
-    // Get admin role
-    const roleCheck = await query(`SELECT id FROM roles WHERE name = 'admin' LIMIT 1`)
+    // Get admin role for the appropriate platform
+    const platformType = tenant.entity_type === 'school' ? 'school' : 'corporate'
+    const roleCheck = await query(
+      `SELECT r.id FROM roles r
+       JOIN platforms p ON r.platform_id = p.id
+       WHERE r.name = 'admin' AND p.name = $1
+       LIMIT 1`,
+      [platformType]
+    )
     if (roleCheck.rows.length === 0) {
-      return res.status(500).json({ error: 'Admin role not found' })
+      return res.status(500).json({ error: 'Admin role not found for this platform' })
     }
 
     const adminRoleId = roleCheck.rows[0].id
 
-    // Create user record
+    // Get platform_id
+    const platformResult = await query(`SELECT id FROM platforms WHERE name = $1`, [platformType])
+    const platformId = platformResult.rows[0]?.id
+
+    // Create user record with correct column names
     const userResult = await query(
-      `INSERT INTO users (email, password, name, role_id, entity_id, is_active, created_at)
+      `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, created_at)
        VALUES ($1, $2, $3, $4, $5, true, NOW())
-       RETURNING id, email, name`,
-      [email.toLowerCase(), hashedPassword, name, adminRoleId, tenantId]
+       RETURNING id, email, full_name`,
+      [platformId, email.toLowerCase(), fullName, adminRoleId, hashedPassword]
     )
 
     const newUser = userResult.rows[0]
+
+    // Link user to tenant via association table
+    if (tenant.entity_type === 'school') {
+      await query(
+        `INSERT INTO school_user_associations (user_id, school_entity_id, status, assigned_at)
+         VALUES ($1, $2, 'active', NOW())
+         ON CONFLICT DO NOTHING`,
+        [newUser.id, tenantId]
+      )
+    } else {
+      await query(
+        `INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status, assigned_at)
+         VALUES ($1, $2, 'active', NOW())
+         ON CONFLICT DO NOTHING`,
+        [newUser.id, tenantId]
+      )
+    }
+
+    // Update entity admin_user_id
+    if (tenant.entity_type === 'school') {
+      await query(`UPDATE school_entities SET admin_user_id = $1 WHERE id = $2 AND admin_user_id IS NULL`, [newUser.id, tenantId])
+    } else {
+      await query(`UPDATE corporate_entities SET admin_user_id = $1 WHERE id = $2 AND admin_user_id IS NULL`, [newUser.id, tenantId])
+    }
 
     // Log audit entry for superadmin action
     try {
       await query(
         `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
          VALUES ($1, $2, $3, $4)`,
-        [superadminId, 'CREATE_TENANT_ADMIN', req.ip || 'unknown', JSON.stringify({
+        [superadminId, 'CREATE_TENANT_ADMIN', getClientIp(req) || 'unknown', JSON.stringify({
           admin_id: newUser.id,
           admin_email: newUser.email,
           tenant_id: tenantId,
@@ -1437,7 +1901,7 @@ router.post('/tenant-admins', authenticateToken, (req, res, next) => verifySuper
       data: {
         id: newUser.id,
         email: newUser.email,
-        name: newUser.name,
+        name: newUser.full_name,
         tenantId: tenantId,
         tenantName: tenant.name
       }
@@ -1454,17 +1918,19 @@ router.get('/tenant-admins/:tenantId', authenticateToken, (req, res, next) => ve
     const { tenantId } = req.params
 
     const result = await query(
-      `SELECT u.id, u.email, u.name, u.created_at, 
+      `SELECT u.id, u.email, u.full_name as name, u.created_at, 
               CASE 
-                WHEN se.id IS NOT NULL THEN 'school' 
+                WHEN sua.school_entity_id IS NOT NULL THEN 'school' 
                 ELSE 'corporate' 
               END as tenant_type,
               COALESCE(se.name, ce.name) as tenant_name
        FROM users u
-       LEFT JOIN school_entities se ON u.entity_id = se.id
-       LEFT JOIN corporate_entities ce ON u.entity_id = ce.id
+       LEFT JOIN school_user_associations sua ON sua.user_id = u.id
+       LEFT JOIN school_entities se ON se.id = sua.school_entity_id
+       LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
+       LEFT JOIN corporate_entities ce ON ce.id = cua.corporate_entity_id
        JOIN roles r ON u.role_id = r.id
-       WHERE r.name = 'admin' AND u.entity_id = $1
+       WHERE r.name = 'admin' AND (sua.school_entity_id = $1 OR cua.corporate_entity_id = $1)
        ORDER BY u.created_at DESC`,
       [tenantId]
     )
@@ -1488,7 +1954,12 @@ router.delete('/tenant-admins/:adminId', authenticateToken, (req, res, next) => 
 
     // Get admin info before deletion
     const adminInfo = await query(
-      `SELECT u.id, u.email, u.entity_id FROM users u WHERE u.id = $1`,
+      `SELECT u.id, u.email,
+              COALESCE(sua.school_entity_id, cua.corporate_entity_id) as tenant_id
+       FROM users u
+       LEFT JOIN school_user_associations sua ON sua.user_id = u.id
+       LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
+       WHERE u.id = $1`,
       [adminId]
     )
 
@@ -1509,10 +1980,10 @@ router.delete('/tenant-admins/:adminId', authenticateToken, (req, res, next) => 
       await query(
         `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
          VALUES ($1, $2, $3, $4)`,
-        [superadminId, 'REMOVE_TENANT_ADMIN', req.ip || 'unknown', JSON.stringify({
+        [superadminId, 'REMOVE_TENANT_ADMIN', getClientIp(req) || 'unknown', JSON.stringify({
           admin_id: admin.id,
           admin_email: admin.email,
-          tenant_id: admin.entity_id
+          tenant_id: admin.tenant_id
         })]
       )
     } catch (auditError) {
@@ -1526,6 +1997,184 @@ router.delete('/tenant-admins/:adminId', authenticateToken, (req, res, next) => 
   } catch (error: any) {
     console.error('Error removing tenant admin:', error)
     return res.status(500).json({ error: error.message || 'Failed to remove tenant admin' })
+  }
+})
+
+// ===========================
+// USERS MANAGEMENT ENDPOINTS
+// ===========================
+
+// GET: List all users in the system
+router.get('/users', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+
+    // Get all users with their entity and role information
+    // Users link to entities via school_user_associations / corporate_user_associations
+    const usersResult = await query(
+      `SELECT 
+        u.id,
+        u.email,
+        u.full_name as name,
+        u.is_active,
+        false as is_suspended,
+        r.name as role,
+        COALESCE(se.name, ce.name, 'System') as entity_name,
+        u.created_at
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.id
+      LEFT JOIN school_user_associations sua ON sua.user_id = u.id
+      LEFT JOIN school_entities se ON se.id = sua.school_entity_id
+      LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
+      LEFT JOIN corporate_entities ce ON ce.id = cua.corporate_entity_id
+      ORDER BY u.created_at DESC`
+    )
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
+       VALUES ($1, $2, $3)`,
+      [superadminId, 'list_users', getClientIp(req)]
+    ).catch(() => {})
+
+    return res.json(usersResult.rows || [])
+  } catch (error: any) {
+    console.error('Error listing users:', error)
+    return res.status(500).json({ error: error.message || 'Failed to list users' })
+  }
+})
+
+// PATCH: Update user (activate / suspend / disable / edit)
+router.patch('/users/:userId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+    const { userId } = req.params
+    const { action, name, email } = req.body
+
+    // Verify user exists
+    const userCheck = await query(`SELECT id, email, full_name, is_active FROM users WHERE id = $1`, [userId])
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const user = userCheck.rows[0]
+
+    // Prevent modifying superadmin users
+    const roleCheck = await query(
+      `SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+      [userId]
+    )
+    if (roleCheck.rows[0]?.name === 'superadmin') {
+      return res.status(403).json({ error: 'Cannot modify superadmin users' })
+    }
+
+    if (action === 'activate') {
+      await query(`UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1`, [userId])
+    } else if (action === 'suspend') {
+      await query(`UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1`, [userId])
+    } else if (action === 'disable') {
+      await query(`UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1`, [userId])
+    } else if (action === 'edit') {
+      if (!name && !email) {
+        return res.status(400).json({ error: 'No fields to update' })
+      }
+      const updates: string[] = []
+      const values: any[] = []
+      let paramIdx = 1
+
+      if (name) {
+        updates.push(`full_name = $${paramIdx++}`)
+        values.push(name)
+      }
+      if (email) {
+        // Check email uniqueness
+        const emailExists = await query(`SELECT id FROM users WHERE email = $1 AND id != $2`, [email.toLowerCase(), userId])
+        if (emailExists.rows.length > 0) {
+          return res.status(409).json({ error: 'Email already in use by another user' })
+        }
+        updates.push(`email = $${paramIdx++}`)
+        values.push(email.toLowerCase())
+      }
+      updates.push(`updated_at = NOW()`)
+      values.push(userId)
+
+      await query(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIdx}`,
+        values
+      )
+    } else {
+      return res.status(400).json({ error: 'Invalid action. Use: activate, suspend, disable, or edit' })
+    }
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
+       VALUES ($1, $2, $3, $4)`,
+      [superadminId, `USER_${(action || 'unknown').toUpperCase()}`, getClientIp(req) || 'unknown', JSON.stringify({
+        user_id: userId,
+        user_email: user.email,
+        action
+      })]
+    ).catch(() => {})
+
+    return res.json({ success: true, message: `User ${action}d successfully` })
+  } catch (error: any) {
+    console.error('Error updating user:', error)
+    return res.status(500).json({ error: error.message || 'Failed to update user' })
+  }
+})
+
+// DELETE: Remove user permanently
+router.delete('/users/:userId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const superadminId = req.user!.userId
+    const { userId } = req.params
+
+    // Verify user exists
+    const userCheck = await query(`SELECT id, email, full_name FROM users WHERE id = $1`, [userId])
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const user = userCheck.rows[0]
+
+    // Prevent deleting superadmin users
+    const roleCheck = await query(
+      `SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+      [userId]
+    )
+    if (roleCheck.rows[0]?.name === 'superadmin') {
+      return res.status(403).json({ error: 'Cannot delete superadmin users' })
+    }
+
+    // Remove associations first
+    await query(`DELETE FROM school_user_associations WHERE user_id = $1`, [userId])
+    await query(`DELETE FROM corporate_user_associations WHERE user_id = $1`, [userId])
+    await query(`DELETE FROM school_user_approvals WHERE user_id = $1`, [userId])
+    await query(`DELETE FROM corporate_user_approvals WHERE user_id = $1`, [userId])
+
+    // Clear admin_user_id references
+    await query(`UPDATE school_entities SET admin_user_id = NULL WHERE admin_user_id = $1`, [userId])
+    await query(`UPDATE corporate_entities SET admin_user_id = NULL WHERE admin_user_id = $1`, [userId])
+
+    // Delete user
+    await query(`DELETE FROM users WHERE id = $1`, [userId])
+
+    // Log the action
+    await query(
+      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
+       VALUES ($1, $2, $3, $4)`,
+      [superadminId, 'DELETE_USER', getClientIp(req) || 'unknown', JSON.stringify({
+        user_id: userId,
+        user_email: user.email,
+        user_name: user.full_name
+      })]
+    ).catch(() => {})
+
+    return res.json({ success: true, message: 'User deleted successfully' })
+  } catch (error: any) {
+    console.error('Error deleting user:', error)
+    return res.status(500).json({ error: error.message || 'Failed to delete user' })
   }
 })
 

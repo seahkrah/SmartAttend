@@ -16,11 +16,13 @@ interface OrgSettings {
   id: string
   name: string
   code: string
-  contact_email: string
-  contact_phone: string | null
+  email: string
+  phone: string | null
   headquarters_address: string | null
   industry: string | null
+  is_active: boolean
   created_at: string
+  updated_at: string
 }
 
 const CorporateAdminSettingsPage: React.FC = () => {

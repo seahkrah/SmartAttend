@@ -48,7 +48,7 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
       const response = await axios.get('/api/auth/admin/pending-approvals', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setApprovals(response.data.approvals);
+      setApprovals(response.data.approvals || {});
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to fetch pending approvals');

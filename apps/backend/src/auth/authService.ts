@@ -158,7 +158,11 @@ export async function loginUser(
           }
         } else {
           // Not a superadmin, show platform mismatch error
-          throw new Error('email_registered_different_platform')
+          const correctPlatform = userInOtherPlatform.platform_name === 'school' ? 'School' : 'Corporate'
+          const error = new Error(`PLATFORM_MISMATCH:${correctPlatform}`) as any
+          error.code = 'PLATFORM_MISMATCH'
+          error.correctPlatform = correctPlatform
+          throw error
         }
       } else {
         // Password is incorrect

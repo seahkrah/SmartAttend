@@ -10,11 +10,13 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = React.useState('');
   const [loginType, setLoginType] = React.useState<'user' | 'superadmin'>('user');
   const [platform, setPlatform] = React.useState<'school' | 'corporate'>('school');
+  const [platformMismatch, setPlatformMismatch] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const { login, superadminLogin, isLoading, error, clearError } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPlatformMismatch(null);
     try {
       if (loginType === 'superadmin') {
         // Superadmin login without platform requirement
@@ -55,8 +57,12 @@ export const LoginPage: React.FC = () => {
           navigate('/dashboard');
         }
       }, 0);
-    } catch (err) {
-      // Error is already set in store
+    } catch (err: any) {
+      // Check for platform mismatch error
+      const responseData = err?.response?.data;
+      if (responseData?.code === 'PLATFORM_MISMATCH' && responseData?.correctPlatform) {
+        setPlatformMismatch(responseData.correctPlatform);
+      }
     }
   };
 
@@ -170,9 +176,32 @@ export const LoginPage: React.FC = () => {
             />
 
             {/* Error Message */}
-            {error && (
+            {error && !platformMismatch && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
                 {error}
+              </div>
+            )}
+
+            {/* Platform Mismatch Warning */}
+            {platformMismatch && (
+              <div className="p-4 bg-amber-500/15 border border-amber-500/50 rounded-lg">
+                <p className="text-amber-300 text-sm font-medium mb-2">
+                  ⚠️ Wrong platform selected
+                </p>
+                <p className="text-amber-200/80 text-sm mb-3">
+                  Your account is registered under the <strong className="text-amber-100">{platformMismatch === 'school' ? 'School' : 'Corporate'}</strong> platform. Please switch to continue.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlatform(platformMismatch as 'school' | 'corporate');
+                    setPlatformMismatch(null);
+                    clearError();
+                  }}
+                  className="w-full py-2 px-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-200 text-sm font-medium transition-colors"
+                >
+                  Switch to {platformMismatch === 'school' ? 'School' : 'Corporate'} and retry
+                </button>
               </div>
             )}
 

@@ -412,6 +412,17 @@ router.post('/login', async (req: LoginRequest, res: Response) => {
     })
   } catch (error: any) {
     logError('Login', error)
+    
+    // Handle platform mismatch - tell the user which platform to use
+    if (error.code === 'PLATFORM_MISMATCH' || (error.message && error.message.startsWith('PLATFORM_MISMATCH:'))) {
+      const correctPlatform = error.correctPlatform || error.message.split(':')[1] || 'other'
+      return res.status(401).json({
+        error: `Your account is registered under the ${correctPlatform} platform. Please select "${correctPlatform}" and try again.`,
+        code: 'PLATFORM_MISMATCH',
+        correctPlatform: correctPlatform.toLowerCase()
+      })
+    }
+    
     // Don't expose whether email exists or password is wrong
     return res.status(401).json({ error: ErrorMessages.AUTH_INVALID_CREDENTIALS })
   }

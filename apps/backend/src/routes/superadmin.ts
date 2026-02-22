@@ -2178,4 +2178,149 @@ router.delete('/users/:userId', authenticateToken, (req, res, next) => verifySup
   }
 })
 
+// ===========================
+// ANALYTICS ENDPOINT - LIVE DATA
+// ===========================
+
+router.get('/analytics', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30
+
+    // 1. User growth trend: for each day in the range, get cumulative total users,
+    //    new registrations that day, and active users as of that day
+    const userGrowthResult = await query(
+      `WITH date_series AS (
+        SELECT generate_series(
+          (CURRENT_DATE - ($1 || ' days')::interval)::date,
+          CURRENT_DATE,
+          '1 day'::interval
+        )::date AS day
+      ),
+      daily_registrations AS (
+        SELECT created_at::date AS day, COUNT(*) AS new_registrations
+        FROM users
+        WHERE created_at >= (CURRENT_DATE - ($1 || ' days')::interval)
+        GROUP BY created_at::date
+      ),
+      cumulative AS (
+        SELECT
+          ds.day,
+          COALESCE(dr.new_registrations, 0) AS new_registrations,
+          (SELECT COUNT(*) FROM users WHERE created_at::date <= ds.day) AS total_users,
+          (SELECT COUNT(*) FROM users WHERE created_at::date <= ds.day AND is_active = true) AS active_users
+        FROM date_series ds
+        LEFT JOIN daily_registrations dr ON ds.day = dr.day
+      )
+      SELECT day, new_registrations, total_users, active_users
+      FROM cumulative
+      ORDER BY day ASC`,
+      [days]
+    )
+
+    const userGrowth = userGrowthResult.rows.map((row: any) => ({
+      date: new Date(row.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      rawDate: row.day,
+      newRegistrations: parseInt(row.new_registrations) || 0,
+      totalUsers: parseInt(row.total_users) || 0,
+      activeUsers: parseInt(row.active_users) || 0,
+    }))
+
+    // 2. System health summary from system_health table
+    const healthResult = await query(
+      `SELECT
+        COUNT(CASE WHEN status = 'DOWN' THEN 1 END) AS critical,
+        COUNT(CASE WHEN status = 'DEGRADED' THEN 1 END) AS warnings,
+        COUNT(CASE WHEN status = 'HEALTHY' THEN 1 END) AS healthy
+       FROM system_health`
+    )
+    const healthRow = healthResult.rows[0] || {}
+    const systemHealth = {
+      critical: parseInt(healthRow.critical) || 0,
+      warnings: parseInt(healthRow.warnings) || 0,
+      healthy: parseInt(healthRow.healthy) || 0,
+    }
+
+    // 3. Key metrics - computed from real data
+    // Average response time from platform_metrics (last 24h)
+    const avgLatencyResult = await query(
+      `SELECT COALESCE(AVG(response_time_ms), 0) AS avg_response_time
+       FROM platform_metrics
+       WHERE created_at >= NOW() - INTERVAL '24 hours'
+         AND response_time_ms IS NOT NULL`
+    )
+
+    // Active sessions (users who logged in within last hour - approximate from audit_logs or just active user count)
+    const activeSessionsResult = await query(
+      `SELECT COUNT(DISTINCT created_by_user_id) as active_sessions
+       FROM platform_metrics
+       WHERE created_at >= NOW() - INTERVAL '1 hour'`
+    )
+
+    // API calls in last hour
+    const apiCallsResult = await query(
+      `SELECT COUNT(*) as api_calls
+       FROM platform_metrics
+       WHERE created_at >= NOW() - INTERVAL '1 hour'`
+    )
+
+    // Uptime: percentage of healthy checks vs total checks
+    const uptimeResult = await query(
+      `SELECT
+        COUNT(*) as total_checks,
+        COUNT(CASE WHEN status = 'HEALTHY' THEN 1 END) as healthy_checks
+       FROM system_health`
+    )
+    const uptimeRow = uptimeResult.rows[0] || {}
+    const totalChecks = parseInt(uptimeRow.total_checks) || 0
+    const healthyChecks = parseInt(uptimeRow.healthy_checks) || 0
+    const uptime = totalChecks > 0 ? ((healthyChecks / totalChecks) * 100).toFixed(2) : '100.00'
+
+    const keyMetrics = {
+      avgResponseTimeMs: Math.round(parseFloat(avgLatencyResult.rows[0]?.avg_response_time) || 0),
+      systemUptime: parseFloat(uptime),
+      apiCallsLastHour: parseInt(apiCallsResult.rows[0]?.api_calls) || 0,
+      activeSessions: parseInt(activeSessionsResult.rows[0]?.active_sessions) || 0,
+    }
+
+    // 4. Summary stats: total users, active, roles breakdown, tenants
+    const totalUsersResult = await query(`SELECT COUNT(*) as cnt FROM users`)
+    const activeUsersResult = await query(`SELECT COUNT(*) as cnt FROM users WHERE is_active = true`)
+    const rolesResult = await query(
+      `SELECT r.name, COUNT(u.id) as count
+       FROM roles r
+       LEFT JOIN users u ON u.role_id = r.id
+       GROUP BY r.name
+       ORDER BY r.name`
+    )
+    const schoolsResult = await query(`SELECT COUNT(*) as cnt FROM school_entities`)
+    const corporatesResult = await query(`SELECT COUNT(*) as cnt FROM corporate_entities`)
+    const incidentsResult = await query(`SELECT COUNT(*) as cnt FROM incidents`)
+
+    const summary = {
+      totalUsers: parseInt(totalUsersResult.rows[0]?.cnt) || 0,
+      activeUsers: parseInt(activeUsersResult.rows[0]?.cnt) || 0,
+      totalSchools: parseInt(schoolsResult.rows[0]?.cnt) || 0,
+      totalCorporates: parseInt(corporatesResult.rows[0]?.cnt) || 0,
+      totalIncidents: parseInt(incidentsResult.rows[0]?.cnt) || 0,
+      roleBreakdown: rolesResult.rows.map((r: any) => ({
+        role: r.name,
+        count: parseInt(r.count) || 0,
+      })),
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        userGrowth,
+        systemHealth,
+        keyMetrics,
+        summary,
+      },
+    })
+  } catch (error: any) {
+    console.error('Error loading analytics:', error)
+    return res.status(500).json({ error: error.message || 'Failed to load analytics' })
+  }
+})
+
 export default router

@@ -8,23 +8,16 @@ import { useNavigate } from 'react-router-dom';
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
-  const [loginType, setLoginType] = React.useState<'user' | 'superadmin'>('user');
   const [platform, setPlatform] = React.useState<'school' | 'corporate'>('school');
   const [platformMismatch, setPlatformMismatch] = React.useState<string | null>(null);
   const navigate = useNavigate();
-  const { login, superadminLogin, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading, error, clearError } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPlatformMismatch(null);
     try {
-      if (loginType === 'superadmin') {
-        // Superadmin login without platform requirement
-        await superadminLogin(email, password);
-      } else {
-        // Regular user login with platform
-        await login(email, password, platform);
-      }
+      await login(email, password, platform);
       
       // Route based on role after login
       setTimeout(() => {
@@ -88,65 +81,34 @@ export const LoginPage: React.FC = () => {
         {/* Form Card */}
         <div className="card mb-6">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Login Type Selection */}
+            {/* Platform Selection */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Login Type
+                Platform Type
               </label>
               <div className="flex gap-3">
-                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: loginType === 'user' ? '#5d7fff' : undefined }}>
+                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'school' ? '#5d7fff' : undefined }}>
                   <input
                     type="radio"
-                    value="user"
-                    checked={loginType === 'user'}
-                    onChange={(e) => setLoginType(e.target.value as 'user' | 'superadmin')}
+                    value="school"
+                    checked={platform === 'school'}
+                    onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">User Login</span>
+                  <span className="text-slate-300">School</span>
                 </label>
-                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: loginType === 'superadmin' ? '#5d7fff' : undefined }}>
+                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'corporate' ? '#5d7fff' : undefined }}>
                   <input
                     type="radio"
-                    value="superadmin"
-                    checked={loginType === 'superadmin'}
-                    onChange={(e) => setLoginType(e.target.value as 'user' | 'superadmin')}
+                    value="corporate"
+                    checked={platform === 'corporate'}
+                    onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">System Admin</span>
+                  <span className="text-slate-300">Corporate</span>
                 </label>
               </div>
             </div>
-
-            {/* Platform Selection - Only for regular users */}
-            {loginType === 'user' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Platform Type
-                </label>
-                <div className="flex gap-3">
-                  <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'school' ? '#5d7fff' : undefined }}>
-                    <input
-                      type="radio"
-                      value="school"
-                      checked={platform === 'school'}
-                      onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-slate-300">School</span>
-                  </label>
-                  <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'corporate' ? '#5d7fff' : undefined }}>
-                    <input
-                      type="radio"
-                      value="corporate"
-                      checked={platform === 'corporate'}
-                      onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-slate-300">Corporate</span>
-                  </label>
-                </div>
-              </div>
-            )}
 
             {/* Email Input */}
             <div>

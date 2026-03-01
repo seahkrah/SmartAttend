@@ -9,21 +9,9 @@ import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import {
   Save, Building2, Mail, Phone, MapPin,
   Briefcase, Loader2, CheckCircle2, AlertCircle,
+  Eye, EyeOff
 } from 'lucide-react'
 import axios from 'axios'
-
-interface OrgSettings {
-  id: string
-  name: string
-  code: string
-  email: string
-  phone: string | null
-  headquarters_address: string | null
-  industry: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
 
 const CorporateAdminSettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<OrgSettings | null>(null)
@@ -33,6 +21,15 @@ const CorporateAdminSettingsPage: React.FC = () => {
   const [form, setForm] = useState({
     name: '', contact_email: '', contact_phone: '', headquarters_address: '', industry: '',
   })
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loadingPassword, setLoadingPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const token = localStorage.getItem('accessToken')
   const headers = { Authorization: `Bearer ${token}` }
@@ -84,6 +81,44 @@ const CorporateAdminSettingsPage: React.FC = () => {
       setSaving(false)
     }
   }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+    if (!newPassword || newPassword.length < 8) {
+      setError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('New password and confirmation do not match.');
+      return;
+    }
+    setLoadingPassword(true);
+    try {
+      // Replace with your actual API call
+      const res = await fetch('/api/corporate-admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to reset password.');
+      } else {
+        setSuccess(true);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+    } catch (err) {
+      setError('Network error.');
+    } finally {
+      setLoadingPassword(false);
+    }
+  };
+
+  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
   if (loading) {
     return (
@@ -193,6 +228,77 @@ const CorporateAdminSettingsPage: React.FC = () => {
               </button>
             </div>
           </form>
+
+          {/* Password Reset Section */}
+          <div className="mt-8">
+            <h2 className="text-xl font-bold text-white mb-6">Reset Password</h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6">
+              <div className="relative">
+                <label className="block text-sm text-slate-300 mb-2">Current Password</label>
+                <input
+                  type={showCurrent ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  className="input-field w-full pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute top-8 right-3 text-slate-400 hover:text-slate-200"
+                  tabIndex={-1}
+                  onClick={() => setShowCurrent(v => !v)}
+                >
+                  {showCurrent ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <div className="relative">
+                <label className="block text-sm text-slate-300 mb-2">New Password</label>
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="input-field w-full pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute top-8 right-3 text-slate-400 hover:text-slate-200"
+                  tabIndex={-1}
+                  onClick={() => setShowNew(v => !v)}
+                >
+                  {showNew ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm text-slate-300 mb-2">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="input-field w-full"
+                  required
+                />
+                {confirmPassword.length > 0 && (
+                  passwordsMatch ? (
+                    <div className="text-green-400 text-sm mt-1">Passwords match</div>
+                  ) : (
+                    <div className="text-red-400 text-sm mt-1">Passwords do not match</div>
+                  )
+                )}
+              </div>
+              {error && <div className="text-red-400 text-sm">{error}</div>}
+              {success && <div className="text-green-400 text-sm">Password reset successful!</div>}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="btn-primary px-6 py-2 rounded-lg font-medium"
+                  disabled={loadingPassword}
+                >
+                  {loadingPassword ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </TenantAdminLayout>

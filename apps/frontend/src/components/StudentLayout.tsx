@@ -21,6 +21,7 @@ import {
   Bell,
   GraduationCap,
   LucideIcon,
+  Award,
 } from 'lucide-react'
 
 // ── Sidebar items ──
@@ -37,6 +38,7 @@ const STUDENT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'courses', label: 'My Courses', icon: BookOpen, color: 'from-purple-500 to-purple-600' },
   { id: 'attendance', label: 'Attendance', icon: ClipboardList, color: 'from-emerald-500 to-emerald-600' },
   { id: 'schedule', label: 'Schedule', icon: CalendarDays, color: 'from-violet-500 to-violet-600' },
+  { id: 'results', label: 'Results', icon: Award, color: 'from-amber-500 to-amber-600' },
   { id: 'settings', label: 'Settings', icon: Settings, color: 'from-slate-500 to-slate-600' },
 ]
 

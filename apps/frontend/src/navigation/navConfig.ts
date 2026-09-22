@@ -74,8 +74,7 @@ export const schoolNav: NavGroup[] = [
     label: 'Academics',
     items: [
       { label: 'Colleges & Departments', to: '/departments', icon: Landmark, status: 'ready' },
-      // Needs a curriculum schema — programmes, versioned curricula, accreditation.
-      { label: 'Programmes & Curriculum', to: '/programmes', icon: Layers, status: 'planned' },
+      { label: 'Programmes & Curriculum', to: '/programmes', icon: Layers, status: 'ready' },
       { label: 'Courses & Sections', to: '/courses', icon: BookOpen, status: 'ready' },
     ],
   },
@@ -99,7 +98,8 @@ export const schoolNav: NavGroup[] = [
   {
     label: 'Examinations',
     items: [
-      // Needs results, an approval workflow and transcript generation.
+      // Grading schemes and publication live with the registrar; lecturers
+      // enter marks from their own gradebook.
       { label: 'Results & Transcripts', to: '/examinations', icon: FileText, status: 'planned' },
     ],
   },

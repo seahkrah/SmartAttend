@@ -24,6 +24,7 @@ import {
   CalendarDays,
   BarChart3,
   Settings,
+  Award,
 } from 'lucide-react'
 
 // ── Sidebar items ──
@@ -43,6 +44,7 @@ const FACULTY_SIDEBAR_ITEMS: Omit<SidebarItem, 'badge'>[] = [
   { id: 'enrollment', label: 'Enrollment', icon: UserPlus, color: 'from-teal-500 to-teal-600' },
   { id: 'attendance', label: 'Attendance', icon: ClipboardList, color: 'from-orange-500 to-orange-600' },
   { id: 'schedules', label: 'Schedules', icon: CalendarDays, color: 'from-violet-500 to-violet-600' },
+  { id: 'gradebook', label: 'Gradebook', icon: Award, color: 'from-amber-500 to-amber-600' },
   { id: 'reports', label: 'Reports', icon: BarChart3, color: 'from-cyan-500 to-cyan-600' },
   { id: 'settings', label: 'Settings', icon: Settings, color: 'from-slate-500 to-slate-600' },
 ]

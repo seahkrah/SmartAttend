@@ -49,6 +49,9 @@ import SchoolAdminSettingsPage from './pages/SchoolAdminSettingsPage';
 import SchoolAdminStudentsPage from './pages/SchoolAdminStudentsPage';
 import SchoolAdminFacultyPage from './pages/SchoolAdminFacultyPage';
 import SchoolAdminCoursesPage from './pages/SchoolAdminCoursesPage';
+import SchoolAdminProgrammesPage from './pages/SchoolAdminProgrammesPage';
+import FacultyGradebookPage from './pages/FacultyGradebookPage';
+import StudentResultsPage from './pages/StudentResultsPage';
 import SchoolAdminRoomsPage from './pages/SchoolAdminRoomsPage';
 import SchoolAdminSchedulesPage from './pages/SchoolAdminSchedulesPage';
 import SchoolAdminEnrollmentPage from './pages/SchoolAdminEnrollmentPage';
@@ -155,6 +158,7 @@ export default function App() {
                   <Route path="/students" element={<SchoolAdminStudentsPage />} />
                   <Route path="/faculty" element={<SchoolAdminFacultyPage />} />
                   <Route path="/courses" element={<SchoolAdminCoursesPage />} />
+                  <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
                   <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
                   <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                   <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
@@ -218,6 +222,7 @@ export default function App() {
                   <Route path="/enrollment" element={<FacultyEnrollmentPage />} />
                   <Route path="/attendance" element={<FacultyAttendanceWorkflowPage />} />
                   <Route path="/schedules" element={<FacultySchedulesPage />} />
+                  <Route path="/gradebook" element={<FacultyGradebookPage />} />
                   <Route path="/reports" element={<FacultyReportsPage />} />
                   <Route path="/settings" element={<FacultySettingsPage />} />
                 </Routes>
@@ -252,6 +257,7 @@ export default function App() {
                   <Route path="/courses" element={<StudentCoursesPage />} />
                   <Route path="/attendance" element={<StudentAttendancePage />} />
                   <Route path="/schedule" element={<StudentSchedulePage />} />
+                  <Route path="/results" element={<StudentResultsPage />} />
                   <Route path="/settings" element={<StudentSettingsPage />} />
                 </Routes>
               </RoleRoute>

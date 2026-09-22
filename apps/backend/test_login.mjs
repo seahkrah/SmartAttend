@@ -3,14 +3,19 @@ import fetch from 'node-fetch';
 
 async function testLogin() {
   try {
+    if (!process.env.SUPERADMIN_EMAIL || !process.env.SUPERADMIN_PASSWORD) {
+      console.error('Set SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD before running this script.');
+      process.exit(1);
+    }
+
     console.log('🧪 Testing superadmin login endpoint...\n');
     
     const response = await fetch('http://localhost:5000/api/auth/login-superadmin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'newadmin@jjelotech.local',
-        password: 'NewAdmin123!@#'
+        email: process.env.SUPERADMIN_EMAIL,
+        password: process.env.SUPERADMIN_PASSWORD
       })
     });
     

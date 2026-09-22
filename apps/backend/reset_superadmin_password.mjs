@@ -20,14 +20,19 @@ async function resetSuperadminPassword() {
   try {
     console.log('🔄 Resetting superadmin password...\n');
     
-    const newPassword = 'Superadmin@123';
+    const newPassword = process.env.NEW_PASSWORD;
+    if (!newPassword) {
+      console.error('Set NEW_PASSWORD before running this script.');
+      await pool.end();
+      process.exit(1);
+    }
     const saltRounds = 10;
     const hashedPassword = await bcryptjs.hash(newPassword, saltRounds);
     
     // Update the password
     const result = await pool.query(
       `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE email = $2 AND id = $3 RETURNING email, id`,
-      [hashedPassword, 'newadmin@jjelotech.local', '42c836f0-527e-4bd8-834c-31f82c2afcb2']
+      [hashedPassword, process.env.TARGET_EMAIL, process.env.TARGET_USER_ID]
     );
     
     if (result.rows.length === 0) {
@@ -38,10 +43,9 @@ async function resetSuperadminPassword() {
     
     console.log('✅ Password reset successfully\n');
     console.log('━'.repeat(70));
-    console.log('📧 Email:    newadmin@jjelotech.local');
-    console.log('🔑 Password: Superadmin@123');
+    console.log(`📧 Email:    ${result.rows[0].email}`);
+    console.log('🔑 Password: (the value you passed in NEW_PASSWORD)');
     console.log('━'.repeat(70));
-    console.log('\n✅ Try logging in with these NEW credentials\n');
     
   } catch (error) {
     console.error('❌ Error:', error.message);

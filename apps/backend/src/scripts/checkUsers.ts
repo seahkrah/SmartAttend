@@ -8,13 +8,12 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 
-const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  database: 'jjelotech',
-  user: 'jjelotech_user',
-  password: 'jjelotech_password',
-});
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is not set. Export it (or source your .env) before running this script.');
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function checkUsers() {
   try {

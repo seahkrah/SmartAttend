@@ -197,3 +197,11 @@ docker-compose.override.yml
 !Dockerfile
 !docker-compose.yml
 !.dockerignore
+
+# ── Credentials (never commit) ─────────────────────────────────────────────
+# Plaintext account passwords were committed to this repository once; see
+# SECURITY_CREDENTIAL_ROTATION.md. These patterns stop it happening again.
+*credentials*.txt
+*passwords*.txt
+*Passwords*.txt
+rotated-credentials-*.txt

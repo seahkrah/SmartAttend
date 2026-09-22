@@ -1,13 +1,12 @@
 import pg from 'pg';
 const { Pool } = pg;
 
-const pool = new Pool({
-  user: 'postgres',
-  password: 'seahkrah',
-  host: 'localhost',
-  port: 5432,
-  database: 'jjelotech'
-});
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is not set. Export it (or source your .env) before running this script.');
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function checkSchema() {
   try {

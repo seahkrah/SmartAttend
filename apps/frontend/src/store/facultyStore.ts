@@ -137,7 +137,7 @@ export const useFacultyStore = create<FacultyState>((set, get) => ({
       useToastStore.getState().addToast({
         type: 'success',
         title: 'Attendance marked',
-        message: `${data.studentIds.length} student(s) marked`,
+        message: `${data.entries.length} student(s) marked`,
         duration: 3000
       });
     } catch (error: any) {

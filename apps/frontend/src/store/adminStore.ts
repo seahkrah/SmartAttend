@@ -176,7 +176,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       useToastStore.getState().addToast({
         type: 'success',
         title: 'Import completed',
-        message: `${result.successful} users imported, ${result.failed} failed`,
+        message: `${result.imported} users imported, ${result.failed} failed`,
         duration: 5000
       });
     } catch (error: any) {
@@ -199,7 +199,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       useToastStore.getState().addToast({
         type: 'success',
         title: 'Course created',
-        message: `${data.course_name} has been added`,
+        message: `${data.name} has been added`,
         duration: 4000
       });
     } catch (error: any) {

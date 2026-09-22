@@ -179,9 +179,16 @@ export const SILENT_FAILURE_WARNINGS: Record<string, string> = {
   PAST_MONTH: 'You are marking attendance from a month ago. This may already be locked.',
   SUSPENSION_DURING_SESSION: 'This organization has active users online. Suspension may disrupt them.',
   BULK_DELETE_LARGE: 'You are about to delete many records. This cannot be undone.',
-  PARTIAL_SUCCESS: (success: number, failed: number) => 
-    `${success} succeeded, but ${failed} failed. Review the errors before trying again.`,
 };
+
+/**
+ * A partial success needs the counts, so it is a formatter rather than one of
+ * the fixed strings above. It lived in that map and broke its Record<string,
+ * string> type.
+ */
+export function partialSuccessWarning(success: number, failed: number): string {
+  return `${success} succeeded, but ${failed} failed. Review the errors before trying again.`;
+}
 
 /**
  * Retry recommendations based on error status
@@ -195,7 +202,7 @@ export function shouldRetry(statusCode?: number): boolean {
 /**
  * Get action guidance for user (step-by-step)
  */
-export function getErrorGuidance(errorCode: string, statusCode?: number): string[] {
+export function getErrorGuidance(_errorCode: string, statusCode?: number): string[] {
   const steps: string[] = [];
 
   if (statusCode === 401) {

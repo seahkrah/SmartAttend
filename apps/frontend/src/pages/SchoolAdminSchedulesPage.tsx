@@ -443,7 +443,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                       Days of Week * <span className="text-xs text-gray-400">(select {scheduleDayFormat})</span>
                     </label>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      {DAYS_OF_WEEK.map((day, index) => {
+                      {DAYS_OF_WEEK.map((_day, index) => {
                         const isSelected = formData.daysOfWeek.includes(index);
                         const isDisabled = !isSelected && formData.daysOfWeek.length >= scheduleDayFormat;
                         return (

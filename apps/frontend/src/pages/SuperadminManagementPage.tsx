@@ -151,7 +151,7 @@ const SuperadminManagementPage: React.FC = () => {
   // Toast & confirmation dialog state
   const [toasts, setToasts] = useState<Toast[]>([])
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
-  const [toastCounter, setToastCounter] = useState(0)
+  const [, setToastCounter] = useState(0)
 
   const addToast = useCallback((type: Toast['type'], title: string, message?: string, duration?: number) => {
     setToastCounter(prev => {

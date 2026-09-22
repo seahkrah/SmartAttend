@@ -13,6 +13,18 @@ import {
 } from 'lucide-react'
 import axios from 'axios'
 
+/** The organisation profile this page reads and writes. */
+interface OrgSettings {
+  id: string
+  code?: string
+  created_at?: string
+  name: string
+  contact_email?: string
+  contact_phone?: string
+  headquarters_address?: string
+  industry?: string
+}
+
 const CorporateAdminSettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<OrgSettings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,7 +38,6 @@ const CorporateAdminSettingsPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [loadingPassword, setLoadingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

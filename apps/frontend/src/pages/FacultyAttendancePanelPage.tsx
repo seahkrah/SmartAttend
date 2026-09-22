@@ -69,10 +69,8 @@ export const FacultyAttendancePanelPage: React.FC = () => {
                     : 'border-slate-700 bg-slate-800 hover:border-slate-600'
                 }`}
               >
-                <div className={HIERARCHY.PRIMARY.className}>{course.course_name}</div>
-                <div className={HIERARCHY.SECONDARY.className}>
-                  {course.enrollment_count} students
-                </div>
+                <div className={HIERARCHY.PRIMARY.className}>{course.name}</div>
+                <div className={HIERARCHY.SECONDARY.className}>{course.code}</div>
               </button>
             ))
           )}

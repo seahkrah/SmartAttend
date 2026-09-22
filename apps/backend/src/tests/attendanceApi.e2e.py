@@ -1,5 +1,7 @@
 import json, subprocess, sys
-SP="/tmp/claude-0/-home-user-SmartAttend/d93ac8ad-306e-535c-92c4-36bf785b1524/scratchpad"
+import os
+SP = os.environ.get("E2E_FIXTURE_DIR",
+                    os.path.join(os.getcwd(), ".e2e-fixtures"))
 c=json.load(open(f"{SP}/corp.json")); A,B=c['A'],c['B']
 BASE="http://127.0.0.1:5000/api/attendance"
 P=F=0

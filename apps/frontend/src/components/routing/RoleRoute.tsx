@@ -129,9 +129,12 @@ export const PermissionRoute: React.FC<PermissionRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
+  // permissions is optional on the profile; an account that carries none is
+  // unauthorised rather than a crash.
+  const granted = user.permissions ?? [];
   const hasPermission = Array.isArray(requiredPermission)
-    ? requiredPermission.some((perm) => user.permissions.includes(perm))
-    : user.permissions.includes(requiredPermission);
+    ? requiredPermission.some((perm) => granted.includes(perm))
+    : granted.includes(requiredPermission);
 
   if (!hasPermission) {
     return <Navigate to={fallbackPath} replace />;

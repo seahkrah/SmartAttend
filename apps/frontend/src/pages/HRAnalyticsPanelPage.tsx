@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react';
 import { useHRStore } from '../store/hrStore';
-import { ErrorAlert } from '../components/ErrorDisplay';
+import { ErrorAlert, EmptyState } from '../components/ErrorDisplay';
 import { LoadingOverlay } from '../components/LoadingStates';
 import { HIERARCHY, STATUS_COLORS } from '../utils/visualHierarchy';
 
@@ -61,13 +61,13 @@ export const HRAnalyticsPanelPage: React.FC = () => {
               <div className={HIERARCHY.SECONDARY.className}>Total Members</div>
               <div className="text-3xl font-bold mt-2">{overview.total_members}</div>
               <div className={HIERARCHY.TERTIARY.className}>
-                {overview.active_members} active
+                {overview.above_80_percent} above 80%
               </div>
             </div>
 
             <div className={`rounded-lg p-6 border-2 ${STATUS_COLORS.EXCELLENT}`}>
               <div className={HIERARCHY.SECONDARY.className}>Overall Attendance</div>
-              <div className="text-3xl font-bold mt-2">{overview.avg_attendance}%</div>
+              <div className="text-3xl font-bold mt-2">{overview.average_attendance}%</div>
             </div>
 
             <div className={`rounded-lg p-6 border-2 ${STATUS_COLORS.AT_RISK}`}>
@@ -78,8 +78,8 @@ export const HRAnalyticsPanelPage: React.FC = () => {
 
             <div className={`rounded-lg p-6 border-2 ${STATUS_COLORS.CRITICAL}`}>
               <div className={HIERARCHY.SECONDARY.className}>Critical</div>
-              <div className="text-3xl font-bold mt-2">{overview.critical_count}</div>
-              <div className={HIERARCHY.TERTIARY.className}>Below 40%</div>
+              <div className="text-3xl font-bold mt-2">{overview.chronic_absentees}</div>
+              <div className={HIERARCHY.TERTIARY.className}>Chronic absentees</div>
             </div>
           </div>
         )}
@@ -97,10 +97,11 @@ export const HRAnalyticsPanelPage: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <div className={HIERARCHY.PRIMARY.className}>
-                        {pattern.pattern_type}
+                        {pattern.member_name}
                       </div>
                       <div className={HIERARCHY.SECONDARY.className}>
-                        {pattern.affected_count} member(s)
+                        {pattern.pattern.replace(/_/g, ' ').toLowerCase()} ·{' '}
+                        {pattern.absences_in_period} absence(s)
                       </div>
                     </div>
                     <div className="text-sm font-semibold bg-blue-500/20 text-blue-300 px-3 py-1 rounded">
@@ -114,7 +115,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
         )}
 
         {patterns.length === 0 && !isLoading && (
-          <ErrorDisplay.EmptyState
+          <EmptyState
             title="No patterns detected"
             message="Attendance is tracking normally across the organization"
           />

@@ -5,7 +5,9 @@ These routes scoped by platform_id and called it tenant scoping. GET
 employer. This suite pins the fix.
 """
 import json, subprocess, sys
-SP="/tmp/claude-0/-home-user-SmartAttend/d93ac8ad-306e-535c-92c4-36bf785b1524/scratchpad"
+import os
+SP = os.environ.get("E2E_FIXTURE_DIR",
+                    os.path.join(os.getcwd(), ".e2e-fixtures"))
 c=json.load(open(f"{SP}/corp.json")); A,B=c['A'],c['B']
 sc=json.load(open(f"{SP}/seed.json")); SA,SB=sc['A'],sc['B']
 P=F=0

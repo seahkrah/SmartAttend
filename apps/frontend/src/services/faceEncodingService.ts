@@ -39,7 +39,6 @@ function analyzeImageMetadata(imageData: ImageData): {
 } {
   const data = imageData.data;
   let totalBrightness = 0;
-  let totalContrast = 0;
   let edgeCount = 0;
   let textureVariance = 0;
 

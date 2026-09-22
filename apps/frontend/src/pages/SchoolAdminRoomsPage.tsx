@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToastStore } from '../components/Toast';
 import { TenantAdminLayout } from '../components/TenantAdminLayout';
-import { getErrorMessage, showSuccess } from '../utils/errorHandler';
+import { getErrorMessage } from '../utils/errorHandler';
 import { useConfirmDialog } from '../components/useConfirmDialog';
 
 interface Room {

@@ -13,7 +13,9 @@ and that the trail is populated rather than merely empty.
 """
 import json, subprocess, sys, time
 RUN = str(int(time.time()))[-6:]
-SP = "/tmp/claude-0/-home-user-SmartAttend/d93ac8ad-306e-535c-92c4-36bf785b1524/scratchpad"
+import os
+SP = os.environ.get("E2E_FIXTURE_DIR",
+                    os.path.join(os.getcwd(), ".e2e-fixtures"))
 d = json.load(open(f"{SP}/seed.json")); A, B = d['A'], d['B']
 ROOT = "http://127.0.0.1:5000/api"
 P = F = 0

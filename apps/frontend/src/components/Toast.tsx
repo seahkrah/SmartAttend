@@ -23,7 +23,15 @@ export interface Toast {
     label: string;
     onClick: () => void;
   };
-  duration?: number; // ms, null = persistent
+  /**
+   * Milliseconds before the toast dismisses itself; null keeps it on screen
+   * until the viewer closes it.
+   *
+   * The type said `number` while the comment and the runtime check below
+   * both treated null as "persistent", so every error toast in the stores —
+   * which is exactly where a message must not vanish — was a type error.
+   */
+  duration?: number | null;
 }
 
 interface ToastStore {

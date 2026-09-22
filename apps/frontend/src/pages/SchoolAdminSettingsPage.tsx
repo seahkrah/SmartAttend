@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { TenantAdminLayout } from '../components/TenantAdminLayout'
-import { useAuthStore } from '../store/authStore'
+import { LoadingOverlay } from '../components/LoadingStates'
 import axios from 'axios'
 import {
   Settings,
@@ -139,6 +139,16 @@ const SchoolAdminSettingsPage: React.FC = () => {
       />
     </button>
   )
+
+  // The page was tracking `loading` and never rendering it, so a slow fetch
+  // showed default values as though they were the school's saved settings.
+  if (loading) {
+    return (
+      <TenantAdminLayout currentPage="settings" platform="school">
+        <LoadingOverlay message="Loading settings…" />
+      </TenantAdminLayout>
+    )
+  }
 
   return (
     <TenantAdminLayout currentPage="settings" platform="school">

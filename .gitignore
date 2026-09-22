@@ -205,3 +205,4 @@ docker-compose.override.yml
 *passwords*.txt
 *Passwords*.txt
 rotated-credentials-*.txt
+.e2e-fixtures/

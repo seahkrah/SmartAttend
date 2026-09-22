@@ -3,14 +3,18 @@
  * Test endpoints for running failure scenarios and validating system resilience
  */
 
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import type { ExtendedRequest } from '../types/auth.js';
 import { authenticateToken } from '../auth/middleware.js';
+import {
+  resolveTenantContext,
+  requireTenant,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js';
 import { query } from '../db/connection.js';
 import {
   simulateTimeDrift,
   simulatePartialOutage,
-  simulateDuplicateStorm,
   simulateNetworkInstability,
   runComprehensiveSimulation,
   generateSimulationReport,
@@ -19,18 +23,48 @@ import {
 const router = Router();
 
 /**
+ * Failure simulations: deliberately stressing the platform to see how it
+ * behaves. These are operational tools, not tenant features.
+ *
+ * Two things were wrong. Every route filtered on req.tenantId, which
+ * tenantIdExtractorMiddleware copied from the X-Tenant-Id header before
+ * authentication had run, so any authenticated caller could name any tenant
+ * and run a simulation against it. And the only role check was "is there a
+ * token", so any student or lecturer could trigger one.
+ *
+ * The tenant now comes from the resolved context — for a superadmin, from an
+ * explicit and recorded X-Tenant-Id selection that requireTenant validates —
+ * and the whole router is reserved to superadmins, because running a failure
+ * scenario against live data is not something a tenant administrator should
+ * be able to do to their own institution, let alone anyone else's.
+ */
+router.use(authenticateToken, resolveTenantContext);
+
+router.use((req, res: Response, next: NextFunction) => {
+  if (!(req as TenantRequest).ctx?.isSuperadmin) {
+    res.status(403).json({ error: 'Failure simulations are superadmin only' });
+    return;
+  }
+  next();
+});
+
+router.use(requireTenant);
+
+/** The server-resolved tenant. Never a value the caller supplied. */
+function tenantOf(req: ExtendedRequest): string {
+  return (req as unknown as TenantRequest).ctx!.tenantId!;
+}
+
+/**
  * POST /api/simulations/time-drift
  * Simulate clock drift between client and server
  * Query params:
  *   - max_drift_ms: number (default 5000)
  *   - iterations: number (default 5)
  */
-router.post('/time-drift', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.post('/time-drift', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const maxDrift = parseInt(req.query.max_drift_ms as string) || 5000;
     const iterations = parseInt(req.query.iterations as string) || 5;
@@ -60,12 +94,9 @@ router.post('/time-drift', authenticateToken, async (req: ExtendedRequest, res: 
  *   - endpoint: string (default /api/school/attendance)
  *   - recovery_attempts: number (default 10)
  */
-router.post('/partial-outage', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.post('/partial-outage', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const endpoint = (req.query.endpoint as string) || '/api/school/attendance';
     const recoveryAttempts = parseInt(req.query.recovery_attempts as string) || 10;
@@ -97,34 +128,24 @@ router.post('/partial-outage', authenticateToken, async (req: ExtendedRequest, r
  *   - batch_size: number (default 10)
  *   - interval_ms: number (default 100)
  */
-router.post('/duplicate-storm', authenticateToken, async (req: ExtendedRequest, res: Response) => {
-  try {
-    const tenantId = req.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
-    const duplicates = parseInt(req.query.duplicates as string) || 50;
-    const batchSize = parseInt(req.query.batch_size as string) || 10;
-    const intervalMs = parseInt(req.query.interval_ms as string) || 100;
-
-    const result = await simulateDuplicateStorm(tenantId, {
-      duplicate_submissions: duplicates,
-      batch_size: batchSize,
-      interval_ms: intervalMs,
-    });
-
-    return res.status(200).json({
-      simulation: 'duplicate_storm',
-      tenant_id: tenantId,
-      duplicate_count: duplicates,
-      result,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    console.error('Duplicate storm simulation error:', error);
-    return res.status(500).json({ error: 'Simulation failed', details: error.message });
-  }
+router.post('/duplicate-storm', async (_req: ExtendedRequest, res: Response) => {
+  // simulateDuplicateStorm writes a test row into school_attendance naming
+  // school_id, is_present, marked_by_user_id and face_verification_at — none
+  // of which that table has — and passes string literals into uuid columns.
+  // The insert throws, so the scenario has never exercised anything; it
+  // reports "failed" with its own error in issues_found, which reads exactly
+  // like a genuine finding about the platform.
+  //
+  // Refusing plainly is better than a simulation that cannot run reporting a
+  // fault it invented. It also happens to be the only scenario that writes to
+  // real attendance data, so it stays off until it is written against the
+  // schema that exists.
+  res.status(501).json({
+    error: 'Not implemented',
+    message:
+      'The duplicate-storm scenario is written against columns school_attendance does not have, ' +
+      'so it cannot run. The other scenarios are read-only probes and are unaffected.',
+  });
 });
 
 /**
@@ -136,12 +157,9 @@ router.post('/duplicate-storm', authenticateToken, async (req: ExtendedRequest, 
  *   - timeout_probability: number 0-100 (default 5)
  *   - iterations: number (default 50)
  */
-router.post('/network-instability', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.post('/network-instability', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const failureRate = Math.min(100, parseInt(req.query.failure_rate as string) || 10);
     const latencySpike = parseInt(req.query.latency_spike_ms as string) || 3000;
@@ -178,12 +196,9 @@ router.post('/network-instability', authenticateToken, async (req: ExtendedReque
  * Run complete failure simulation suite
  * Tests all 4 scenarios and generates comprehensive report
  */
-router.post('/comprehensive', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.post('/comprehensive', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     console.log(`[API] Starting comprehensive simulation for tenant ${tenantId}`);
     
@@ -208,12 +223,9 @@ router.post('/comprehensive', authenticateToken, async (req: ExtendedRequest, re
  * High-intensity stress test: maximum load across all endpoints
  * Tests system under extreme conditions
  */
-router.post('/stress-test', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.post('/stress-test', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     console.log(`[API] Starting stress test for tenant ${tenantId}`);
 
@@ -232,12 +244,10 @@ router.post('/stress-test', authenticateToken, async (req: ExtendedRequest, res:
         affected_records: 500,
         iterations: 10,
       }),
-      // Massive duplicate storm
-      simulateDuplicateStorm(tenantId, {
-        duplicate_submissions: 200,
-        batch_size: 50,
-        interval_ms: 50,
-      }),
+      // The duplicate storm is omitted: it is written against columns
+      // school_attendance does not have, so including it only contributed its
+      // own failure to the totals below and made the stress test look like it
+      // had found a fault.
       // Sustained outage
       simulatePartialOutage(tenantId, {
         outage_duration_ms: 10000,
@@ -271,12 +281,9 @@ router.post('/stress-test', authenticateToken, async (req: ExtendedRequest, res:
  * GET /api/simulations/status
  * Get status of last simulations run
  */
-router.get('/status', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/status', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     // Get metrics from last hour
     const metricsHealth = await query(

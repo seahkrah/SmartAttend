@@ -3,8 +3,16 @@
  * PHASE 5, STEP 5.2: Incident Lifecycle Enforcement Routes
  */
 
-import { Router, Response } from 'express'
+import { Router, Response, NextFunction } from 'express'
 import type { ExtendedRequest } from '../types/auth.js'
+import { authenticateToken } from '../auth/middleware.js'
+import { resolveTenantContext } from '../auth/tenantContextMiddleware.js'
+import {
+  incidentVisibility,
+  contextOf,
+  IncidentAccessError,
+  type IncidentVisibility,
+} from '../auth/incidentVisibility.js'
 import { withIncidentTracking } from '../middleware/errorToIncidentMiddleware.js'
 import {
   getIncident,
@@ -30,23 +38,80 @@ import {
 const router = Router()
 
 /**
+ * This router carried no authentication middleware at all — not at the mount
+ * point, not on any route. Every handler read a role off req.user, which was
+ * therefore always undefined, so the role checks compared against the empty
+ * string and refused everyone. The whole surface was dead, and looked
+ * protected.
+ *
+ * Reviving it needed the scoping first. The list and statistics queries
+ * filtered on platform_id, one value shared by every school, and the by-id
+ * reads filtered on nothing; an incident carries a title, a description, the
+ * error that produced it and who it affected, so one school's incidents would
+ * have been readable and editable by another's administrators.
+ */
+router.use(authenticateToken, resolveTenantContext)
+
+function visibility(req: ExtendedRequest): IncidentVisibility {
+  return incidentVisibility(contextOf(req))
+}
+
+/**
+ * Resolves :incidentId once, for every route that takes one.
+ *
+ * Doing it as param middleware rather than in each handler means the check
+ * cannot be forgotten when a route is added, and an incident outside the
+ * caller's view is refused before any handler runs. It reads as 404 rather
+ * than 403, so an id cannot be probed for existence.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+router.param('incidentId', async (req, res, next: NextFunction, incidentId: string) => {
+  try {
+    // A path segment that is not an id at all reads as absent, rather than
+    // reaching the database and coming back as a cast error.
+    if (!UUID.test(incidentId)) {
+      res.status(404).json({ success: false, error: 'Incident not found' })
+      return
+    }
+    const incident = await getIncident(incidentId, visibility(req as ExtendedRequest))
+    if (!incident) {
+      res.status(404).json({ success: false, error: 'Incident not found' })
+      return
+    }
+    ;(req as any).incident = incident
+    next()
+  } catch (error) {
+    if (error instanceof IncidentAccessError) {
+      res.status(error.status).json({ success: false, error: error.message })
+      return
+    }
+    next(error)
+  }
+})
+
+/** Restricts a route to roles that may act on incidents. */
+function requireIncidentRole(req: ExtendedRequest, res: Response, next: NextFunction): void {
+  if (!visibility(req).any) {
+    res.status(403).json({ success: false, error: 'Insufficient permissions to view incidents' })
+    return
+  }
+  next()
+}
+
+/**
  * GET /api/incidents/critical
  * Get all critical open incidents for platform
  */
 router.get(
   '/critical',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    // Verify user has admin or security role
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view critical incidents',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view critical incidents' })
       return
     }
 
-    const incidents = await getCriticalIncidents(req.platformId!)
+    const incidents = await getCriticalIncidents(visibility(req))
 
     res.json({
       success: true,
@@ -66,17 +131,12 @@ router.get(
 router.get(
   '/open',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    // Verify user has admin role
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view incidents',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view incidents' })
       return
     }
 
-    const incidents = await getOpenIncidents(req.platformId!)
+    const incidents = await getOpenIncidents(visibility(req))
 
     res.json({
       success: true,
@@ -90,44 +150,45 @@ router.get(
 )
 
 /**
+ * GET /api/incidents/stats
+ * Get incident statistics for platform
+ */
+router.get(
+  '/stats',
+  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view statistics' })
+      return
+    }
+
+    const stats = await getIncidentStatistics(visibility(req))
+
+    res.json({
+      success: true,
+      data: {
+        statistics: stats,
+        timestamp: new Date().toISOString(),
+      },
+    })
+  })
+)
+
+/**
  * GET /api/incidents/:incidentId
  * Get incident details
  */
 router.get(
   '/:incidentId',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    // Verify user has admin role
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view incident',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view incident' })
       return
     }
 
-    const incident = await getIncident(req.params.incidentId)
-
-    if (!incident) {
-      res.status(404).json({
-        success: false,
-        error: 'Incident not found',
-      })
-      return
-    }
-
-    // Verify incident belongs to user's platform
-    if (incident.platform_id !== req.platformId) {
-      res.status(403).json({
-        success: false,
-        error: 'Incident not found',
-      })
-      return
-    }
-
+    // Resolved and scoped by the :incidentId param middleware above.
     res.json({
       success: true,
-      data: incident,
+      data: (req as any).incident,
     })
   })
 )
@@ -139,39 +200,17 @@ router.get(
 router.patch(
   '/:incidentId',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    // Verify user has admin role
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to update incident',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to update incident' })
       return
     }
 
-    // Get current incident for comparison
-    const incident = await getIncident(req.params.incidentId)
-    if (!incident) {
-      res.status(404).json({
-        success: false,
-        error: 'Incident not found',
-      })
-      return
-    }
-
-    // Verify incident belongs to user's platform
-    if (incident.platform_id !== req.platformId) {
-      res.status(403).json({
-        success: false,
-        error: 'Incident not found',
-      })
-      return
-    }
-
+    // Resolved and scoped by the :incidentId param middleware above.
+    const incident = (req as any).incident
     const updates = {
       status: req.body.status,
       severity: req.body.severity,
-      acknowledgedByUserId: req.body.acknowledgedByUserId || (req.user as any)?.id,
+      acknowledgedByUserId: req.body.acknowledgedByUserId || contextOf(req).userId,
       resolvedByUserId: req.body.resolvedByUserId,
       rootCause: req.body.rootCause,
       remediationSteps: req.body.remediationSteps,
@@ -197,7 +236,7 @@ router.patch(
         incident.status,
         req.body.status,
         `Status changed from ${incident.status} to ${req.body.status}`,
-        (req.user as any)?.id
+        contextOf(req).userId
       )
     }
 
@@ -209,7 +248,7 @@ router.patch(
         incident.severity,
         req.body.severity,
         `Severity updated from ${incident.severity} to ${req.body.severity}`,
-        (req.user as any)?.id
+        contextOf(req).userId
       )
     }
 
@@ -228,24 +267,14 @@ router.patch(
 router.post(
   '/:incidentId/acknowledge',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to acknowledge incident',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to acknowledge incident' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       await acknowledgeIncident(req.params.incidentId, {
-        acknowledgedByUserId: (req.user as any)?.id,
+        acknowledgedByUserId: contextOf(req).userId,
         acknowledgementNote: req.body.acknowledgementNote,
       })
 
@@ -270,26 +299,16 @@ router.post(
 router.post(
   '/:incidentId/escalate',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to escalate incident',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to escalate incident' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       await escalateIncident(req.params.incidentId, {
         escalationLevel: req.body.escalationLevel,
         escalationReason: req.body.escalationReason,
-        escalatedByUserId: (req.user as any)?.id,
+        escalatedByUserId: contextOf(req).userId,
         escalationNote: req.body.escalationNote,
       })
 
@@ -314,25 +333,15 @@ router.post(
 router.post(
   '/:incidentId/investigate',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to start investigation',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to start investigation' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       await startInvestigation(
         req.params.incidentId,
-        (req.user as any)?.id,
+        contextOf(req).userId,
         req.body.investigationNote
       )
 
@@ -357,25 +366,15 @@ router.post(
 router.post(
   '/:incidentId/root-cause',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to assign root cause',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to assign root cause' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       await assignRootCause(req.params.incidentId, {
         rootCause: req.body.rootCause,
-        assignedByUserId: (req.user as any)?.id,
+        assignedByUserId: contextOf(req).userId,
         confidence: req.body.confidence || 'medium',
         analysisNotes: req.body.analysisNotes,
       })
@@ -401,25 +400,15 @@ router.post(
 router.post(
   '/:incidentId/mitigate',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to begin mitigation',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to begin mitigation' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       await beginMitigation(
         req.params.incidentId,
-        (req.user as any)?.id,
+        contextOf(req).userId,
         req.body.mitigationPlan
       )
 
@@ -445,22 +434,12 @@ router.post(
 router.post(
   '/:incidentId/resolve',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to resolve incident',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to resolve incident' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       await resolveIncident(
         req.params.incidentId,
         {
@@ -470,7 +449,7 @@ router.post(
           postMortemUrl: req.body.postMortemUrl,
           estimatedImpact: req.body.estimatedImpact,
         },
-        (req.user as any)?.id
+        contextOf(req).userId
       )
 
       res.json({
@@ -494,23 +473,13 @@ router.post(
 router.post(
   '/:incidentId/close',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to close incident',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to close incident' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
-      await closeIncident(req.params.incidentId, (req.user as any)?.id, req.body.closureNote)
+      await closeIncident(req.params.incidentId, contextOf(req).userId, req.body.closureNote)
 
       res.json({
         success: true,
@@ -533,22 +502,12 @@ router.post(
 router.get(
   '/:incidentId/timeline',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view timeline',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view timeline' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       const timeline = await getIncidentTimeline(req.params.incidentId)
 
       res.json({
@@ -574,22 +533,12 @@ router.get(
 router.get(
   '/:incidentId/escalations',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view escalations',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view escalations' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       const escalations = await getEscalationHistory(req.params.incidentId)
 
       res.json({
@@ -615,22 +564,12 @@ router.get(
 router.get(
   '/:incidentId/root-causes',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view root causes',
-      })
+    if (!visibility(req).any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view root causes' })
       return
     }
 
     try {
-      const incident = await getIncident(req.params.incidentId)
-      if (!incident || incident.platform_id !== req.platformId) {
-        res.status(404).json({ success: false, error: 'Incident not found' })
-        return
-      }
-
       const rootCauses = await getRootCauseAnalysis(req.params.incidentId)
 
       res.json({
@@ -649,33 +588,5 @@ router.get(
   })
 )
 
-/**
- * GET /api/incidents/stats
- * Get incident statistics for platform
- */
-router.get(
-  '/stats',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    // Verify user has admin role
-    const userRole = (req.user as any)?.role || ''
-    if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions to view statistics',
-      })
-      return
-    }
-
-    const stats = await getIncidentStatistics(req.platformId!)
-
-    res.json({
-      success: true,
-      data: {
-        statistics: stats,
-        timestamp: new Date().toISOString(),
-      },
-    })
-  })
-)
 
 export default router

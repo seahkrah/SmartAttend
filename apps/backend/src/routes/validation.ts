@@ -3,19 +3,74 @@
  * API endpoints for triggering validation scenarios, simulations, and recovery drills
  */
 
-import { Router, Response } from 'express'
+import { Router, Response, NextFunction } from 'express'
 import type { ExtendedRequest } from '../types/auth.js'
-import { withIncidentTracking } from '../middleware/errorToIncidentMiddleware.js'
+import { authenticateToken } from '../auth/middleware.js'
 import {
-  validatePlatformReadiness,
-  getLatestValidationReport,
-} from '../services/platformReadinessService.js'
+  resolveTenantContext,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
+import { withIncidentTracking } from '../middleware/errorToIncidentMiddleware.js'
+// Only the scenario runner is backed by real storage — it writes to the
+// incidents table. The readiness, simulation, export and handoff services
+// write to tables that do not exist in this schema, so their routes refuse
+// rather than import them.
 import { runAllScenarios } from '../services/incidentScenarioService.js'
-import { runAllSimulations } from '../services/timeBasedSimulationService.js'
-import { exportIncident, replayIncident } from '../services/incidentReplayService.js'
-import { initiateHandoffSession, acceptHandoff, generateHandoffBriefing } from '../services/adminHandoffService.js'
 
 const router = Router()
+
+/**
+ * This router had no authentication middleware at all. Every route below read
+ * a role off req.user, which was therefore always undefined, so the role
+ * checks compared against undefined and refused everyone — except
+ * /handoff/:sessionId/accept and /handoff/:sessionId/briefing, which had no
+ * role check either and were open to anyone who could reach the port.
+ *
+ * These are platform operations: running scenarios and simulations, exporting
+ * and replaying incidents, handing administration from one person to another.
+ * They are not tenant-scoped because they are not tenant-owned; they are
+ * reserved to superadmins, and that is now enforced from the server-resolved
+ * identity rather than from a JWT claim a token need not carry.
+ */
+router.use(authenticateToken, resolveTenantContext)
+
+function isSuperadmin(req: ExtendedRequest): boolean {
+  return (req as unknown as TenantRequest).ctx?.isSuperadmin === true
+}
+
+/** Reserves a route to superadmins, using the resolved identity. */
+function superadminOnly(req: ExtendedRequest, res: Response, next: NextFunction): void {
+  if (!isSuperadmin(req)) {
+    res.status(403).json({ success: false, error: 'Superadmin access required' })
+    return
+  }
+  next()
+}
+
+/**
+ * Refuses a route whose storage was never created.
+ *
+ * admin_handoff_sessions, handoff_audit, platform_readiness_reports and
+ * validation_reports do not exist in the schema. The services wrote to them
+ * inside `.catch(() => {})`, so every call reported success while storing
+ * nothing — /handoff/:sessionId/accept in particular answered
+ * "Handoff accepted" to an unauthenticated caller and did nothing at all.
+ *
+ * Answering 501 is not a placeholder: it states plainly that the feature has
+ * no persistence yet, instead of fabricating a result the caller cannot
+ * distinguish from a real one. Building the subsystem is its own piece of
+ * work; reporting fake successes in the meantime is not.
+ */
+function notImplemented(feature: string, missing: string[]) {
+  return (_req: ExtendedRequest, res: Response): void => {
+    res.status(501).json({
+      success: false,
+      error: 'Not implemented',
+      message: `${feature} has no storage in this schema, so it cannot record anything. ` +
+        `Missing tables: ${missing.join(', ')}.`,
+    })
+  }
+}
 
 /**
  * POST /api/validation/platform-readiness
@@ -25,38 +80,8 @@ const router = Router()
  */
 router.post(
   '/platform-readiness',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    // Superadmin only
-    if ((req.user as any)?.role !== 'superadmin') {
-      res.status(403).json({
-        success: false,
-        error: 'Platform readiness validation is superadmin only',
-      })
-      return
-    }
-
-    try {
-      console.log('[READINESS] Starting platform validation...')
-      const report = await validatePlatformReadiness((req.user as any)?.id, req.platformId)
-
-      res.json({
-        success: true,
-        data: {
-          reportId: report.reportId,
-          status: report.status,
-          timestamp: report.timestamp,
-          consensus: report.consensus,
-          recommendations: report.recommendations,
-          findings: report.findings,
-        },
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Platform validation failed',
-      })
-    }
-  })
+  superadminOnly,
+  notImplemented('Platform readiness validation', ['platform_readiness_reports', 'validation_reports'])
 )
 
 /**
@@ -65,45 +90,8 @@ router.post(
  */
 router.get(
   '/platform-readiness/latest',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    if ((req.user as any)?.role !== 'superadmin') {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions',
-      })
-      return
-    }
-
-    try {
-      const report = await getLatestValidationReport(req.platformId)
-
-      if (!report) {
-        res.json({
-          success: true,
-          data: null,
-          message: 'No validation reports found',
-        })
-        return
-      }
-
-      res.json({
-        success: true,
-        data: {
-          reportId: report.reportId,
-          status: report.status,
-          timestamp: report.timestamp,
-          consensus: report.consensus,
-          recommendations: report.recommendations,
-          findings: report.findings,
-        },
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      })
-    }
-  })
+  superadminOnly,
+  notImplemented('Platform readiness reporting', ['platform_readiness_reports'])
 )
 
 /**
@@ -113,11 +101,10 @@ router.get(
 router.post(
   '/scenarios',
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    if (!['admin', 'superadmin'].includes((req.user as any)?.role)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions',
-      })
+    // An operational action on the platform, so it is reserved to
+    // superadmins rather than to any tenant administrator.
+    if (!isSuperadmin(req)) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions' })
       return
     }
 
@@ -156,44 +143,8 @@ router.post(
  */
 router.post(
   '/simulations',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    if ((req.user as any)?.role !== 'superadmin') {
-      res.status(403).json({
-        success: false,
-        error: 'Simulations are superadmin only',
-      })
-      return
-    }
-
-    try {
-      console.log('[SIMULATIONS] Running time-based simulations...')
-      const result = await runAllSimulations()
-
-      res.json({
-        success: true,
-        data: {
-          totalSimulations: result.totalSimulations,
-          completed: result.completed,
-          failed: result.failed,
-          totalRealDuration: result.totalRealDuration,
-          systemStable: result.systemStable,
-          results: result.results.map((r) => ({
-            name: r.name,
-            status: r.status,
-            realDuration: r.realDuration,
-            simulatedDuration: r.simulatedDuration,
-            eventsExecuted: r.eventsExecuted,
-            eventsFailed: r.eventsFailed,
-          })),
-        },
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-      })
-    }
-  })
+  superadminOnly,
+  notImplemented('Time-based simulations', ['simulation_events', 'simulation_runs'])
 )
 
 /**
@@ -202,37 +153,8 @@ router.post(
  */
 router.post(
   '/incidents/:incidentId/export',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    if (!['admin', 'security_officer', 'superadmin'].includes((req.user as any)?.role)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions',
-      })
-      return
-    }
-
-    try {
-      const record = await exportIncident(req.params.incidentId)
-
-      res.json({
-        success: true,
-        data: {
-          exportId: record.id,
-          incidentId: record.incidentId,
-          title: record.title,
-          actionsCount: record.actions.length,
-          escalationsCount: record.escalations.length,
-          rootCausesCount: record.rootCauseAnalyses.length,
-          exportedAt: record.exportedAt,
-        },
-      })
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      })
-    }
-  })
+  superadminOnly,
+  notImplemented('Incident export', ['incident_exports'])
 )
 
 /**
@@ -241,49 +163,8 @@ router.post(
  */
 router.post(
   '/handoff/initiate',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    if (!['admin', 'superadmin'].includes((req.user as any)?.role)) {
-      res.status(403).json({
-        success: false,
-        error: 'Insufficient permissions',
-      })
-      return
-    }
-
-    try {
-      if (!req.body.toUserId) {
-        res.status(400).json({
-          success: false,
-          error: 'toUserId is required',
-        })
-        return
-      }
-
-      const session = await initiateHandoffSession(
-        (req.user as any)?.id,
-        req.body.toUserId,
-        req.platformId!,
-        req.body.briefingNotes || ''
-      )
-
-      res.json({
-        success: true,
-        data: {
-          sessionId: session.sessionId,
-          fromAdmin: session.fromAdmin,
-          toAdmin: session.toAdmin,
-          incidentCount: session.incidents.length,
-          systemHealth: session.systemHealth,
-          startTime: session.startTime,
-        },
-      })
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      })
-    }
-  })
+  superadminOnly,
+  notImplemented('Administrator handoff', ['admin_handoff_sessions', 'handoff_audit'])
 )
 
 /**
@@ -292,22 +173,8 @@ router.post(
  */
 router.post(
   '/handoff/:sessionId/accept',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    try {
-      await acceptHandoff(req.params.sessionId, (req.user as any)?.id)
-
-      res.json({
-        success: true,
-        message: 'Handoff accepted',
-        sessionId: req.params.sessionId,
-      })
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      })
-    }
-  })
+  superadminOnly,
+  notImplemented('Administrator handoff', ['admin_handoff_sessions', 'handoff_audit'])
 )
 
 /**
@@ -316,24 +183,8 @@ router.post(
  */
 router.get(
   '/handoff/:sessionId/briefing',
-  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
-    try {
-      const briefing = await generateHandoffBriefing(req.params.sessionId)
-
-      res.json({
-        success: true,
-        data: {
-          sessionId: req.params.sessionId,
-          briefing,
-        },
-      })
-    } catch (error: any) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      })
-    }
-  })
+  superadminOnly,
+  notImplemented('Administrator handoff', ['admin_handoff_sessions', 'handoff_audit'])
 )
 
 /**

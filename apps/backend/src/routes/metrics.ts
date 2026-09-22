@@ -8,6 +8,11 @@ import { Router, Response } from 'express';
 import type { ExtendedRequest } from '../types/auth.js';
 import { authenticateToken } from '../auth/middleware.js';
 import {
+  resolveTenantContext,
+  requireTenant,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js';
+import {
   getTenantFailureRate,
   getAPILatencyPercentiles,
   getClockDriftStatistics,
@@ -23,17 +28,37 @@ import {
 const router = Router();
 
 /**
+ * Every route here filtered on
+ *
+ *     req.tenantId || req.headers['x-tenant-id']
+ *
+ * and both halves of that came from the client. tenantIdExtractorMiddleware
+ * copies the X-Tenant-Id header onto req.tenantId before authentication has
+ * even run, so any authenticated caller could name any tenant and read its
+ * failure rates, clock drift, verification mismatches and early-warning
+ * signals.
+ *
+ * The tenant is now resolved from the authenticated identity and the server's
+ * own membership records. requireTenant still honours X-Tenant-Id, but only
+ * to choose between memberships the server already established — and, for a
+ * superadmin, as a deliberate and recorded selection.
+ */
+router.use(authenticateToken, resolveTenantContext, requireTenant);
+
+/** The server-resolved tenant. Never a value the caller supplied. */
+function tenantOf(req: ExtendedRequest): string {
+  return (req as unknown as TenantRequest).ctx!.tenantId!;
+}
+
+/**
  * GET /api/metrics/failure-rates
  * Get failure rates by category for tenant
  * Query params:
  *   - hours: number (default 24)
  */
-router.get('/failure-rates', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/failure-rates', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const hours = parseInt(req.query.hours as string) || 24;
 
@@ -58,12 +83,9 @@ router.get('/failure-rates', authenticateToken, async (req: ExtendedRequest, res
  *   - endpoint: string (optional)
  *   - hours: number (default 1)
  */
-router.get('/api-latency', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/api-latency', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const endpoint = req.query.endpoint as string | undefined;
     const hours = parseInt(req.query.hours as string) || 1;
@@ -89,12 +111,9 @@ router.get('/api-latency', authenticateToken, async (req: ExtendedRequest, res: 
  * Query params:
  *   - hours: number (default 1)
  */
-router.get('/api-latency-by-endpoint', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/api-latency-by-endpoint', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const hours = parseInt(req.query.hours as string) || 1;
 
@@ -119,12 +138,9 @@ router.get('/api-latency-by-endpoint', authenticateToken, async (req: ExtendedRe
  * Query params:
  *   - hours: number (default 24)
  */
-router.get('/clock-drift', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/clock-drift', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const hours = parseInt(req.query.hours as string) || 24;
 
@@ -149,12 +165,9 @@ router.get('/clock-drift', authenticateToken, async (req: ExtendedRequest, res: 
  *   - limit: number (default 100)
  *   - hours: number (default 24)
  */
-router.get('/verification-mismatches', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/verification-mismatches', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const limit = parseInt(req.query.limit as string) || 100;
     const hours = parseInt(req.query.hours as string) || 24;
@@ -179,12 +192,9 @@ router.get('/verification-mismatches', authenticateToken, async (req: ExtendedRe
  * GET /api/metrics/health-status
  * Get current platform health status
  */
-router.get('/health-status', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/health-status', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const healthStatus = await getPlatformHealthStatus(tenantId);
 
@@ -214,12 +224,9 @@ router.get('/health-status', authenticateToken, async (req: ExtendedRequest, res
  * Query params:
  *   - hours: number (default 1)
  */
-router.get('/summary', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/summary', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const hours = parseInt(req.query.hours as string) || 1;
 
@@ -244,12 +251,9 @@ router.get('/summary', authenticateToken, async (req: ExtendedRequest, res: Resp
  *   - limit: number (default 10)
  *   - hours: number (default 24)
  */
-router.get('/failure-reasons', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/failure-reasons', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const limit = parseInt(req.query.limit as string) || 10;
     const hours = parseInt(req.query.hours as string) || 24;
@@ -276,12 +280,9 @@ router.get('/failure-reasons', authenticateToken, async (req: ExtendedRequest, r
  *   - limit: number (default 20)
  *   - hours: number (default 24)
  */
-router.get('/problematic-records', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/problematic-records', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const limit = parseInt(req.query.limit as string) || 20;
     const hours = parseInt(req.query.hours as string) || 24;
@@ -306,12 +307,9 @@ router.get('/problematic-records', authenticateToken, async (req: ExtendedReques
  * Get comprehensive metrics dashboard
  * Combines multiple metrics for single dashboard view
  */
-router.get('/dashboard', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/dashboard', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     // Fetch all metrics in parallel
     const [
@@ -354,12 +352,9 @@ router.get('/dashboard', authenticateToken, async (req: ExtendedRequest, res: Re
  * - privilege_escalations_open: open privilege escalation events
  * - role_violations_24h: role boundary violations in last 24h
  */
-router.get('/early-signals', authenticateToken, async (req: ExtendedRequest, res: Response) => {
+router.get('/early-signals', async (req: ExtendedRequest, res: Response) => {
   try {
-    const tenantId = req.tenantId || (req.headers['x-tenant-id'] as string);
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = tenantOf(req);
 
     const signals = await getEarlyWarningSignals(tenantId);
 

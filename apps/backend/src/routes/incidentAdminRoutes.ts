@@ -2,442 +2,326 @@
  * ===========================
  * INCIDENT ADMIN ROUTES
  * ===========================
- * 
- * Superadmin-only endpoints for incident investigation and management.
- * All access is fully audited to audit_access_log.
- * 
- * Endpoints:
- * - GET /api/admin/incidents - List open incidents
- * - GET /api/admin/incidents/stats - Dashboard stats
- * - GET /api/admin/incidents/:id - Full incident details
- * - POST /api/admin/incidents/:id/acknowledge - ACK incident
- * - POST /api/admin/incidents/:id/root-cause - Record root cause
- * - POST /api/admin/incidents/:id/resolve - Resolve and close
- * - GET /api/admin/incidents/stats/escalations - Escalation tracking
+ *
+ * Superadmin endpoints for incident investigation and management, audited to
+ * audit_access_log.
+ *
+ * Endpoints (paths unchanged, so the existing client keeps working):
+ * - GET  /api/admin/incidents                  - list open incidents
+ * - GET  /api/admin/incidents/stats            - dashboard stats
+ * - GET  /api/admin/incidents/:id              - full incident details
+ * - POST /api/admin/incidents/:id/acknowledge  - acknowledge
+ * - POST /api/admin/incidents/:id/root-cause   - record a root cause
+ * - POST /api/admin/incidents/:id/resolve      - resolve
+ * - GET  /api/admin/incidents/stats/escalations - escalation history
+ *
+ * Rewritten. The gate here was sound in shape — authenticate, then confirm
+ * superadmin against the database — but it read `req.user.id`, and the JWT
+ * payload carries `userId`. The identity was therefore always undefined and
+ * every route answered 401.
+ *
+ * Underneath, it ran on IncidentManagementService, which targets a different
+ * incident schema than the one that exists: `incident_acknowledgments` (the
+ * real table is spelt `incident_acknowledgements`), `incident_root_causes`
+ * (`incident_root_cause_analyses`), an `open_incidents` view, and columns
+ * such as `created_from_error_id`. Not one of its queries could run. The
+ * routes now use incidentService and incidentLifecycleService, which are
+ * written against the real tables and are what /api/incidents uses.
+ *
+ * The audit middleware wrote to audit_access_log naming columns that do not
+ * exist (`admin_user_id`, `endpoint`, `method`, `query_params`) inside a
+ * `.catch()`, so the audit of who looked at incidents silently never
+ * happened. It now writes the columns the table has, and a failure to audit
+ * refuses the request rather than passing it through unrecorded.
  */
 
-import { Router, Response, NextFunction } from 'express'
-import { query } from '../db/connection.js'
+import { Router, Response, NextFunction, Request } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
-import IncidentManagementService from '../services/incidentManagementService.js'
+import {
+  resolveTenantContext,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
+import { logAuditAccess } from '../auth/auditAccessControl.js'
+import {
+  incidentVisibility,
+  contextOf,
+  type IncidentVisibility,
+} from '../auth/incidentVisibility.js'
+import {
+  getIncident,
+  getOpenIncidents,
+  getIncidentStatistics,
+} from '../services/incidentService.js'
+import {
+  acknowledgeIncident,
+  assignRootCause,
+  resolveIncident,
+  getIncidentTimeline,
+  getEscalationHistory,
+  getRootCauseAnalysis,
+} from '../services/incidentLifecycleService.js'
 
-interface AuthRequest {
-  user?: {
-    id?: string
-    email?: string
-    role?: string
+const router = Router()
+
+router.use(authenticateToken, resolveTenantContext)
+
+/** Reserves the whole router to superadmins, from the resolved identity. */
+function verifySuperadminAccess(req: Request, res: Response, next: NextFunction): void {
+  const ctx = (req as TenantRequest).ctx
+  if (!ctx) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Authentication required' })
+    return
   }
-  method?: string
-  path?: string
-  query?: any
-  ip?: string
-  socket?: { remoteAddress?: string }
-  get?: (key: string) => string | undefined
+  if (!ctx.isSuperadmin) {
+    res.status(403).json({
+      error: 'FORBIDDEN',
+      message: 'Only superadmins can access incident endpoints',
+    })
+    return
+  }
+  next()
 }
 
-// ===========================
-// MIDDLEWARE
-// ===========================
-
-const incidentService = new IncidentManagementService()
-
 /**
- * Verify superadmin access
+ * Records who looked at what.
+ *
+ * Auditing the auditors only counts if it actually writes, so a failure here
+ * refuses the request instead of logging a warning and continuing.
  */
-async function verifySuperadminAccess(
-  req: AuthRequest,
+async function auditIncidentAccess(
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  const ctx = contextOf(req)
   try {
-    if (!req.user?.id) {
-      res.status(401).json({
-        error: 'UNAUTHORIZED',
-        message: 'Authentication required',
-      })
-      return
-    }
-
-    // Check if user is superadmin
-    const result = await query(
-      `SELECT r.name FROM users u
-       JOIN roles r ON u.role_id = r.id
-       WHERE u.id = $1`,
-      [req.user.id]
-    )
-
-    if (result.rows.length === 0 || result.rows[0].name !== 'superadmin') {
-      res.status(403).json({
-        error: 'FORBIDDEN',
-        message: 'Only superadmins can access incident endpoints',
-      })
-      return
-    }
-
+    await logAuditAccess({
+      actorId: ctx.userId,
+      actorRole: 'superadmin',
+      accessType: `INCIDENT_ADMIN_${req.method}`,
+      filtersApplied: { path: req.path, method: req.method, query: req.query },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      tenantId: ctx.tenantId ?? undefined,
+    })
     next()
   } catch (error) {
-    console.error('[INCIDENT_ADMIN] Error verifying access:', error)
+    console.error('[INCIDENT_ADMIN] Audit log error:', error)
     res.status(500).json({
       error: 'INTERNAL_ERROR',
-      message: 'Error verifying access',
+      message: 'Access could not be recorded, so the request was refused',
     })
   }
 }
 
-/**
- * Audit all incident admin access
- */
-async function auditIncidentAccess(
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    if (req.user?.id) {
-      query(
-        `INSERT INTO audit_access_log (
-          admin_user_id, action, endpoint, method, query_params,
-          ip_address, user_agent
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          req.user.id,
-          `INCIDENT_ADMIN_${req.method}`,
-          req.path,
-          req.method,
-          JSON.stringify(req.query),
-          req.ip || req.socket?.remoteAddress || null,
-          req.get('user-agent') || null,
-        ]
-      ).catch((err: Error) => {
-        console.error('[INCIDENT_ADMIN] Audit log error:', err)
-      })
-    }
-
-    next()
-  } catch (error) {
-    console.error('[INCIDENT_ADMIN] Audit middleware error:', error)
-    next(error)
-  }
-}
-
-// ===========================
-// ROUTES
-// ===========================
-
-const router = Router()
-
-// Apply middleware to all routes
-router.use(authenticateToken)
 router.use(verifySuperadminAccess)
 router.use(auditIncidentAccess)
+
+function visibility(req: Request): IncidentVisibility {
+  return incidentVisibility(contextOf(req))
+}
+
+/**
+ * Resolves :id once for every route that takes one, within the caller's view.
+ */
+router.param('id', async (req, res, next: NextFunction, id: string) => {
+  try {
+    const incident = await getIncident(id, visibility(req))
+    if (!incident) {
+      res.status(404).json({ error: 'NOT_FOUND', message: 'Incident not found' })
+      return
+    }
+    ;(req as any).incident = incident
+    next()
+  } catch (error) {
+    next(error)
+  }
+})
+
+function fail(res: Response, label: string, error: unknown) {
+  console.error(`[INCIDENT_ADMIN] Error ${label}:`, error)
+  res.status(500).json({ error: 'INTERNAL_ERROR', message: `Error ${label}` })
+}
 
 // ===========================
 // GET /api/admin/incidents
 // ===========================
-/**
- * List open incidents (paginated)
- */
-router.get('/', async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 500)
-    const offset = parseInt(req.query.offset as string) || 0
-    const status = req.query.status as string
+    const limit = Math.min(parseInt(String(req.query.limit)) || 50, 500)
+    const offset = Math.max(parseInt(String(req.query.offset)) || 0, 0)
+    const status = req.query.status ? String(req.query.status) : undefined
 
-    let sql = `SELECT * FROM open_incidents WHERE 1=1`
-    const params: any[] = []
-
-    if (status) {
-      sql += ` AND current_status = $${params.length + 1}`
-      params.push(status)
-    }
-
-    sql += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
-    params.push(limit)
-    params.push(offset)
-
-    const result = await query(sql, params)
+    const all = await getOpenIncidents(visibility(req))
+    const filtered = status ? all.filter((i: any) => i.status === status) : all
 
     res.json({
-      data: result.rows,
-      pagination: {
-        limit,
-        offset,
-        total: result.rows.length,
-      },
+      data: filtered.slice(offset, offset + limit),
+      pagination: { limit, offset, total: filtered.length },
     })
   } catch (error) {
-    console.error('[INCIDENT_ADMIN] Error listing incidents:', error)
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Error retrieving incidents',
+    fail(res, 'retrieving incidents', error)
+  }
+})
+
+// ===========================
+// GET /api/admin/incidents/stats/escalations
+// Declared before /:id so the literal path is not captured as an id.
+// ===========================
+router.get('/stats/escalations', async (req: Request, res: Response) => {
+  try {
+    const open = await getOpenIncidents(visibility(req))
+    const escalated = open.filter((i: any) => i.status === 'escalated')
+
+    const histories = await Promise.all(
+      escalated.map(async (incident: any) => ({
+        incidentId: incident.id,
+        incidentNumber: incident.incident_number,
+        title: incident.title,
+        severity: incident.severity,
+        escalations: await getEscalationHistory(incident.id),
+      }))
+    )
+
+    res.json({
+      data: histories,
+      total: histories.length,
     })
+  } catch (error) {
+    fail(res, 'retrieving escalations', error)
   }
 })
 
 // ===========================
 // GET /api/admin/incidents/stats
 // ===========================
-/**
- * Dashboard stats
- */
-router.get('/stats', async (req: AuthRequest, res: Response) => {
+router.get('/stats', async (req: Request, res: Response) => {
   try {
-    const stats = await incidentService.getOpenIncidents()
+    const view = visibility(req)
+    const [stats, open] = await Promise.all([
+      getIncidentStatistics(view),
+      getOpenIncidents(view),
+    ])
 
-    const summary = {
-      totalOpen: stats.length,
+    const count = (predicate: (i: any) => boolean) => open.filter(predicate).length
+    const HOUR = 60 * 60 * 1000
+
+    res.json({
+      totalOpen: open.length,
       byStatus: {
-        reported: stats.filter((i: any) => i.current_status === 'REPORTED').length,
-        acknowledged: stats.filter((i: any) => i.current_status === 'ACKNOWLEDGED').length,
-        investigating: stats.filter((i: any) => i.current_status === 'INVESTIGATING').length,
+        open: count((i) => i.status === 'open'),
+        acknowledged: count((i) => i.status === 'acknowledged'),
+        investigating: count((i) => i.status === 'investigating'),
+        escalated: count((i) => i.status === 'escalated'),
       },
       bySeverity: {
-        critical: stats.filter((i: any) => i.severity === 'CRITICAL').length,
-        high: stats.filter((i: any) => i.severity === 'HIGH').length,
-        medium: stats.filter((i: any) => i.severity === 'MEDIUM').length,
+        critical: count((i) => i.severity === 'critical'),
+        high: count((i) => i.severity === 'high'),
+        medium: count((i) => i.severity === 'medium'),
+        low: count((i) => i.severity === 'low'),
       },
-      overdue: stats.filter((i: any) => i.hours_open > 1 && i.current_status === 'REPORTED')
-        .length,
-    }
-
-    res.json(summary)
-  } catch (error) {
-    console.error('[INCIDENT_ADMIN] Error getting stats:', error)
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Error retrieving stats',
+      // Unacknowledged for more than an hour.
+      overdue: count(
+        (i) => i.status === 'open' && Date.now() - new Date(i.created_at).getTime() > HOUR
+      ),
+      totals: stats,
     })
+  } catch (error) {
+    fail(res, 'retrieving stats', error)
   }
 })
 
 // ===========================
 // GET /api/admin/incidents/:id
 // ===========================
-/**
- * Get full incident details
- */
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const incident = (req as any).incident
+    const [timeline, escalations, rootCauses] = await Promise.all([
+      getIncidentTimeline(incident.id),
+      getEscalationHistory(incident.id),
+      getRootCauseAnalysis(incident.id),
+    ])
 
-    const details = await incidentService.getIncidentDetails(id)
-
-    if (!details) {
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Incident not found',
-      })
-    }
-
-    res.json(details)
+    res.json({ ...incident, timeline, escalations, rootCauses })
   } catch (error) {
-    console.error('[INCIDENT_ADMIN] Error getting incident details:', error)
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Error retrieving incident',
-    })
+    fail(res, 'retrieving incident', error)
   }
 })
 
 // ===========================
 // POST /api/admin/incidents/:id/acknowledge
 // ===========================
-/**
- * Acknowledge incident (required workflow step)
- */
-router.post('/:id/acknowledge', async (req: AuthRequest, res: Response) => {
+router.post('/:id/acknowledge', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    const { notes } = req.body
-
-    if (!notes || typeof notes !== 'string') {
-      return res.status(400).json({
-        error: 'INVALID_REQUEST',
-        message: 'Acknowledgment notes are required',
-      })
-    }
-
-    await incidentService.acknowledgeIncident({
-      incidentId: id,
-      userId: req.user!.id,
-      notes,
-      context: {
-        userId: req.user!.id,
-        role: req.user?.role || 'SUPERADMIN',
-        ipAddress: req.ip || req.socket?.remoteAddress || undefined,
-        userAgent: req.get('user-agent') || undefined,
-      },
+    const incident = (req as any).incident
+    await acknowledgeIncident(incident.id, {
+      acknowledgedByUserId: contextOf(req).userId,
+      acknowledgementNote: req.body?.notes,
     })
 
-    res.json({
-      success: true,
-      message: 'Incident acknowledged',
-    })
+    res.json({ success: true, message: 'Incident acknowledged', incidentId: incident.id })
   } catch (error: any) {
-    console.error('[INCIDENT_ADMIN] Error acknowledging incident:', error)
-
-    // Check for already acknowledged
-    if (error.message && error.message.includes('already acknowledged')) {
-      return res.status(400).json({
-        error: 'ALREADY_ACKNOWLEDGED',
-        message: error.message,
-      })
-    }
-
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: error.message || 'Error acknowledging incident',
-    })
+    // A refused state transition is the caller's error, not the server's.
+    res.status(400).json({ error: 'BAD_REQUEST', message: error.message })
   }
 })
 
 // ===========================
 // POST /api/admin/incidents/:id/root-cause
 // ===========================
-/**
- * Record root cause (required before resolution)
- */
-router.post('/:id/root-cause', async (req: AuthRequest, res: Response) => {
+router.post('/:id/root-cause', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    const { summary, category, remediationSteps } = req.body
+    const incident = (req as any).incident
+    const { summary, confidence, analysisNotes } = req.body ?? {}
 
-    if (!summary || !category || !remediationSteps) {
-      return res.status(400).json({
-        error: 'INVALID_REQUEST',
-        message: 'Summary, category, and remediation steps are required',
-      })
+    if (!summary || String(summary).trim().length === 0) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'A root cause summary is required' })
+      return
     }
 
-    const rcId = await incidentService.recordRootCause({
-      incidentId: id,
-      userId: req.user!.id,
-      rootCauseSummary: summary,
-      category: category as any,
-      remediationSteps,
-      context: {
-        userId: req.user!.id,
-        role: req.user?.role || 'SUPERADMIN',
-      },
+    const level = ['low', 'medium', 'high'].includes(confidence) ? confidence : 'medium'
+
+    await assignRootCause(incident.id, {
+      rootCause: String(summary),
+      assignedByUserId: contextOf(req).userId,
+      confidence: level,
+      analysisNotes,
     })
 
-    res.json({
-      success: true,
-      message: 'Root cause recorded',
-      rootCauseId: rcId,
-    })
+    res.json({ success: true, message: 'Root cause recorded', incidentId: incident.id })
   } catch (error: any) {
-    console.error('[INCIDENT_ADMIN] Error recording root cause:', error)
-
-    if (error.message && error.message.includes('must be acknowledged')) {
-      return res.status(400).json({
-        error: 'NOT_ACKNOWLEDGED',
-        message: error.message,
-      })
-    }
-
-    if (error.message && error.message.includes('already recorded')) {
-      return res.status(400).json({
-        error: 'ALREADY_RECORDED',
-        message: error.message,
-      })
-    }
-
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: error.message || 'Error recording root cause',
-    })
+    res.status(400).json({ error: 'BAD_REQUEST', message: error.message })
   }
 })
 
 // ===========================
 // POST /api/admin/incidents/:id/resolve
 // ===========================
-/**
- * Resolve incident and close
- * Requires: ACK + Root Cause
- */
-router.post('/:id/resolve', async (req: AuthRequest, res: Response) => {
+router.post('/:id/resolve', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    const { resolutionSummary, resolutionNotes, impactAssessment, lessonsLearned, followUpActions } =
-      req.body
+    const incident = (req as any).incident
+    const { rootCause, remediationSteps, preventionMeasures, estimatedImpact, postMortemUrl } =
+      req.body ?? {}
 
-    if (!resolutionSummary) {
-      return res.status(400).json({
-        error: 'INVALID_REQUEST',
-        message: 'Resolution summary is required',
+    if (!rootCause || !remediationSteps || !preventionMeasures) {
+      res.status(400).json({
+        error: 'BAD_REQUEST',
+        message:
+          'rootCause, remediationSteps and preventionMeasures are all required to resolve an incident',
       })
+      return
     }
 
-    await incidentService.resolveIncident({
-      incidentId: id,
-      userId: req.user!.id,
-      resolutionSummary,
-      resolutionNotes: resolutionNotes || '',
-      impactAssessment,
-      lessonsLearned,
-      followUpActions,
-      context: {
-        userId: req.user!.id,
-        role: req.user?.role || 'SUPERADMIN',
-      },
-    })
-
-    res.json({
-      success: true,
-      message: 'Incident resolved and closed',
-    })
-  } catch (error: any) {
-    console.error('[INCIDENT_ADMIN] Error resolving incident:', error)
-
-    if (error.message && error.message.includes('must be acknowledged')) {
-      return res.status(400).json({
-        error: 'NOT_ACKNOWLEDGED',
-        message: error.message,
-      })
-    }
-
-    if (error.message && error.message.includes('must be recorded')) {
-      return res.status(400).json({
-        error: 'NO_ROOT_CAUSE',
-        message: error.message,
-      })
-    }
-
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: error.message || 'Error resolving incident',
-    })
-  }
-})
-
-// ===========================
-// GET /api/admin/incidents/stats/escalations
-// ===========================
-/**
- * Get escalation stats
- */
-router.get('/stats/escalations', async (req: AuthRequest, res: Response) => {
-  try {
-    // Get escalations in last 24 hours
-    const result = await query(
-      `SELECT escalation_reason, COUNT(*) as count
-       FROM incident_escalations
-       WHERE escalated_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'
-       GROUP BY escalation_reason
-       ORDER BY count DESC`
+    await resolveIncident(
+      incident.id,
+      { rootCause, remediationSteps, preventionMeasures, estimatedImpact, postMortemUrl },
+      contextOf(req).userId
     )
 
-    res.json({
-      escalations: result.rows,
-    })
-  } catch (error) {
-    console.error('[INCIDENT_ADMIN] Error getting escalation stats:', error)
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: 'Error retrieving escalation stats',
-    })
+    res.json({ success: true, message: 'Incident resolved', incidentId: incident.id })
+  } catch (error: any) {
+    res.status(400).json({ error: 'BAD_REQUEST', message: error.message })
   }
 })
 

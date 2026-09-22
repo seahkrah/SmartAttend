@@ -5,6 +5,10 @@
 
 import { query } from '../db/connection.js'
 import {
+  type IncidentVisibility,
+  shiftVisibility,
+} from '../auth/incidentVisibility.js'
+import {
   classifyError,
   shouldCreateIncident,
   type ErrorClassification,
@@ -17,6 +21,14 @@ import {
 
 export interface CreateIncidentInput {
   platformId: string
+  /**
+   * The tenant the incident arose in, where there is one.
+   *
+   * This is what makes an incident visible to that tenant's administrators
+   * and invisible to everyone else's. Left unset for platform-level events,
+   * which only a superadmin sees.
+   */
+  tenantId?: string | null
   errorCode?: string
   errorMessage: string
   errorType?: string
@@ -137,9 +149,10 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
           last_error_at,
           affected_users,
           affected_systems,
-          business_impact
+          business_impact,
+          affected_tenant_id
         ) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, 1, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $11, $12, $13) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, 1, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $11, $12, $13, $14) 
        RETURNING id`,
       [
         input.platformId,
@@ -155,6 +168,7 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
         input.affectedUsers || 0,
         input.affectedSystems ? JSON.stringify(input.affectedSystems) : null,
         input.businessImpact || null,
+        input.tenantId ?? null,
       ]
     )
 
@@ -332,11 +346,19 @@ export async function updateIncident(
 /**
  * Get incident by ID
  */
-export async function getIncident(incidentId: string): Promise<any> {
+export async function getIncident(
+  incidentId: string,
+  visibility: IncidentVisibility
+): Promise<any> {
   try {
-    const result = await query('SELECT * FROM incidents WHERE id = $1', [
-      incidentId,
-    ])
+    if (!visibility.any) return null
+    const scoped = shiftVisibility(visibility, 2)
+    // An incident outside the caller's view reads as absent, so an id cannot
+    // be probed for existence.
+    const result = await query(
+      `SELECT * FROM incidents WHERE id = $1 AND (${scoped.sql})`,
+      [incidentId, ...scoped.params]
+    )
     return result.rows[0] || null
   } catch (error) {
     console.error('Error retrieving incident:', error)
@@ -347,13 +369,14 @@ export async function getIncident(incidentId: string): Promise<any> {
 /**
  * Get open incidents for platform
  */
-export async function getOpenIncidents(platformId: string): Promise<any[]> {
+export async function getOpenIncidents(visibility: IncidentVisibility): Promise<any[]> {
   try {
+    if (!visibility.any) return []
     const result = await query(
       `SELECT * FROM incidents 
-       WHERE platform_id = $1 AND status IN ('open', 'investigating', 'escalated') 
+       WHERE (${visibility.sql}) AND status IN ('open', 'investigating', 'escalated') 
        ORDER BY severity DESC, created_at DESC`,
-      [platformId]
+      visibility.params
     )
     return result.rows
   } catch (error) {
@@ -365,13 +388,14 @@ export async function getOpenIncidents(platformId: string): Promise<any[]> {
 /**
  * Get critical open incidents
  */
-export async function getCriticalIncidents(platformId: string): Promise<any[]> {
+export async function getCriticalIncidents(visibility: IncidentVisibility): Promise<any[]> {
   try {
+    if (!visibility.any) return []
     const result = await query(
       `SELECT * FROM incidents 
-       WHERE platform_id = $1 AND status IN ('open', 'investigating') AND severity = 'critical'
+       WHERE (${visibility.sql}) AND status IN ('open', 'investigating') AND severity = 'critical'
        ORDER BY created_at DESC`,
-      [platformId]
+      visibility.params
     )
     return result.rows
   } catch (error) {
@@ -383,8 +407,14 @@ export async function getCriticalIncidents(platformId: string): Promise<any[]> {
 /**
  * Get incident statistics for platform
  */
-export async function getIncidentStatistics(platformId: string): Promise<any> {
+export async function getIncidentStatistics(visibility: IncidentVisibility): Promise<any> {
   try {
+    if (!visibility.any) {
+      return {
+        total_incidents: '0', critical_count: '0', high_count: '0', medium_count: '0',
+        open_count: '0', resolved_count: '0', avg_resolution_time_minutes: null,
+      }
+    }
     const result = await query(
       `SELECT 
          COUNT(*) as total_incidents,
@@ -395,8 +425,8 @@ export async function getIncidentStatistics(platformId: string): Promise<any> {
          SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count,
          AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60) as avg_resolution_time_minutes
        FROM incidents 
-       WHERE platform_id = $1`,
-      [platformId]
+       WHERE (${visibility.sql})`,
+      visibility.params
     )
     return result.rows[0]
   } catch (error) {

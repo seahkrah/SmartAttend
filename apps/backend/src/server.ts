@@ -4,7 +4,6 @@ import http from 'http'
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import { enforceTenantBoundaries } from './auth/tenantEnforcementMiddleware.js'
 import { initializeDatabase } from './db/connection.js'
 import authRoutes from './routes/auth.js'
 import schoolAdminRoutes from './routes/schoolAdmin.js'
@@ -72,17 +71,28 @@ app.use((req, res, next) => {
 app.use('/api/auth', schoolAdminRoutes)
 app.use('/api/auth', authRoutes)
 
-// Tenant-scoped routes: enforce tenant boundaries using authenticated context.
-// This ensures all tenant-facing data access is automatically filtered by platform/tenant.
-app.use('/api/school', enforceTenantBoundaries, schoolRoutes)
-app.use('/api/corporate', enforceTenantBoundaries, corporateRoutes)
+// Tenant-scoped routers resolve their own context.
+//
+// These were previously mounted behind enforceTenantBoundaries, which read as
+// though it guaranteed isolation and did not: it set tenantId from the JWT's
+// platformId — the platform, shared by every institution — and nothing read
+// the result. Worse, it ran at the mount point while these routers
+// authenticated per route, so req.user was still undefined when it ran and it
+// skipped silently.
+//
+// Each router now begins with authenticateToken + resolveTenantContext, which
+// derives the tenant from the authenticated identity and the server's own
+// membership records, and states what it requires (requireTenant,
+// requirePlatform, requireRoles) at its own mount.
+app.use('/api/school', schoolRoutes)
+app.use('/api/corporate', corporateRoutes)
 // Self-service and department views. Mounted first; the original attendance
 // router keeps /sessions, /face and /mark-with-face, whose paths do not clash.
 app.use('/api/attendance', attendanceSelfServiceRoutes)
-app.use('/api/attendance', enforceTenantBoundaries, attendanceRoutes)
-app.use('/api/users', enforceTenantBoundaries, userRoutes)
-app.use('/api/metrics', enforceTenantBoundaries, metricsRoutes)
-app.use('/api/simulations', enforceTenantBoundaries, simulationsRoutes)
+app.use('/api/attendance', attendanceRoutes)
+app.use('/api/users', userRoutes)
+app.use('/api/metrics', metricsRoutes)
+app.use('/api/simulations', simulationsRoutes)
 
 // Superadmin/control-plane routes remain system-scoped and already have their own guards.
 app.use('/api/superadmin', superadminRoutes)
@@ -100,13 +110,13 @@ app.use('/api/validation', validationRoutes)
 app.use('/api/admin', adminTenantRoutes)
 // EMS — HR command centre. Platform-gated to corporate inside the router.
 app.use('/api/hr', hrRoutes)
-app.use('/api/admin', enforceTenantBoundaries, tenantAdminRoutes)
+app.use('/api/admin', tenantAdminRoutes)
 // Attendance lifecycle (draft/submit/lock/export/bulk-edit/facial-match/qr).
 // Mounted first; the original faculty router keeps its own paths.
 app.use('/api/faculty', facultyWorkflowRoutes)
-app.use('/api/faculty', enforceTenantBoundaries, facultyRoutes)
-app.use('/api/student', enforceTenantBoundaries, studentRoutes)
-app.use('/api/face', enforceTenantBoundaries, faceVerificationRoutes)
+app.use('/api/faculty', facultyRoutes)
+app.use('/api/student', studentRoutes)
+app.use('/api/face', faceVerificationRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/time', timeRoutes)
 

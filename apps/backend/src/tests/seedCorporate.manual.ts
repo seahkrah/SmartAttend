@@ -10,6 +10,11 @@ async function main() {
 
   await query(`DELETE FROM notifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_campaigns WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  // Leave rows reference employees and types, so they clear first.
+  await query(`DELETE FROM leave_request_days WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM leave_requests WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM leave_balances WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM leave_types WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM corporate_checkins WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM employees WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM corporate_departments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
@@ -35,6 +40,15 @@ async function main() {
     const dept = (await query(
       `INSERT INTO corporate_departments (name, code, platform_id, tenant_id) VALUES ($1,$2,$3,$4) RETURNING id`,
       [`Operations ${tag}`, `OPS${tag}`, cp.id, ent.id])).rows[0]
+
+    // The HR user is an employee of the company too. Without this they cannot
+    // take leave, and the rule that nobody approves their own request has no
+    // way to be exercised for the people it matters most for.
+    const hrEmp = (await query(
+      `INSERT INTO employees (user_id, employee_id, first_name, last_name, email, phone,
+                              department_id, date_of_joining, is_currently_employed, tenant_id)
+       VALUES ($1,$2,$3,$4,$5,'000',$6,'2024-01-01',true,$7) RETURNING id`,
+      [hr.id, `E-${tag}HR`, 'HR', tag, `hr.${tag.toLowerCase()}@c2e.test`, dept.id, ent.id])).rows[0]
 
     const empIds: string[] = []
     let firstEmpUserId: string | null = null
@@ -63,6 +77,7 @@ async function main() {
 
     out[tag] = {
       tenantId: ent.id, deptId: dept.id, employees: empIds,
+      hrEmpId: hrEmp.id,
       token: generateAccessToken(hr.id, cp.id, hrRole.id),
       empToken: generateAccessToken(firstEmpUserId!, cp.id, empRole.id),
       empId: empIds[0],

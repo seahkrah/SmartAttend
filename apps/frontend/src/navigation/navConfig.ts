@@ -138,8 +138,7 @@ export const corporateNav: NavGroup[] = [
       { label: 'Shifts & rosters', to: '/shifts', icon: CalendarDays, status: 'planned' },
       // Needs verified-hours aggregation and payroll export.
       { label: 'Timesheets', to: '/timesheets', icon: Clock, status: 'planned' },
-      // Needs leave types, balances and an approval workflow.
-      { label: 'Leave requests', to: '/leave', icon: ClipboardCheck, status: 'planned', countKey: 'leave' },
+      { label: 'Leave requests', to: '/leave', icon: ClipboardCheck, status: 'ready', countKey: 'leave' },
     ],
   },
   {

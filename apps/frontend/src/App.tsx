@@ -52,6 +52,8 @@ import SchoolAdminCoursesPage from './pages/SchoolAdminCoursesPage';
 import SchoolAdminProgrammesPage from './pages/SchoolAdminProgrammesPage';
 import FacultyGradebookPage from './pages/FacultyGradebookPage';
 import StudentResultsPage from './pages/StudentResultsPage';
+import EmployeeLeavePage from './pages/EmployeeLeavePage';
+import HRLeavePage from './pages/HRLeavePage';
 import SchoolAdminRoomsPage from './pages/SchoolAdminRoomsPage';
 import SchoolAdminSchedulesPage from './pages/SchoolAdminSchedulesPage';
 import SchoolAdminEnrollmentPage from './pages/SchoolAdminEnrollmentPage';
@@ -240,6 +242,7 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<HREmployeeAttendanceDashboard />} />
                   <Route path="/analytics" element={<HREmployeeAttendanceDashboard />} />
+                  <Route path="/leave" element={<HRLeavePage />} />
                 </Routes>
               </RoleRoute>
             </ProtectedRoute>
@@ -258,6 +261,7 @@ export default function App() {
                   <Route path="/attendance" element={<StudentAttendancePage />} />
                   <Route path="/schedule" element={<StudentSchedulePage />} />
                   <Route path="/results" element={<StudentResultsPage />} />
+                  <Route path="/leave" element={<EmployeeLeavePage />} />
                   <Route path="/settings" element={<StudentSettingsPage />} />
                 </Routes>
               </RoleRoute>

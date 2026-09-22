@@ -42,6 +42,7 @@ SUITES=(
   opsRoutesIsolation
   authFlow
   academicsGradebook
+  leaveApi
 )
 
 fail=0

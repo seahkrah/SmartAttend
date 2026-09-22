@@ -26,7 +26,8 @@ co,r=call("GET","/overview",SCHOOL['token']); check("school identity refused fro
 print("\n-- overview / metrics --")
 co,r=call("GET","/overview",A['token']); check("overview 200", co==200, f"({co} {r})")
 if co==200:
-    check("headcount is tenant-scoped", r.get('total_members')==3, f"({r})")
+    # Three staff plus the HR manager, who is an employee of the company too.
+    check("headcount is tenant-scoped", r.get('total_members')==4, f"({r})")
     check("bands computed", r.get('chronic_absentees',0)>=1, f"({r})")
 co,r=call("GET","/departments/metrics",A['token']); check("dept metrics 200", co==200, f"({co} {r})")
 names=[d['name'] for d in r] if co==200 and isinstance(r,list) else []
@@ -35,7 +36,7 @@ check("only own departments", names==['Operations A'], f"({names})")
 print("\n-- members --")
 co,r=call("GET","/members",A['token']); check("members 200", co==200, f"({co} {r})")
 mails=sorted(m['email'] for m in (r.get('data') or [])) if co==200 else []
-check("only own employees", all(e.endswith('.a@c2e.test') for e in mails) and len(mails)==3, f"({mails})")
+check("only own employees", all(e.endswith('.a@c2e.test') for e in mails) and len(mails)==4, f"({mails})")
 co,r=call("GET",f"/members/{B['employees'][0]}",A['token']); check("cannot read B employee", co==404, f"({co})")
 co,r=call("GET",f"/members/{A['employees'][0]}",A['token']); check("can read own employee", co==200, f"({co})")
 
@@ -43,7 +44,7 @@ print("\n-- patterns / compliance --")
 co,r=call("GET","/patterns",A['token']); check("patterns 200", co==200 and isinstance(r,list), f"({co} {r})")
 if co==200: check("detects an absentee", any(p['pattern']!='NONE' for p in r), f"({r})")
 co,r=call("GET","/compliance/summary",A['token']); check("compliance 200", co==200, f"({co} {r})")
-if co==200: check("compliance scoped", r.get('headcount')==3, f"({r})")
+if co==200: check("compliance scoped", r.get('headcount')==4, f"({r})")
 
 print("\n-- campaigns --")
 co,r=call("POST","/campaigns",A['token'],{"name":"Nudge","criteria":"BAD","message_template":"hello there"})

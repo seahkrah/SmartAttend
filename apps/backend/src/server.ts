@@ -24,6 +24,8 @@ import validationRoutes from './routes/validation.js'
 import tenantAdminRoutes from './routes/tenantAdmin.js'
 import adminTenantRoutes from './routes/adminTenant.js'
 import hrRoutes from './routes/hr.js'
+// EMS leave: types, balances, requests, approvals, calendar.
+import leaveRoutes from './routes/leave.js'
 import attendanceSelfServiceRoutes from './routes/attendanceSelfService.js'
 import facultyRoutes from './routes/faculty.js'
 import facultyWorkflowRoutes from './routes/facultyWorkflow.js'
@@ -114,6 +116,7 @@ app.use('/api/validation', validationRoutes)
 app.use('/api/admin', adminTenantRoutes)
 // EMS — HR command centre. Platform-gated to corporate inside the router.
 app.use('/api/hr', hrRoutes)
+app.use('/api/leave', leaveRoutes)
 app.use('/api/admin', tenantAdminRoutes)
 // Attendance lifecycle (draft/submit/lock/export/bulk-edit/facial-match/qr).
 // Mounted first; the original faculty router keeps its own paths.

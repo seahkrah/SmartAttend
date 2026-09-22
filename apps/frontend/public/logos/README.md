@@ -1,19 +1,26 @@
 # JjeloTech brand assets
 
-| File | Used by | Status |
-|------|---------|--------|
-| `jjelotech-mark.png` | `BrandLogo.tsx`, `SuperadminLayout.tsx`, `LandingPage.tsx` | Active — icon mark only, no wordmark |
-| `favicon.png` | `index.html` (favicon, apple-touch-icon) | Active |
+## The in-app logo is SVG, not a file here
+
+`src/components/BrandLogo.tsx` draws the mark as inline SVG — it scales
+cleanly, uses the Tailwind palette (`primary-500` → `secondary-500`), and needs
+no raster asset. `JjeloTechMark`, `JjeloTechLogo` and `JjeloTechIcon` are the
+three exports; every screen uses one of them.
+
+To switch back to raster artwork, replace the `<svg>` in `JjeloTechMark` with an
+`<img src="/logos/your-file.png" />`. Nothing else needs changing.
+
+## Files in this folder
+
+| File | Used by | Notes |
+|------|---------|-------|
+| `favicon.png` | `index.html` — favicon and apple-touch-icon | The one raster asset still wired up |
+| `platform-logo.png`, `alt-platform-logo.png` | — | Unreferenced |
 | `brand-logo.png`, `alt-brand-logo.png` | — | SmartCode (development vendor) logo, unreferenced |
-| `platform-logo.png`, `alt-platform-logo.png` | — | **Legacy SmartAttend wordmark — do not use** |
 
-## Replacing the mark with the real JjeloTech logo
+Only `apps/frontend/public/` is served by Vite. The `logo/` folder at the
+repository root is an artwork stash — changes there have no effect on the app.
 
-The rebrand from SmartAttend to JjeloTech removed every reference to the old
-wordmark. `jjelotech-mark.png` is the existing icon mark (no text), used as a
-stand-in so nothing stale ships.
-
-To drop in the real logo, overwrite `jjelotech-mark.png` and `favicon.png` —
-no code changes are needed. Once that is done the legacy `platform-logo.png`
-and `alt-platform-logo.png` files can be deleted; they are kept for now only so
-the old artwork is not lost.
+A file placed directly in `public/` is served from the root, so
+`public/platform-logo.png` would be `/platform-logo.png`, not
+`/logos/platform-logo.png`. Brand assets belong in this folder.

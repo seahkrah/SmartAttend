@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import {
   BarChart3, Building2, Users, AlertTriangle, Settings, LogOut, Menu, X,
-  Home, Bell, ArrowLeft, Shield
+  Home, Bell, ArrowLeft
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
+import { JjeloTechMark } from './BrandLogo'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -67,22 +68,7 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
         <div className="p-4 border-b border-slate-700 flex items-center justify-between">
           {sidebarOpen && (
             <div className="flex items-center gap-3 min-w-0">
-              <img
-                src="/logos/jjelotech-mark.png"
-                alt="JjeloTech"
-                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                  const fallback = e.currentTarget.nextElementSibling as HTMLElement
-                  if (fallback) {
-                    fallback.classList.remove('hidden')
-                    fallback.classList.add('flex', 'items-center', 'justify-center')
-                  }
-                }}
-              />
-              <div className="hidden">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
+              <JjeloTechMark className="w-10 h-10 flex-shrink-0" idSuffix="superadmin-sidebar" />
               <div className="truncate">
                 <h1 className="text-sm font-bold text-white truncate">JjeloTech</h1>
                 <p className="text-xs text-slate-400">Console</p>

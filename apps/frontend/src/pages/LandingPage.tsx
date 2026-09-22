@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Users, BarChart3, ArrowRight, Github, Shield, Lightbulb } from 'lucide-react';
 import { AnimatedIconBackground, BouncingCard, FadeIn, SlideInFromSide } from '../components/Animations';
-import { JjeloTechLogo } from '../components/BrandLogo';
+import { JjeloTechLogo, JjeloTechMark } from '../components/BrandLogo';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -132,14 +132,7 @@ export const LandingPage: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-br from-primary-500/20 to-secondary-600/20 rounded-2xl"></div>
                   <div className="absolute inset-4 bg-gradient-to-br from-primary-600/30 to-secondary-700/30 rounded-xl backdrop-blur-xl border border-primary-500/20 flex items-center justify-center">
                     <div className="text-center">
-                      <img
-                        src="/logos/jjelotech-mark.png"
-                        alt="JjeloTech"
-                        className="w-24 h-24 mx-auto mb-4 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
+                      <JjeloTechMark className="w-24 h-24 mx-auto mb-4" idSuffix="landing-hero" />
                       <p className="text-2xl font-bold">JjeloTech</p>
                       <p className="text-slate-400 mt-2">Attendance Platform</p>
                     </div>

@@ -91,7 +91,7 @@ export const AnimatedIconBackground: React.FC = () => {
       />
 
       <motion.div
-        className="absolute top-1/2 left-1/2 w-96 h-96 bg-accent-500/10 rounded-full filter blur-3xl"
+        className="absolute top-1/2 left-1/2 w-96 h-96 bg-brand-500/10 rounded-full filter blur-3xl"
         animate={{
           scale: [0.8, 1, 0.8],
           opacity: [0.2, 0.4, 0.2],

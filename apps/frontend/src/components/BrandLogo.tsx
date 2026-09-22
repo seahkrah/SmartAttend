@@ -12,9 +12,11 @@ import React from 'react';
  * see apps/frontend/public/logos/README.md.
  */
 
-const GRADIENT_FROM = '#5d7fff'; // primary-500
-const GRADIENT_TO = '#8b5cf6'; // secondary-500
-const CHECK_GREEN = '#22c55e'; // accent-500
+// Brand palette — see tailwind.config.js. Inline hex rather than Tailwind
+// classes because SVG gradient stops cannot take utility classes.
+const GRADIENT_FROM = '#3366e0'; // brand-500
+const GRADIENT_TO = '#1d4ed8'; // brand-600
+const ACCENT = '#f7941d'; // accent-500
 
 /**
  * The icon mark on its own — no wordmark.
@@ -46,11 +48,7 @@ export const JjeloTechMark: React.FC<{ className?: string; idSuffix?: string }> 
         d="M14 44 L40 44 L52 64 L40 84 L14 84 L26 64 Z"
         fill={`url(#${gradientId})`}
       />
-      <path
-        d="M30 90 L56 90 L44 70 L18 70 Z"
-        fill={`url(#${gradientId})`}
-        opacity="0.55"
-      />
+      <path d="M30 90 L56 90 L44 70 L18 70 Z" fill={ACCENT} opacity="0.9" />
 
       {/* Location pin with check */}
       <path
@@ -122,7 +120,7 @@ export const JjeloTechIcon: React.FC<{
 
   return (
     <div
-      className={`${sizes[size]} bg-gradient-to-br from-primary-500 to-secondary-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-soft ${className}`}
+      className={`${sizes[size]} bg-gradient-to-br from-brand-500 to-brand-700 rounded-lg flex items-center justify-center flex-shrink-0 shadow-soft ${className}`}
     >
       <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full p-1" role="presentation">
         <circle cx="50" cy="50" r="30" fill="none" stroke="white" strokeWidth="2.5" />
@@ -130,7 +128,7 @@ export const JjeloTechIcon: React.FC<{
         <line x1="50" y1="50" x2="65" y2="35" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
         <line x1="50" y1="50" x2="65" y2="65" stroke="white" strokeWidth="2" strokeLinecap="round" />
         <g transform="translate(75, 25) scale(0.8)">
-          <circle cx="0" cy="0" r="12" fill={CHECK_GREEN} />
+          <circle cx="0" cy="0" r="12" fill={ACCENT} />
           <path
             d="M -6 0 L -2 4 L 6 -6"
             stroke="white"

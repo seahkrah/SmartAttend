@@ -158,5 +158,34 @@ co, r = call("GET", "/failure-rates", HR, base="/metrics")
 check("an EMS identity reads only its own metrics",
       co != 200 or r.get('tenant_id') not in (A['tenantId'], B['tenantId']), f"({co} {r})")
 
+print("-- registration approvals --")
+# Authority used to be school_entities.admin_user_id, NULL for every entity,
+# so this queue was permanently empty and no request could be acted on.
+co, r = call("GET", "/admin/pending-approvals", AT, base="/auth")
+check("approvals queue reachable for an administrator", co == 200, f"({co} {r})")
+if co == 200:
+    check("reports the caller's own platform", r.get('platform') == 'school', f"({r})")
+co, r = call("GET", "/admin/pending-approvals", FA, base="/auth")
+check("a lecturer has no approvals queue", co == 403, f"({co} {r})")
+co, r = call("GET", "/admin/pending-approvals", None, base="/auth")
+check("unauthenticated refused", co in (401, 403), f"({co})")
+
+co, r = call("POST", "/admin/approval-action", AT,
+             {"approvalId": GHOST, "action": "approve"}, base="/auth")
+check("an approval outside the caller's tenant reads as absent",
+      co == 404 and 'not found' in str(r).lower(), f"({co} {r})")
+
+print("-- corporate stats --")
+co, r = call("GET", "/admin/corporate/stats", HR, base="/auth")
+check("an EMS administrator reads their own stats", co == 200, f"({co} {r})")
+if co == 200:
+    rate = r.get('stats', {}).get('checkinRate')
+    check("the check-in rate is computed, not the hardcoded '92.3%'",
+          rate is None or isinstance(rate, (int, float)), f"({rate!r})")
+    check("the entity is the caller's own tenant",
+          r.get('entity', {}).get('id') == c['A']['tenantId'], f"({r.get('entity')})")
+co, r = call("GET", "/admin/corporate/stats", AT, base="/auth")
+check("an SMS administrator is refused from the EMS dashboard", co == 403, f"({co} {r})")
+
 print(f"\n{P} passed, {F} failed")
 sys.exit(1 if F else 0)

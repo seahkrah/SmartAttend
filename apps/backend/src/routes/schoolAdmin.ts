@@ -46,7 +46,15 @@ import { TenantScopeError } from '../db/tenantScoped.js'
 
 const router = Router()
 
+// Scoped to this router's own path prefix, not to the whole mount.
+//
+// A bare router.use() runs for every request that reaches the router, and
+// this one is mounted at /api/auth ahead of the authentication routes — so
+// without the prefix it gated /api/auth/login, /api/auth/me and everything
+// else, rejecting the unauthenticated login request outright and refusing
+// /me to anyone who was not a school administrator.
 router.use(
+  '/admin/school',
   authenticateToken,
   resolveTenantContext,
   requireTenant,

@@ -23,6 +23,13 @@ import {
   hashPassword
 } from '../auth/authService.js'
 import { authenticateToken } from '../auth/middleware.js'
+import {
+  resolveTenantContext,
+  requireTenant,
+  requirePlatform,
+  requireRoles,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
 import { ErrorMessages, getUserFriendlyError, logError } from '../utils/errorMessages.js'
 import { getClientIp } from '../utils/getClientIp.js'
 
@@ -143,62 +150,32 @@ router.post('/register-with-role', async (req: RoleBasedRegisterRequest, res: Re
 // ===========================
 
 // Get pending approvals for logged-in admin
-router.get('/admin/pending-approvals', authenticateToken, async (req: Request, res: Response) => {
+/**
+ * Registration requests awaiting a decision in the caller's own tenant.
+ *
+ * Authority used to be "are you named as an entity's admin_user_id", a column
+ * that is NULL for every entity, so this answered 403 or an empty list to
+ * everyone and the approvals dashboard never showed anything. It now uses the
+ * resolved tenant and the administrator role, as elsewhere.
+ */
+router.get(
+  '/admin/pending-approvals',
+  authenticateToken,
+  resolveTenantContext,
+  requireTenant,
+  requireRoles('admin'),
+  async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: ErrorMessages.AUTH_REQUIRED })
-    }
+    const ctx = req.ctx!
 
-    // Check if user is admin
-    const userResult = await query(
-      `SELECT u.*, r.name as role_name FROM users u
-       JOIN roles r ON u.role_id = r.id
-       WHERE u.id = $1`,
-      [req.user.userId]
+    const approvals = await getPendingApprovalsForAdmin(
+      ctx.userId,
+      ctx.platformId,
+      ctx.tenantId!
     )
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: ErrorMessages.USER_NOT_FOUND })
-    }
-
-    const user = userResult.rows[0]
-
-    // Get platform name
-    const platformResult = await query(
-      `SELECT name FROM platforms WHERE id = $1`,
-      [user.platform_id]
-    )
-
-    if (platformResult.rows.length === 0) {
-      return res.status(400).json({ error: ErrorMessages.SYSTEM_CONFIGURATION_ERROR })
-    }
-
-    const platformName = platformResult.rows[0].name
-
-    // Check if user is admin of any entity
-    if (platformName === 'school') {
-      const schoolAdminCheck = await query(
-        `SELECT id FROM school_entities WHERE admin_user_id = $1`,
-        [req.user.userId]
-      )
-      if (schoolAdminCheck.rows.length === 0) {
-        return res.status(403).json({ error: ErrorMessages.AUTH_PERMISSION_DENIED })
-      }
-    } else if (platformName === 'corporate') {
-      const corporateAdminCheck = await query(
-        `SELECT id FROM corporate_entities WHERE admin_user_id = $1`,
-        [req.user.userId]
-      )
-      if (corporateAdminCheck.rows.length === 0) {
-        return res.status(403).json({ error: ErrorMessages.AUTH_PERMISSION_DENIED })
-      }
-    }
-
-    // Get pending approvals
-    const approvals = await getPendingApprovalsForAdmin(req.user.userId, user.platform_id)
 
     return res.json({
-      platform: platformName,
+      platform: ctx.platformKind,
       approvals
     })
   } catch (error: any) {
@@ -217,11 +194,15 @@ interface ApprovalActionRequest extends Request {
   }
 }
 
-router.post('/admin/approval-action', authenticateToken, async (req: ApprovalActionRequest, res: Response) => {
+router.post(
+  '/admin/approval-action',
+  authenticateToken,
+  resolveTenantContext,
+  requireTenant,
+  requireRoles('admin'),
+  async (req: ApprovalActionRequest & TenantRequest, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: ErrorMessages.AUTH_REQUIRED })
-    }
+    const ctx = req.ctx!
 
     const { approvalId, action, rejectionReason } = req.body
 
@@ -233,30 +214,26 @@ router.post('/admin/approval-action', authenticateToken, async (req: ApprovalAct
       return res.status(400).json({ error: 'Please select a valid action' })
     }
 
-    // Get user's platform
-    const userResult = await query(
-      `SELECT platform_id FROM users WHERE id = $1`,
-      [req.user.userId]
-    )
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: ErrorMessages.USER_NOT_FOUND })
-    }
-
-    const platformId = userResult.rows[0].platform_id
-
-    // Approve or reject
+    // Approving a request creates an account inside a tenant, so the request
+    // must belong to the caller's own.
     const result = await approveOrRejectRegistration(
       approvalId,
-      platformId,
+      ctx.platformId,
       action,
-      req.user.userId,
+      ctx.userId,
+      ctx.tenantId!,
       rejectionReason
     )
 
     return res.json(result)
   } catch (error: any) {
     logError('Approval action', error)
+    // A request that is not this tenant's reads as missing, which is both the
+    // honest answer and the one that does not confirm the id exists
+    // elsewhere. The generic message hid a refusal behind an apparent fault.
+    if (String(error?.message ?? '').includes('not found')) {
+      return res.status(404).json({ error: 'Approval request not found' })
+    }
     const friendlyError = getUserFriendlyError(error, 'Unable to process approval action')
     return res.status(400).json({ error: friendlyError.error })
   }
@@ -1101,49 +1078,77 @@ router.get('/superadmin/entity-users', authenticateToken, verifySuperadmin, asyn
 })
 
 // Get corporate admin stats
-router.get('/admin/corporate/stats', authenticateToken, async (req: Request, res: Response) => {
+/**
+ * Dashboard figures for a company administrator.
+ *
+ * Authority came from corporate_entities.admin_user_id, NULL for every entity,
+ * so this answered 403 to everyone. The check-in rate it would have returned
+ * was the string '92.3%', written into the handler — a number that never came
+ * from the data and could not change. It is computed now, over the tenant's
+ * own check-ins for the last thirty days, and reported as null when there is
+ * nothing to compute it from rather than as a plausible-looking figure.
+ */
+router.get(
+  '/admin/corporate/stats',
+  authenticateToken,
+  resolveTenantContext,
+  requireTenant,
+  requirePlatform('corporate'),
+  requireRoles('admin', 'hr', 'hr_director', 'manager'),
+  async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'User not authenticated' })
-    }
+    const ctx = req.ctx!
 
-    const entityResult = await query(
-      `SELECT * FROM corporate_entities WHERE admin_user_id = $1`,
-      [req.user.userId]
-    )
+    const [users, active, approvals, checkins] = await Promise.all([
+      query(
+        `SELECT COUNT(*)::int AS n FROM corporate_user_associations
+          WHERE corporate_entity_id = $1`,
+        [ctx.tenantId]
+      ),
+      query(
+        `SELECT COUNT(*)::int AS n
+           FROM corporate_user_associations cua
+           JOIN users u ON u.id = cua.user_id
+          WHERE cua.corporate_entity_id = $1 AND cua.status = 'active' AND u.is_active = TRUE`,
+        [ctx.tenantId]
+      ),
+      query(
+        `SELECT COUNT(*)::int AS n FROM user_registration_requests
+          WHERE entity_id = $1 AND status = 'pending'`,
+        [ctx.tenantId]
+      ),
+      // Expected check-ins are one per active employee per working day over
+      // the window; actual are the distinct employee-days recorded.
+      query(
+        `SELECT
+           COUNT(DISTINCT (c.employee_id, c.check_in_time::date))::int AS recorded,
+           (SELECT COUNT(*)::int FROM employees e
+             WHERE e.tenant_id = $1 AND e.is_currently_employed = TRUE) AS active_employees,
+           COUNT(DISTINCT c.check_in_time::date)::int AS days_with_activity
+         FROM corporate_checkins c
+        WHERE c.tenant_id = $1
+          AND c.check_in_time >= CURRENT_DATE - INTERVAL '30 days'`,
+        [ctx.tenantId]
+      ),
+    ])
 
-    if (entityResult.rows.length === 0) {
-      return res.status(403).json({ error: 'No entity assigned to this admin' })
-    }
-
-    const entity = entityResult.rows[0]
-
-    const usersResult = await query(
-      `SELECT COUNT(*) as count FROM corporate_user_associations WHERE corporate_entity_id = $1`,
-      [entity.id]
-    )
-
-    const activeUsersResult = await query(
-      `SELECT COUNT(*) as count FROM corporate_user_associations cua JOIN users u ON cua.user_id = u.id WHERE cua.corporate_entity_id = $1 AND cua.status = 'active' AND u.is_active = true`,
-      [entity.id]
-    )
-
-    const approvalsResult = await query(
-      `SELECT COUNT(*) as count FROM user_registration_requests WHERE entity_id = $1 AND status = 'pending'`,
-      [entity.id]
-    )
+    const c = checkins.rows[0]
+    const expected = c.active_employees * c.days_with_activity
+    const checkinRate =
+      expected > 0 ? Math.round((c.recorded / expected) * 1000) / 10 : null
 
     return res.json({
       stats: {
-        totalUsers: parseInt(usersResult.rows[0].count),
-        activeUsers: parseInt(activeUsersResult.rows[0].count),
-        pendingApprovals: parseInt(approvalsResult.rows[0].count),
-        checkinRate: '92.3%',
+        totalUsers: users.rows[0].n,
+        activeUsers: active.rows[0].n,
+        pendingApprovals: approvals.rows[0].n,
+        checkinRate,
       },
       recentActivity: [],
-      entity: { id: entity.id, name: entity.name, code: entity.code }
+      entity: { id: ctx.tenantId, name: ctx.tenantName },
     })
   } catch (error: any) {
+    logError('Get corporate stats', error)
     return res.status(500).json({ error: 'Failed to get stats' })
   }
 })

@@ -396,9 +396,20 @@ export async function registerUserWithRole(
 }
 
 // Get pending approvals for admin
+/**
+ * Registration requests awaiting this administrator's decision.
+ *
+ * Authority used to come from school_entities.admin_user_id (and the corporate
+ * equivalent), a column that is NULL for every entity in the schema — so the
+ * query matched nothing and the approvals dashboard was permanently empty for
+ * everyone. It now comes from the caller's resolved tenant, which is how
+ * authority is established everywhere else, and the tenant predicate is what
+ * keeps one institution's requests out of another's queue.
+ */
 export async function getPendingApprovalsForAdmin(
   adminUserId: string,
-  platformId: string
+  platformId: string,
+  tenantId: string
 ): Promise<{
   school?: Array<any>
   corporate?: Array<any>
@@ -432,10 +443,10 @@ export async function getPendingApprovalsForAdmin(
       JOIN users u ON sua.user_id = u.id
       JOIN school_entities se ON sua.school_entity_id = se.id
       WHERE sua.status = 'pending'
-        AND se.admin_user_id = $1
+        AND sua.school_entity_id = $1
         AND u.platform_id = $2
       ORDER BY sua.requested_at DESC`,
-      [adminUserId, platformId]
+      [tenantId, platformId]
     )
     
     result.school = approvalsResult.rows.map((row: any) => ({
@@ -468,10 +479,10 @@ export async function getPendingApprovalsForAdmin(
       JOIN users u ON cua.user_id = u.id
       JOIN corporate_entities ce ON cua.corporate_entity_id = ce.id
       WHERE cua.status = 'pending'
-        AND ce.admin_user_id = $1
+        AND cua.corporate_entity_id = $1
         AND u.platform_id = $2
       ORDER BY cua.requested_at DESC`,
-      [adminUserId, platformId]
+      [tenantId, platformId]
     )
     
     result.corporate = approvalsResult.rows.map((row: any) => ({
@@ -494,11 +505,22 @@ export async function getPendingApprovalsForAdmin(
 }
 
 // Approve or reject user registration
+/**
+ * Approves or rejects a registration request.
+ *
+ * Approving one creates an account inside a tenant, so the request must be
+ * that tenant's. The ownership test was `se.admin_user_id === adminUserId`,
+ * which is correct in shape but keyed on a column that is NULL everywhere, so
+ * every call threw 'Not authorized'. It is now the caller's resolved tenant,
+ * checked in the WHERE clause rather than after the fetch: a request
+ * belonging to another institution reads as absent, so an id cannot be probed.
+ */
 export async function approveOrRejectRegistration(
   approvalId: string,
   platformId: string,
   action: 'approve' | 'reject',
   adminUserId: string,
+  tenantId: string,
   rejectionReason?: string
 ): Promise<{
   success: boolean
@@ -521,36 +543,26 @@ export async function approveOrRejectRegistration(
   
   if (platformName === 'school') {
     const result = await query(
-      `SELECT sua.*, se.admin_user_id FROM school_user_approvals sua
-       JOIN school_entities se ON sua.school_entity_id = se.id
-       WHERE sua.id = $1`,
-      [approvalId]
+      `SELECT sua.* FROM school_user_approvals sua
+       WHERE sua.id = $1 AND sua.school_entity_id = $2`,
+      [approvalId, tenantId]
     )
     
     if (result.rows.length === 0) {
       throw new Error('Approval request not found')
-    }
-    
-    if (result.rows[0].admin_user_id !== adminUserId) {
-      throw new Error('Not authorized to approve this request')
     }
     
     approvalRow = result.rows[0]
     approvalTable = 'school_user_approvals'
   } else if (platformName === 'corporate') {
     const result = await query(
-      `SELECT cua.*, ce.admin_user_id FROM corporate_user_approvals cua
-       JOIN corporate_entities ce ON cua.corporate_entity_id = ce.id
-       WHERE cua.id = $1`,
-      [approvalId]
+      `SELECT cua.* FROM corporate_user_approvals cua
+       WHERE cua.id = $1 AND cua.corporate_entity_id = $2`,
+      [approvalId, tenantId]
     )
     
     if (result.rows.length === 0) {
       throw new Error('Approval request not found')
-    }
-    
-    if (result.rows[0].admin_user_id !== adminUserId) {
-      throw new Error('Not authorized to approve this request')
     }
     
     approvalRow = result.rows[0]

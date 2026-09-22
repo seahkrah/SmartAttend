@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Superadmin Dashboard provides **platform-wide system oversight and management** for SmartAttend. It gives superadmin users complete visibility into all schools, corporate entities, users, pending approvals, and system activities.
+The Superadmin Dashboard provides **platform-wide system oversight and management** for JjeloTech. It gives superadmin users complete visibility into all schools, corporate entities, users, pending approvals, and system activities.
 
 ## Features
 
@@ -300,8 +300,8 @@ The superadmin role is defined in the `system` platform with comprehensive permi
 ### Default Superadmin User
 
 **Created automatically** by migration 004:
-- Email: `superadmin@smartattend.local`
-- Password: `smartattend123` (should be changed in production)
+- Email: `superadmin@jjelotech.local`
+- Password: `jjelotech123` (should be changed in production)
 - Platform: `system`
 - Role: `superadmin`
 
@@ -389,8 +389,8 @@ GET /api/auth/superadmin/action-logs
 ### Default Credentials (Change Immediately in Production!)
 
 ```
-Email: superadmin@smartattend.local
-Password: smartattend123
+Email: superadmin@jjelotech.local
+Password: jjelotech123
 ```
 
 ## Data Isolation & Security
@@ -460,7 +460,7 @@ Creates:
 - Superadmin role with permissions
 - Audit logging tables
 - Helper functions and views
-- Default superadmin user (email: superadmin@smartattend.local)
+- Default superadmin user (email: superadmin@jjelotech.local)
 
 Run: `npm run migrate` (when migration system is set up)
 
@@ -484,7 +484,7 @@ Production: Configure via environment variables
 ```bash
 JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
 REFRESH_TOKEN_SECRET=your_super_secret_refresh_token_key
-DATABASE_URL=postgresql://user:password@localhost:5432/smartattend
+DATABASE_URL=postgresql://user:password@localhost:5432/jjelotech
 ```
 
 ## Testing the Superadmin System
@@ -493,7 +493,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/smartattend
 
 1. **Login as Superadmin**
    - Go to `/login`
-   - Use `superadmin@smartattend.local` / `smartattend123`
+   - Use `superadmin@jjelotech.local` / `jjelotech123`
    - Navigate to `/superadmin`
 
 2. **Test Overview Tab**

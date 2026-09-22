@@ -1,8 +1,8 @@
-# SmartAttend Animations - Technical Documentation
+# JjeloTech Animations - Technical Documentation
 
 ## 🎬 Overview
 
-The SmartAttend frontend now features professional JavaScript animations using **Framer Motion**, a powerful animation library that provides smooth, performant motion graphics similar to techdefenseinc.com.
+The JjeloTech frontend now features professional JavaScript animations using **Framer Motion**, a powerful animation library that provides smooth, performant motion graphics similar to techdefenseinc.com.
 
 ## 📦 Animation Library: Framer Motion
 

@@ -358,7 +358,7 @@ RESULT:
 
 1. **Apply Migration**
    ```bash
-   psql -d smartattend -f apps/backend/src/db/migrations/008_immutable_audit_logging.sql
+   psql -d jjelotech -f apps/backend/src/db/migrations/008_immutable_audit_logging.sql
    ```
 
 2. **Verify Schema**
@@ -500,7 +500,7 @@ With Step 2.1 complete, the next step will implement:
 
 ### PHASE 2, STEP 2.1: COMPLETE ✅
 
-SmartAttend now has production-grade immutable audit logging:
+JjeloTech now has production-grade immutable audit logging:
 
 ✅ Append-only at database level  
 ✅ Before/after state capture  

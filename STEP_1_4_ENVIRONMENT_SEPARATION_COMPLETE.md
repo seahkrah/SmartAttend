@@ -29,9 +29,9 @@
 
 **Implementation:**
 - Each environment has separate `DATABASE_URL` environment variable
-- Development: `postgresql://localhost:5432/smartattend_dev`
-- Staging: `postgresql://user:pass@staging-db.example.com:5432/smartattend_staging`
-- Production: `postgresql://user:pass@prod-db.example.com:5432/smartattend_prod`
+- Development: `postgresql://localhost:5432/jjelotech_dev`
+- Staging: `postgresql://user:pass@staging-db.example.com:5432/jjelotech_staging`
+- Production: `postgresql://user:pass@prod-db.example.com:5432/jjelotech_prod`
 
 **Isolation:**
 - Connection strings are completely separate

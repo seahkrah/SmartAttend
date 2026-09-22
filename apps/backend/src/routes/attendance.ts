@@ -32,7 +32,7 @@ import {
   verifyEnrollment,
   getEnrollmentStatus,
 } from '../services/faceRecognitionService.js'
-import { CreateSessionRequest, UpdateSessionRequest, MarkAttendanceWithFaceRequest } from '@smartattend/types'
+import { CreateSessionRequest, UpdateSessionRequest, MarkAttendanceWithFaceRequest } from '@jjelotech/types'
 
 const router = Router()
 

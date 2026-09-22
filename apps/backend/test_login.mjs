@@ -9,7 +9,7 @@ async function testLogin() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'newadmin@smartattend.local',
+        email: 'newadmin@jjelotech.local',
         password: 'NewAdmin123!@#'
       })
     });

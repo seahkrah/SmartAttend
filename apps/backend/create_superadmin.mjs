@@ -72,7 +72,7 @@ async function createNewSuperadmin() {
     
     // 3. Create new superadmin user with a fresh email and known password
     console.log('📍 Creating new superadmin user...');
-    const newEmail = 'newadmin@smartattend.local';
+    const newEmail = 'newadmin@jjelotech.local';
     const newPassword = 'NewAdmin123!@#';
     
     // Hash the password using bcrypt

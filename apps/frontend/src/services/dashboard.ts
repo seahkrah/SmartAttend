@@ -1,4 +1,4 @@
-import { AttendanceStats } from '@smartattend/types';
+import { AttendanceStats } from '@jjelotech/types';
 import { apiClient } from './api';
 
 export interface DashboardStats extends AttendanceStats {

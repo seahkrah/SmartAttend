@@ -6,7 +6,7 @@ const pool = new Pool({
   password: 'seahkrah',
   host: 'localhost',
   port: 5432,
-  database: 'smartattend'
+  database: 'jjelotech'
 });
 
 async function checkSchema() {

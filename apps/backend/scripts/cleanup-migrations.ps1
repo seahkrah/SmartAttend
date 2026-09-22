@@ -1,10 +1,10 @@
 #!/usr/bin/env pwsh
-# Database cleanup and migration reset script for SmartAttend
+# Database cleanup and migration reset script for JjeloTech
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================" -ForegroundColor Blue
-Write-Host "  SmartAttend Database Cleanup Tool" -ForegroundColor Blue
+Write-Host "  JjeloTech Database Cleanup Tool" -ForegroundColor Blue
 Write-Host "========================================" -ForegroundColor Blue
 Write-Host ""
 

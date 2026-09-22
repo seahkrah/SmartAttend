@@ -608,7 +608,7 @@ EXECUTE FUNCTION raise_immutability_error();
 
 **Verification Command**:
 ```bash
-psql smartattend -c "SELECT trigger_name FROM information_schema.triggers 
+psql jjelotech -c "SELECT trigger_name FROM information_schema.triggers 
   WHERE event_object_table = 'audit_logs';"
 ```
 

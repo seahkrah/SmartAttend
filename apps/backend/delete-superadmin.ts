@@ -7,7 +7,7 @@ async function deleteSuperadmin() {
     // Find and delete the superadmin user
     const result = await query(
       `DELETE FROM users 
-       WHERE email = 'superadmin@smartattend.local'
+       WHERE email = 'superadmin@jjelotech.local'
        RETURNING id, email`
     )
 

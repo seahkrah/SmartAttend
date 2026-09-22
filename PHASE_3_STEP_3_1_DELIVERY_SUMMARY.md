@@ -175,7 +175,7 @@ curl -X POST http://localhost:3000/api/superadmin/bootstrap
 
 # 3. Login with default credentials
 curl -X POST http://localhost:3000/api/auth/login \
-  -d '{"email":"superadmin@smartattend.local","password":"smartattend123"}'
+  -d '{"email":"superadmin@jjelotech.local","password":"jjelotech123"}'
 
 # 4. Use JWT for operational endpoints
 curl http://localhost:3000/api/superadmin/accounts \

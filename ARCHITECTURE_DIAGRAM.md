@@ -1,10 +1,10 @@
-# SmartAttend Platform Architecture - Favicon & Branding
+# JjeloTech Platform Architecture - Favicon & Branding
 
 ## Complete System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        SmartAttend Platform                       │
+│                        JjeloTech Platform                       │
 │                    Favicon & Branding System                      │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -12,7 +12,7 @@
           ┌────────────────────────────────────┐
           │        Browser Tab Display         │
           │  ┌──────────────────────────────┐  │
-          │  │ 🔷 SmartAttend | localhost  │  │ ← SVG Favicon
+          │  │ 🔷 JjeloTech | localhost  │  │ ← SVG Favicon
           │  └──────────────────────────────┘  │
           │                                    │
           │  Favicon URLs:                     │
@@ -69,18 +69,18 @@
           │   (src/components/BrandLogo.tsx)       │
           │                                        │
           │  ┌─────────────────────────────────┐  │
-          │  │ export SmartAttendLogo           │  │
+          │  │ export JjeloTechLogo           │  │
           │  │   sizes: 'sm' | 'md' | 'lg'    │  │
           │  │   showText: boolean              │  │
           │  │                                 │  │
           │  │  Renders:                       │  │
           │  │  • Inline SVG gradient box      │  │
           │  │  • Clock + checkmark symbol     │  │
-          │  │  • Optional "SmartAttend" text  │  │
+          │  │  • Optional "JjeloTech" text  │  │
           │  └─────────────────────────────────┘  │
           │                                        │
           │  ┌─────────────────────────────────┐  │
-          │  │ export SmartAttendIcon           │  │
+          │  │ export JjeloTechIcon           │  │
           │  │   size: number (pixels)         │  │
           │  │                                 │  │
           │  │  Renders:                       │  │
@@ -95,10 +95,10 @@
        │              Landing Page                        │
        │         http://localhost:5174/                   │
        │  ┌────────────────────────────────────────────┐ │
-       │  │ 🔷 SmartAttend  [Login] [Register] [CTA] │ │
+       │  │ 🔷 JjeloTech  [Login] [Register] [CTA] │ │
        │  │ ─────────────────────────────────────────  │ │
        │  │                                            │ │
-       │  │    SmartAttend - Attendance Made Smart    │ │
+       │  │    JjeloTech - Attendance Made Smart    │ │
        │  │                                            │ │
        │  │    [9 Animated Icons - Background]        │ │
        │  │                                            │ │
@@ -106,7 +106,7 @@
        │  │    🔗 Easy Integration                     │ │
        │  │                                            │ │
        │  └────────────────────────────────────────────┘ │
-       │  Page uses: SmartAttendLogo (size='sm')         │
+       │  Page uses: JjeloTechLogo (size='sm')         │
        └──────────────────────────────────────────────────┘
 
        ┌──────────────────────────────────────────────────┐
@@ -115,7 +115,7 @@
        │  ┌────────────────────────────────────────────┐ │
        │  │                                            │ │
        │  │           🔷                              │ │
-       │  │           SmartAttend                     │ │
+       │  │           JjeloTech                     │ │
        │  │           Attendance Platform            │ │
        │  │                                            │ │
        │  │  [📧 Email input]                        │ │
@@ -125,14 +125,14 @@
        │  │  Don't have account? Register            │ │
        │  │                                            │ │
        │  └────────────────────────────────────────────┘ │
-       │  Page uses: SmartAttendLogo (size='lg')         │
+       │  Page uses: JjeloTechLogo (size='lg')         │
        └──────────────────────────────────────────────────┘
 
        ┌──────────────────────────────────────────────────┐
        │              Dashboard Page                      │
        │         http://localhost:5174/dashboard          │
        │  ┌─────────────┬──────────────────────────────┐ │
-       │  │ 🔷 SmartAtd │ 🔷 SmartAttend              │ │ ← Topbar
+       │  │ 🔷 SmartAtd │ 🔷 JjeloTech              │ │ ← Topbar
        │  │             │ [Account]     [Logout]      │ │
        │  │─────────────┼──────────────────────────────┤ │
        │  │ 🔷 SmartAtt │ Statistics & Analytics      │ │
@@ -145,8 +145,8 @@
        │  │             │                            │ │
        │  │ [Logout]    │                            │ │
        │  └─────────────┴──────────────────────────────┘ │
-       │  Sidebar uses: SmartAttendLogo (size='md')      │
-       │  Topbar uses: SmartAttendLogo (size='md')       │
+       │  Sidebar uses: JjeloTechLogo (size='md')      │
+       │  Topbar uses: JjeloTechLogo (size='md')       │
        └──────────────────────────────────────────────────┘
 
 
@@ -175,7 +175,7 @@
        │  │ ≡ 🔷 SmartA [User]              │ │
        │  │ ──────────────────────────────  │ │
        │  │                                 │ │
-       │  │ SmartAttend                    │ │
+       │  │ JjeloTech                    │ │
        │  │ Attendance Made Smart          │ │
        │  │                                 │ │
        │  │ [Animated Background]          │ │
@@ -188,10 +188,10 @@
        ┌────────────────────────────────────────┐
        │  Tablet (768px - 1024px)               │
        │  ┌──────────────────────────────────┐ │
-       │  │ ≡ 🔷 SmartAttend [User]         │ │
+       │  │ ≡ 🔷 JjeloTech [User]         │ │
        │  │ ──────────────────────────────  │ │
        │  │                                 │ │
-       │  │ SmartAttend Attendance Platform │ │
+       │  │ JjeloTech Attendance Platform │ │
        │  │ Animated Features               │ │
        │  │                                 │ │
        │  │ [Sidebar Toggleable]            │ │
@@ -202,7 +202,7 @@
        ┌────────────────────────────────────────┐
        │  Desktop (> 1024px)                    │
        │  ┌─────────────┬──────────────────────┐│
-       │  │ 🔷 SmartAtt │ 🔷 SmartAttend [U] ││
+       │  │ 🔷 SmartAtt │ 🔷 JjeloTech [U] ││
        │  │─────────────┼──────────────────────┤│
        │  │             │                      ││
        │  │ Menu Items  │ Full Dashboard      ││
@@ -233,7 +233,7 @@
        │  • Loads BrandLogo component     │
        │  • Initializes pages             │
        │         ↓                         │
-       │  Components Import SmartAttendLogo│
+       │  Components Import JjeloTechLogo│
        │  • Landing: size='sm'            │
        │  • Auth pages: size='lg'         │
        │  • Dashboard: size='md'          │
@@ -336,7 +336,7 @@
        │  ✅ Ready for deployment                           │
        └────────────────────────────────────────────────────┘
 
-       🎉 SmartAttend Platform - Favicon & Branding Complete!
+       🎉 JjeloTech Platform - Favicon & Branding Complete!
 ```
 
 ## Key Integration Points

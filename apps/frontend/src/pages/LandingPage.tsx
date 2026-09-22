@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Users, BarChart3, ArrowRight, Github, Shield, Lightbulb } from 'lucide-react';
 import { AnimatedIconBackground, BouncingCard, FadeIn, SlideInFromSide } from '../components/Animations';
-import { SmartAttendLogo } from '../components/BrandLogo';
+import { JjeloTechLogo } from '../components/BrandLogo';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -51,7 +51,7 @@ export const LandingPage: React.FC = () => {
         <nav className="fixed top-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-b border-slate-700/50 z-40">
           <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <SmartAttendLogo size="sm" showText={true} />
+              <JjeloTechLogo size="sm" showText={true} />
             </div>
 
             <div className="flex items-center gap-4">
@@ -76,7 +76,7 @@ export const LandingPage: React.FC = () => {
               <div>
                 <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 bg-primary-500/20 border border-primary-500/50 rounded-full">
                   <span className="w-2 h-2 bg-primary-400 rounded-full"></span>
-                  <span className="text-sm font-medium text-primary-300">Welcome to SmartAttend</span>
+                  <span className="text-sm font-medium text-primary-300">Welcome to JjeloTech</span>
                 </div>
 
                 <h1 className="text-5xl lg:text-6xl font-bold mb-6 leading-tight">
@@ -133,14 +133,14 @@ export const LandingPage: React.FC = () => {
                   <div className="absolute inset-4 bg-gradient-to-br from-primary-600/30 to-secondary-700/30 rounded-xl backdrop-blur-xl border border-primary-500/20 flex items-center justify-center">
                     <div className="text-center">
                       <img
-                        src="/logos/platform-logo.png"
-                        alt="SmartAttend"
+                        src="/logos/jjelotech-mark.png"
+                        alt="JjeloTech"
                         className="w-24 h-24 mx-auto mb-4 object-contain"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                         }}
                       />
-                      <p className="text-2xl font-bold">SmartAttend</p>
+                      <p className="text-2xl font-bold">JjeloTech</p>
                       <p className="text-slate-400 mt-2">Attendance Platform</p>
                     </div>
                   </div>
@@ -188,7 +188,7 @@ export const LandingPage: React.FC = () => {
               <div className="card text-center">
                 <h2 className="text-3xl font-bold mb-4">Ready to get started?</h2>
                 <p className="text-slate-400 mb-8">
-                  Join thousands of organizations using SmartAttend for secure and efficient attendance management.
+                  Join thousands of organizations using JjeloTech for secure and efficient attendance management.
                 </p>
                 <button
                   onClick={() => navigate('/register')}
@@ -207,7 +207,7 @@ export const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto">
             <div className="grid md:grid-cols-4 gap-8 mb-8">
               <div>
-                <h3 className="font-bold mb-4">SmartAttend</h3>
+                <h3 className="font-bold mb-4">JjeloTech</h3>
                 <p className="text-slate-400 text-sm">Modern attendance management platform</p>
               </div>
               <div>
@@ -258,7 +258,7 @@ export const LandingPage: React.FC = () => {
             </div>
 
             <div className="border-t border-slate-700/50 pt-8 text-center text-slate-400 text-sm">
-              <p>© 2026 SmartAttend. All rights reserved. Powered by SmartCode</p>
+              <p>© 2026 JjeloTech. All rights reserved. Powered by SmartCode</p>
             </div>
           </div>
         </footer>

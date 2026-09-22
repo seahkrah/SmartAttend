@@ -1,4 +1,4 @@
-# SmartAttend Frontend - Visual & Technical Guide
+# JjeloTech Frontend - Visual & Technical Guide
 
 ## 🎨 Design System
 

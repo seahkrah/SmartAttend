@@ -378,7 +378,7 @@ Superadmin     │ ✅ own+all │ ✅ all     │ ❌ (DB blocks)
 ### 1. Apply Database Migration
 
 ```bash
-psql -d smartattend -f apps/backend/src/db/migrations/008_immutable_audit_logging.sql
+psql -d jjelotech -f apps/backend/src/db/migrations/008_immutable_audit_logging.sql
 ```
 
 ### 2. Verify Schema
@@ -518,7 +518,7 @@ What it will include:
 
 ### PHASE 2, STEP 2.1: COMPLETE ✅
 
-SmartAttend now has a production-grade immutable audit logging system:
+JjeloTech now has a production-grade immutable audit logging system:
 
 **Core Guarantees:**
 - ✅ Append-only at database layer (triggers prevent UPDATE/DELETE)

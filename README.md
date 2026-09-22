@@ -1,11 +1,11 @@
-# SMARTATTEND - Monorepo
+# JJELOTECH - Monorepo
 
 A modern attendance tracking system with a React frontend, Express backend, and PostgreSQL database.
 
 ## Project Structure
 
 ```
-smartattend/
+jjelotech/
 ├── apps/
 │   ├── frontend/          # React 18 + Vite + TypeScript
 │   │   └── src/
@@ -44,7 +44,7 @@ smartattend/
 | **HTTP** | Axios 1.6.0 with interceptors |
 | **Backend** | Express.js, TypeScript, PostgreSQL 16 |
 | **Auth** | JWT (24hr access, 7d refresh), bcryptjs |
-| **Shared Types** | TypeScript interfaces in `@smartattend/types` |
+| **Shared Types** | TypeScript interfaces in `@jjelotech/types` |
 
 ## Quick Start
 
@@ -133,7 +133,7 @@ The `packages/types` package provides TypeScript interfaces used across frontend
 
 ```typescript
 // Frontend usage
-import { User, AuthResponse, AttendanceStats } from '@smartattend/types';
+import { User, AuthResponse, AttendanceStats } from '@jjelotech/types';
 
 // Api Service
 class ApiClient {

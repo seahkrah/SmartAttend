@@ -1,19 +1,19 @@
-# @smartattend/types
+# @jjelotech/types
 
-Shared TypeScript types and interfaces for the SmartAttend monorepo.
+Shared TypeScript types and interfaces for the JjeloTech monorepo.
 
 ## Usage
 
 ### In Frontend
 
 ```typescript
-import { User, AuthResponse, AttendanceStats } from '@smartattend/types';
+import { User, AuthResponse, AttendanceStats } from '@jjelotech/types';
 ```
 
 ### In Backend
 
 ```typescript
-import { LoginRequest, RegisterRequest, Student } from '@smartattend/types';
+import { LoginRequest, RegisterRequest, Student } from '@jjelotech/types';
 ```
 
 ## Type Categories

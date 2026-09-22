@@ -1,11 +1,11 @@
 import React from 'react';
 
 /**
- * SmartAttend Logo Component
+ * JjeloTech Logo Component
  * Used consistently across all pages for brand visibility
  */
 
-export const SmartAttendLogo: React.FC<{
+export const JjeloTechLogo: React.FC<{
   size?: 'sm' | 'md' | 'lg';
   showText?: boolean;
   className?: string;
@@ -27,8 +27,8 @@ export const SmartAttendLogo: React.FC<{
       {/* Platform Logo Image */}
       <div className={`${sizes[size]} rounded-lg flex items-center justify-center flex-shrink-0`}>
         <img
-          src="/logos/platform-logo.png"
-          alt="SmartAttend"
+          src="/logos/jjelotech-mark.png"
+          alt="JjeloTech"
           className="w-full h-full object-contain"
         />
       </div>
@@ -37,7 +37,7 @@ export const SmartAttendLogo: React.FC<{
       {showText && (
         <div className="flex flex-col leading-tight">
           <span className={`font-bold text-gradient ${textSizes[size]}`}>
-            SmartAttend
+            JjeloTech
           </span>
           <span className="text-xs text-slate-400">Attendance Platform</span>
         </div>
@@ -50,7 +50,7 @@ export const SmartAttendLogo: React.FC<{
  * Favicon Icon Component
  * Just the icon, no text
  */
-export const SmartAttendIcon: React.FC<{ size?: 'sm' | 'md' | 'lg'; className?: string }> = ({
+export const JjeloTechIcon: React.FC<{ size?: 'sm' | 'md' | 'lg'; className?: string }> = ({
   size = 'md',
   className = '',
 }) => {

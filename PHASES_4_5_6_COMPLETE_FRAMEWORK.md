@@ -14,7 +14,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ SMARTATTEND SECURITY FRAMEWORK (Phases 4-6)                         │
+│ JJELOTECH SECURITY FRAMEWORK (Phases 4-6)                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  Phase 4: ROLE BOUNDARIES & PRIVILEGE ESCALATION DETECTION          │

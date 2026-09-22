@@ -1,5 +1,5 @@
 {
-  "name": "smartattend-frontend",
+  "name": "jjelotech-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@smartattend/types": "file:../../packages/types",
+    "@jjelotech/types": "file:../../packages/types",
     "axios": "^1.6.0",
     "framer-motion": "^10.16.0",
     "lucide-react": "^0.263.1",

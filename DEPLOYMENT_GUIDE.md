@@ -1,4 +1,4 @@
-# SMARTATTEND Backend - Deployment Guide
+# JJELOTECH Backend - Deployment Guide
 
 ## ✅ Current Status
 
@@ -20,7 +20,7 @@ Backend is **COMPLETE AND FUNCTIONAL** - All 31 REST API endpoints are implement
 ### Option 1: Linux / macOS / WSL (Recommended for Development)
 
 ```bash
-cd c:\smartattend\apps\backend
+cd c:\jjelotech\apps\backend
 
 # Install dependencies
 npm install
@@ -59,16 +59,16 @@ CMD ["node", "dist/server.js"]
 **Build:**
 ```bash
 cd apps/backend
-docker build -t smartattend-backend:latest .
+docker build -t jjelotech-backend:latest .
 ```
 
 **Run:**
 ```bash
 docker run \
   -p 5000:5000 \
-  -e DATABASE_URL=postgresql://postgres:seahkrah@localhost:5432/smartattend \
+  -e DATABASE_URL=postgresql://postgres:seahkrah@localhost:5432/jjelotech \
   -e NODE_ENV=production \
-  smartattend-backend:latest
+  jjelotech-backend:latest
 ```
 
 ### Option 3: Cloud Deployment
@@ -90,12 +90,12 @@ All major platforms supported:
 **Google Cloud:**
 ```bash
 # Cloud Run
-gcloud run deploy smartattend-backend --source .
+gcloud run deploy jjelotech-backend --source .
 ```
 
 **Heroku:**
 ```bash
-heroku create smartattend-backend
+heroku create jjelotech-backend
 git push heroku main
 ```
 
@@ -157,7 +157,7 @@ Edit `apps/backend/.env`:
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:password@host:5432/smartattend
+DATABASE_URL=postgresql://user:password@host:5432/jjelotech
 
 # Server
 PORT=5000
@@ -174,10 +174,10 @@ REFRESH_TOKEN_SECRET=your-refresh-key-min-32-chars
 
 ```bash
 # 1. Create database
-createdb smartattend
+createdb jjelotech
 
 # 2. Load schema
-psql smartattend < database-schema.sql
+psql jjelotech < database-schema.sql
 
 # 3. Start backend
 npm run start
@@ -187,7 +187,7 @@ npm run start
 
 The backend will automatically work with:
 - ✅ PostgreSQL 12+
-- ✅ Any existing smart_attend database schema
+- ✅ Any existing jjelotech database schema
 - ✅ Connection pooling enabled by default
 
 ## 🔍 Monitoring
@@ -208,7 +208,7 @@ Look for:
 ### Database Connection Issues?
 ```bash
 # Test PostgreSQL connection
-psql postgresql://postgres:password@localhost:5432/smartattend
+psql postgresql://postgres:password@localhost:5432/jjelotech
 
 # Check if server is running
 netstat -an | grep 5000
@@ -242,7 +242,7 @@ kill -9 {PID}
 
 **Check:**
 1. PostgreSQL service is running
-2. Database exists: `psql -l | grep smartattend`
+2. Database exists: `psql -l | grep jjelotech`
 3. User has permissions
 4. Connection string is correct
 

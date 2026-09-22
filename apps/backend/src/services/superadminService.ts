@@ -67,7 +67,7 @@ export async function verifyDefaultCredentialsChanged(): Promise<boolean> {
   try {
     const result = await query(
       `SELECT COUNT(*) as count FROM users 
-       WHERE email = 'superadmin@smartattend.local'`
+       WHERE email = 'superadmin@jjelotech.local'`
     )
     
     if (result.rows[0].count === 0) {
@@ -194,7 +194,7 @@ export async function bootstrapSuperadmin(): Promise<SuperadminBootstrapResult> 
 
     // 5. Hash default password
     console.log('[BOOTSTRAP] Hashing default password...')
-    const defaultPassword = 'smartattend123'
+    const defaultPassword = 'jjelotech123'
     const hashedPassword = await hashPassword(defaultPassword)
 
     // 6. Create or update superadmin user
@@ -205,7 +205,7 @@ export async function bootstrapSuperadmin(): Promise<SuperadminBootstrapResult> 
        ON CONFLICT (platform_id, email) DO UPDATE
        SET password_hash = $5, is_active = true, updated_at = CURRENT_TIMESTAMP
        RETURNING id, email`,
-      [systemPlatformId, 'superadmin@smartattend.local', 'System Superadmin', superadminRoleId, hashedPassword]
+      [systemPlatformId, 'superadmin@jjelotech.local', 'System Superadmin', superadminRoleId, hashedPassword]
     )
 
     const superadminUser = userResult.rows[0]

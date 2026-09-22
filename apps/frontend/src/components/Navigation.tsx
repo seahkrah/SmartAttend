@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu, X, LogOut, User, Home, BarChart3, Users, Settings } from 'lucide-react';
-import { SmartAttendLogo } from './BrandLogo';
+import { JjeloTechLogo } from './BrandLogo';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onLogout }) =
         {/* Header */}
         <div className="p-6 border-b border-slate-700/30">
           <div className="flex items-center justify-between">
-            <SmartAttendLogo size="md" showText={true} />
+            <JjeloTechLogo size="md" showText={true} />
             <button onClick={onClose} className="lg:hidden text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
@@ -83,7 +83,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick, userName }) => {
 
       <div className="flex-1 flex justify-center">
         <div className="hidden md:flex items-center gap-2">
-          <SmartAttendLogo size="md" showText={true} />
+          <JjeloTechLogo size="md" showText={true} />
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-# SMARTATTEND Database Schema - Refactored Design
+# JJELOTECH Database Schema - Refactored Design
 
 ## Summary of Changes
 

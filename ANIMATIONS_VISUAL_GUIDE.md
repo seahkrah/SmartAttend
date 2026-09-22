@@ -1,4 +1,4 @@
-# SmartAttend Animated Landing Page - Visual Guide
+# JjeloTech Animated Landing Page - Visual Guide
 
 ## 🎬 What You're Seeing
 
@@ -168,7 +168,7 @@ Before Animation        After 0.2s (Starts)     After 1.0s (Complete)
   Waits                 Sliding from            ✓ Full opacity
   (0.2s delay)          right (100px)           ✓ Centered
 
-  SmartAttend Platform Logo Box
+  JjeloTech Platform Logo Box
   with glassmorphism effect
 ```
 

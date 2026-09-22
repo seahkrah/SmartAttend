@@ -1,5 +1,5 @@
 # =============================================================================
-# ROOT .gitignore — SmartAttend Platform
+# ROOT .gitignore — JjeloTech Platform
 # =============================================================================
 # Enforces strict repository hygiene: only source code, configs, and lockfiles
 # System must be 100% reproducible from lockfiles, manifests, and Docker config

@@ -1,6 +1,6 @@
 import React from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
-import { SmartAttendLogo } from '../components/BrandLogo';
+import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -64,7 +64,7 @@ export const SuperadminLoginPage: React.FC = () => {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <SmartAttendLogo size="lg" showText={true} />
+          <JjeloTechLogo size="lg" showText={true} />
           <p className="text-slate-400 mt-4">Superadmin Portal</p>
         </div>
 

@@ -1,4 +1,4 @@
-# SMARTATTEND API Documentation
+# JJELOTECH API Documentation
 
 ## Base URL
 ```

@@ -310,16 +310,16 @@ If unified account desired, plan database migration
 
 ### Test Case 1: Cross-Platform Login
 ```
-1. Register as school@smartattend.com (School)
-2. Try login as school@smartattend.com (Corporate)
+1. Register as school@jjelotech.com (School)
+2. Try login as school@jjelotech.com (Corporate)
 3. Expected: "Invalid email or password"
 4. User Experience: Confusing ❌
 ```
 
 ### Test Case 2: Different Email
 ```
-1. Register as school@smartattend.com (School)
-2. Register as corporate@smartattend.com (Corporate)
+1. Register as school@jjelotech.com (School)
+2. Register as corporate@jjelotech.com (Corporate)
 3. Can login to each separately
 4. User Experience: Works but confusing for same person ⚠️
 ```

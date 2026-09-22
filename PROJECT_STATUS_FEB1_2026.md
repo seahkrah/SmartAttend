@@ -47,7 +47,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    SmartAttend Monorepo                 │
+│                    JjeloTech Monorepo                 │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  Frontend (Vite + React + TypeScript)                  │
@@ -79,7 +79,7 @@
 ## 📁 Project Structure
 
 ```
-smartattend/
+jjelotech/
 ├── apps/
 │   ├── backend/
 │   │   ├── src/

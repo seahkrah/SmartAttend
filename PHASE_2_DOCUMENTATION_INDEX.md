@@ -2,7 +2,7 @@
 
 ## PHASE 2: AUDIT & AUTHORITY
 
-SmartAttend's platform hardening phase focuses on non-repudiation, accountability, and access control.
+JjeloTech's platform hardening phase focuses on non-repudiation, accountability, and access control.
 
 ### Step 2.1 — IMMUTABLE AUDIT LOGGING ✅ COMPLETE
 

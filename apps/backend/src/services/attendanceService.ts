@@ -20,7 +20,7 @@ import {
   MarkAttendanceWithFaceRequest,
   MarkAttendanceWithFaceResponse,
   AttendanceStatus,
-} from '@smartattend/types';
+} from '@jjelotech/types';
 import {
   enrollStudentFace,
   verifyStudentFace,

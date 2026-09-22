@@ -1,8 +1,8 @@
-# SmartAttend Favicon & Branding Guide
+# JjeloTech Favicon & Branding Guide
 
 ## Overview
 
-The SmartAttend platform now features a comprehensive, professional branding system with:
+The JjeloTech platform now features a comprehensive, professional branding system with:
 - **SVG favicon** with attendance-themed design (clock + checkmark)
 - **BrandLogo component** for consistent logo usage across all pages
 - **Multi-format favicon support** for maximum browser compatibility
@@ -56,7 +56,7 @@ The SmartAttend platform now features a comprehensive, professional branding sys
 
 ### Components
 
-#### SmartAttendLogo
+#### JjeloTechLogo
 Primary branding component with logo and text.
 
 ```typescript
@@ -75,16 +75,16 @@ interface Props {
 **Example Usage**:
 ```tsx
 // In Navigation sidebar
-<SmartAttendLogo size="md" showText={true} />
+<JjeloTechLogo size="md" showText={true} />
 
 // In Login page
-<SmartAttendLogo size="lg" showText={true} />
+<JjeloTechLogo size="lg" showText={true} />
 
 // Compact variant in topbar
-<SmartAttendLogo size="sm" showText={true} />
+<JjeloTechLogo size="sm" showText={true} />
 ```
 
-#### SmartAttendIcon
+#### JjeloTechIcon
 Icon-only variant for compact spaces.
 
 ```typescript
@@ -97,7 +97,7 @@ interface Props {
 **Example Usage**:
 ```tsx
 // In narrow spaces
-<SmartAttendIcon size={32} />
+<JjeloTechIcon size={32} />
 ```
 
 ### Design Details
@@ -117,7 +117,7 @@ interface Props {
 - **Status**: ✅ Updated
 
 ```tsx
-<SmartAttendLogo size="sm" showText={true} />
+<JjeloTechLogo size="sm" showText={true} />
 ```
 
 ### 2. Login Page (`src/pages/LoginPage.tsx`)
@@ -126,7 +126,7 @@ interface Props {
 - **Status**: ✅ Updated
 
 ```tsx
-<SmartAttendLogo size="lg" showText={true} />
+<JjeloTechLogo size="lg" showText={true} />
 ```
 
 ### 3. Register Page (`src/pages/RegisterPage.tsx`)
@@ -135,7 +135,7 @@ interface Props {
 - **Status**: ✅ Updated
 
 ```tsx
-<SmartAttendLogo size="lg" showText={true} />
+<JjeloTechLogo size="lg" showText={true} />
 ```
 
 ### 4. Navigation Sidebar (`src/components/Navigation.tsx`)
@@ -145,7 +145,7 @@ interface Props {
 - **Status**: ✅ Updated
 
 ```tsx
-<SmartAttendLogo size="md" showText={true} />
+<JjeloTechLogo size="md" showText={true} />
 ```
 
 ### 5. Navigation Topbar (`src/components/Navigation.tsx`)
@@ -155,7 +155,7 @@ interface Props {
 - **Status**: ✅ Updated
 
 ```tsx
-<SmartAttendLogo size="md" showText={true} />
+<JjeloTechLogo size="md" showText={true} />
 ```
 
 ### 6. Dashboard Page (`src/pages/DashboardPage.tsx`)
@@ -179,10 +179,10 @@ interface Props {
 **File**: `index.html` (lines 15-23)
 
 ```html
-<meta name="description" content="SmartAttend - Modern Attendance Management Platform for Schools and Corporations" />
+<meta name="description" content="JjeloTech - Modern Attendance Management Platform for Schools and Corporations" />
 <meta name="theme-color" content="#5d7fff" />
-<meta name="application-name" content="SmartAttend" />
-<meta name="apple-mobile-web-app-title" content="SmartAttend" />
+<meta name="application-name" content="JjeloTech" />
+<meta name="apple-mobile-web-app-title" content="JjeloTech" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 ```
@@ -224,7 +224,7 @@ interface Props {
 ## File Structure
 
 ```
-smartattend/
+jjelotech/
 ├── apps/frontend/
 │   ├── public/
 │   │   ├── favicon.svg                 ← Primary favicon
@@ -328,7 +328,7 @@ npm run build
 
 ## Summary
 
-The SmartAttend platform now has:
+The JjeloTech platform now has:
 - ✅ Professional SVG favicon with attendance theme
 - ✅ Consistent BrandLogo component across all pages
 - ✅ Multi-format favicon support (SVG primary, PNG fallback)
@@ -337,4 +337,4 @@ The SmartAttend platform now has:
 - ✅ Clear visual identity across entire application
 - ✅ Zero performance impact
 
-All pages now display the SmartAttend branding consistently and professionally.
+All pages now display the JjeloTech branding consistently and professionally.

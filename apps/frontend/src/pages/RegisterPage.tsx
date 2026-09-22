@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserPlus, Mail, Lock, Building2, AlertCircle, Check } from 'lucide-react';
-import { SmartAttendLogo } from '../components/BrandLogo';
+import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -141,9 +141,9 @@ export const RegisterPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <SmartAttendLogo size="lg" showText={true} />
+          <JjeloTechLogo size="lg" showText={true} />
           <h2 className="text-2xl font-bold text-white mt-4 mb-2">Create Account</h2>
-          <p className="text-slate-400">Join SmartAttend with your role</p>
+          <p className="text-slate-400">Join JjeloTech with your role</p>
         </div>
 
         {/* Form Card */}

@@ -1,7 +1,7 @@
 # Error Message System - User-Friendly Error Handling
 
 ## Overview
-The SmartAttend application now features a comprehensive user-friendly error message system that converts technical backend errors into clear, actionable messages for users.
+The JjeloTech application now features a comprehensive user-friendly error message system that converts technical backend errors into clear, actionable messages for users.
 
 ## Key Features
 

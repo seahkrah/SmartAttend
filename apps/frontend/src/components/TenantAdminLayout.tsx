@@ -153,7 +153,7 @@ export const TenantAdminLayout: React.FC<TenantAdminLayoutProps> = ({
             </div>
             {sidebarOpen && (
               <div>
-                <h1 className="text-lg font-bold text-white">SmartAttend</h1>
+                <h1 className="text-lg font-bold text-white">JjeloTech</h1>
                 <p className="text-xs text-white/70">{platformName}</p>
               </div>
             )}

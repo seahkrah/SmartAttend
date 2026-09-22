@@ -4,12 +4,12 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                   SMARTATTEND ENVIRONMENTS                       │
+│                   JJELOTECH ENVIRONMENTS                       │
 └─────────────────────────────────────────────────────────────────┘
 
 DEVELOPMENT
 ├─ NODE_ENV: development
-├─ Database: localhost:5432/smartattend_dev
+├─ Database: localhost:5432/jjelotech_dev
 ├─ Backend API: http://localhost:3000
 ├─ Frontend: http://localhost:5173
 ├─ Security: MFA OFF, IP Allowlist OFF
@@ -18,7 +18,7 @@ DEVELOPMENT
 
 STAGING
 ├─ NODE_ENV: staging
-├─ Database: staging-db.example.com:5432/smartattend_staging
+├─ Database: staging-db.example.com:5432/jjelotech_staging
 ├─ Backend API: https://staging-api.example.com
 ├─ Frontend: https://staging.example.com
 ├─ Security: MFA ON, IP Allowlist ON
@@ -27,7 +27,7 @@ STAGING
 
 PRODUCTION
 ├─ NODE_ENV: production
-├─ Database: prod-db.example.com:5432/smartattend_prod
+├─ Database: prod-db.example.com:5432/jjelotech_prod
 ├─ Backend API: https://api.example.com
 ├─ Frontend: https://app.example.com
 ├─ Security: MFA ON, IP Allowlist ON
@@ -92,13 +92,13 @@ cp .env.example .env.local
 nano .env.local
   NODE_ENV=development
   BACKEND_PORT=3000
-  DATABASE_URL=postgresql://localhost:5432/smartattend_dev
+  DATABASE_URL=postgresql://localhost:5432/jjelotech_dev
   JWT_SECRET=dev-secret-key-unsafe
   VITE_API_BASE_URL=http://localhost:3000/api
 
 # 3. Start PostgreSQL locally
-docker run -d --name smartattend-dev-db \
-  -e POSTGRES_DB=smartattend_dev \
+docker run -d --name jjelotech-dev-db \
+  -e POSTGRES_DB=jjelotech_dev \
   -p 5432:5432 \
   postgres:latest
 
@@ -118,7 +118,7 @@ npm run dev
 ```bash
 # Set on deployment platform (AWS ECS, Heroku, Railway, etc.)
 NODE_ENV=staging
-DATABASE_URL=postgresql://user:pass@staging-db:5432/smartattend_staging
+DATABASE_URL=postgresql://user:pass@staging-db:5432/jjelotech_staging
 JWT_SECRET=<unique-staging-secret>
 VITE_API_BASE_URL=https://staging-api.example.com
 SUPERADMIN_MFA_ENABLED=true
@@ -134,7 +134,7 @@ git push origin main
 ```bash
 # Set on deployment platform secrets manager
 NODE_ENV=production
-DATABASE_URL=postgresql://user:pass@prod-db:5432/smartattend_prod
+DATABASE_URL=postgresql://user:pass@prod-db:5432/jjelotech_prod
 JWT_SECRET=<unique-production-secret>
 VITE_API_BASE_URL=https://api.example.com
 SUPERADMIN_MFA_ENABLED=true

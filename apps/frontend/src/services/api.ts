@@ -5,7 +5,7 @@ import {
   RegisterRequest,
   User,
   AttendanceStats,
-} from '@smartattend/types';
+} from '@jjelotech/types';
 
 const API_BASE_URL = frontendConfig.apiBaseUrl;
 

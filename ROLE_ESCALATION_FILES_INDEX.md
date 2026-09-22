@@ -351,7 +351,7 @@ A: Query `role_assignment_history` table or use `getUserRoleHistory()` method.
 ## 📍 File Locations Summary
 
 ```
-c:\smartattend\
+c:\jjelotech\
 ├── apps\backend\
 │   ├── src\
 │   │   ├── db\

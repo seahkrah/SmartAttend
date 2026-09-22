@@ -11,7 +11,7 @@ Go to: `http://localhost:3000/register-superadmin`
 
 ### Step 2: Fill in the Registration Form
 - **Full Name**: Your name (e.g., "System Administrator")
-- **Email**: A unique email address (e.g., "admin@smartattend.local")
+- **Email**: A unique email address (e.g., "admin@jjelotech.local")
 - **Password**: A strong password (minimum 6 characters)
 - **Confirm Password**: Repeat the password
 
@@ -42,7 +42,7 @@ Content-Type: application/json
 
 {
   "fullName": "System Administrator",
-  "email": "admin@smartattend.local",
+  "email": "admin@jjelotech.local",
   "password": "securePassword123",
   "confirmPassword": "securePassword123"
 }
@@ -54,7 +54,7 @@ Response:
   "message": "Superadmin account created successfully",
   "user": {
     "id": "uuid",
-    "email": "admin@smartattend.local",
+    "email": "admin@jjelotech.local",
     "fullName": "System Administrator",
     "role": "superadmin"
   }
@@ -68,7 +68,7 @@ Content-Type: application/json
 
 {
   "platform": "school",  // Can be any platform
-  "email": "admin@smartattend.local",
+  "email": "admin@jjelotech.local",
   "password": "securePassword123"
 }
 ```
@@ -79,7 +79,7 @@ Response:
   "message": "Login successful",
   "user": {
     "id": "uuid",
-    "email": "admin@smartattend.local",
+    "email": "admin@jjelotech.local",
     "fullName": "System Administrator",
     "platform": "system",
     "role": "superadmin",

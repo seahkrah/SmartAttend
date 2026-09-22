@@ -241,7 +241,7 @@ DRIFT CATEGORIES:
   "locationClient": { "lat": 12.34, "lon": 56.78 },
   "locationServer": { "derived_from_gps": null },
   
-  "userAgent": "SmartAttend/2.1.3 (iOS)",
+  "userAgent": "JjeloTech/2.1.3 (iOS)",
   "ipAddress": "203.0.113.42",
   "networkType": "wi-fi",
   "httpStatus": 200,

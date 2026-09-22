@@ -146,10 +146,10 @@ ls -la dist/ | grep -E '(setup|delete|test-server)'
 
 ```bash
 # Create production image
-docker build -t smartattend-backend:latest .
+docker build -t jjelotech-backend:latest .
 
 # Verify scripts not in container
-docker run --rm smartattend-backend:latest ls -la /app/dist/
+docker run --rm jjelotech-backend:latest ls -la /app/dist/
 
 # Should NOT contain:
 # setup-superadmin.js

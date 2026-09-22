@@ -6,7 +6,7 @@
 
 ## 1. System Overview
 
-The superadmin control plane is a comprehensive management interface for platform administrators to oversee both school and corporate tenants across the SmartAttend ecosystem.
+The superadmin control plane is a comprehensive management interface for platform administrators to oversee both school and corporate tenants across the JjeloTech ecosystem.
 
 ### Architecture
 
@@ -62,14 +62,14 @@ The superadmin control plane is a comprehensive management interface for platfor
 
 #### 1. Terminal 1 - Backend Server
 ```bash
-cd c:\smartattend\apps\backend
+cd c:\jjelotech\apps\backend
 npm run dev
 # Output: [SERVER] ✅ LISTENING on port 5000
 ```
 
 #### 2. Terminal 2 - Frontend Dev Server
 ```bash
-cd c:\smartattend\apps\frontend
+cd c:\jjelotech\apps\frontend
 npm run dev
 # Output: VITE v5.4.21 ready at http://localhost:5174/
 ```
@@ -198,7 +198,7 @@ All tables include:
 **Request**:
 ```json
 {
-  "email": "admin@smartattend.com",
+  "email": "admin@jjelotech.com",
   "password": "SecurePassword123!",
   "name": "Platform Admin"
 }
@@ -211,7 +211,7 @@ All tables include:
   "message": "Superadmin registered successfully",
   "data": {
     "id": "superadmin-uuid",
-    "email": "admin@smartattend.com",
+    "email": "admin@jjelotech.com",
     "name": "Platform Admin"
   }
 }
@@ -221,7 +221,7 @@ All tables include:
 **Request**:
 ```json
 {
-  "email": "admin@smartattend.com",
+  "email": "admin@jjelotech.com",
   "password": "SecurePassword123!"
 }
 ```
@@ -319,7 +319,7 @@ All tables include:
     },
     "currentUser": {
       "id": "superadmin-uuid",
-      "email": "admin@smartattend.com",
+      "email": "admin@jjelotech.com",
       "name": "Platform Admin",
       "role": "superadmin"
     }
@@ -546,7 +546,7 @@ Check platform health status.
 
 1. Open http://localhost:5174/superadmin-register
 2. Fill in:
-   - Email: `admin@smartattend.com`
+   - Email: `admin@jjelotech.com`
    - Password: `TestPass123!`
    - Name: `Platform Admin`
 3. Click "Register"
@@ -556,7 +556,7 @@ Check platform health status.
 
 1. Open http://localhost:5174/superadmin-login
 2. Fill in:
-   - Email: `admin@smartattend.com`
+   - Email: `admin@jjelotech.com`
    - Password: `TestPass123!`
 3. Click "Sign In"
 4. **Expected**: JWT tokens saved, redirect to dashboard
@@ -773,7 +773,7 @@ Created on:
 For issues or questions:
 1. Check backend logs: `npm run dev` output
 2. Check frontend console: DevTools → Console
-3. Verify database: `psql -U postgres -d smartattend -c "SELECT * FROM migrations;"`
+3. Verify database: `psql -U postgres -d jjelotech -c "SELECT * FROM migrations;"`
 4. Review this guide's Troubleshooting section
 
 ---

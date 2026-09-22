@@ -1,8 +1,8 @@
-# Shared Types System - SMARTATTEND Monorepo
+# Shared Types System - JJELOTECH Monorepo
 
 ## Overview
 
-The `@smartattend/types` package provides a centralized, shared type system for the entire SMARTATTEND monorepo. This ensures type consistency across frontend, backend, and any other packages in the ecosystem.
+The `@jjelotech/types` package provides a centralized, shared type system for the entire JJELOTECH monorepo. This ensures type consistency across frontend, backend, and any other packages in the ecosystem.
 
 **Benefits:**
 - ✅ Single source of truth for all API contracts
@@ -85,7 +85,7 @@ export interface LogoutResponse {
 **Usage:**
 ```typescript
 // Frontend - Auth Store
-import { User, AuthResponse } from '@smartattend/types';
+import { User, AuthResponse } from '@jjelotech/types';
 
 const useAuthStore = create<AuthState>((set) => ({
   user: null as User | null,
@@ -167,7 +167,7 @@ export interface AttendanceReport {
 **Usage:**
 ```typescript
 // Frontend - Dashboard Service
-import { AttendanceStats, AttendanceRecord } from '@smartattend/types';
+import { AttendanceStats, AttendanceRecord } from '@jjelotech/types';
 
 async getDashboardStats(userId: string): Promise<AttendanceStats> {
   return apiClient.getAttendanceStats(userId);
@@ -361,7 +361,7 @@ import {
   AuthResponse, 
   LoginRequest, 
   AttendanceStats 
-} from '@smartattend/types';
+} from '@jjelotech/types';
 import axios from 'axios';
 
 class ApiClient {
@@ -386,7 +386,7 @@ class ApiClient {
 
 ```typescript
 import { create } from 'zustand';
-import { User } from '@smartattend/types';
+import { User } from '@jjelotech/types';
 
 interface AuthState {
   user: User | null;
@@ -425,7 +425,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 ```typescript
 import { useEffect, useState } from 'react';
-import { AttendanceStats, Student } from '@smartattend/types';
+import { AttendanceStats, Student } from '@jjelotech/types';
 
 export function DashboardPage() {
   const [stats, setStats] = useState<AttendanceStats | null>(null);
@@ -466,7 +466,7 @@ import {
   User as ApiUser, 
   AttendanceStats, 
   Student as ApiStudent 
-} from '@smartattend/types';
+} from '@jjelotech/types';
 import type { User as DbUser, Student as DbStudent } from './types/database';
 
 // Convert database user to API response
@@ -512,7 +512,7 @@ npm run build
 ```json
 {
   "dependencies": {
-    "@smartattend/types": "file:../../packages/types"
+    "@jjelotech/types": "file:../../packages/types"
   }
 }
 ```
@@ -524,7 +524,7 @@ npm install
 
 **Import:**
 ```typescript
-import { User, AuthResponse } from '@smartattend/types';
+import { User, AuthResponse } from '@jjelotech/types';
 ```
 
 ## Best Practices

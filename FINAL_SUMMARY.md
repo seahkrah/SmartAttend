@@ -1,4 +1,4 @@
-# ✨ SMARTATTEND - Error Message System Complete
+# ✨ JJELOTECH - Error Message System Complete
 
 ---
 
@@ -341,7 +341,7 @@ Questions about the implementation?
 3. **Before/After** → See `ERROR_MESSAGES_BEFORE_AFTER.md`
 4. **Complete Summary** → See `IMPLEMENTATION_COMPLETE.md`
 
-All guides are in the root `smartattend` directory.
+All guides are in the root `jjelotech` directory.
 
 ---
 

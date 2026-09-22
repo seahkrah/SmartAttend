@@ -91,7 +91,7 @@ async function setupSuperadmin() {
 
     // 5. Hash password
     console.log('📍 Hashing password...')
-    const hashedPassword = await hashPassword('smartattend123')
+    const hashedPassword = await hashPassword('jjelotech123')
 
     // 6. Create or update superadmin user
     console.log('📍 Creating superadmin user...')
@@ -101,7 +101,7 @@ async function setupSuperadmin() {
        ON CONFLICT (platform_id, email) DO UPDATE
        SET password_hash = $5, is_active = true, updated_at = CURRENT_TIMESTAMP
        RETURNING id, email`,
-      [systemPlatformId, 'superadmin@smartattend.local', 'System Superadmin', superadminRoleId, hashedPassword]
+      [systemPlatformId, 'superadmin@jjelotech.local', 'System Superadmin', superadminRoleId, hashedPassword]
     )
 
     const superadminUser = userResult.rows[0]
@@ -204,8 +204,8 @@ async function setupSuperadmin() {
 
     console.log('\n✅ Superadmin setup completed successfully!')
     console.log('\n📝 Default Credentials:')
-    console.log('   Email: superadmin@smartattend.local')
-    console.log('   Password: smartattend123')
+    console.log('   Email: superadmin@jjelotech.local')
+    console.log('   Password: jjelotech123')
     console.log('\n⚠️  IMPORTANT: Change the default password immediately in production!')
 
     process.exit(0)

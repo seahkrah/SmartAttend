@@ -3,17 +3,17 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: smartattend-db
+    container_name: jjelotech-db
     environment:
-      POSTGRES_USER: smartattend_user
-      POSTGRES_PASSWORD: smartattend_password
-      POSTGRES_DB: smartattend_db
+      POSTGRES_USER: jjelotech_user
+      POSTGRES_PASSWORD: jjelotech_password
+      POSTGRES_DB: jjelotech_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U smartattend_user"]
+      test: ["CMD-SHELL", "pg_isready -U jjelotech_user"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,11 +22,11 @@ services:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
-    container_name: smartattend-backend
+    container_name: jjelotech-backend
     environment:
       NODE_ENV: development
       PORT: 5000
-      DATABASE_URL: postgresql://smartattend_user:smartattend_password@postgres:5432/smartattend_db
+      DATABASE_URL: postgresql://jjelotech_user:jjelotech_password@postgres:5432/jjelotech_db
     ports:
       - "5000:5000"
     depends_on:
@@ -38,7 +38,7 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
-    container_name: smartattend-frontend
+    container_name: jjelotech-frontend
     environment:
       VITE_API_URL: http://localhost:5000/api
     ports:

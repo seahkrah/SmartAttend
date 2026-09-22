@@ -1,6 +1,6 @@
-# SMARTATTEND Backend
+# JJELOTECH Backend
 
-Node.js + Express + TypeScript API for SMARTATTEND.
+Node.js + Express + TypeScript API for JJELOTECH.
 
 ## Setup
 
@@ -22,13 +22,13 @@ cp .env.example .env
 
 Edit `.env` and set your PostgreSQL connection string:
 ```
-DATABASE_URL=postgresql://user:password@localhost:5432/smartattend
+DATABASE_URL=postgresql://user:password@localhost:5432/jjelotech
 ```
 
 3. Initialize the database:
 ```bash
 # Make sure PostgreSQL is running
-psql -U postgres -c "CREATE DATABASE smartattend;"
+psql -U postgres -c "CREATE DATABASE jjelotech;"
 
 # Run migrations
 npm run setup
@@ -36,7 +36,7 @@ npm run setup
 
 Or manually run:
 ```bash
-psql -d smartattend -f src/db/migrations/001_init_schema.sql
+psql -d jjelotech -f src/db/migrations/001_init_schema.sql
 ```
 
 ### Development
@@ -102,7 +102,7 @@ The schema includes support for two platforms:
 ## Environment Variables
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/smartattend
+DATABASE_URL=postgresql://user:password@localhost:5432/jjelotech
 PORT=3000
 NODE_ENV=development
 JWT_SECRET=your_secret_key

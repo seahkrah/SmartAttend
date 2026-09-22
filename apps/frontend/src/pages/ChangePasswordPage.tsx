@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Shield } from 'lucide-react';
-import { SmartAttendLogo } from '../components/BrandLogo';
+import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../components/Toast';
@@ -100,7 +100,7 @@ export const ChangePasswordPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <SmartAttendLogo className="mx-auto mb-4" size="lg" />
+          <JjeloTechLogo className="mx-auto mb-4" size="lg" />
         </div>
 
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10">

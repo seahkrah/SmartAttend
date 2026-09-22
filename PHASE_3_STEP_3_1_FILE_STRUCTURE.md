@@ -211,7 +211,7 @@ console.log(`[ENVIRONMENT] Superadmin Bootstrap: Enabled=${config.superadmin.boo
 ## File Tree
 
 ```
-c:\smartattend\
+c:\jjelotech\
 ├── apps/backend/src/
 │   ├── services/
 │   │   └── superadminService.ts (NEW - 465 lines)
@@ -275,7 +275,7 @@ c:\smartattend\
 -- Existing tables (no new tables needed)
 users
   - id (superadmin account)
-  - email (superadmin@smartattend.local)
+  - email (superadmin@jjelotech.local)
   - password_hash (secure password)
   - role_id (references superadmin role)
   - is_active (account status)

@@ -261,21 +261,21 @@ Error Display:      Instant
 ### **Setup Steps**
 ```bash
 # 1. Navigate to frontend
-cd c:\smartattend\apps\frontend
+cd c:\jjelotech\apps\frontend
 
 # 2. Start development server (if not running)
 npm run dev
 
 # 3. Backend should be running on port 5000
 # (If not, run in another terminal:)
-cd c:\smartattend\apps\backend
+cd c:\jjelotech\apps\backend
 node dist/server.js
 
 # 4. Open browser to
 http://localhost:5174
 
 # 5. Login with superadmin credentials
-Email: newadmin@smartattend.local
+Email: newadmin@jjelotech.local
 Pass:  NewAdmin123!@#
 Platform: school
 ```
@@ -491,7 +491,7 @@ Accessibility Score:           92/100
 
 ---
 
-**Thank you for using SmartAttend! 🎉**
+**Thank you for using JjeloTech! 🎉**
 
 For issues or suggestions, please contact the development team.
 

@@ -10,7 +10,7 @@ const { Pool } = pkg;
 const pool = new Pool({
   host: 'localhost',
   port: 5432,
-  database: 'smartattend',
+  database: 'jjelotech',
   user: 'postgres',
   password: 'seahkrah',
 });

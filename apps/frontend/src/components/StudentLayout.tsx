@@ -125,7 +125,7 @@ export const StudentLayout: React.FC<StudentLayoutProps> = ({ children, currentP
             </div>
             {sidebarOpen && (
               <div>
-                <h1 className="text-lg font-bold text-white">SmartAttend</h1>
+                <h1 className="text-lg font-bold text-white">JjeloTech</h1>
                 <p className="text-xs text-white/70">Student Portal</p>
               </div>
             )}

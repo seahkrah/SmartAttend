@@ -3,7 +3,7 @@
  * Comprehensive test suite for platform production readiness
  *
  * Purpose: Execute end-to-end, time-based, and recovery validation
- * to ensure SmartAttend can be trusted in production
+ * to ensure JjeloTech can be trusted in production
  */
 
 import { runAllScenarios } from './incidentScenarioService.js'
@@ -38,7 +38,7 @@ export interface ValidationReport {
 
 /**
  * Run comprehensive platform validation
- * This is what makes SmartAttend a production-ready platform
+ * This is what makes JjeloTech a production-ready platform
  */
 export async function validatePlatformReadiness(
   userId: string,
@@ -49,7 +49,7 @@ export async function validatePlatformReadiness(
 
   console.log('\n')
   console.log('╔' + '═' . repeat(78) + '╗')
-  console.log('║' + ' ' . repeat(14) + 'SMARTATTEND PLATFORM READINESS VALIDATION' + ' ' . repeat(24) + '║')
+  console.log('║' + ' ' . repeat(14) + 'JJELOTECH PLATFORM READINESS VALIDATION' + ' ' . repeat(24) + '║')
   console.log('╚' + '═' . repeat(78) + '╝\n')
 
   const recommendations: string[] = []

@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename)
 
 const schemaPath = path.join(__dirname, 'migrations', '001_init_schema.sql')
 
-console.log('🚀 SMARTATTEND Database Setup')
+console.log('🚀 JJELOTECH Database Setup')
 console.log('=' .repeat(50))
 
 // Check if schema file exists

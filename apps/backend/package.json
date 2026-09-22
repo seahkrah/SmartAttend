@@ -1,7 +1,7 @@
 {
-  "name": "smartattend-backend",
+  "name": "jjelotech-backend",
   "version": "1.0.0",
-  "description": "SMARTATTEND backend API",
+  "description": "JJELOTECH backend API",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
     "delete-superadmin": "tsx delete-superadmin.ts"
   },
   "dependencies": {
-    "@smartattend/types": "file:../../packages/types",
+    "@jjelotech/types": "file:../../packages/types",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

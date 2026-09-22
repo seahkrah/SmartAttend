@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-SmartAttend now has a production-grade immutable audit logging system that captures and preserves all domain operations with complete state snapshots and tamper detection.
+JjeloTech now has a production-grade immutable audit logging system that captures and preserves all domain operations with complete state snapshots and tamper detection.
 
 ### Key Achievements
 

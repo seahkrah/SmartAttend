@@ -206,7 +206,7 @@ Get-Content /path/to/server.log -Tail 50
 ```powershell
 Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 1
-node "c:\smartattend\apps\backend\dist\server.js"
+node "c:\jjelotech\apps\backend\dist\server.js"
 ```
 
 ---

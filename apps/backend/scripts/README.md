@@ -7,7 +7,7 @@ This directory contains scripts for cleaning up failed database migrations and r
 ### Option 1: Automatic Cleanup (Recommended)
 
 ```powershell
-cd C:\smartattend\apps\backend
+cd C:\jjelotech\apps\backend
 .\scripts\cleanup-migrations.ps1
 ```
 
@@ -44,7 +44,7 @@ SELECT * FROM migrations ORDER BY executed_at;
 Restart the backend to re-execute migrations:
 
 ```powershell
-cd C:\smartattend\apps\backend
+cd C:\jjelotech\apps\backend
 npm run dev
 ```
 
@@ -61,7 +61,7 @@ You should see:
 ### "Error: Could not find .env file"
 Run the script from the backend directory or parent directory:
 ```powershell
-cd C:\smartattend\apps\backend
+cd C:\jjelotech\apps\backend
 .\scripts\cleanup-migrations.ps1
 ```
 

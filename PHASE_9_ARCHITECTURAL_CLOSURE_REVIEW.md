@@ -8,7 +8,7 @@
 
 ## EXECUTIVE SUMMARY
 
-SmartAttend has been verified against three non-negotiable requirements:
+JjeloTech has been verified against three non-negotiable requirements:
 
 1. ✅ **Every Superadmin capability is API-based** — No direct script manipulation possible
 2. ✅ **Every Superadmin capability is audited** — All actions logged with context and outcome
@@ -32,22 +32,22 @@ Additionally verified:
 
 | Capability | Route | Handler | Authentication | Search Params |
 |-----------|-------|---------|-----------------|---------------|
-| **List tenants** | `GET /superadmin/tenants` | [superadmin.ts:62](c:\smartattend\apps\backend\src\routes\superadmin.ts#L62) | `authenticateToken` + `verifySuperadmin` | tenant type, user count, entity details |
-| **Lock tenant** | `POST /superadmin/tenants/lock` | [superadmin.ts:200](c:\smartattend\apps\backend\src\routes\superadmin.ts#L200) | `authenticateToken` + `verifySuperadmin` | tenant_id, reason |
-| **Unlock tenant** | `POST /superadmin/tenants/unlock` | [superadmin.ts:265](c:\smartattend\apps\backend\src\routes\superadmin.ts#L265) | `authenticateToken` + `verifySuperadmin` | tenant_id, confirmation_token |
-| **Create incident** | `POST /superadmin/incidents` | [superadmin.ts:382](c:\smartattend\apps\backend\src\routes\superadmin.ts#L382) | `authenticateToken` + `verifySuperadmin` | title, description, severity, tenant_id |
-| **Update incident** | `PUT /superadmin/incidents/:id` | [superadmin.ts:454](c:\smartattend\apps\backend\src\routes\superadmin.ts#L454) | `authenticateToken` + `verifySuperadmin` | status, root_cause, post_mortem_url |
-| **Confirm operations** | `POST /superadmin/confirmation-tokens` | [superadmin.ts:624](c:\smartattend\apps\backend\src\routes\superadmin.ts#L624) | `authenticateToken` + `verifySuperadmin` | operation_type, operation_context |
-| **Tenant lifecycle** | `POST /superadmin/tenants/:id/lifecycle` | [superadmin.ts:705](c:\smartattend\apps\backend\src\routes\superadmin.ts#L705) | `authenticateToken` + `verifySuperadmin` | new_state, justification |
-| **Invalidate sessions** | `POST /superadmin/sessions/invalidate` | [superadmin.ts:825](c:\smartattend\apps\backend\src\routes\superadmin.ts#L825) | `authenticateToken` + `verifySuperadmin` | tenant_id, reason |
-| **Log clock drift** | `POST /superadmin/clock-drift` | [superadmin.ts:877](c:\smartattend\apps\backend\src\routes\superadmin.ts#L877) | `authenticateToken` + `verifySuperadmin` | tenant_id, drift_seconds, severity |
-| **Flag attendance** | `POST /superadmin/attendance/flags` | [superadmin.ts:946](c:\smartattend\apps\backend\src\routes\superadmin.ts#L946) | `authenticateToken` + `verifySuperadmin` | attendance_id, severity, reason |
-| **MFA Challenge** | `POST /superadmin/mfa/challenge` | [superadmin.ts:1006](c:\smartattend\apps\backend\src\routes\superadmin.ts#L1006) | `authenticateToken` + `verifySuperadmin` | method (email/sms) |
-| **MFA Verify** | `POST /superadmin/mfa/verify` | [superadmin.ts:1035](c:\smartattend\apps\backend\src\routes\superadmin.ts#L1035) | None (confirmation endpoint) | challenge_id, code |
-| **IP Allowlist** | `POST /superadmin/ip-allowlist` | [superadmin.ts:1090](c:\smartattend\apps\backend\src\routes\superadmin.ts#L1090) | `authenticateToken` + `verifySuperadmin` | ip_address, description |
-| **Create account** | `POST /superadmin/accounts` | [superadmin-operations.ts:167](c:\smartattend\apps\backend\src\routes\superadmin-operations.ts#L167) | `authenticateToken` + `verifySuperadmin` | email, full_name |
-| **Delete account** | `DELETE /superadmin/accounts/:userId` | [superadmin-operations.ts:259](c:\smartattend\apps\backend\src\routes\superadmin-operations.ts#L259) | `authenticateToken` + `verifySuperadmin` | user_id |
-| **Reset password** | `POST /superadmin/accounts/:userId/reset-password` | [superadmin-operations.ts:351](c:\smartattend\apps\backend\src\routes\superadmin-operations.ts#L351) | `authenticateToken` + `verifySuperadmin` | new_password |
+| **List tenants** | `GET /superadmin/tenants` | [superadmin.ts:62](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L62) | `authenticateToken` + `verifySuperadmin` | tenant type, user count, entity details |
+| **Lock tenant** | `POST /superadmin/tenants/lock` | [superadmin.ts:200](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L200) | `authenticateToken` + `verifySuperadmin` | tenant_id, reason |
+| **Unlock tenant** | `POST /superadmin/tenants/unlock` | [superadmin.ts:265](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L265) | `authenticateToken` + `verifySuperadmin` | tenant_id, confirmation_token |
+| **Create incident** | `POST /superadmin/incidents` | [superadmin.ts:382](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L382) | `authenticateToken` + `verifySuperadmin` | title, description, severity, tenant_id |
+| **Update incident** | `PUT /superadmin/incidents/:id` | [superadmin.ts:454](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L454) | `authenticateToken` + `verifySuperadmin` | status, root_cause, post_mortem_url |
+| **Confirm operations** | `POST /superadmin/confirmation-tokens` | [superadmin.ts:624](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L624) | `authenticateToken` + `verifySuperadmin` | operation_type, operation_context |
+| **Tenant lifecycle** | `POST /superadmin/tenants/:id/lifecycle` | [superadmin.ts:705](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L705) | `authenticateToken` + `verifySuperadmin` | new_state, justification |
+| **Invalidate sessions** | `POST /superadmin/sessions/invalidate` | [superadmin.ts:825](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L825) | `authenticateToken` + `verifySuperadmin` | tenant_id, reason |
+| **Log clock drift** | `POST /superadmin/clock-drift` | [superadmin.ts:877](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L877) | `authenticateToken` + `verifySuperadmin` | tenant_id, drift_seconds, severity |
+| **Flag attendance** | `POST /superadmin/attendance/flags` | [superadmin.ts:946](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L946) | `authenticateToken` + `verifySuperadmin` | attendance_id, severity, reason |
+| **MFA Challenge** | `POST /superadmin/mfa/challenge` | [superadmin.ts:1006](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L1006) | `authenticateToken` + `verifySuperadmin` | method (email/sms) |
+| **MFA Verify** | `POST /superadmin/mfa/verify` | [superadmin.ts:1035](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L1035) | None (confirmation endpoint) | challenge_id, code |
+| **IP Allowlist** | `POST /superadmin/ip-allowlist` | [superadmin.ts:1090](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L1090) | `authenticateToken` + `verifySuperadmin` | ip_address, description |
+| **Create account** | `POST /superadmin/accounts` | [superadmin-operations.ts:167](c:\jjelotech\apps\backend\src\routes\superadmin-operations.ts#L167) | `authenticateToken` + `verifySuperadmin` | email, full_name |
+| **Delete account** | `DELETE /superadmin/accounts/:userId` | [superadmin-operations.ts:259](c:\jjelotech\apps\backend\src\routes\superadmin-operations.ts#L259) | `authenticateToken` + `verifySuperadmin` | user_id |
+| **Reset password** | `POST /superadmin/accounts/:userId/reset-password` | [superadmin-operations.ts:351](c:\jjelotech\apps\backend\src\routes\superadmin-operations.ts#L351) | `authenticateToken` + `verifySuperadmin` | new_password |
 
 **Finding**: ✅ **VERIFIED** — All 16 Superadmin capabilities are API-based with HTTP endpoints. No direct script exposure.
 
@@ -55,7 +55,7 @@ Additionally verified:
 - All routes registered with Express router
 - All require `authenticateToken` middleware
 - All apply `verifySuperadmin` guard function checking role = 'superadmin'
-- Entry points in [superadmin.ts](c:\smartattend\apps\backend\src\routes\superadmin.ts), [superadmin-operations.ts](c:\smartattend\apps\backend\src\routes\superadmin-operations.ts)
+- Entry points in [superadmin.ts](c:\jjelotech\apps\backend\src\routes\superadmin.ts), [superadmin-operations.ts](c:\jjelotech\apps\backend\src\routes\superadmin-operations.ts)
 
 ---
 
@@ -66,14 +66,14 @@ Additionally verified:
 
 | Capability | Audit Table | Audit Function | Context Captured |
 |-----------|------------|-----------------|-----------------|
-| **All Superadmin actions** | `superadmin_action_logs` | [auditService.ts](c:\smartattend\apps\backend\src\services\auditService.ts) | superadmin_user_id, action, entity_type, entity_id, ip_address, timestamp, before/after state |
-| **Tenant locks** | `tenant_lock_events` | [superadmin.ts:230](c:\smartattend\apps\backend\src\routes\superadmin.ts#L230) | tenant_id, action (lock/unlock), reason, superadmin_id, timestamp |
-| **Incident changes** | `incident_activity_log` | [superadmin.ts:417](c:\smartattend\apps\backend\src\routes\superadmin.ts#L417) | incident_id, activity_type, description, actor_id, state_change_from/to |
-| **Tenant lifecycle** | `tenant_lifecycle_audit` | [superadmin.ts:756](c:\smartattend\apps\backend\src\routes\superadmin.ts#L756) | tenant_id, previous_state, new_state, actor_id, action_type, justification, confirmation_token, ip_address |
-| **Session invalidation** | `session_invalidation_log` | [superadmin.ts:791](c:\smartattend\apps\backend\src\routes\superadmin.ts#L791) | tenant_id, reason, superadmin_id, invalidated_session_count, timestamp |
-| **Clock drift events** | `clock_drift_log` | [superadmin.ts:900](c:\smartattend\apps\backend\src\routes\superadmin.ts#L900) | tenant_id, user_id, client_timestamp, server_timestamp, drift_seconds, severity, attendance_affected |
-| **Attendance flags** | `attendance_integrity_flags` | [superadmin.ts:972](c:\smartattend\apps\backend\src\routes\superadmin.ts#L972) | tenant_id, attendance_record_id, flag_type, severity, superadmin_id, reason |
-| **Account operations** | `superadmin_action_logs` + result | [superadmin-operations.ts:203](c:\smartattend\apps\backend\src\routes\superadmin-operations.ts#L203) | user_id, action (create/delete/reset), details, superadmin_id, success/failure |
+| **All Superadmin actions** | `superadmin_action_logs` | [auditService.ts](c:\jjelotech\apps\backend\src\services\auditService.ts) | superadmin_user_id, action, entity_type, entity_id, ip_address, timestamp, before/after state |
+| **Tenant locks** | `tenant_lock_events` | [superadmin.ts:230](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L230) | tenant_id, action (lock/unlock), reason, superadmin_id, timestamp |
+| **Incident changes** | `incident_activity_log` | [superadmin.ts:417](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L417) | incident_id, activity_type, description, actor_id, state_change_from/to |
+| **Tenant lifecycle** | `tenant_lifecycle_audit` | [superadmin.ts:756](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L756) | tenant_id, previous_state, new_state, actor_id, action_type, justification, confirmation_token, ip_address |
+| **Session invalidation** | `session_invalidation_log` | [superadmin.ts:791](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L791) | tenant_id, reason, superadmin_id, invalidated_session_count, timestamp |
+| **Clock drift events** | `clock_drift_log` | [superadmin.ts:900](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L900) | tenant_id, user_id, client_timestamp, server_timestamp, drift_seconds, severity, attendance_affected |
+| **Attendance flags** | `attendance_integrity_flags` | [superadmin.ts:972](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L972) | tenant_id, attendance_record_id, flag_type, severity, superadmin_id, reason |
+| **Account operations** | `superadmin_action_logs` + result | [superadmin-operations.ts:203](c:\jjelotech\apps\backend\src\routes\superadmin-operations.ts#L203) | user_id, action (create/delete/reset), details, superadmin_id, success/failure |
 
 **Finding**: ✅ **VERIFIED** — All operations logged to dedicated audit tables with full context.
 
@@ -86,7 +86,7 @@ Additionally verified:
 - `before_state` / `after_state` — WHAT CHANGED
 
 **Protection level**: Database-level immutability triggers prevent ANY UPDATE or DELETE on audit tables:
-- Trigger: [008_5_immutability_triggers.sql](c:\smartattend\apps\backend\src\db\migrations\008_5_immutability_triggers.sql#L1)
+- Trigger: [008_5_immutability_triggers.sql](c:\jjelotech\apps\backend\src\db\migrations\008_5_immutability_triggers.sql#L1)
 - Function: `raise_immutability_error()` blocks UPDATE/DELETE with error message: "Audit logs cannot be modified or deleted"
 
 ---
@@ -96,7 +96,7 @@ Additionally verified:
 
 **Verification**:
 
-**Guard mechanism** ([superadmin.ts:31](c:\smartattend\apps\backend\src\routes\superadmin.ts#L31)):
+**Guard mechanism** ([superadmin.ts:31](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L31)):
 ```typescript
 async function verifySuperadmin(req: Request, res: Response, next: Function) {
   const roleCheck = await query(
@@ -151,13 +151,13 @@ router.post('/tenants/lock',
 
 | Script | Purpose | Database Operations | Audit Logging | Risk Level | Status |
 |--------|---------|-------------------|----------------|-----------|--------|
-| [setup-superadmin.ts](c:\smartattend\apps\backend\setup-superadmin.ts) | Initialize platform | CREATE tables, INSERT initial data | None (initialization) | ⚠️ **MEDIUM**† | ✅ Restricted |
-| [delete-superadmin.ts](c:\smartattend\apps\backend\delete-superadmin.ts) | DELETE user | `DELETE FROM users WHERE email = ...` | None | ⚠️ **MEDIUM**† | ✅ Restricted |
-| [execute-stage1.js](c:\smartattend\apps\backend\execute-stage1.js) | Execute migrations | ALTER TABLE, UPDATE, CREATE, ADD CONSTRAINT | None | ⚠️ **MEDIUM**† | ✅ Restricted |
-| [rollback-stage1.js](c:\smartattend\apps\backend\rollback-stage1.js) | Rollback migrations | DROP TABLE, DROP CONSTRAINT, DROP TRIGGER, DROP FUNCTION | None | ⚠️ **MEDIUM**† | ✅ Restricted |
-| [clear-stage1-migrations.js](c:\smartattend\apps\backend\clear-stage1-migrations.js) | Clear migration records | DELETE migrations | None | 🟢 **LOW** | ✅ Read-only |
-| [verify-stage1-gate.js](c:\smartattend\apps\backend\verify-stage1-gate.js) | Verify immutability | SELECT only, attempted UPDATE shows constraint | Full logging | 🟢 **LOW** | ✅ Read-only |
-| [check-migrations.js](c:\smartattend\apps\backend\check-migrations.js) | Check migration status | SELECT only | N/A | 🟢 **LOW** | ✅ Read-only |
+| [setup-superadmin.ts](c:\jjelotech\apps\backend\setup-superadmin.ts) | Initialize platform | CREATE tables, INSERT initial data | None (initialization) | ⚠️ **MEDIUM**† | ✅ Restricted |
+| [delete-superadmin.ts](c:\jjelotech\apps\backend\delete-superadmin.ts) | DELETE user | `DELETE FROM users WHERE email = ...` | None | ⚠️ **MEDIUM**† | ✅ Restricted |
+| [execute-stage1.js](c:\jjelotech\apps\backend\execute-stage1.js) | Execute migrations | ALTER TABLE, UPDATE, CREATE, ADD CONSTRAINT | None | ⚠️ **MEDIUM**† | ✅ Restricted |
+| [rollback-stage1.js](c:\jjelotech\apps\backend\rollback-stage1.js) | Rollback migrations | DROP TABLE, DROP CONSTRAINT, DROP TRIGGER, DROP FUNCTION | None | ⚠️ **MEDIUM**† | ✅ Restricted |
+| [clear-stage1-migrations.js](c:\jjelotech\apps\backend\clear-stage1-migrations.js) | Clear migration records | DELETE migrations | None | 🟢 **LOW** | ✅ Read-only |
+| [verify-stage1-gate.js](c:\jjelotech\apps\backend\verify-stage1-gate.js) | Verify immutability | SELECT only, attempted UPDATE shows constraint | Full logging | 🟢 **LOW** | ✅ Read-only |
+| [check-migrations.js](c:\jjelotech\apps\backend\check-migrations.js) | Check migration status | SELECT only | N/A | 🟢 **LOW** | ✅ Read-only |
 
 **†Medium Risk Justification**:
 - These scripts have direct database access
@@ -175,7 +175,7 @@ router.post('/tenants/lock',
 ```typescript
 // File: delete-superadmin.ts
 await query(`DELETE FROM users 
-             WHERE email = 'superadmin@smartattend.local'
+             WHERE email = 'superadmin@jjelotech.local'
              RETURNING id, email`)
 ```
 
@@ -223,7 +223,7 @@ await client.query(`UPDATE school_departments
 
 #### 3.1 Attendance State Machine
 
-**Valid state transitions** ([attendanceStateService.ts](c:\smartattend\apps\backend\src\services\attendanceStateService.ts)):
+**Valid state transitions** ([attendanceStateService.ts](c:\jjelotech\apps\backend\src\services\attendanceStateService.ts)):
 
 ```
 PRESENT    → VERIFIED  (faculty marked attendance, security verified)
@@ -234,7 +234,7 @@ FLAGGED    → REVOKED   (fraud confirmed, attendance revoked)
 ABSENT     → PRESENT   (student appeal with documentation)
 ```
 
-**Change handler** ([attendanceStateService.ts:88](c:\smartattend\apps\backend\src\services\attendanceStateService.ts#L88)):
+**Change handler** ([attendanceStateService.ts:88](c:\jjelotech\apps\backend\src\services\attendanceStateService.ts#L88)):
 
 ```typescript
 async function changeSchoolAttendanceState(
@@ -330,7 +330,7 @@ Result: Complete timeline of every state change with reason and actor.
 3. `authenticateToken` — Validates JWT token
 4. `verifySuperadmin` — Confirms role = 'superadmin'
 
-**Middleware order** ([superadmin.ts:14](c:\smartattend\apps\backend\src\routes\superadmin.ts#L14)):
+**Middleware order** ([superadmin.ts:14](c:\jjelotech\apps\backend\src\routes\superadmin.ts#L14)):
 ```typescript
 router.use(auditContextMiddleware)      // 1. Capture context
 router.use(ipAllowlistMiddleware)       // 2. IP enforcement
@@ -348,7 +348,7 @@ router.use(authenticateToken, (req, res, next) => verifySuperadmin(req, res, nex
 - `POST /superadmin/ip-allowlist` — rate limited
 - `DELETE /superadmin/accounts/:userId` — rate limited
 
-**Implementation**: [rateLimitMiddleware.ts](c:\smartattend\apps\backend\src\auth\rateLimitMiddleware.ts)
+**Implementation**: [rateLimitMiddleware.ts](c:\jjelotech\apps\backend\src\auth\rateLimitMiddleware.ts)
 
 ```typescript
 router.post('/mfa/challenge', ..., 
@@ -446,7 +446,7 @@ None found.
 **Proof against attack**:
 - *Attack*: "Show me data from other schools"
 - *Defense*: User's token contains platform_id. Query builder adds `WHERE platform_id = ?` automatically.
-- *Verification*: [tenantQueryBuilder.ts](c:\smartattend\apps\backend\src\services\tenantQueryBuilder.ts) enforces filtering
+- *Verification*: [tenantQueryBuilder.ts](c:\jjelotech\apps\backend\src\services\tenantQueryBuilder.ts) enforces filtering
 
 ---
 
@@ -534,7 +534,7 @@ None found.
 
 ## CONCLUSION
 
-**The SmartAttend platform holds under scrutiny.**
+**The JjeloTech platform holds under scrutiny.**
 
 ✅ All three non-negotiable requirements are met:
 1. Every Superadmin capability is **API-based, audited, and role-guarded**
@@ -550,11 +550,11 @@ The system is built with multiple layers of enforcement (database constraints, a
 ## VERIFICATION ARTIFACTS
 
 ### Files Verified
-- [x] [superadmin.ts](c:\smartattend\apps\backend\src\routes\superadmin.ts) — 1142 lines, 16 endpoints
-- [x] [superadmin-operations.ts](c:\smartattend\apps\backend\src\routes\superadmin-operations.ts) — Operations routes
-- [x] [attendanceStateService.ts](c:\smartattend\apps\backend\src\services\attendanceStateService.ts) — State machine
-- [x] [auditService.ts](c:\smartattend\apps\backend\src\services\auditService.ts) — Audit logging
-- [x] [008_5_immutability_triggers.sql](c:\smartattend\apps\backend\src\db\migrations\008_5_immutability_triggers.sql) — Immutability
+- [x] [superadmin.ts](c:\jjelotech\apps\backend\src\routes\superadmin.ts) — 1142 lines, 16 endpoints
+- [x] [superadmin-operations.ts](c:\jjelotech\apps\backend\src\routes\superadmin-operations.ts) — Operations routes
+- [x] [attendanceStateService.ts](c:\jjelotech\apps\backend\src\services\attendanceStateService.ts) — State machine
+- [x] [auditService.ts](c:\jjelotech\apps\backend\src\services\auditService.ts) — Audit logging
+- [x] [008_5_immutability_triggers.sql](c:\jjelotech\apps\backend\src\db\migrations\008_5_immutability_triggers.sql) — Immutability
 - [x] Migration files 006-009
 
 ### Verification Date

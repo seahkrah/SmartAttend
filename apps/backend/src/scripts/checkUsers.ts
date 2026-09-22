@@ -11,9 +11,9 @@ const { Pool } = pkg;
 const pool = new Pool({
   host: 'localhost',
   port: 5432,
-  database: 'smartattend',
-  user: 'smartattend_user',
-  password: 'smartattend_password',
+  database: 'jjelotech',
+  user: 'jjelotech_user',
+  password: 'jjelotech_password',
 });
 
 async function checkUsers() {

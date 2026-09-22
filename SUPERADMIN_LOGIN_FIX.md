@@ -74,8 +74,8 @@ if (user_found_on_selected_platform) {
 1. **User visits login page**
 2. **Selects any platform** (school or corporate) - doesn't matter
 3. **Enters superadmin credentials**:
-   - Email: `superadmin@smartattend.local`
-   - Password: `smartattend123`
+   - Email: `superadmin@jjelotech.local`
+   - Password: `jjelotech123`
 4. **Backend logic**:
    - Doesn't find on selected platform
    - Finds in system platform
@@ -111,8 +111,8 @@ Different scenarios return different error messages:
 1. Navigate to `/login`
 2. **Try both platform options** (select School OR Corporate - doesn't matter)
 3. Enter credentials:
-   - Email: `superadmin@smartattend.local`
-   - Password: `smartattend123`
+   - Email: `superadmin@jjelotech.local`
+   - Password: `jjelotech123`
 4. Click "Sign In"
 5. ✅ Should succeed and redirect to `/dashboard`
 6. Navigate to `/superadmin`

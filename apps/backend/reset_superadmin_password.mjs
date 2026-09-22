@@ -27,7 +27,7 @@ async function resetSuperadminPassword() {
     // Update the password
     const result = await pool.query(
       `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE email = $2 AND id = $3 RETURNING email, id`,
-      [hashedPassword, 'newadmin@smartattend.local', '42c836f0-527e-4bd8-834c-31f82c2afcb2']
+      [hashedPassword, 'newadmin@jjelotech.local', '42c836f0-527e-4bd8-834c-31f82c2afcb2']
     );
     
     if (result.rows.length === 0) {
@@ -38,7 +38,7 @@ async function resetSuperadminPassword() {
     
     console.log('✅ Password reset successfully\n');
     console.log('━'.repeat(70));
-    console.log('📧 Email:    newadmin@smartattend.local');
+    console.log('📧 Email:    newadmin@jjelotech.local');
     console.log('🔑 Password: Superadmin@123');
     console.log('━'.repeat(70));
     console.log('\n✅ Try logging in with these NEW credentials\n');

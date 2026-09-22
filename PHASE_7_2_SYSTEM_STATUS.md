@@ -1,4 +1,4 @@
-# SMARTATTEND - PHASE 7.2 SYSTEM STATUS
+# JJELOTECH - PHASE 7.2 SYSTEM STATUS
 **Date**: February 5, 2026  
 **Status**: ✅ **OPERATIONAL - Phase 7.2 Complete**
 
@@ -189,13 +189,13 @@ GET    /api/simulations/status               → Metrics health summary
 
 ### Start Server
 ```bash
-cd c:\smartattend\apps\backend
+cd c:\jjelotech\apps\backend
 node dist/server.js
 ```
 
 ### Build Backend
 ```bash
-cd c:\smartattend\apps\backend
+cd c:\jjelotech\apps\backend
 npm run build
 ```
 

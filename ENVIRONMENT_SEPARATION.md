@@ -2,7 +2,7 @@
 
 ## Overview
 
-SmartAttend implements strict environment separation across development, staging, and production. Each environment has:
+JjeloTech implements strict environment separation across development, staging, and production. Each environment has:
 - **Separate database instances** (no data sharing)
 - **Unique secrets** (no secret sharing between environments)
 - **No hardcoded environment assumptions** (configuration-driven)
@@ -120,7 +120,7 @@ No hardcoded localhost URLs, API endpoints, or secrets anywhere in source code.
    ```bash
    NODE_ENV=development
    BACKEND_PORT=3000
-   DATABASE_URL=postgresql://localhost:5432/smartattend_dev
+   DATABASE_URL=postgresql://localhost:5432/jjelotech_dev
    VITE_API_BASE_URL=http://localhost:3000/api
    ```
 
@@ -134,7 +134,7 @@ No hardcoded localhost URLs, API endpoints, or secrets anywhere in source code.
 1. Set environment variables on staging deployment platform (e.g., AWS ECS, Heroku, Railway):
    ```
    NODE_ENV=staging
-   DATABASE_URL=postgresql://user:pass@staging-db:5432/smartattend_staging
+   DATABASE_URL=postgresql://user:pass@staging-db:5432/jjelotech_staging
    JWT_SECRET=<unique-staging-secret>
    VITE_API_BASE_URL=https://staging-api.example.com
    SUPERADMIN_MFA_ENABLED=true
@@ -149,7 +149,7 @@ No hardcoded localhost URLs, API endpoints, or secrets anywhere in source code.
 1. Set environment variables on production deployment platform:
    ```
    NODE_ENV=production
-   DATABASE_URL=postgresql://user:pass@prod-db:5432/smartattend_prod
+   DATABASE_URL=postgresql://user:pass@prod-db:5432/jjelotech_prod
    JWT_SECRET=<unique-production-secret-min-32-chars>
    VITE_API_BASE_URL=https://api.example.com
    SUPERADMIN_MFA_ENABLED=true

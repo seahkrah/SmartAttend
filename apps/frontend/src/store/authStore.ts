@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User } from '@smartattend/types';
+import { User } from '@jjelotech/types';
 import { apiClient } from '../services/api';
 import { frontendConfig } from '../config/environment';
 import { getUserFriendlyError } from '../utils/errorMessages';

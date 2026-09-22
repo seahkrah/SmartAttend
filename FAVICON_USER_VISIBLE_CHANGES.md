@@ -9,20 +9,20 @@ When you open http://localhost:5174, you'll see:
 - It appears immediately on page load
 
 ### 2. **Page Headers - Logo Component**
-Across all pages, you'll see the **SmartAttend logo** displayed consistently:
+Across all pages, you'll see the **JjeloTech logo** displayed consistently:
 
 #### Landing Page
 - Top navigation bar shows the logo in the top-left corner
-- Logo size: medium with text "SmartAttend"
+- Logo size: medium with text "JjeloTech"
 
 #### Login Page  
 - Form header displays the logo prominently
-- Logo size: large with "SmartAttend" text below
+- Logo size: large with "JjeloTech" text below
 - Professional appearance for authentication
 
 #### Register Page
 - Form header displays the logo prominently
-- Logo size: large with "SmartAttend" text below
+- Logo size: large with "JjeloTech" text below
 - Matching design with login page
 
 #### Dashboard
@@ -54,24 +54,24 @@ The logos are fully responsive:
 ### Browser Tab Area
 ```
 ┌─────────────────────────────────────┐
-│ 🔷 SmartAttend - Attendance...  ✕   │ ← Favicon here (blue→purple gradient)
+│ 🔷 JjeloTech - Attendance...  ✕   │ ← Favicon here (blue→purple gradient)
 └─────────────────────────────────────┘
 ```
 
 ### Landing Page Layout
 ```
 ┌──────────────────────────────────────────────┐
-│ 🔷 SmartAttend  [Login]  [Register]  [CTA]   │ ← Logo in top nav
+│ 🔷 JjeloTech  [Login]  [Register]  [CTA]   │ ← Logo in top nav
 ├──────────────────────────────────────────────┤
 │                                               │
-│          SmartAttend                         │
+│          JjeloTech                         │
 │       Attendance Made Smart                 │
 │                                               │
 │    [9 animated icons in background]         │
 │    Modern Features  Easy Integration         │
 │                                               │
 ├──────────────────────────────────────────────┤
-│ © 2024 SmartAttend. All rights reserved.    │
+│ © 2024 JjeloTech. All rights reserved.    │
 └──────────────────────────────────────────────┘
 ```
 
@@ -79,7 +79,7 @@ The logos are fully responsive:
 ```
 ┌────────────────────────────────────┐
 │   🔷                               │
-│   SmartAttend                      │
+│   JjeloTech                      │
 │   Attendance Platform              │ ← Logo prominently displayed
 │                                    │
 │   [Email input]                    │
@@ -93,7 +93,7 @@ The logos are fully responsive:
 ### Dashboard Layout (Desktop)
 ```
 ┌─────────────────────────────────────────────────┐
-│ ≡  🔷 SmartAttend  [Account]  [Logout]        │ ← Topbar with centered logo
+│ ≡  🔷 JjeloTech  [Account]  [Logout]        │ ← Topbar with centered logo
 ├──────────────┬──────────────────────────────────┤
 │ 🔷 SmartAtnd │                                  │
 │              │                                  │
@@ -212,8 +212,8 @@ Edit the Tailwind classes in:
 - `tailwind.config.js`
 
 ### Change Logo Text
-Search for "SmartAttend" in the component files
+Search for "JjeloTech" in the component files
 
 ---
 
-**Enjoy your professional, branded SmartAttend application! 🎉**
+**Enjoy your professional, branded JjeloTech application! 🎉**

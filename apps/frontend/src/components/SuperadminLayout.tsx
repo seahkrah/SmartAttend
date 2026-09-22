@@ -68,8 +68,8 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
           {sidebarOpen && (
             <div className="flex items-center gap-3 min-w-0">
               <img
-                src="/logos/platform-logo.png"
-                alt="SmartAttend"
+                src="/logos/jjelotech-mark.png"
+                alt="JjeloTech"
                 className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
@@ -84,7 +84,7 @@ export const SuperadminLayout: React.FC<LayoutProps> = ({
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div className="truncate">
-                <h1 className="text-sm font-bold text-white truncate">SmartAttend</h1>
+                <h1 className="text-sm font-bold text-white truncate">JjeloTech</h1>
                 <p className="text-xs text-slate-400">Console</p>
               </div>
             </div>

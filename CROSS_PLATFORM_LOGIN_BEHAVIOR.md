@@ -8,7 +8,7 @@
 
 ### Current System Design
 
-The SMARTATTEND system allows the **same email address to exist in both platforms**:
+The JJELOTECH system allows the **same email address to exist in both platforms**:
 
 ```
 Email: john@example.com

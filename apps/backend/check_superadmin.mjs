@@ -32,11 +32,11 @@ async function checkSuperadminAccount() {
       FROM users u
       LEFT JOIN platforms p ON u.platform_id = p.id
       LEFT JOIN roles r ON u.role_id = r.id
-      WHERE u.email = 'newadmin@smartattend.local'
+      WHERE u.email = 'newadmin@jjelotech.local'
       ORDER BY p.name
     `);
     
-    console.log('Found ' + result.rows.length + ' account(s) with email newadmin@smartattend.local:\n');
+    console.log('Found ' + result.rows.length + ' account(s) with email newadmin@jjelotech.local:\n');
     
     for (const row of result.rows) {
       console.log('━'.repeat(70));

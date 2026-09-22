@@ -15,13 +15,13 @@ npm run dev
 # 2. Initialize superadmin system (one-time)
 curl -X POST http://localhost:3000/api/superadmin/bootstrap
 
-# 3. Save default credentials (email: superadmin@smartattend.local)
+# 3. Save default credentials (email: superadmin@jjelotech.local)
 # 4. Login to get JWT token
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "superadmin@smartattend.local",
-    "password": "smartattend123"
+    "email": "superadmin@jjelotech.local",
+    "password": "jjelotech123"
   }'
 
 # 5. Use JWT token for operational endpoints
@@ -149,7 +149,7 @@ npm run dev
 JWT=$(curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "superadmin@smartattend.local",
+    "email": "superadmin@jjelotech.local",
     "password": "your-password"
   }' | jq -r '.data.token')
 
@@ -249,7 +249,7 @@ ORDER BY timestamp DESC LIMIT 10;
 
 ```bash
 NODE_ENV=development
-DATABASE_URL=postgresql://user:pass@localhost:5432/smartattend_dev
+DATABASE_URL=postgresql://user:pass@localhost:5432/jjelotech_dev
 JWT_SECRET=dev-secret-key-change-in-production
 BACKEND_PORT=3000
 
@@ -261,7 +261,7 @@ FORCE_BOOTSTRAP=false
 
 ```bash
 NODE_ENV=production
-DATABASE_URL=postgresql://user:pass@prod-db:5432/smartattend
+DATABASE_URL=postgresql://user:pass@prod-db:5432/jjelotech
 JWT_SECRET=unique-very-long-random-string
 BACKEND_PORT=3000
 
@@ -422,12 +422,12 @@ done
 ```bash
 # After bootstrap
 curl -X POST http://localhost:3000/api/auth/login \
-  -d '{"email":"superadmin@smartattend.local","password":"smartattend123"}'
+  -d '{"email":"superadmin@jjelotech.local","password":"jjelotech123"}'
 
 # Get new JWT and change password
 curl -X POST http://localhost:3000/api/auth/change-password \
   -H "Authorization: Bearer $JWT" \
-  -d '{"currentPassword":"smartattend123","newPassword":"NewSecurePassword123!"}'
+  -d '{"currentPassword":"jjelotech123","newPassword":"NewSecurePassword123!"}'
 ```
 
 ### 2. Enable MFA
@@ -502,7 +502,7 @@ npm run dev
 
 ```bash
 # Application logs
-tail -f /var/log/smartattend/backend.log
+tail -f /var/log/jjelotech/backend.log
 
 # Database logs
 tail -f /var/log/postgresql/postgresql.log

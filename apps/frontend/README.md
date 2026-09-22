@@ -1,6 +1,6 @@
-# SmartAttend Frontend
+# JjeloTech Frontend
 
-A modern, clean, and stylish web application built with React, TypeScript, Tailwind CSS, and Vite. Designed to work seamlessly with the SmartAttend backend API.
+A modern, clean, and stylish web application built with React, TypeScript, Tailwind CSS, and Vite. Designed to work seamlessly with the JjeloTech backend API.
 
 ## 🎨 Features
 
@@ -67,7 +67,7 @@ The app uses a sophisticated color scheme:
 ## 📄 Pages
 
 ### Landing Page (`/`)
-- Public homepage showcasing SmartAttend features
+- Public homepage showcasing JjeloTech features
 - Call-to-action buttons for login/signup
 - Feature cards highlighting platform capabilities
 

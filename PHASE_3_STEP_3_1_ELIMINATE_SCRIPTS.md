@@ -110,8 +110,8 @@ curl -X POST http://localhost:3000/api/superadmin/bootstrap \
     "systemPlatformId": "uuid",
     "superadminRoleId": "uuid",
     "superadminUserId": "uuid",
-    "email": "superadmin@smartattend.local",
-    "password": "smartattend123",
+    "email": "superadmin@jjelotech.local",
+    "password": "jjelotech123",
     "passwordExpires": "2026-02-05T10:30:00.000Z"
   },
   "warning": "IMPORTANT: This is a default account for development only. Change the password immediately before production use."
@@ -309,7 +309,7 @@ curl http://localhost:3000/api/superadmin/accounts \
   "data": [
     {
       "id": "superadmin-1-uuid",
-      "email": "superadmin@smartattend.local",
+      "email": "superadmin@jjelotech.local",
       "full_name": "System Superadmin",
       "is_active": true,
       "created_at": "2026-02-04T08:00:00.000Z",

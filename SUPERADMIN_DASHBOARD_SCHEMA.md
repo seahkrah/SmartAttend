@@ -1,4 +1,4 @@
-# SmartAttend Superadmin Dashboard - Schema & API Design
+# JjeloTech Superadmin Dashboard - Schema & API Design
 
 **Version:** 1.0  
 **Date:** February 2026  

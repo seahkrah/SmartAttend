@@ -178,7 +178,7 @@ Admin reviews → Approve → User activated → Can login ✅
 ## 🔄 Complete User Journey
 
 ```
-┌─ NEW USER VISITS SMARTATTEND
+┌─ NEW USER VISITS JJELOTECH
 │
 ├─ Clicks "Register"
 │

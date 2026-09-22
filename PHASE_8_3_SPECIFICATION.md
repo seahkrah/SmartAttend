@@ -8,7 +8,7 @@
 
 ## PHASE 8.3 DIRECTIVE
 
-SmartAttend operates as **infrastructure for institutional truth**. All remediation follows:
+JjeloTech operates as **infrastructure for institutional truth**. All remediation follows:
 
 - ✅ **Explicit rules over assumptions** — No implicit behavior
 - ✅ **Immutability over convenience** — Write-once semantics where possible

@@ -17,7 +17,7 @@ import {
   StudentFaceEnrollmentStatus,
   EnrollFaceResponse,
   VerifyFaceResponse,
-} from '@smartattend/types';
+} from '@jjelotech/types';
 
 // ===========================
 // DISTANCE CALCULATION

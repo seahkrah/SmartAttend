@@ -1,4 +1,4 @@
-# Quick Reference - SmartAttend Animations
+# Quick Reference - JjeloTech Animations
 
 ## 🎬 What Changed?
 

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Server time is now the authoritative clock for all SmartAttend operations. Client timestamps are detected, validated, and logged. Clock drift is classified by severity and can block attendance actions if it exceeds thresholds.
+Server time is now the authoritative clock for all JjeloTech operations. Client timestamps are detected, validated, and logged. Clock drift is classified by severity and can block attendance actions if it exceeds thresholds.
 
 ---
 

@@ -1,4 +1,4 @@
-# SmartAttend Root Dockerfile
+# JjeloTech Root Dockerfile
 # Multi-stage build for reproducibility
 
 FROM node:18-alpine AS builder

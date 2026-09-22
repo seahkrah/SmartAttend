@@ -9,7 +9,7 @@
 ## COMPLETED (Stage 1: Database Foundation)
 
 ### ✅ Specification Document
-- **File**: [PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md](c:\smartattend\PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md)
+- **File**: [PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md](c:\jjelotech\PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md)
 - **Scope**: 6 comprehensive requirements with implementation roadmap
 - **Core Principle**: "If attendance changes, the system must remember the lie it refused to tell"
 
@@ -276,10 +276,10 @@ What admin sees:
 
 | File | Status | Purpose |
 |------|--------|---------|
-| [PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md](c:\smartattend\PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md) | ✅ Created | Full specification document |
-| [013_attendance_reason_codes_and_rejection_logging.sql](c:\smartattend\apps\backend\src\db\migrations\013_attendance_reason_codes_and_rejection_logging.sql) | ✅ Created | Database migration with 3 new tables |
-| [attendance_reason_codes.sql](c:\smartattend\apps\backend\src\db\seeds\attendance_reason_codes.sql) | ✅ Created | Seed data: 22 reason codes |
-| [attendanceStateService.v2.ts](c:\smartattend\apps\backend\src\services\attendanceStateService.v2.ts) | ✅ Created | Enhanced service with rejection logging |
+| [PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md](c:\jjelotech\PHASE_10_ATTENDANCE_TRUTH_INTEGRITY_SPECIFICATION.md) | ✅ Created | Full specification document |
+| [013_attendance_reason_codes_and_rejection_logging.sql](c:\jjelotech\apps\backend\src\db\migrations\013_attendance_reason_codes_and_rejection_logging.sql) | ✅ Created | Database migration with 3 new tables |
+| [attendance_reason_codes.sql](c:\jjelotech\apps\backend\src\db\seeds\attendance_reason_codes.sql) | ✅ Created | Seed data: 22 reason codes |
+| [attendanceStateService.v2.ts](c:\jjelotech\apps\backend\src\services\attendanceStateService.v2.ts) | ✅ Created | Enhanced service with rejection logging |
 
 ---
 

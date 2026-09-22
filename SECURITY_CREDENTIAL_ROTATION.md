@@ -38,11 +38,42 @@ is the most serious item on this list.
 
 ### 1. Rotate the application accounts
 
-```bash
-cd apps/backend
-export DATABASE_URL=postgresql://...
-node scripts/rotate-credentials.mjs
+First make sure you have the script — it lives on the branch, so pull before
+running anything:
+
 ```
+git pull origin claude/exciting-noether-k86dbw
+cd apps\backend
+npm install
+```
+
+Then set `DATABASE_URL` in whatever shell you are using and run the script.
+
+**Windows, `cmd.exe`** — note `set`, not `export`, and no spaces around the `=`:
+
+```
+set DATABASE_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/smartattend
+node scripts\rotate-credentials.mjs --all
+```
+
+**Windows, PowerShell:**
+
+```
+$env:DATABASE_URL = "postgresql://postgres:YOURPASSWORD@localhost:5432/smartattend"
+node scripts\rotate-credentials.mjs --all
+```
+
+**macOS / Linux:**
+
+```bash
+export DATABASE_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/smartattend
+node scripts/rotate-credentials.mjs --all
+```
+
+Use the database name your deployment actually has: `smartattend` if you have
+not yet renamed it, `jjelotech_dev` or similar once you have. `#` is not a
+comment character in `cmd.exe`, so do not paste trailing notes onto the command
+line — they become arguments.
 
 Each account gets a fresh 144-bit random password and is flagged
 `must_reset_password`, so the holder must choose their own at next login. The
@@ -50,8 +81,10 @@ new passwords are written to `rotated-credentials-<timestamp>.txt` with mode
 `0600`; that name is gitignored. Send them over something other than this
 repository, then delete the file.
 
-Add `--all` to rotate every account in the database rather than only the seven
-known-leaked ones.
+`--all` rotates every account in the database. Without it, only the
+known-leaked addresses are rotated — but one entry in the credentials file was
+written as `joyneufville.com`, with no `@`, so that account's real address is
+unknown and only `--all` is certain to cover it.
 
 ### 2. Rotate the PostgreSQL passwords
 

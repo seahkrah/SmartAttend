@@ -8,12 +8,14 @@
  * This script issues a fresh random password for each affected account and
  * flags it so the holder is forced to choose their own at next login.
  *
- * Usage:
- *   cd apps/backend
- *   export DATABASE_URL=postgresql://...
- *   node scripts/rotate-credentials.mjs                 # rotate the known-leaked accounts
- *   node scripts/rotate-credentials.mjs --all           # rotate every account in the database
- *   node scripts/rotate-credentials.mjs a@b.com c@d.com # rotate specific addresses
+ * Usage (from apps/backend, with DATABASE_URL set):
+ *   bash        export DATABASE_URL=postgresql://...
+ *   cmd.exe     set DATABASE_URL=postgresql://...
+ *   PowerShell  $env:DATABASE_URL = "postgresql://..."
+ *
+ *   node scripts/rotate-credentials.mjs                  rotate the known-leaked accounts
+ *   node scripts/rotate-credentials.mjs --all            rotate every account in the database
+ *   node scripts/rotate-credentials.mjs a@b.com c@d.com  rotate specific addresses
  *
  * The new passwords are written to rotated-credentials-<timestamp>.txt in the
  * current directory. That filename is gitignored. Distribute the passwords
@@ -28,8 +30,18 @@ import { writeFileSync } from 'fs'
 const { Pool } = pg
 
 // Addresses whose passwords appeared in the committed credentials file.
+//
+// The .local addresses are listed under both domains on purpose: migration 024
+// moves them from @smartattend.local to @jjelotech.local, and a database that
+// has not run it yet still holds the old form. Whichever exists gets rotated;
+// the other is reported as not found, which is expected.
+//
+// The credentials file also listed a student as "joyneufville.com", with no @,
+// so the real address is unknown. Use --all to be sure that account is covered.
 const LEAKED_ACCOUNTS = [
+  'newadmin@smartattend.local',
   'newadmin@jjelotech.local',
+  'superadmin@smartattend.local',
   'superadmin@jjelotech.local',
   'praisekrah@gmail.com',
   'abrahamkrah@gmail.com',
@@ -54,7 +66,10 @@ function generatePassword() {
 
 async function main() {
   if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL is not set. Export it (or source your .env) before running this script.')
+    console.error('DATABASE_URL is not set. Set it before running this script:')
+    console.error('  bash        export DATABASE_URL=postgresql://...')
+    console.error('  cmd.exe     set DATABASE_URL=postgresql://...')
+    console.error('  PowerShell  $env:DATABASE_URL = "postgresql://..."')
     process.exit(1)
   }
 
@@ -68,6 +83,16 @@ async function main() {
   })
 
   try {
+    const { rows: colRows } = await pool.query(
+      `SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'must_reset_password'`
+    )
+    const hasResetFlag = colRows.length > 0
+    if (!hasResetFlag) {
+      console.log('Note: users.must_reset_password does not exist (migration 012 has not run).')
+      console.log('      Passwords will be rotated, but holders will not be forced to change them.\n')
+    }
+
     let targets
     if (rotateAll) {
       const { rows } = await pool.query('SELECT email FROM users ORDER BY email')
@@ -93,7 +118,7 @@ async function main() {
       const { rows } = await pool.query(
         `UPDATE users
             SET password_hash = $1,
-                must_reset_password = true,
+                ${hasResetFlag ? 'must_reset_password = true,' : ''}
                 updated_at = CURRENT_TIMESTAMP
           WHERE email = $2
       RETURNING email`,
@@ -122,7 +147,9 @@ async function main() {
       'JjeloTech — rotated credentials',
       `Generated ${new Date().toISOString()}`,
       '',
-      'Each account must change this password at next login (must_reset_password is set).',
+      hasResetFlag
+        ? 'Each account must change this password at next login (must_reset_password is set).'
+        : 'NOTE: must_reset_password does not exist in this database, so holders are NOT forced to change these.',
       'Send these over a channel that is not the git repository, then delete this file.',
       '',
       ...issued.map(({ email, password }) => `${email}  ${password}`),

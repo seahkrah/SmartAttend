@@ -5,6 +5,13 @@
 
 import { Router, Response } from 'express'
 import type { ExtendedRequest } from '../types/auth.js'
+import { authenticateToken } from '../auth/middleware.js'
+import {
+  resolveTenantContext,
+  requireTenant,
+  type ResolvedTenantContext,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
 import {
   correctSchoolAttendance,
   correctCorporateCheckin,
@@ -21,6 +28,33 @@ import {
 const router = Router()
 
 /**
+ * This router carried no authentication at all — not at the mount point, not
+ * on any route. Every handler read a role off req.user, which was always
+ * undefined, so the role check compared against '' and refused everyone: the
+ * whole corrections surface answered 403 and had never worked.
+ *
+ * Reviving it needed the scoping too. The service queried corrections by id
+ * alone, so once authentication existed an administrator of one school could
+ * have read, created and reverted another school's corrections — reasons,
+ * sign-offs and what each mark originally said.
+ */
+router.use(authenticateToken, resolveTenantContext, requireTenant)
+
+function ctxOf(req: ExtendedRequest): ResolvedTenantContext {
+  return (req as unknown as TenantRequest).ctx!
+}
+
+/**
+ * Roles are checked against the server-resolved role name, not a JWT claim
+ * the token need not carry.
+ */
+function lacksRole(req: ExtendedRequest, allowed: string[]): boolean {
+  const ctx = ctxOf(req)
+  if (ctx.isSuperadmin) return false
+  return !allowed.includes(ctx.roleName)
+}
+
+/**
  * POST /api/corrections/school/:attendanceId
  * Create immutable correction for school attendance
  * REQUIRED: correctionReason (min 10 chars), correctionType, at least one field to correct
@@ -29,8 +63,7 @@ router.post(
   '/school/:attendanceId',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'faculty', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'security_officer', 'faculty', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions to create correction',
@@ -75,9 +108,10 @@ router.post(
       }
 
       const correction = await correctSchoolAttendance(req.params.attendanceId, {
+        tenantId: ctxOf(req).tenantId!,
         correctionReason: req.body.correctionReason,
         correctionType: req.body.correctionType as CorrectionType,
-        correctedByUserId: (req.user as any)?.id,
+        correctedByUserId: ctxOf(req).userId,
         supportingEvidenceUrl: req.body.supportingEvidenceUrl,
         approvalNotes: req.body.approvalNotes,
         newStatus: req.body.newStatus,
@@ -107,8 +141,7 @@ router.post(
   '/corporate/:checkinId',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions to create correction',
@@ -133,9 +166,10 @@ router.post(
       }
 
       const correction = await correctCorporateCheckin(req.params.checkinId, {
+        tenantId: ctxOf(req).tenantId!,
         correctionReason: req.body.correctionReason,
         correctionType: req.body.correctionType as CorrectionType,
-        correctedByUserId: (req.user as any)?.id,
+        correctedByUserId: ctxOf(req).userId,
         supportingEvidenceUrl: req.body.supportingEvidenceUrl,
         approvalNotes: req.body.approvalNotes,
         newStatus: req.body.newStatus,
@@ -166,8 +200,7 @@ router.get(
   '/history/:recordId',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'faculty', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'security_officer', 'faculty', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions to view history',
@@ -176,7 +209,7 @@ router.get(
       }
 
       const recordType = (req.query.type as 'school_attendance' | 'corporate_checkins') || 'school_attendance'
-      const history = await getCorrectionHistory(req.params.recordId, recordType)
+      const history = await getCorrectionHistory(req.params.recordId, recordType, ctxOf(req).tenantId!)
 
       res.json({
         success: true,
@@ -208,8 +241,7 @@ router.post(
   '/:correctionId/revert',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Only administrators can revert corrections',
@@ -225,7 +257,12 @@ router.post(
         return
       }
 
-      await revertCorrection(req.params.correctionId, (req.user as any)?.id, req.body.revertReason)
+      await revertCorrection(
+        req.params.correctionId,
+        ctxOf(req).userId,
+        req.body.revertReason,
+        ctxOf(req).tenantId!
+      )
 
       res.json({
         success: true,
@@ -249,8 +286,7 @@ router.get(
   '/active',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions',
@@ -268,7 +304,8 @@ router.get(
 
       const corrections = await getActiveCorrections(
         req.query.startDate as string,
-        req.query.endDate as string
+        req.query.endDate as string,
+        ctxOf(req).tenantId!
       )
 
       res.json({
@@ -299,8 +336,7 @@ router.get(
   '/statistics',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions',
@@ -308,7 +344,7 @@ router.get(
         return
       }
 
-      const stats = await getCorrectionStatistics(req.query.date as string)
+      const stats = await getCorrectionStatistics(ctxOf(req).tenantId!, req.query.date as string)
 
       res.json({
         success: true,
@@ -332,8 +368,7 @@ router.get(
   '/by-type/:correctionType',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions',
@@ -352,7 +387,8 @@ router.get(
       const corrections = await getCorrectionsByType(
         req.params.correctionType as CorrectionType,
         req.query.startDate as string,
-        req.query.endDate as string
+        req.query.endDate as string,
+        ctxOf(req).tenantId!
       )
 
       res.json({
@@ -380,8 +416,7 @@ router.get(
   '/audit-trail',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'security_officer', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions',
@@ -399,7 +434,8 @@ router.get(
 
       const trail = await getFullCorrectionAuditTrail(
         req.query.startDate as string,
-        req.query.endDate as string
+        req.query.endDate as string,
+        ctxOf(req).tenantId!
       )
 
       res.json({
@@ -433,8 +469,7 @@ router.get(
   '/compliance/silent-corrections',
   async (req: ExtendedRequest, res: Response) => {
     try {
-      const userRole = (req.user as any)?.role || ''
-      if (!['admin', 'superadmin'].includes(userRole)) {
+      if (lacksRole(req, ['admin', 'superadmin'])) {
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions',
@@ -452,7 +487,8 @@ router.get(
 
       const validation = await validateNoSilentCorrections(
         req.query.startDate as string,
-        req.query.endDate as string
+        req.query.endDate as string,
+        ctxOf(req).tenantId!
       )
 
       res.json({

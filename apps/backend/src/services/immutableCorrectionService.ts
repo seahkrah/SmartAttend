@@ -2,6 +2,13 @@
  * PHASE 6, STEP 6.2: Immutable Correction History Service
  * Non-destructive attendance corrections with visible audit trail
  * Core Principle: Silent corrections are prohibited
+ *
+ * Every function takes the caller's tenant. Before this, none did: a
+ * correction was created against whatever attendance id arrived, the history
+ * and statistics read across every school, and a correction belonging to one
+ * school could be reverted by an administrator of another. A correction trail
+ * carries reasons, sign-offs and what a mark originally said, which is
+ * precisely the material that must not cross a tenant boundary.
  */
 
 import { query } from '../db/connection.js'
@@ -22,6 +29,8 @@ export interface CorrectionRequest {
   correctionReason: string
   correctionType: CorrectionType
   correctedByUserId: string
+  /** Server-resolved. Never taken from the request body. */
+  tenantId: string
   supportingEvidenceUrl?: string
   approvalNotes?: string
   
@@ -62,9 +71,12 @@ export async function correctSchoolAttendance(
     }
 
     // Get current attendance record (preserve original values)
+    // The record must be this tenant's. A record belonging to another school
+    // reads as absent, so an id cannot be probed for existence.
     const attendanceResult = await query(
-      `SELECT id, status, attendance_state, face_verified FROM school_attendance WHERE id = $1`,
-      [attendanceId]
+      `SELECT id, status, attendance_state, face_verified
+         FROM school_attendance WHERE id = $1 AND tenant_id = $2`,
+      [attendanceId, request.tenantId]
     )
 
     if (attendanceResult.rows.length === 0) {
@@ -88,8 +100,9 @@ export async function correctSchoolAttendance(
         correction_type,
         corrected_by_user_id,
         supporting_evidence_url,
-        approval_notes
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        approval_notes,
+        tenant_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING id, correction_timestamp`,
       [
         attendanceId,
@@ -105,6 +118,7 @@ export async function correctSchoolAttendance(
         request.correctedByUserId,
         request.supportingEvidenceUrl || null,
         request.approvalNotes || null,
+        request.tenantId,
       ]
     )
 
@@ -113,9 +127,9 @@ export async function correctSchoolAttendance(
 
     // Log correction in audit log (for meta-tracking)
     await query(
-      `INSERT INTO correction_audit_log (correction_id, action, actor_user_id, action_notes)
-       VALUES ($1, 'created', $2, $3)`,
-      [correctionId, request.correctedByUserId, `Type: ${request.correctionType}`]
+      `INSERT INTO correction_audit_log (correction_id, action, actor_user_id, action_notes, tenant_id)
+       VALUES ($1, 'created', $2, $3, $4)`,
+      [correctionId, request.correctedByUserId, `Type: ${request.correctionType}`, request.tenantId]
     )
 
     // Get user info for response
@@ -169,8 +183,9 @@ export async function correctCorporateCheckin(
 
     // Get current record
     const checkinResult = await query(
-      `SELECT id, face_verified, checkin_state FROM corporate_checkins WHERE id = $1`,
-      [checkinId]
+      `SELECT id, face_verified, checkin_state
+         FROM corporate_checkins WHERE id = $1 AND tenant_id = $2`,
+      [checkinId, request.tenantId]
     )
 
     if (checkinResult.rows.length === 0) {
@@ -192,8 +207,9 @@ export async function correctCorporateCheckin(
         correction_type,
         corrected_by_user_id,
         supporting_evidence_url,
-        approval_notes
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        approval_notes,
+        tenant_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id, correction_timestamp`,
       [
         checkinId,
@@ -207,6 +223,7 @@ export async function correctCorporateCheckin(
         request.correctedByUserId,
         request.supportingEvidenceUrl || null,
         request.approvalNotes || null,
+        request.tenantId,
       ]
     )
 
@@ -215,9 +232,9 @@ export async function correctCorporateCheckin(
 
     // Log in audit
     await query(
-      `INSERT INTO correction_audit_log (correction_id, action, actor_user_id, action_notes)
-       VALUES ($1, 'created', $2, $3)`,
-      [correctionId, request.correctedByUserId, `Type: ${request.correctionType}`]
+      `INSERT INTO correction_audit_log (correction_id, action, actor_user_id, action_notes, tenant_id)
+       VALUES ($1, 'created', $2, $3, $4)`,
+      [correctionId, request.correctedByUserId, `Type: ${request.correctionType}`, request.tenantId]
     )
 
     const userResult = await query('SELECT email FROM users WHERE id = $1', [request.correctedByUserId])
@@ -255,14 +272,15 @@ export async function correctCorporateCheckin(
  */
 export async function getCorrectionHistory(
   attendanceRecordId: string,
-  recordType: RecordType
+  recordType: RecordType,
+  tenantId: string
 ): Promise<any[]> {
   try {
     const result = await query(
       `SELECT * FROM attendance_corrections 
-       WHERE attendance_record_id = $1 AND record_type = $2 
+       WHERE attendance_record_id = $1 AND record_type = $2 AND tenant_id = $3
        ORDER BY correction_timestamp DESC`,
-      [attendanceRecordId, recordType]
+      [attendanceRecordId, recordType, tenantId]
     )
     return result.rows
   } catch (error) {
@@ -278,29 +296,37 @@ export async function getCorrectionHistory(
 export async function revertCorrection(
   correctionId: string,
   revertedByUserId: string,
-  revertReason: string
+  revertReason: string,
+  tenantId: string
 ): Promise<void> {
   try {
     if (!revertReason || revertReason.trim().length < 10) {
       throw new Error('Revert reason must be at least 10 characters')
     }
 
-    // Mark correction as reverted (immutable, cannot undo)
-    await query(
+    // Scoped, and RETURNING tells us whether anything was reverted. Without
+    // it the call succeeded silently against another school's correction, or
+    // against one already reverted, and said nothing either way.
+    const reverted = await query(
       `UPDATE attendance_corrections 
        SET is_reverted = true, 
            reverted_by_user_id = $1, 
            reverted_at = CURRENT_TIMESTAMP,
            revert_reason = $2
-       WHERE id = $3 AND is_reverted = false`,
-      [revertedByUserId, revertReason, correctionId]
+       WHERE id = $3 AND tenant_id = $4 AND is_reverted = false
+       RETURNING id`,
+      [revertedByUserId, revertReason, correctionId, tenantId]
     )
+
+    if (reverted.rows.length === 0) {
+      throw new Error(`Correction ${correctionId} not found or already reverted`)
+    }
 
     // Log revert in audit log
     await query(
-      `INSERT INTO correction_audit_log (correction_id, action, actor_user_id, action_notes)
-       VALUES ($1, 'reverted', $2, $3)`,
-      [correctionId, revertedByUserId, revertReason]
+      `INSERT INTO correction_audit_log (correction_id, action, actor_user_id, action_notes, tenant_id)
+       VALUES ($1, 'reverted', $2, $3, $4)`,
+      [correctionId, revertedByUserId, revertReason, tenantId]
     )
 
     console.log(`[CORRECTION] Correction ${correctionId} reverted: ${revertReason}`)
@@ -315,14 +341,16 @@ export async function revertCorrection(
  */
 export async function getActiveCorrections(
   startDate: string,
-  endDate: string
+  endDate: string,
+  tenantId: string
 ): Promise<any[]> {
   try {
     const result = await query(
       `SELECT * FROM attendance_correction_trail 
-       WHERE status = 'ACTIVE' AND correction_timestamp >= $1 AND correction_timestamp <= $2
+       WHERE status = 'ACTIVE' AND tenant_id = $3
+         AND correction_timestamp >= $1 AND correction_timestamp <= $2
        ORDER BY correction_timestamp DESC`,
-      [startDate, endDate]
+      [startDate, endDate, tenantId]
     )
     return result.rows
   } catch (error) {
@@ -334,14 +362,16 @@ export async function getActiveCorrections(
 /**
  * Get correction statistics
  */
-export async function getCorrectionStatistics(date?: string): Promise<any[]> {
+export async function getCorrectionStatistics(tenantId: string, date?: string): Promise<any[]> {
   try {
-    let query_text = `SELECT * FROM correction_statistics`
-    const params: any[] = []
+    // The tenant predicate is written first so the optional date filter
+    // cannot displace it.
+    let query_text = `SELECT * FROM correction_statistics WHERE tenant_id = $1`
+    const params: any[] = [tenantId]
 
     if (date) {
-      query_text += ` WHERE correction_date = $1`
       params.push(date)
+      query_text += ` AND correction_date = $${params.length}`
     }
 
     const result = await query(query_text, params)
@@ -358,16 +388,18 @@ export async function getCorrectionStatistics(date?: string): Promise<any[]> {
 export async function getCorrectionsByType(
   correctionType: CorrectionType,
   startDate: string,
-  endDate: string
+  endDate: string,
+  tenantId: string
 ): Promise<any[]> {
   try {
     const result = await query(
       `SELECT * FROM attendance_correction_trail 
        WHERE correction_type = $1 
+       AND tenant_id = $4
        AND correction_timestamp >= $2 
        AND correction_timestamp <= $3
        ORDER BY correction_timestamp DESC`,
-      [correctionType, startDate, endDate]
+      [correctionType, startDate, endDate, tenantId]
     )
     return result.rows
   } catch (error) {
@@ -381,14 +413,15 @@ export async function getCorrectionsByType(
  */
 export async function getFullCorrectionAuditTrail(
   startDate: string,
-  endDate: string
+  endDate: string,
+  tenantId: string
 ): Promise<any[]> {
   try {
     const result = await query(
       `SELECT * FROM attendance_correction_trail 
-       WHERE correction_timestamp >= $1 AND correction_timestamp <= $2
+       WHERE tenant_id = $3 AND correction_timestamp >= $1 AND correction_timestamp <= $2
        ORDER BY correction_timestamp DESC`,
-      [startDate, endDate]
+      [startDate, endDate, tenantId]
     )
     return result.rows
   } catch (error) {
@@ -402,7 +435,8 @@ export async function getFullCorrectionAuditTrail(
  */
 export async function validateNoSilentCorrections(
   startDate: string,
-  endDate: string
+  endDate: string,
+  tenantId: string
 ): Promise<{
   isSilentCorrectionFree: boolean
   recordsWithoutReason: number
@@ -411,10 +445,11 @@ export async function validateNoSilentCorrections(
   try {
     const result = await query(
       `SELECT * FROM attendance_corrections 
-       WHERE correction_timestamp >= $1 
+       WHERE tenant_id = $3
+       AND correction_timestamp >= $1 
        AND correction_timestamp <= $2
        AND (correction_reason IS NULL OR correction_reason = '')`,
-      [startDate, endDate]
+      [startDate, endDate, tenantId]
     )
 
     return {

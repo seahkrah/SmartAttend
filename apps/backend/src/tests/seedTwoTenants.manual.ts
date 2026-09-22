@@ -28,6 +28,17 @@ async function main() {
   await query(`ALTER TABLE audit_access_log DISABLE TRIGGER USER`)
   await query(`DELETE FROM audit_access_log WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`ALTER TABLE audit_access_log ENABLE TRIGGER USER`)
+  // Corrections reference the attendance rows they amend and the person who
+  // made them, so they go before both. They are immutable for the same reason
+  // audit_logs is — a correction trail that can be deleted proves nothing — so
+  // the fixture suspends that guard for its own cleanup rather than weakening
+  // it, exactly as it does above.
+  await query(`ALTER TABLE correction_audit_log DISABLE TRIGGER USER`)
+  await query(`DELETE FROM correction_audit_log WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`ALTER TABLE correction_audit_log ENABLE TRIGGER USER`)
+  await query(`ALTER TABLE attendance_corrections DISABLE TRIGGER USER`)
+  await query(`DELETE FROM attendance_corrections WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`ALTER TABLE attendance_corrections ENABLE TRIGGER USER`)
   await query(`DELETE FROM attendance_submissions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM school_attendance WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   // Face templates and their verification attempts hang off students and

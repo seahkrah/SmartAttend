@@ -9,6 +9,24 @@ async function main() {
   const facRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='faculty'`, [sp.id])).rows[0]
 
   // Order matters: children before parents.
+  // The attendance audit trigger writes audit_logs rows referencing these
+  // users, and that foreign key is RESTRICT by design — an audit trail should
+  // outlive the record it describes. audit_logs is also immutable (008_5), so
+  // deletion is refused outright.
+  //
+  // Both behaviours are correct and worth keeping. A fixture reset therefore
+  // suspends the immutability trigger for the length of its own cleanup rather
+  // than weakening either guarantee. This runs only against a throwaway
+  // verification database.
+  await query(`ALTER TABLE audit_logs DISABLE TRIGGER USER`)
+  await query(`DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
+  await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)
+  await query(`DELETE FROM attendance_submissions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM school_attendance WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM student_courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM students WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM class_schedules WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM rooms WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM faculty_courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM faculty WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM school_user_associations WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
@@ -19,13 +37,13 @@ async function main() {
   await query(`DELETE FROM school_entities WHERE code LIKE 'E2E-%'`)
   await query(`DELETE FROM tenants WHERE code LIKE 'E2E-%'`)
 
+  const hash = await bcrypt.hash('Passw0rd!x', 10)
   const out: any = {}
   for (const tag of ['A', 'B']) {
     const ent = (await query(
       `INSERT INTO school_entities (name, code, email, is_active) VALUES ($1,$2,$3,true) RETURNING id`,
       [`E2E School ${tag}`, `E2E-${tag}`, `${tag.toLowerCase()}@e2e.test`])).rows[0]
     // trigger syncs tenants
-    const hash = await bcrypt.hash('Passw0rd!x', 10)
     const admin = (await query(
       `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
        VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
@@ -58,9 +76,39 @@ async function main() {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
       [fuser.id, `EMP-${tag}`, 'Fac', tag, 'Computing', `fac.${tag.toLowerCase()}@e2e.test`, dept.id, ent.id])).rows[0]
 
+    // a room, schedule and two enrolled students, so a register exists
+    const room = (await query(
+      `INSERT INTO rooms (building, room_number, capacity, tenant_id) VALUES ($1,$2,30,$3) RETURNING id`,
+      [`Block ${tag}`, `R-${tag}`, ent.id])).rows[0]
+    const sched = (await query(
+      `INSERT INTO class_schedules (course_id, room_id, faculty_id, day_of_week, start_time, end_time, tenant_id)
+       VALUES ($1,$2,$3,1,'10:00','11:30',$4) RETURNING id`,
+      [course.id, room.id, fac.id, ent.id])).rows[0]
+    await query(`INSERT INTO faculty_courses (faculty_id, course_id, tenant_id) VALUES ($1,$2,$3)`,
+      [fac.id, course.id, ent.id])
+
+    const studentIds: string[] = []
+    for (let i = 1; i <= 2; i++) {
+      const su = (await query(
+        `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
+         VALUES ($1,$2,$3,(SELECT id FROM roles WHERE platform_id=$1 AND name='student'),$4,true) RETURNING id`,
+        [sp.id, `stu${i}.${tag.toLowerCase()}@e2e.test`, `Stu${i} ${tag}`, hash])).rows[0]
+      await query(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1,$2,'active')`,
+        [su.id, ent.id])
+      const st = (await query(
+        `INSERT INTO students (user_id, student_id, first_name, last_name, college, email, status, enrollment_year, platform_id, department_id, tenant_id)
+         VALUES ($1,$2,$3,$4,'Computing',$5,'active',2026,$6,$7,$8) RETURNING id`,
+        [su.id, `S-${tag}${i}`, `Stu${i}`, tag, `stu${i}.${tag.toLowerCase()}@e2e.test`, sp.id, dept.id, ent.id])).rows[0]
+      studentIds.push(st.id)
+      await query(`INSERT INTO student_courses (schedule_id, student_id, is_active, tenant_id) VALUES ($1,$2,true,$3)`,
+        [sched.id, st.id, ent.id])
+    }
+
     out[tag] = {
       tenantId: ent.id, deptId: dept.id, semId: sem.id, courseId: course.id, facultyId: fac.id,
+      scheduleId: sched.id, students: studentIds,
       token: generateAccessToken(admin.id, sp.id, adminRole.id),
+      facToken: generateAccessToken(fuser.id, sp.id, facRole.id),
     }
   }
   console.log(JSON.stringify(out))

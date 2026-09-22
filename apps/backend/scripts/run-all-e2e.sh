@@ -8,7 +8,7 @@ mkdir -p "$SP"
 npx tsx src/tests/seedTwoTenants.manual.ts 2>/dev/null | grep -E '^\{' > "$SP/seed.json"
 npx tsx src/tests/seedCorporate.manual.ts 2>/dev/null | grep -E '^\{' > "$SP/corp.json"
 fail=0
-for suite in adminApi hrApi attendanceApi; do
+for suite in adminApi hrApi attendanceApi facultyApi; do
   echo "=== $suite ==="
   python3 "src/tests/${suite}.e2e.py" || fail=1
 done

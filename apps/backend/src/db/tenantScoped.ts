@@ -42,6 +42,7 @@ export const TENANT_OWNED_TABLES = new Set([
   'notification_campaigns',
   'notifications',
   'attendance_discrepancy_reports',
+  'attendance_submissions',
 ])
 
 /** Which platform a tenant-owned table belongs to. */
@@ -57,6 +58,7 @@ const TABLE_PLATFORM: Record<string, 'school' | 'corporate'> = {
   student_courses: 'school',
   faculty_courses: 'school',
   course_sessions: 'school',
+  attendance_submissions: 'school',
   employees: 'corporate',
   corporate_departments: 'corporate',
   corporate_checkins: 'corporate',

@@ -26,6 +26,7 @@ import adminTenantRoutes from './routes/adminTenant.js'
 import hrRoutes from './routes/hr.js'
 import attendanceSelfServiceRoutes from './routes/attendanceSelfService.js'
 import facultyRoutes from './routes/faculty.js'
+import facultyWorkflowRoutes from './routes/facultyWorkflow.js'
 import studentRoutes from './routes/student.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
 import auditRoutes from './routes/audit.js'
@@ -98,6 +99,9 @@ app.use('/api/admin', adminTenantRoutes)
 // EMS — HR command centre. Platform-gated to corporate inside the router.
 app.use('/api/hr', hrRoutes)
 app.use('/api/admin', enforceTenantBoundaries, tenantAdminRoutes)
+// Attendance lifecycle (draft/submit/lock/export/bulk-edit/facial-match/qr).
+// Mounted first; the original faculty router keeps its own paths.
+app.use('/api/faculty', facultyWorkflowRoutes)
 app.use('/api/faculty', enforceTenantBoundaries, facultyRoutes)
 app.use('/api/student', enforceTenantBoundaries, studentRoutes)
 app.use('/api/face', enforceTenantBoundaries, faceVerificationRoutes)

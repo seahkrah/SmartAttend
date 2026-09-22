@@ -1,44 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Semantic surface tokens.
+ *
+ * Components reference these rather than raw palette steps, so a screen renders
+ * correctly in either theme without conditional classes. Raw `brand-*`,
+ * `accent-*` and `ink-*` are still available where a specific value is wanted.
+ *
+ * The `dark` class on <html> is set by ThemeProvider.
+ */
 @layer base {
+  :root {
+    /* Light — admin and record surfaces */
+    --surface-page: 242 244 249; /* ink-100  */
+    --surface-card: 255 255 255;
+    --surface-sunken: 238 241 247; /* ink-200  */
+    --surface-raised: 255 255 255;
+    --border-subtle: 230 234 242; /* ink-250  */
+    --border-strong: 224 229 238; /* ink-300  */
+    --text-primary: 16 24 40; /* ink-900  */
+    --text-secondary: 71 84 103; /* ink-700  */
+    --text-muted: 102 112 133; /* ink-550  */
+    --text-inverse: 255 255 255;
+  }
+
+  .dark {
+    /* Dark — capture, auth, superadmin, marketing */
+    --surface-page: 11 18 32; /* ink-950  */
+    --surface-card: 16 24 40; /* ink-900  */
+    --surface-sunken: 8 14 26;
+    --surface-raised: 24 34 54;
+    --border-subtle: 32 43 66;
+    --border-strong: 45 59 86;
+    --text-primary: 255 255 255;
+    --text-secondary: 169 183 205; /* ink-400  */
+    --text-muted: 127 143 171; /* ink-500  */
+    --text-inverse: 16 24 40;
+  }
+
   html {
     scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-slate-100;
+    background-color: rgb(var(--surface-page));
+    color: rgb(var(--text-primary));
+    font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .bg-page {
+    background-color: rgb(var(--surface-page));
+  }
+  .bg-card {
+    background-color: rgb(var(--surface-card));
+  }
+  .bg-sunken {
+    background-color: rgb(var(--surface-sunken));
+  }
+  .bg-raised {
+    background-color: rgb(var(--surface-raised));
+  }
+  .border-subtle {
+    border-color: rgb(var(--border-subtle));
+  }
+  .border-strong {
+    border-color: rgb(var(--border-strong));
+  }
+  .text-primary {
+    color: rgb(var(--text-primary));
+  }
+  .text-secondary {
+    color: rgb(var(--text-secondary));
+  }
+  .text-muted {
+    color: rgb(var(--text-muted));
+  }
+  .text-inverse {
+    color: rgb(var(--text-inverse));
   }
 }
 
 @layer components {
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-150
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/40 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
   .btn-primary {
-    @apply px-6 py-2.5 bg-gradient-to-r from-primary-500 to-secondary-600 hover:from-primary-600 hover:to-secondary-700 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-glow;
+    @apply btn bg-brand-600 hover:bg-brand-700 text-white;
   }
-
+  /* Orange: primary actions on dark surfaces, per the mockups. */
+  .btn-accent {
+    @apply btn bg-accent-500 hover:bg-accent-600 text-ink-900;
+  }
   .btn-secondary {
-    @apply px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all duration-300 shadow-soft;
+    @apply btn bg-card border border-strong text-primary hover:bg-sunken;
+  }
+  .btn-ghost {
+    @apply btn text-secondary hover:bg-sunken;
+  }
+  .btn-danger {
+    @apply btn bg-danger-600 hover:bg-danger-700 text-white;
   }
 
-  .btn-outline {
-    @apply px-6 py-2.5 border-2 border-primary-500 text-primary-400 hover:bg-primary-500/10 font-semibold rounded-lg transition-all duration-300;
-  }
-
+  /* ── Surfaces ────────────────────────────────────────────────────────── */
+  /* Padding is part of .card: 20 existing usages rely on it. */
   .card {
-    @apply bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6 shadow-soft hover:shadow-lg transition-all duration-300;
+    @apply bg-card border border-subtle rounded-xl shadow-card p-5;
+  }
+  .card-flush {
+    @apply bg-card border border-subtle rounded-xl shadow-card;
   }
 
+  /* ── Forms ───────────────────────────────────────────────────────────── */
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wide text-muted mb-1.5;
+  }
   .input-field {
-    @apply w-full px-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 transition-all duration-300;
+    @apply w-full px-3.5 py-2.5 bg-card border border-strong rounded-lg text-primary text-sm
+           placeholder:text-muted focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20
+           transition-colors duration-150;
   }
 
+  /* ── Badges ──────────────────────────────────────────────────────────── */
+  /* The bare .badge carries a neutral fill so the 37 existing usages keep an
+     appearance; the variants below override it. */
   .badge {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-primary-500/20 text-primary-300 border border-primary-500/30;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold
+           bg-sunken text-secondary;
+  }
+  .badge-neutral {
+    @apply badge;
+  }
+  .badge-brand {
+    @apply badge bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300;
+  }
+  .badge-success {
+    @apply badge bg-success-50 text-success-700 dark:bg-success-700/20 dark:text-success-300;
+  }
+  .badge-warning {
+    @apply badge bg-accent-50 text-accent-800 dark:bg-accent-500/15 dark:text-accent-300;
+  }
+  .badge-danger {
+    @apply badge bg-danger-50 text-danger-600 dark:bg-danger-600/20 dark:text-danger-400;
   }
 
+  /* ── Navigation ──────────────────────────────────────────────────────── */
+  .nav-group-label {
+    @apply px-3 pt-5 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted;
+  }
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-secondary
+           hover:bg-sunken transition-colors duration-150;
+  }
+  .nav-item-active {
+    @apply nav-item bg-brand-600 text-white hover:bg-brand-600;
+  }
+  /* The EMS platform marks its active item in orange. */
+  .nav-item-active-accent {
+    @apply nav-item bg-accent-500 text-ink-900 hover:bg-accent-500;
+  }
+
+  /* Kept until the pages are restyled — see DESIGN_AUDIT.md step 4. */
+  .btn-outline {
+    @apply btn border-2 border-brand-600 text-brand-600 hover:bg-brand-600/10;
+  }
   .text-gradient {
-    @apply bg-gradient-to-r from-primary-400 to-secondary-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent;
   }
 }
 

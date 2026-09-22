@@ -37,6 +37,7 @@ async function main() {
       [`Operations ${tag}`, `OPS${tag}`, cp.id, ent.id])).rows[0]
 
     const empIds: string[] = []
+    let firstEmpUserId: string | null = null
     for (let i = 1; i <= 3; i++) {
       const eu = (await query(
         `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
@@ -49,6 +50,7 @@ async function main() {
          VALUES ($1,$2,$3,$4,$5,'000',$6,'2025-01-01',true,$7) RETURNING id`,
         [eu.id, `E-${tag}${i}`, `Emp${i}`, tag, `emp${i}.${tag.toLowerCase()}@c2e.test`, dept.id, ent.id])).rows[0]
       empIds.push(emp.id)
+      if (i === 1) firstEmpUserId = eu.id
       // employee 1 attends a lot, 2 some, 3 none -> distinct bands and patterns
       const n = i === 1 ? 28 : i === 2 ? 12 : 0
       for (let d = 0; d < n; d++) {
@@ -62,6 +64,8 @@ async function main() {
     out[tag] = {
       tenantId: ent.id, deptId: dept.id, employees: empIds,
       token: generateAccessToken(hr.id, cp.id, hrRole.id),
+      empToken: generateAccessToken(firstEmpUserId!, cp.id, empRole.id),
+      empId: empIds[0],
     }
   }
   console.log(JSON.stringify(out))

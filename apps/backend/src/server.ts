@@ -24,6 +24,7 @@ import validationRoutes from './routes/validation.js'
 import tenantAdminRoutes from './routes/tenantAdmin.js'
 import adminTenantRoutes from './routes/adminTenant.js'
 import hrRoutes from './routes/hr.js'
+import attendanceSelfServiceRoutes from './routes/attendanceSelfService.js'
 import facultyRoutes from './routes/faculty.js'
 import studentRoutes from './routes/student.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
@@ -72,6 +73,9 @@ app.use('/api/auth', authRoutes)
 // This ensures all tenant-facing data access is automatically filtered by platform/tenant.
 app.use('/api/school', enforceTenantBoundaries, schoolRoutes)
 app.use('/api/corporate', enforceTenantBoundaries, corporateRoutes)
+// Self-service and department views. Mounted first; the original attendance
+// router keeps /sessions, /face and /mark-with-face, whose paths do not clash.
+app.use('/api/attendance', attendanceSelfServiceRoutes)
 app.use('/api/attendance', enforceTenantBoundaries, attendanceRoutes)
 app.use('/api/users', enforceTenantBoundaries, userRoutes)
 app.use('/api/metrics', enforceTenantBoundaries, metricsRoutes)

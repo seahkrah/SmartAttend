@@ -18,6 +18,15 @@ import correctionsRoutes from './routes/corrections.js'
 import metricsRoutes from './routes/metrics.js'
 import simulationsRoutes from './routes/simulations.js'
 import validationRoutes from './routes/validation.js'
+// Present in src/index.ts but previously missing here, which is why every
+// /api/faculty, /api/student, /api/admin, /api/face, /api/audit and /api/time
+// request 404'd against the server that actually runs.
+import tenantAdminRoutes from './routes/tenantAdmin.js'
+import facultyRoutes from './routes/faculty.js'
+import studentRoutes from './routes/student.js'
+import faceVerificationRoutes from './routes/faceVerification.js'
+import auditRoutes from './routes/audit.js'
+import timeRoutes from './routes/time.js'
 import {
   apiLatencyTrackingMiddleware,
   tenantIdExtractorMiddleware,
@@ -73,6 +82,15 @@ app.use('/api/incidents', incidentsRoutes)
 app.use('/api/admin/incidents', incidentAdminRoutes)
 app.use('/api/corrections', correctionsRoutes)
 app.use('/api/validation', validationRoutes)
+
+// Role portals and shared services. /api/admin is mounted after
+// /api/admin/incidents above so the more specific path keeps priority.
+app.use('/api/admin', enforceTenantBoundaries, tenantAdminRoutes)
+app.use('/api/faculty', enforceTenantBoundaries, facultyRoutes)
+app.use('/api/student', enforceTenantBoundaries, studentRoutes)
+app.use('/api/face', enforceTenantBoundaries, faceVerificationRoutes)
+app.use('/api/audit', auditRoutes)
+app.use('/api/time', timeRoutes)
 
 // Error handling middleware (MUST be last)
 app.use(errorToIncidentHandler)

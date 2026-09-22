@@ -1,0 +1,68 @@
+/** Seeds two school tenants with an admin each, and prints their JWTs. */
+import { query } from '../db/connection.js'
+import { generateAccessToken } from '../auth/authService.js'
+import bcrypt from 'bcryptjs'
+
+async function main() {
+  const sp = (await query(`SELECT id FROM platforms WHERE name='school'`)).rows[0]
+  const adminRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='admin'`, [sp.id])).rows[0]
+  const facRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='faculty'`, [sp.id])).rows[0]
+
+  // Order matters: children before parents.
+  await query(`DELETE FROM faculty_courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM faculty WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM school_user_associations WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
+  await query(`DELETE FROM courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM semesters WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM school_departments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM users WHERE email LIKE '%@e2e.test'`)
+  await query(`DELETE FROM school_entities WHERE code LIKE 'E2E-%'`)
+  await query(`DELETE FROM tenants WHERE code LIKE 'E2E-%'`)
+
+  const out: any = {}
+  for (const tag of ['A', 'B']) {
+    const ent = (await query(
+      `INSERT INTO school_entities (name, code, email, is_active) VALUES ($1,$2,$3,true) RETURNING id`,
+      [`E2E School ${tag}`, `E2E-${tag}`, `${tag.toLowerCase()}@e2e.test`])).rows[0]
+    // trigger syncs tenants
+    const hash = await bcrypt.hash('Passw0rd!x', 10)
+    const admin = (await query(
+      `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
+       VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+      [sp.id, `admin.${tag.toLowerCase()}@e2e.test`, `Admin ${tag}`, adminRole.id, hash])).rows[0]
+    await query(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1,$2,'active')`,
+      [admin.id, ent.id])
+
+    const dept = (await query(
+      `INSERT INTO school_departments (name, code, platform_id, tenant_id)
+       VALUES ($1,$2,$3,$4) RETURNING id`,
+      [`Computing ${tag}`, `CMP${tag}`, sp.id, ent.id])).rows[0]
+    const sem = (await query(
+      `INSERT INTO semesters (department_id, name, start_date, end_date, is_active, tenant_id)
+       VALUES ($1,$2,'2026-01-01','2026-06-30',true,$3) RETURNING id`,
+      [dept.id, `Semester I ${tag}`, ent.id])).rows[0]
+    const course = (await query(
+      `INSERT INTO courses (department_id, semester_id, code, name, tenant_id)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [dept.id, sem.id, `CSC-${tag}`, `Course ${tag}`, ent.id])).rows[0]
+
+    // a faculty member for assign-faculty
+    const fuser = (await query(
+      `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
+       VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+      [sp.id, `fac.${tag.toLowerCase()}@e2e.test`, `Faculty ${tag}`, facRole.id, hash])).rows[0]
+    await query(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1,$2,'active')`,
+      [fuser.id, ent.id])
+    const fac = (await query(
+      `INSERT INTO faculty (user_id, employee_id, first_name, last_name, college, email, department_id, tenant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [fuser.id, `EMP-${tag}`, 'Fac', tag, 'Computing', `fac.${tag.toLowerCase()}@e2e.test`, dept.id, ent.id])).rows[0]
+
+    out[tag] = {
+      tenantId: ent.id, deptId: dept.id, semId: sem.id, courseId: course.id, facultyId: fac.id,
+      token: generateAccessToken(admin.id, sp.id, adminRole.id),
+    }
+  }
+  console.log(JSON.stringify(out))
+}
+main().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})

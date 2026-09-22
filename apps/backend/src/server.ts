@@ -22,6 +22,7 @@ import validationRoutes from './routes/validation.js'
 // /api/faculty, /api/student, /api/admin, /api/face, /api/audit and /api/time
 // request 404'd against the server that actually runs.
 import tenantAdminRoutes from './routes/tenantAdmin.js'
+import adminTenantRoutes from './routes/adminTenant.js'
 import facultyRoutes from './routes/faculty.js'
 import studentRoutes from './routes/student.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
@@ -85,6 +86,10 @@ app.use('/api/validation', validationRoutes)
 
 // Role portals and shared services. /api/admin is mounted after
 // /api/admin/incidents above so the more specific path keeps priority.
+// Tenant-scoped admin API (users, courses, approvals, analytics, export).
+// Mounted before tenantAdminRoutes, whose paths are /school/* and /corporate/*
+// and so do not overlap.
+app.use('/api/admin', adminTenantRoutes)
 app.use('/api/admin', enforceTenantBoundaries, tenantAdminRoutes)
 app.use('/api/faculty', enforceTenantBoundaries, facultyRoutes)
 app.use('/api/student', enforceTenantBoundaries, studentRoutes)

@@ -13,17 +13,33 @@
 import { Router, Request, Response } from 'express'
 import { query } from '../db/connection.js'
 import { authenticateToken } from '../auth/middleware.js'
+import {
+  resolveTenantContext,
+  requireTenant,
+  requirePlatform,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
 
 const router = Router()
 
-// ── Helper: Get student record from authenticated user ──
-async function getStudentFromUser(userId: string) {
+/**
+ * Every route here serves the caller their own record, so the data is already
+ * confined by the authenticated identity. The tenant context is resolved all
+ * the same: it keeps the platform gate honest (a corporate identity has no
+ * business in the student portal) and it means the scope is enforced rather
+ * than merely implied by how the student row happens to be looked up.
+ */
+router.use(authenticateToken, resolveTenantContext, requireTenant, requirePlatform('school'))
+
+// ── Helper: Get student record from authenticated user, within their tenant ──
+async function getStudentFromUser(req: TenantRequest) {
+  const ctx = req.ctx!
   const result = await query(
     `SELECT s.*, u.email AS user_email, u.full_name AS user_full_name
      FROM students s
      JOIN users u ON s.user_id = u.id
-     WHERE s.user_id = $1`,
-    [userId]
+     WHERE s.user_id = $1 AND s.tenant_id = $2`,
+    [ctx.userId, ctx.tenantId]
   )
   return result.rows[0] || null
 }
@@ -31,16 +47,15 @@ async function getStudentFromUser(userId: string) {
 // ══════════════════════════════════════
 // GET /student/dashboard
 // ══════════════════════════════════════
-router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
+router.get('/dashboard', async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const student = await getStudentFromUser(req.user.userId)
+    const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
 
     // 1. Enrolled courses count
     const coursesResult = await query(
       `SELECT COUNT(DISTINCT sc.id) as course_count
-       FROM student_schedules sc
+       FROM student_courses sc
        JOIN class_schedules cs ON sc.schedule_id = cs.id
        WHERE sc.student_id = $1 AND sc.status = 'enrolled'`,
       [student.id]
@@ -76,7 +91,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       `SELECT cs.id, c.code AS course_code, c.name AS course_name,
               cs.start_time, cs.end_time, cs.section,
               COALESCE(r.building || ' ' || r.room_number, r.room_number) AS room_name
-       FROM student_schedules sc
+       FROM student_courses sc
        JOIN class_schedules cs ON sc.schedule_id = cs.id
        JOIN courses c ON cs.course_id = c.id
        LEFT JOIN rooms r ON cs.room_id = r.id
@@ -124,10 +139,9 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
 // ══════════════════════════════════════
 // GET /student/courses
 // ══════════════════════════════════════
-router.get('/courses', authenticateToken, async (req: Request, res: Response) => {
+router.get('/courses', async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const student = await getStudentFromUser(req.user.userId)
+    const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
 
     const result = await query(
@@ -137,7 +151,7 @@ router.get('/courses', authenticateToken, async (req: Request, res: Response) =>
               COALESCE(r.building || ' ' || r.room_number, r.room_number) AS room_name,
               CONCAT(f.first_name, ' ', COALESCE(f.middle_name || ' ', ''), f.last_name) AS faculty_name,
               sc.enrolled_at
-       FROM student_schedules sc
+       FROM student_courses sc
        JOIN class_schedules cs ON sc.schedule_id = cs.id
        JOIN courses c ON cs.course_id = c.id
        LEFT JOIN rooms r ON cs.room_id = r.id
@@ -157,10 +171,9 @@ router.get('/courses', authenticateToken, async (req: Request, res: Response) =>
 // ══════════════════════════════════════
 // GET /student/schedules
 // ══════════════════════════════════════
-router.get('/schedules', authenticateToken, async (req: Request, res: Response) => {
+router.get('/schedules', async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const student = await getStudentFromUser(req.user.userId)
+    const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
 
     const result = await query(
@@ -168,7 +181,7 @@ router.get('/schedules', authenticateToken, async (req: Request, res: Response) 
               cs.start_time, cs.end_time, cs.day_of_week, cs.days_of_week,
               cs.section, COALESCE(r.building || ' ' || r.room_number, r.room_number) AS room_name,
               CONCAT(f.first_name, ' ', COALESCE(f.middle_name || ' ', ''), f.last_name) AS faculty_name
-       FROM student_schedules sc
+       FROM student_courses sc
        JOIN class_schedules cs ON sc.schedule_id = cs.id
        JOIN courses c ON cs.course_id = c.id
        LEFT JOIN rooms r ON cs.room_id = r.id
@@ -188,10 +201,9 @@ router.get('/schedules', authenticateToken, async (req: Request, res: Response) 
 // ══════════════════════════════════════
 // GET /student/attendance
 // ══════════════════════════════════════
-router.get('/attendance', authenticateToken, async (req: Request, res: Response) => {
+router.get('/attendance', async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const student = await getStudentFromUser(req.user.userId)
+    const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
 
     const { course_id, date_from, date_to, status: statusFilter } = req.query
@@ -266,10 +278,9 @@ router.get('/attendance', authenticateToken, async (req: Request, res: Response)
 // ══════════════════════════════════════
 // GET /student/profile
 // ══════════════════════════════════════
-router.get('/profile', authenticateToken, async (req: Request, res: Response) => {
+router.get('/profile', async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const student = await getStudentFromUser(req.user.userId)
+    const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
 
     return res.json({
@@ -296,10 +307,9 @@ router.get('/profile', authenticateToken, async (req: Request, res: Response) =>
 // ══════════════════════════════════════
 // PUT /student/profile
 // ══════════════════════════════════════
-router.put('/profile', authenticateToken, async (req: Request, res: Response) => {
+router.put('/profile', async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const student = await getStudentFromUser(req.user.userId)
+    const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
 
     const { phone, address, gender, profile_photo_url } = req.body

@@ -7,6 +7,7 @@ import dotenv from 'dotenv'
 import { enforceTenantBoundaries } from './auth/tenantEnforcementMiddleware.js'
 import { initializeDatabase } from './db/connection.js'
 import authRoutes from './routes/auth.js'
+import schoolAdminRoutes from './routes/schoolAdmin.js'
 import schoolRoutes from './routes/school.js'
 import corporateRoutes from './routes/corporate.js'
 import attendanceRoutes from './routes/attendance.js'
@@ -68,6 +69,7 @@ app.use((req, res, next) => {
 });
 
 // Routes
+app.use('/api/auth', schoolAdminRoutes)
 app.use('/api/auth', authRoutes)
 
 // Tenant-scoped routes: enforce tenant boundaries using authenticated context.

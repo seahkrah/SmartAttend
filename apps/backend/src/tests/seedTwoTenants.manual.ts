@@ -20,7 +20,14 @@ async function main() {
   // verification database.
   await query(`ALTER TABLE audit_logs DISABLE TRIGGER USER`)
   await query(`DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
+  await query(`DELETE FROM audit_logs WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)
+  // audit_access_log records who read the trail and is immutable for the same
+  // reason, with actor_id now RESTRICT rather than SET NULL (037). The fixture
+  // clears its own rows the same way.
+  await query(`ALTER TABLE audit_access_log DISABLE TRIGGER USER`)
+  await query(`DELETE FROM audit_access_log WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
+  await query(`ALTER TABLE audit_access_log ENABLE TRIGGER USER`)
   await query(`DELETE FROM attendance_submissions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM school_attendance WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   // Face templates and their verification attempts hang off students and

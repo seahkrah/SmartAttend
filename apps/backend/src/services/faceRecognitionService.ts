@@ -206,10 +206,11 @@ export async function enrollStudentFace(
     }
 
     await client.query(
-      `INSERT INTO audit_logs (platform_id, user_id, action, entity_type, entity_id, new_values)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
+      `INSERT INTO audit_logs (platform_id, tenant_id, user_id, action, entity_type, entity_id, new_values)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [
         ctx.platformId,
+        ctx.tenantId,
         enrolledById,
         'CREATE',
         'face_enrollment',
@@ -277,10 +278,11 @@ export async function verifyEnrollment(
   }
 
   await query(
-    `INSERT INTO audit_logs (platform_id, user_id, action, entity_type, entity_id, new_values)
-     VALUES ($1,$2,$3,$4,$5,$6)`,
+    `INSERT INTO audit_logs (platform_id, tenant_id, user_id, action, entity_type, entity_id, new_values)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
     [
       ctx.platformId,
+      ctx.tenantId,
       verifiedById,
       'VERIFY',
       'face_enrollment',
@@ -456,10 +458,11 @@ export async function verifyStudentFace(
     const verificationId = verificationResult.rows[0].id;
 
     await client.query(
-      `INSERT INTO audit_logs (platform_id, user_id, action, entity_type, entity_id, new_values)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
+      `INSERT INTO audit_logs (platform_id, tenant_id, user_id, action, entity_type, entity_id, new_values)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [
         ctx.platformId,
+        ctx.tenantId,
         ctx.userId,
         'FACE_VERIFICATION',
         'face_verification',

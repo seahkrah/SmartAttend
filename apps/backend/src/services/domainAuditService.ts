@@ -27,11 +27,40 @@ export interface AuditLogEntry {
   requestId?: string
   ipAddress: string
   userAgent?: string
+  /** The tenant this entry belongs to. Omitted only for platform-level
+   *  events, which no tenant administrator should see. */
+  tenantId?: string
+}
+
+/**
+ * A predicate confining a read to what the caller may see, as built by
+ * auditVisibilityPredicate in auditAccessControl.
+ *
+ * Passed in rather than derived here, so the service stays unaware of roles
+ * and so no caller can read the trail without having stated whose view it is.
+ * Every read below splices it into its WHERE clause; none filters afterwards,
+ * because a post-filter still leaks through counts and pagination.
+ */
+export interface AuditVisibility {
+  sql: string
+  params: any[]
+}
+
+/**
+ * Renumbers a visibility predicate's placeholders so it can be spliced into a
+ * query that already binds parameters.
+ *
+ * auditVisibilityPredicate numbers from $1; a host query that has already used
+ * $1 and $2 asks for `shift(v, 3)` and appends v.params in the same order.
+ */
+function shift(visibility: AuditVisibility, startAt: number): string {
+  if (visibility.params.length === 0) return visibility.sql
+  return visibility.sql.replace(/\$(\d+)/g, (_m, n) => `$${Number(n) + startAt - 1}`)
 }
 
 /**
  * Log an operation to the immutable audit log
- * 
+ *
  * @param entry - Audit log entry data
  * @returns - ID of created audit log entry
  * @throws - If database operation fails
@@ -41,8 +70,9 @@ export async function logAudit(entry: AuditLogEntry): Promise<string> {
     const result = await query(
       `INSERT INTO audit_logs 
        (actor_id, actor_role, action_type, action_scope, resource_type, resource_id, 
-        before_state, after_state, justification, request_id, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        before_state, after_state, justification, request_id, ip_address, user_agent,
+        tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING id`,
       [
         entry.actorId,
@@ -56,7 +86,8 @@ export async function logAudit(entry: AuditLogEntry): Promise<string> {
         entry.justification || null,
         entry.requestId || null,
         entry.ipAddress,
-        entry.userAgent || null
+        entry.userAgent || null,
+        entry.tenantId || null
       ]
     )
 
@@ -184,11 +215,14 @@ export async function queryAuditLogs(
  * @param auditId - ID of audit log entry
  * @returns - Audit log entry or null
  */
-export async function getAuditLogById(auditId: string): Promise<any | null> {
+export async function getAuditLogById(
+  auditId: string,
+  visibility: AuditVisibility
+): Promise<any | null> {
   try {
     const result = await query(
-      `SELECT * FROM audit_logs WHERE id = $1`,
-      [auditId]
+      `SELECT * FROM audit_logs WHERE id = $1 AND (${shift(visibility, 2)})`,
+      [auditId, ...visibility.params]
     )
     return result.rows[0] || null
   } catch (error) {
@@ -206,14 +240,21 @@ export async function getAuditLogById(auditId: string): Promise<any | null> {
  */
 export async function getAuditTrailForResource(
   resourceType: string,
-  resourceId: string
+  resourceId: string,
+  visibility: AuditVisibility
 ): Promise<any[]> {
   try {
     const result = await query(
+      // Two eras of writer: the database triggers record entity_type and
+      // entity_id, the service layer records resource_type and resource_id.
+      // They name the same thing, so a trail that matched only one of them
+      // came back empty for everything the triggers had written.
       `SELECT * FROM audit_logs 
-       WHERE resource_type = $1 AND resource_id = $2
+       WHERE (resource_type = $1 OR entity_type = $1)
+         AND (resource_id = $2 OR entity_id = $2)
+         AND (${shift(visibility, 3)})
        ORDER BY created_at ASC`,
-      [resourceType, resourceId]
+      [resourceType, resourceId, ...visibility.params]
     )
     return result.rows
   } catch (error) {
@@ -228,30 +269,46 @@ export async function getAuditTrailForResource(
  * 
  * @returns - Audit activity summary
  */
-export async function getAuditSummary(): Promise<any> {
+export async function getAuditSummary(visibility: AuditVisibility): Promise<any> {
   try {
     // Total operations
-    const totalResult = await query(`SELECT COUNT(*) as total FROM audit_logs`)
+    const scope = shift(visibility, 1)
+    const totalResult = await query(
+      `SELECT COUNT(*) as total FROM audit_logs WHERE (${scope})`,
+      visibility.params
+    )
     const total = parseInt(totalResult.rows[0].total)
 
     // By action type
     const byActionResult = await query(
-      `SELECT action_type, COUNT(*) as count FROM audit_logs GROUP BY action_type ORDER BY count DESC LIMIT 10`
+      `SELECT action_type, COUNT(*) as count FROM audit_logs
+        WHERE (${scope})
+        GROUP BY action_type ORDER BY count DESC LIMIT 10`,
+      visibility.params
     )
 
-    // By scope
+    // Every aggregate carries the same predicate. Three of these counted the
+    // whole table: a tenant administrator's "summary" reported the scope
+    // distribution, the busiest actors and the last 24 hours across every
+    // school in the deployment.
     const byScopeResult = await query(
-      `SELECT action_scope, COUNT(*) as count FROM audit_logs GROUP BY action_scope`
+      `SELECT action_scope, COUNT(*) as count FROM audit_logs
+        WHERE (${scope})
+        GROUP BY action_scope`,
+      visibility.params
     )
 
-    // By actor
     const byActorResult = await query(
-      `SELECT actor_id, COUNT(*) as count FROM audit_logs GROUP BY actor_id ORDER BY count DESC LIMIT 10`
+      `SELECT actor_id, COUNT(*) as count FROM audit_logs
+        WHERE (${scope})
+        GROUP BY actor_id ORDER BY count DESC LIMIT 10`,
+      visibility.params
     )
 
-    // Recent activity (last 24 hours)
     const recentResult = await query(
-      `SELECT COUNT(*) as count FROM audit_logs WHERE created_at > NOW() - INTERVAL '24 hours'`
+      `SELECT COUNT(*) as count FROM audit_logs
+        WHERE (${scope}) AND created_at > NOW() - INTERVAL '24 hours'`,
+      visibility.params
     )
 
     return {
@@ -275,14 +332,17 @@ export async function getAuditSummary(): Promise<any> {
  * @param auditId - ID of audit log entry
  * @returns - Object with integrity check result
  */
-export async function verifyAuditLogIntegrity(auditId: string): Promise<{
+export async function verifyAuditLogIntegrity(
+  auditId: string,
+  visibility: AuditVisibility
+): Promise<{
   isValid: boolean
   storedChecksum: string
   calculatedChecksum: string
   entry?: any
 }> {
   try {
-    const entry = await getAuditLogById(auditId)
+    const entry = await getAuditLogById(auditId, visibility)
     if (!entry) {
       throw new Error(`Audit log ${auditId} not found`)
     }
@@ -323,15 +383,17 @@ export async function verifyAuditLogIntegrity(auditId: string): Promise<{
  */
 export async function searchAuditLogsByJustification(
   searchText: string,
+  visibility: AuditVisibility,
   limit: number = 100
 ): Promise<any[]> {
   try {
     const result = await query(
       `SELECT * FROM audit_logs 
        WHERE to_tsvector('english', COALESCE(justification, '')) @@ plainto_tsquery('english', $1)
+         AND (${shift(visibility, 3)})
        ORDER BY created_at DESC
        LIMIT $2`,
-      [searchText, Math.min(limit, 10000)]
+      [searchText, Math.min(limit, 10000), ...visibility.params]
     )
     return result.rows
   } catch (error) {
@@ -351,18 +413,20 @@ export async function searchAuditLogsByJustification(
 export async function getAuditLogsForPeriod(
   startTime: Date,
   endTime: Date,
+  visibility: AuditVisibility,
   actionScope?: 'GLOBAL' | 'TENANT' | 'USER'
 ): Promise<any[]> {
   try {
+    const params: any[] = [startTime, endTime, ...visibility.params]
     let sql = `
       SELECT * FROM audit_logs 
       WHERE created_at BETWEEN $1 AND $2
+        AND (${shift(visibility, 3)})
     `
-    const params: any[] = [startTime, endTime]
 
     if (actionScope) {
-      sql += ` AND action_scope = $3`
       params.push(actionScope)
+      sql += ` AND action_scope = $${params.length}`
     }
 
     sql += ` ORDER BY created_at DESC`

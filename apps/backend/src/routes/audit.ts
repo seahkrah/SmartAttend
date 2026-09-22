@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
+import { resolveTenantContext } from '../auth/tenantContextMiddleware.js'
 import {
   queryAuditLogs,
   getAuditLogById,
@@ -14,13 +15,48 @@ import {
   queryAuditLogsWithAccessControl,
   enforceAuditAccess,
   logAuditAccess,
+  auditVisibilityPredicate,
+  contextOf,
+  auditRoleOf,
   AUDIT_ACCESS_RULES
 } from '../auth/auditAccessControl.js'
 
 const router = express.Router()
 
-// All audit endpoints require authentication
-router.use(authenticateToken)
+/**
+ * Every audit endpoint needs a resolved identity, and the access-control layer
+ * needs the caller's real tenant and role rather than whatever the JWT payload
+ * happens to carry. Resolving here means a handler cannot be reached without
+ * one.
+ *
+ * requireTenant is deliberately not applied: a superadmin reads the audit
+ * trail across tenants, and that is the one identity for which no tenant is
+ * the correct answer. The access-control layer refuses a tenant administrator
+ * who has no tenant, so the unscoped case stays closed for everyone else.
+ */
+router.use(authenticateToken, resolveTenantContext)
+
+/**
+ * What this caller may see, as a SQL predicate.
+ *
+ * Only /logs went through access control; the other reads — a log by id, a
+ * resource's trail, the summary, the search, the period export — queried
+ * audit_logs unfiltered and returned every tenant's history to anyone with a
+ * token. Each one now binds this predicate into its own WHERE clause.
+ */
+function visibility(req: Request) {
+  return auditVisibilityPredicate(contextOf(req))
+}
+
+/** A refusal from the access layer reads as 403, not as an internal error. */
+function denied(res: Response, e: unknown): boolean {
+  const message = (e as Error)?.message ?? ''
+  if (message.startsWith('Access Denied')) {
+    res.status(403).json({ success: false, error: 'Insufficient permissions', message })
+    return true
+  }
+  return false
+}
 
 /**
  * ===========================
@@ -58,7 +94,6 @@ router.use(authenticateToken)
  */
 router.get('/logs', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
     const requestedScope = req.query.actionScope ? String(req.query.actionScope) : undefined
 
     // Phase 10.2: Enforce access control
@@ -90,7 +125,7 @@ router.get('/logs', async (req: Request, res: Response) => {
     res.json({
       success: true,
       count: logs.length,
-      userRole: user?.role,
+      userRole: auditRoleOf(contextOf(req)),
       filters: {
         actionScope: requestedScope,
         actionType: filters.actionType,
@@ -100,6 +135,7 @@ router.get('/logs', async (req: Request, res: Response) => {
       logs
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to query logs:', error)
     res.status(500).json({
       success: false,
@@ -121,18 +157,15 @@ router.get('/logs', async (req: Request, res: Response) => {
  */
 router.get('/logs/:id', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
     const auditId = req.params.id
 
-    const auditEntry = await getAuditLogById(auditId)
+    // The visibility predicate is the check: an entry outside the caller's
+    // view comes back empty and reads as absent, so a log id cannot be probed
+    // for existence.
+    const auditEntry = await getAuditLogById(auditId, visibility(req))
 
     if (!auditEntry) {
       return res.status(404).json({ error: 'Audit log entry not found' })
-    }
-
-    // Non-superadmin users can only view their own entries
-    if (user?.role !== 'superadmin' && auditEntry.actor_id !== user?.userId) {
-      return res.status(403).json({ error: 'Insufficient permissions' })
     }
 
     res.json({
@@ -140,6 +173,7 @@ router.get('/logs/:id', async (req: Request, res: Response) => {
       entry: auditEntry
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to get audit log:', error)
     res.status(500).json({ error: 'Failed to retrieve audit log', message: error.message })
   }
@@ -157,20 +191,13 @@ router.get('/logs/:id', async (req: Request, res: Response) => {
  */
 router.get('/resource/:resourceType/:resourceId/trail', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
     const resourceType = req.params.resourceType
     const resourceId = req.params.resourceId
 
-    // Non-superadmin users can only view trails for their own resources
-    if (user?.role !== 'superadmin') {
-      // Could add tenant-level checks here
-      // For now, restrict to own user ID
-      if (resourceType === 'user' && resourceId !== user?.userId) {
-        return res.status(403).json({ error: 'Insufficient permissions' })
-      }
-    }
+    // The trail is confined by the same predicate as every other read, so a
+    // resource in another tenant simply yields nothing.
 
-    const trail = await getAuditTrailForResource(resourceType, resourceId)
+    const trail = await getAuditTrailForResource(resourceType, resourceId, visibility(req))
 
     res.json({
       success: true,
@@ -180,6 +207,7 @@ router.get('/resource/:resourceType/:resourceId/trail', async (req: Request, res
       trail
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to get resource trail:', error)
     res.status(500).json({ error: 'Failed to retrieve resource audit trail', message: error.message })
   }
@@ -197,19 +225,18 @@ router.get('/resource/:resourceType/:resourceId/trail', async (req: Request, res
  */
 router.get('/summary', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
+    // Scoped by the visibility predicate rather than reserved to superadmins:
+    // an administrator is entitled to their own school's history, and that is
+    // all this returns.
 
-    if (user?.role !== 'superadmin') {
-      return res.status(403).json({ error: 'Superadmin access required' })
-    }
-
-    const summary = await getAuditSummary()
+    const summary = await getAuditSummary(visibility(req))
 
     res.json({
       success: true,
       summary
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to get summary:', error)
     res.status(500).json({ error: 'Failed to retrieve audit summary', message: error.message })
   }
@@ -232,19 +259,19 @@ router.get('/summary', async (req: Request, res: Response) => {
  */
 router.get('/search', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
     const searchQuery = req.query.q ? String(req.query.q) : null
 
     if (!searchQuery || searchQuery.trim().length === 0) {
       return res.status(400).json({ error: 'Search query required (q parameter)' })
     }
 
-    if (user?.role !== 'superadmin') {
-      return res.status(403).json({ error: 'Superadmin access required for search' })
-    }
+    // Search is no longer superadmin-only: it runs inside the caller's own
+    // visibility, so an administrator searches their tenant's justifications
+    // and a user searches their own. Refusing everyone but the superadmin was
+    // a stand-in for the scoping that now exists.
 
     const limit = req.query.limit ? Math.min(parseInt(String(req.query.limit)), 10000) : 100
-    const results = await searchAuditLogsByJustification(searchQuery, limit)
+    const results = await searchAuditLogsByJustification(searchQuery, visibility(req), limit)
 
     res.json({
       success: true,
@@ -253,6 +280,7 @@ router.get('/search', async (req: Request, res: Response) => {
       results
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to search logs:', error)
     res.status(500).json({ error: 'Failed to search audit logs', message: error.message })
   }
@@ -276,11 +304,9 @@ router.get('/search', async (req: Request, res: Response) => {
  */
 router.get('/period', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-
-    if (user?.role !== 'superadmin') {
-      return res.status(403).json({ error: 'Superadmin access required' })
-    }
+    // Scoped by the visibility predicate rather than reserved to superadmins:
+    // an administrator is entitled to their own school's history, and that is
+    // all this returns.
 
     const startTime = req.query.startTime ? new Date(String(req.query.startTime)) : null
     const endTime = req.query.endTime ? new Date(String(req.query.endTime)) : null
@@ -294,7 +320,7 @@ router.get('/period', async (req: Request, res: Response) => {
 
     const scope = req.query.actionScope as 'GLOBAL' | 'TENANT' | 'USER' | undefined
 
-    const logs = await getAuditLogsForPeriod(startTime, endTime, scope)
+    const logs = await getAuditLogsForPeriod(startTime, endTime, visibility(req), scope)
 
     res.json({
       success: true,
@@ -305,6 +331,7 @@ router.get('/period', async (req: Request, res: Response) => {
       logs
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to get period logs:', error)
     res.status(500).json({ error: 'Failed to retrieve period logs', message: error.message })
   }
@@ -323,14 +350,12 @@ router.get('/period', async (req: Request, res: Response) => {
  */
 router.get('/logs/:id/verify', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-
-    if (user?.role !== 'superadmin') {
-      return res.status(403).json({ error: 'Superadmin access required' })
-    }
+    // Scoped by the visibility predicate rather than reserved to superadmins:
+    // an administrator is entitled to their own school's history, and that is
+    // all this returns.
 
     const auditId = req.params.id
-    const verification = await verifyAuditLogIntegrity(auditId)
+    const verification = await verifyAuditLogIntegrity(auditId, visibility(req))
 
     res.json({
       success: true,
@@ -358,9 +383,7 @@ router.get('/logs/:id/verify', async (req: Request, res: Response) => {
  */
 router.post('/test-immutability', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-
-    if (user?.role !== 'superadmin') {
+    if (!contextOf(req).isSuperadmin) {
       return res.status(403).json({ error: 'Superadmin access required' })
     }
 
@@ -371,6 +394,7 @@ router.post('/test-immutability', async (req: Request, res: Response) => {
       testResult
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to test immutability:', error)
     res.status(500).json({ error: 'Failed to test immutability', message: error.message })
   }
@@ -396,9 +420,7 @@ router.post('/test-immutability', async (req: Request, res: Response) => {
  */
 router.get('/access-log', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-
-    if (user?.role !== 'superadmin') {
+    if (!contextOf(req).isSuperadmin) {
       return res.status(403).json({
         success: false,
         error: 'Superadmin access required',
@@ -464,6 +486,7 @@ router.get('/access-log', async (req: Request, res: Response) => {
       accessLogs: result.rows
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to query access logs:', error)
     res.status(500).json({
       success: false,
@@ -486,9 +509,7 @@ router.get('/access-log', async (req: Request, res: Response) => {
  */
 router.get('/access-patterns', async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-
-    if (user?.role !== 'superadmin') {
+    if (!contextOf(req).isSuperadmin) {
       return res.status(403).json({ error: 'Superadmin access required' })
     }
 
@@ -503,6 +524,7 @@ router.get('/access-patterns', async (req: Request, res: Response) => {
       patterns: result.rows
     })
   } catch (error: any) {
+    if (denied(res, error)) return
     console.error('[AUDIT_API] Failed to get access patterns:', error)
     res.status(500).json({
       success: false,

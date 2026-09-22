@@ -39,6 +39,8 @@ export const TENANT_OWNED_TABLES = new Set([
   'attendance_corrections',
   'face_recognition_enrollments',
   'face_recognition_verifications',
+  'notification_campaigns',
+  'notifications',
 ])
 
 /** Which platform a tenant-owned table belongs to. */

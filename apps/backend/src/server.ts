@@ -23,6 +23,7 @@ import validationRoutes from './routes/validation.js'
 // request 404'd against the server that actually runs.
 import tenantAdminRoutes from './routes/tenantAdmin.js'
 import adminTenantRoutes from './routes/adminTenant.js'
+import hrRoutes from './routes/hr.js'
 import facultyRoutes from './routes/faculty.js'
 import studentRoutes from './routes/student.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
@@ -90,6 +91,8 @@ app.use('/api/validation', validationRoutes)
 // Mounted before tenantAdminRoutes, whose paths are /school/* and /corporate/*
 // and so do not overlap.
 app.use('/api/admin', adminTenantRoutes)
+// EMS — HR command centre. Platform-gated to corporate inside the router.
+app.use('/api/hr', hrRoutes)
 app.use('/api/admin', enforceTenantBoundaries, tenantAdminRoutes)
 app.use('/api/faculty', enforceTenantBoundaries, facultyRoutes)
 app.use('/api/student', enforceTenantBoundaries, studentRoutes)

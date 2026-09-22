@@ -28,6 +28,18 @@ async function main() {
   await query(`ALTER TABLE audit_access_log DISABLE TRIGGER USER`)
   await query(`DELETE FROM audit_access_log WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`ALTER TABLE audit_access_log ENABLE TRIGGER USER`)
+  // Academic records reference courses, students and terms, so they clear
+  // first: results before scores, scores before assessments, curriculum
+  // before programmes.
+  await query(`DELETE FROM course_results WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM assessment_scores WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM assessments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM grade_bands WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM grading_schemes WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM student_programmes WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM programme_courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM programmes WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+
   // Corrections reference the attendance rows they amend and the person who
   // made them, so they go before both. They are immutable for the same reason
   // audit_logs is — a correction trail that can be deleted proves nothing — so
@@ -58,6 +70,7 @@ async function main() {
   await query(`DELETE FROM school_user_associations WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`DELETE FROM courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM semesters WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM academic_years WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM school_departments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM users WHERE email LIKE '%@e2e.test'`)
   await query(`DELETE FROM school_entities WHERE code LIKE 'E2E-%'`)

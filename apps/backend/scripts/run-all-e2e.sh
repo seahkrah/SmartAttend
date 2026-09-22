@@ -41,6 +41,7 @@ SUITES=(
   correctionsFaceApi
   opsRoutesIsolation
   authFlow
+  academicsGradebook
 )
 
 fail=0

@@ -28,6 +28,10 @@ import attendanceSelfServiceRoutes from './routes/attendanceSelfService.js'
 import facultyRoutes from './routes/faculty.js'
 import facultyWorkflowRoutes from './routes/facultyWorkflow.js'
 import studentRoutes from './routes/student.js'
+// SMS academic core: years, terms, programmes, curriculum, student programmes.
+import academicsRoutes from './routes/academics.js'
+// SMS gradebook: schemes, assessments, marks, results, transcripts.
+import gradebookRoutes from './routes/gradebook.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
 import auditRoutes from './routes/audit.js'
 import timeRoutes from './routes/time.js'
@@ -116,6 +120,8 @@ app.use('/api/admin', tenantAdminRoutes)
 app.use('/api/faculty', facultyWorkflowRoutes)
 app.use('/api/faculty', facultyRoutes)
 app.use('/api/student', studentRoutes)
+app.use('/api/academics', academicsRoutes)
+app.use('/api/gradebook', gradebookRoutes)
 app.use('/api/face', faceVerificationRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/time', timeRoutes)

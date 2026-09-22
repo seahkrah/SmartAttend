@@ -192,7 +192,7 @@ ADD COLUMN IF NOT EXISTS drift_seconds DECIMAL(10, 2),
 ADD COLUMN IF NOT EXISTS drift_category VARCHAR(50),
 ADD COLUMN IF NOT EXISTS time_authority_validated BOOLEAN DEFAULT FALSE;
 
-ALTER TABLE corporate_checkin
+ALTER TABLE corporate_checkins
 ADD COLUMN IF NOT EXISTS client_provided_time TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS server_recorded_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 ADD COLUMN IF NOT EXISTS drift_seconds DECIMAL(10, 2),
@@ -202,7 +202,7 @@ ADD COLUMN IF NOT EXISTS time_authority_validated BOOLEAN DEFAULT FALSE;
 -- Indexes for time authority analysis
 CREATE INDEX IF NOT EXISTS idx_school_attendance_drift ON school_attendance(drift_category) 
   WHERE drift_category IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_corporate_checkin_drift ON corporate_checkin(drift_category) 
+CREATE INDEX IF NOT EXISTS idx_corporate_checkin_drift ON corporate_checkins(drift_category) 
   WHERE drift_category IS NOT NULL;
 
 -- ===========================

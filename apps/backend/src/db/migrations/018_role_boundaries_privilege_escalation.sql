@@ -12,39 +12,25 @@ BEGIN;
 -- ===========================
 -- Tracks every role change with full context
 
-CREATE TABLE IF NOT EXISTS role_assignment_history (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  
-  -- User and role info
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  
-  -- Who made the change?
-  assigned_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  
-  -- When?
-  assigned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  revoked_at TIMESTAMPTZ,
-  is_active BOOLEAN DEFAULT TRUE,
-  
-  -- Context
-  reason TEXT,
-  severity VARCHAR(50) NOT NULL DEFAULT 'NORMAL', -- SYSTEM_BOOTSTRAP, NORMAL, ESCALATION_SUSPECTED, EMERGENCY
-  
-  -- Anomaly detection flags (auto-populated)
-  detection_flags TEXT[] DEFAULT '{}',
-  anomaly_score DECIMAL(5,2) DEFAULT 0,
-  
-  -- Human verification
-  is_verified BOOLEAN DEFAULT FALSE,
-  verified_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  verified_at TIMESTAMPTZ,
-  verification_notes TEXT,
-  
-  -- Immutability
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  checksum VARCHAR(64)
-);
+-- role_assignment_history is already created by 007_role_escalation_detection.sql. CREATE TABLE IF NOT
+-- EXISTS would skip this definition silently and leave the columns below
+-- missing, so add them to the existing table instead.
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES roles(id) ON DELETE CASCADE;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS assigned_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS reason TEXT;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS severity VARCHAR(50) NOT NULL DEFAULT 'NORMAL';
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS detection_flags TEXT[] DEFAULT '{}';
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS anomaly_score DECIMAL(5,2) DEFAULT 0;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS verified_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS verification_notes TEXT;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE role_assignment_history ADD COLUMN IF NOT EXISTS checksum VARCHAR(64);
 
 -- Indexes for queries
 CREATE INDEX IF NOT EXISTS idx_role_history_user_id ON role_assignment_history(user_id);
@@ -88,44 +74,28 @@ EXECUTE FUNCTION prevent_role_history_delete();
 -- ===========================
 -- Auto-detected suspicious role changes
 
-CREATE TABLE IF NOT EXISTS privilege_escalation_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  
-  -- What triggered this?
-  role_assignment_id UUID REFERENCES role_assignment_history(id) ON DELETE CASCADE,
-  
-  -- Who is involved?
-  affected_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  affected_role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-  triggered_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  
-  -- Classification
-  event_type VARCHAR(100) NOT NULL, -- TEMPORAL_CLUSTER, RECURSIVE_ELEVATION, BYPASS_PATTERN, COORDINATED_ELEVATION, UNUSUAL_SUPERADMIN_ACTION
-  severity VARCHAR(50) NOT NULL, -- LOW, MEDIUM, HIGH, CRITICAL
-  
-  -- Details
-  description TEXT,
-  correlation_flags TEXT[], -- Detection flags (e.g., ['same_second_cluster', 'multiple_assignments'])
-  anomaly_score DECIMAL(5,2),
-  
-  -- Related events (for coordinated detection)
-  related_event_ids UUID[] DEFAULT '{}',
-  
-  -- Status
-  status VARCHAR(50) DEFAULT 'OPEN', -- OPEN, INVESTIGATING, RESOLVED_LEGITIMATE, RESOLVED_BLOCKED, ESCALATED
-  
-  -- Investigation
-  investigation_notes TEXT,
-  investigated_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  investigated_at TIMESTAMPTZ,
-  
-  -- Auto-actions taken
-  actions_taken TEXT[], -- ['SESSION_INVALIDATED', 'EMAIL_SENT', 'MFA_CHALLENGED', 'ROLE_REVOKED']
-  
-  -- Immutability
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+-- privilege_escalation_events is already created by 005_superadmin_dashboard.sql. CREATE TABLE IF NOT
+-- EXISTS would skip this definition silently and leave the columns below
+-- missing, so add them to the existing table instead.
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS role_assignment_id UUID REFERENCES role_assignment_history(id) ON DELETE CASCADE;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS affected_user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS affected_role_id UUID REFERENCES roles(id) ON DELETE SET NULL;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS triggered_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(100);
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS severity VARCHAR(50);
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS correlation_flags TEXT[];
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS anomaly_score DECIMAL(5,2);
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS related_event_ids UUID[] DEFAULT '{}';
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'OPEN';
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS investigation_notes TEXT;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS investigated_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS investigated_at TIMESTAMPTZ;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS actions_taken TEXT[];
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+-- Required by the unverified_escalations view below, which filters on it.
+ALTER TABLE privilege_escalation_events ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_escalation_user_id ON privilege_escalation_events(affected_user_id);

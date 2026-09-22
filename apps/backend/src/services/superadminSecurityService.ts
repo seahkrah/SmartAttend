@@ -226,7 +226,7 @@ export async function createSuperadminSession(
 
   try {
     await query(
-      `INSERT INTO superadmin_sessions (id, user_id, token, ip_address, user_agent, expires_at, mfa_verified_at, is_active)
+      `INSERT INTO superadmin_sessions (id, user_id, session_token_hash, ip_address, user_agent, expires_at, mfa_verified_at, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
       [sessionId, userId, hashToken(sessionToken), ipAddress, userAgent, expiresAt, mfaVerifiedAt]
     )
@@ -260,7 +260,7 @@ export async function verifySuperadminSession(
     const result = await query(
       `SELECT user_id, ip_address, expires_at, is_active, mfa_verified_at
        FROM superadmin_sessions
-       WHERE id = $1 AND token = $2 AND is_active = true`,
+       WHERE id = $1 AND session_token_hash = $2 AND is_active = true`,
       [sessionId, hashToken(token)]
     )
 

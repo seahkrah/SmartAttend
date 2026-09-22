@@ -30,54 +30,44 @@ CREATE TABLE IF NOT EXISTS error_fingerprints (
 
 -- Incidents
 -- Represents actionable issues that need investigation
-CREATE TABLE IF NOT EXISTS incidents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  platform_id UUID NOT NULL REFERENCES platforms(id),
-  incident_type VARCHAR(100) NOT NULL, -- 'error', 'security_breach', 'data_integrity', 'performance_degradation', 'service_unavailable'
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  severity VARCHAR(20) NOT NULL, -- 'critical', 'high', 'medium', 'low'
-  status VARCHAR(50) DEFAULT 'open', -- 'open', 'investigating', 'mitigating', 'resolved', 'closed', 'escalated'
-  category VARCHAR(100), -- 'security', 'integrity', 'system', 'business', 'user'
-  
-  -- Error relationship
-  error_fingerprint_id UUID REFERENCES error_fingerprints(id),
-  error_count INT DEFAULT 1,
-  
-  -- Detection info
-  detected_by_user_id UUID REFERENCES users(id), -- NULL if detected by system
-  detection_method VARCHAR(100), -- 'automated', 'user_report', 'monitoring'
-  detection_source VARCHAR(255), -- Service/component that detected the incident
-  
-  -- Timeline
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  first_error_at TIMESTAMP,
-  last_error_at TIMESTAMP,
-  acknowledged_at TIMESTAMP,
-  acknowledged_by_user_id UUID REFERENCES users(id),
-  resolved_at TIMESTAMP,
-  resolved_by_user_id UUID REFERENCES users(id),
-  
-  -- Impact assessment
-  affected_users INT DEFAULT 0,
-  affected_systems TEXT, -- JSON array of system names
-  business_impact VARCHAR(255),
-  estimated_loss DECIMAL(15, 2),
-  
-  -- Resolution
-  root_cause TEXT,
-  remediation_steps TEXT,
-  prevention_measures TEXT,
-  post_mortem_url TEXT
-);
+-- incidents is already created by 005_superadmin_dashboard.sql. CREATE TABLE IF NOT
+-- EXISTS would skip this definition silently and leave the columns below
+-- missing, so add them to the existing table instead.
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS platform_id UUID REFERENCES platforms(id);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_type VARCHAR(100);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS severity VARCHAR(20);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'open';
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS category VARCHAR(100);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS error_fingerprint_id UUID REFERENCES error_fingerprints(id);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS error_count INT DEFAULT 1;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS detected_by_user_id UUID REFERENCES users(id);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS detection_method VARCHAR(100);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS detection_source VARCHAR(255);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS first_error_at TIMESTAMP;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMP;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMP;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS acknowledged_by_user_id UUID REFERENCES users(id);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolved_by_user_id UUID REFERENCES users(id);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS affected_users INT DEFAULT 0;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS affected_systems TEXT;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS business_impact VARCHAR(255);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS estimated_loss DECIMAL(15, 2);
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS root_cause TEXT;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS remediation_steps TEXT;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS prevention_measures TEXT;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS post_mortem_url TEXT;
 
 -- Indices for incident queries
-CREATE INDEX idx_incidents_platform_id ON incidents(platform_id);
-CREATE INDEX idx_incidents_status ON incidents(status);
-CREATE INDEX idx_incidents_severity ON incidents(severity);
-CREATE INDEX idx_incidents_created_at ON incidents(created_at DESC);
-CREATE INDEX idx_incidents_error_fingerprint ON incidents(error_fingerprint_id);
-CREATE INDEX idx_incidents_open_critical ON incidents(platform_id, status) WHERE status IN ('open', 'investigating') AND severity = 'critical';
+CREATE INDEX IF NOT EXISTS idx_incidents_platform_id ON incidents(platform_id);
+CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);
+CREATE INDEX IF NOT EXISTS idx_incidents_created_at ON incidents(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_incidents_error_fingerprint ON incidents(error_fingerprint_id);
+CREATE INDEX IF NOT EXISTS idx_incidents_open_critical ON incidents(platform_id, status) WHERE status IN ('open', 'investigating') AND severity = 'critical';
 
 -- Error Logs
 -- Detailed error records linked to incidents
@@ -120,12 +110,12 @@ CREATE TABLE IF NOT EXISTS error_logs (
 );
 
 -- Indices for error log queries
-CREATE INDEX idx_error_logs_platform_id ON error_logs(platform_id);
-CREATE INDEX idx_error_logs_incident_id ON error_logs(incident_id);
-CREATE INDEX idx_error_logs_fingerprint ON error_logs(error_fingerprint_id);
-CREATE INDEX idx_error_logs_severity ON error_logs(severity);
-CREATE INDEX idx_error_logs_created_at ON error_logs(created_at DESC);
-CREATE INDEX idx_error_logs_unresolved ON error_logs(platform_id, resolved) WHERE resolved = false;
+CREATE INDEX IF NOT EXISTS idx_error_logs_platform_id ON error_logs(platform_id);
+CREATE INDEX IF NOT EXISTS idx_error_logs_incident_id ON error_logs(incident_id);
+CREATE INDEX IF NOT EXISTS idx_error_logs_fingerprint ON error_logs(error_fingerprint_id);
+CREATE INDEX IF NOT EXISTS idx_error_logs_severity ON error_logs(severity);
+CREATE INDEX IF NOT EXISTS idx_error_logs_created_at ON error_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_error_logs_unresolved ON error_logs(platform_id, resolved) WHERE resolved = false;
 
 -- Incident Notifications
 -- Track who should be notified about incidents
@@ -142,9 +132,9 @@ CREATE TABLE IF NOT EXISTS incident_notifications (
 );
 
 -- Indices for notification queries
-CREATE INDEX idx_notifications_incident ON incident_notifications(incident_id);
-CREATE INDEX idx_notifications_user ON incident_notifications(user_id);
-CREATE INDEX idx_notifications_sent ON incident_notifications(sent_at) WHERE sent_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_incident ON incident_notifications(incident_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON incident_notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_sent ON incident_notifications(sent_at) WHERE sent_at IS NOT NULL;
 
 -- Incident Timeline
 -- Detailed audit trail of incident lifecycle
@@ -162,8 +152,8 @@ CREATE TABLE IF NOT EXISTS incident_timeline_events (
 );
 
 -- Indices for timeline queries
-CREATE INDEX idx_timeline_incident ON incident_timeline_events(incident_id);
-CREATE INDEX idx_timeline_created_at ON incident_timeline_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_timeline_incident ON incident_timeline_events(incident_id);
+CREATE INDEX IF NOT EXISTS idx_timeline_created_at ON incident_timeline_events(created_at DESC);
 
 -- Incident Statistics
 -- Aggregated metrics for dashboarding
@@ -199,7 +189,7 @@ CREATE TABLE IF NOT EXISTS incident_statistics (
 );
 
 -- Indices for statistics queries
-CREATE INDEX idx_statistics_platform ON incident_statistics(platform_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_statistics_platform ON incident_statistics(platform_id, date DESC);
 
 -- Trigger: Update error fingerprint on new error log
 CREATE OR REPLACE FUNCTION update_error_fingerprint_on_log()

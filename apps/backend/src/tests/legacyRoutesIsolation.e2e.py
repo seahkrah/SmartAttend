@@ -1,4 +1,4 @@
-"""Cross-tenant checks for the pre-existing corporate router.
+"""Cross-tenant checks for the pre-existing corporate and school routers.
 
 These routes scoped by platform_id and called it tenant scoping. GET
 /corporate/departments returned every employer's departments to every
@@ -7,6 +7,7 @@ employer. This suite pins the fix.
 import json, subprocess, sys
 SP="/tmp/claude-0/-home-user-SmartAttend/d93ac8ad-306e-535c-92c4-36bf785b1524/scratchpad"
 c=json.load(open(f"{SP}/corp.json")); A,B=c['A'],c['B']
+sc=json.load(open(f"{SP}/seed.json")); SA,SB=sc['A'],sc['B']
 P=F=0
 def req(method, path, token, body=None):
     cmd=["curl","-s","-w","\n%{http_code}","--max-time","20","-X",method,
@@ -48,6 +49,29 @@ newid = json.loads(body).get('id') if code==201 else None
 code, _ = req("POST","/corporate/departments",A['token'],{"name":"Operations B"})
 check("still unique within A", code==409, f"({code})")
 if newid: req("DELETE",f"/corporate/departments/{newid}",A['token'])
+
+# /api/school answered 401 for every route because req.tenant was never
+# populated: the legacy middleware needs req.user, which per-route
+# authenticateToken sets only after router-level middleware has run.
+print()
+code, body = req("GET","/school/students",SA['token'])
+check("school students 200 (was 401 for everything)", code==200, f"({code} {body[:100]})")
+check("A students visible", "stu1.a@e2e.test" in body)
+check("B students not visible", "stu1.b@e2e.test" not in body, "*** LEAK ***")
+code, body = req("GET","/school/students",SB['token'])
+check("B sees only its own students", "stu1.b@e2e.test" in body and "stu1.a@e2e.test" not in body)
+code, body = req("GET","/school/faculty",SA['token'])
+check("A faculty only", code==200 and "fac.a@e2e.test" in body and "fac.b@e2e.test" not in body, f"({code})")
+code, _ = req("GET",f"/school/students/{SB['students'][0]}",SA['token'])
+check("B student by id is 404", code==404, f"({code})")
+code, _ = req("GET",f"/school/students/{SA['students'][0]}",SA['token'])
+check("own student by id is 200", code==200, f"({code})")
+code, _ = req("GET",f"/school/faculty/{SB['facultyId']}",SA['token'])
+check("B faculty by id is 404", code==404, f"({code})")
+code, _ = req("DELETE",f"/school/students/{SB['students'][0]}",SA['token'])
+check("cannot unenrol B student", code==404, f"({code})")
+code, body = req("GET","/school/students",SB['token'])
+check("B student still enrolled", "stu1.b@e2e.test" in body)
 
 print(f"\n{P} passed, {F} failed")
 sys.exit(0 if F==0 else 1)

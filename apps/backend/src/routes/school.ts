@@ -1,5 +1,10 @@
 import express, { Request, Response } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
+import {
+  resolveTenantContext,
+  requireTenant,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
 import { query } from '../db/connection.js'
 import * as queries from '../db/queries.js'
 import type { Student } from '../types/database.js'
@@ -8,24 +13,39 @@ import { verifyTenantOwnsResource } from '../auth/tenantEnforcementMiddleware.js
 
 const router = express.Router()
 
+/**
+ * Tenant resolution for the whole router.
+ *
+ * These routes read req.tenant, which the legacy middleware only populates
+ * when req.user is already set — but authenticateToken runs per-route, after
+ * router-level middleware, so req.tenant was never populated and every route
+ * answered 401 "Tenant context required". The whole /api/school surface was
+ * dead.
+ *
+ * Simply reviving it would have reproduced the leak fixed in corporate.ts:
+ * the queries below bound req.tenant.tenantId, which carried the PLATFORM id,
+ * against platform_id columns — matching every institution on the platform.
+ * So resolution and scoping are corrected together.
+ */
+router.use(authenticateToken, resolveTenantContext)
+
 // ===========================
 // STUDENTS ENDPOINTS
 // ===========================
 
 // GET all students with pagination (tenant-scoped)
-router.get('/students', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.get('/students', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20
     const offset = parseInt(req.query.offset as string) || 0
     const departmentId = req.query.departmentId as string
-    const tenantId = req.tenant?.tenantId
-
+    const tenantId = req.ctx?.tenantId
     if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
     }
 
     let sql =
-      'SELECT s.*, u.email as user_email, u.full_name FROM students s LEFT JOIN users u ON s.user_id = u.id WHERE s.platform_id = $1'
+      'SELECT s.*, u.email as user_email, u.full_name FROM students s LEFT JOIN users u ON s.user_id = u.id WHERE s.tenant_id = $1'
     const params: any[] = [tenantId]
 
     if (departmentId) {
@@ -50,26 +70,35 @@ router.get('/students', authenticateToken, async (req: TenantAwareRequest, res: 
 })
 
 // GET single student (tenant-scoped)
-router.get('/students/:studentId', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.get('/students/:studentId', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const { studentId } = req.params
-    const student = await queries.getStudentById(studentId)
+    const tenantId = req.ctx?.tenantId
+    if (!tenantId) {
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
+    }
 
-    if (!student) {
+    // The tenant predicate is in the query, not a check afterwards: a student
+    // in another tenant is simply not found, so an id cannot be probed.
+    const result = await query(
+      `SELECT s.*, u.email AS user_email, u.full_name
+         FROM students s
+         LEFT JOIN users u ON u.id = s.user_id
+        WHERE s.id = $1 AND s.tenant_id = $2`,
+      [studentId, tenantId]
+    )
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Student not found' })
     }
 
-    // Enforce tenant ownership of student record
-    await verifyTenantOwnsResource(req.tenant, student, 'Student')
-
-    return res.json({ data: student })
+    return res.json({ data: result.rows[0] })
   } catch (error: any) {
     return res.status(500).json({ error: error.message })
   }
 })
 
 // CREATE student (tenant-scoped)
-router.post('/students', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.post('/students', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const {
       userId,
@@ -92,14 +121,14 @@ router.post('/students', authenticateToken, async (req: TenantAwareRequest, res:
       return res.status(400).json({ error: 'Invalid status' })
     }
 
-    const tenantId = req.tenant?.tenantId
+    const tenantId = req.ctx?.tenantId
     if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
     }
 
     // Check if student already exists in this tenant
     const existing = await query(
-      'SELECT id FROM students WHERE student_id = $1 AND platform_id = $2',
+      'SELECT id FROM students WHERE student_id = $1 AND tenant_id = $2',
       [studentId, tenantId]
     )
     if (existing.rows.length > 0) {
@@ -125,7 +154,7 @@ router.post('/students', authenticateToken, async (req: TenantAwareRequest, res:
 })
 
 // UPDATE student (tenant-scoped)
-router.put('/students/:studentId', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.put('/students/:studentId', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const { studentId } = req.params
     const updates = req.body
@@ -146,15 +175,15 @@ router.put('/students/:studentId', authenticateToken, async (req: TenantAwareReq
       return res.status(400).json({ error: 'No valid fields to update' })
     }
 
-    const tenantId = req.tenant?.tenantId
+    const tenantId = req.ctx?.tenantId
     if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
     }
 
     values.push(studentId, tenantId)
     const sql = `UPDATE students SET ${updateParts.join(
       ', '
-    )} WHERE id = $${values.length - 1} AND platform_id = $${values.length} RETURNING *`
+    )} WHERE id = $${values.length - 1} AND tenant_id = $${values.length} RETURNING *`
 
     const result = await query(sql, values)
 
@@ -172,18 +201,18 @@ router.put('/students/:studentId', authenticateToken, async (req: TenantAwareReq
 })
 
 // DELETE student (tenant-scoped soft delete)
-router.delete('/students/:studentId', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.delete('/students/:studentId', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const { studentId } = req.params
 
     // Soft delete or actual delete - choose based on requirements
-    const tenantId = req.tenant?.tenantId
+    const tenantId = req.ctx?.tenantId
     if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
     }
 
     const result = await query(
-      'UPDATE students SET is_currently_enrolled = false WHERE id = $1 AND platform_id = $2 RETURNING *',
+      'UPDATE students SET is_currently_enrolled = false WHERE id = $1 AND tenant_id = $2 RETURNING *',
       [studentId, tenantId]
     )
 
@@ -201,7 +230,7 @@ router.delete('/students/:studentId', authenticateToken, async (req: TenantAware
 })
 
 // GET student schedules (tenant-scoped via underlying query service)
-router.get('/students/:studentId/schedules', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.get('/students/:studentId/schedules', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const { studentId } = req.params
     const schedules = await queries.getStudentSchedules(studentId)
@@ -212,7 +241,7 @@ router.get('/students/:studentId/schedules', authenticateToken, async (req: Tena
 })
 
 // GET student attendance (tenant-scoped via underlying query service)
-router.get('/students/:studentId/attendance', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.get('/students/:studentId/attendance', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const { studentId } = req.params
     const startDate = (req.query.startDate as string) || '2026-01-01'
@@ -230,19 +259,18 @@ router.get('/students/:studentId/attendance', authenticateToken, async (req: Ten
 // ===========================
 
 // GET all faculty (tenant-scoped)
-router.get('/faculty', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.get('/faculty', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20
     const offset = parseInt(req.query.offset as string) || 0
     const departmentId = req.query.departmentId as string
-    const tenantId = req.tenant?.tenantId
-
+    const tenantId = req.ctx?.tenantId
     if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
     }
 
     let sql =
-      'SELECT f.*, u.email as user_email FROM faculty f LEFT JOIN users u ON f.user_id = u.id WHERE u.platform_id = $1'
+      'SELECT f.*, u.email as user_email FROM faculty f LEFT JOIN users u ON f.user_id = u.id WHERE f.tenant_id = $1'
     const params: any[] = [tenantId]
 
     if (departmentId) {
@@ -266,26 +294,33 @@ router.get('/faculty', authenticateToken, async (req: TenantAwareRequest, res: R
 })
 
 // GET single faculty (tenant-scoped)
-router.get('/faculty/:facultyId', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.get('/faculty/:facultyId', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const { facultyId } = req.params
-    const faculty = await queries.getFacultyById(facultyId)
+    const tenantId = req.ctx?.tenantId
+    if (!tenantId) {
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
+    }
 
-    if (!faculty) {
+    const result = await query(
+      `SELECT f.*, u.email AS user_email, u.full_name
+         FROM faculty f
+         LEFT JOIN users u ON u.id = f.user_id
+        WHERE f.id = $1 AND f.tenant_id = $2`,
+      [facultyId, tenantId]
+    )
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Faculty not found' })
     }
 
-    // Enforce tenant ownership of faculty record
-    await verifyTenantOwnsResource(req.tenant, faculty, 'Faculty')
-
-    return res.json({ data: faculty })
+    return res.json({ data: result.rows[0] })
   } catch (error: any) {
     return res.status(500).json({ error: error.message })
   }
 })
 
 // CREATE faculty (tenant-scoped)
-router.post('/faculty', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.post('/faculty', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const {
       userId,
@@ -304,9 +339,9 @@ router.post('/faculty', authenticateToken, async (req: TenantAwareRequest, res: 
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    const tenantId = req.tenant?.tenantId
+    const tenantId = req.ctx?.tenantId
     if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
     }
 
     // Check if faculty already exists in this tenant
@@ -314,7 +349,7 @@ router.post('/faculty', authenticateToken, async (req: TenantAwareRequest, res: 
       `SELECT f.id
        FROM faculty f
        JOIN users u ON f.user_id = u.id
-       WHERE f.employee_id = $1 AND u.platform_id = $2`,
+       WHERE f.employee_id = $1 AND f.tenant_id = $2`,
       [employeeId, tenantId]
     )
     if (existing.rows.length > 0) {
@@ -338,7 +373,7 @@ router.post('/faculty', authenticateToken, async (req: TenantAwareRequest, res: 
 })
 
 // UPDATE faculty (tenant-scoped)
-router.put('/faculty/:facultyId', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.put('/faculty/:facultyId', authenticateToken, async (req: TenantRequest, res: Response) => {
   try {
     const { facultyId } = req.params
     const updates = req.body
@@ -358,16 +393,16 @@ router.put('/faculty/:facultyId', authenticateToken, async (req: TenantAwareRequ
       return res.status(400).json({ error: 'No valid fields to update' })
     }
 
-    const tenantId = req.tenant?.tenantId
+    const tenantId = req.ctx?.tenantId
     if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+      return res.status(403).json({ error: 'Forbidden', message: 'No tenant in context' })
     }
 
     values.push(facultyId, tenantId)
     const sql = `UPDATE faculty SET ${updateParts.join(
       ', '
     )} WHERE id = $${values.length - 1} AND id IN (
-      SELECT f.id FROM faculty f JOIN users u ON f.user_id = u.id WHERE u.platform_id = $${values.length}
+      SELECT f.id FROM faculty f WHERE f.tenant_id = $${values.length}
     ) RETURNING *`
 
     const result = await query(sql, values)

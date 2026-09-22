@@ -23,6 +23,14 @@ async function main() {
   await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)
   await query(`DELETE FROM attendance_submissions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM school_attendance WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  // Face templates and their verification attempts hang off students and
+  // sessions; course_sessions.lecturer_id is RESTRICT, so sessions have to go
+  // before the faculty rows they name.
+  await query(`DELETE FROM face_recognition_verifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM face_recognition_enrollments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM student_face_embeddings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM course_sessions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM tenant_settings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM student_courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM students WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM class_schedules WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)

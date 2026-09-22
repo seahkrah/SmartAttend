@@ -229,6 +229,9 @@ export interface SessionAttendanceRecord extends AttendanceRecord {
   faceVerificationId?: string;
   faceEnrollmentId?: string;
   faceVerified: boolean;
+  /** When the mark was recorded. school_attendance.marked_at is the column
+   *  that carries this; the table has no created_at/updated_at pair. */
+  markedAt?: string;
 }
 
 export interface MarkAttendanceWithFaceRequest {

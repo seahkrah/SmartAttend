@@ -13,7 +13,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node"
+    // node10 resolution still matches how this package is consumed; the flag
+    // silences the TypeScript 7.0 deprecation error without changing it.
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

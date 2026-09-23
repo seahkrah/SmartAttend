@@ -2,7 +2,7 @@
   "name": "jjelotech-backend",
   "version": "1.0.0",
   "description": "JJELOTECH backend API",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",

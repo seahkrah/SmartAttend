@@ -179,7 +179,7 @@ export function extractClientTimestamp(req: Request): Date | null {
  */
 function generateChecksum(data: any): string {
   const json = JSON.stringify(data, Object.keys(data).sort())
-  return crypto.createHash('sha256').update(json).hexdigest()
+  return crypto.createHash('sha256').update(json).digest('hex')
 }
 
 /**
@@ -318,7 +318,8 @@ function classifyDriftCategory(driftSeconds: number): DriftCategory {
 function determineAction(
   driftSeconds: number,
   category: DriftCategory
-): { actionTaken: ActionTaken; isAccepted: boolean; incidentSeverity?: string } {
+): { actionTaken: ActionTaken; isAccepted: boolean
+     incidentSeverity?: 'WARNING' | 'URGENT' | 'CRITICAL' } {
   const absDrift = Math.abs(driftSeconds)
 
   if (category === 'ACCEPTABLE') {
@@ -563,8 +564,10 @@ export async function getTenantClockDriftStats(tenantId: string): Promise<any> {
         COUNT(*) FILTER (WHERE drift_category = 'ACCEPTABLE') as acceptable_count,
         AVG(ABS(drift_seconds)) as avg_drift_seconds,
         MAX(ABS(drift_seconds)) as max_drift_seconds
-       FROM drift_audit_log 
-       WHERE user_id IN (SELECT id FROM users WHERE tenant_id = $1)`,
+       FROM drift_audit_log
+        -- users has no tenant_id: a user belongs to a tenant through the
+        -- membership view, not through a column on their own row.
+        WHERE user_id IN (SELECT user_id FROM user_tenant_memberships WHERE tenant_id = $1)`,
       [tenantId]
     )
 

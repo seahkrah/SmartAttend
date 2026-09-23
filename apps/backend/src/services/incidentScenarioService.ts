@@ -69,7 +69,7 @@ export async function scenario_CriticalDatabaseOutage(
     let stepStart = Date.now()
     const createResult = await query(
       `INSERT INTO incidents 
-        (title, description, severity, status, error_source, platform_id) 
+        (title, description, severity, status, detection_source, platform_id) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
@@ -167,15 +167,10 @@ export async function scenario_CriticalDatabaseOutage(
       rootCause: 'Connection pool size (50) insufficient for 5000+ concurrent users during peak hours',
       assignedByUserId: userId,
       confidence: 'high',
-      analysisNotes: 'Correlation: Load spike at 16:45 UTC coincides with connection exhaustion',
-      analysisEvidence: {
-        metrics: {
-          peak_connections: 5240,
-          pool_size: 50,
-          response_time_p99_ms: 45000,
-          timeout_rate: 0.95,
-        },
-      },
+      analysisNotes:
+        'Correlation: Load spike at 16:45 UTC coincides with connection exhaustion. '
+        + 'Evidence: peak_connections=5240, pool_size=50, '
+        + 'response_time_p99_ms=45000, timeout_rate=0.95',
     })
     steps.push({
       name: 'Assign root cause',
@@ -219,7 +214,7 @@ export async function scenario_CriticalDatabaseOutage(
 
     // Step 8: Resolve with complete summary (MUST include all 3 fields)
     stepStart = Date.now()
-    await resolveIncident(incidentId, userId, {
+    await resolveIncident(incidentId, {
       rootCause:
         'Connection pool exhaustion: Configuration insufficient for peak load patterns (5000+ concurrent users)',
       remediationSteps:
@@ -230,7 +225,7 @@ export async function scenario_CriticalDatabaseOutage(
         'Prevented 4-hour system outage affecting 250k+ users; estimated cost avoidance: $500k',
       postMortemUrl:
         'https://postmortem.example.com/incidents/2026-02-05-database-outage',
-    })
+    }, userId)
     steps.push({
       name: 'Resolve incident',
       status: 'passed',
@@ -248,9 +243,10 @@ export async function scenario_CriticalDatabaseOutage(
 
     // Step 9: Close incident
     stepStart = Date.now()
-    await closeIncident(incidentId, userId, {
-      closureNote: 'All prevention measures implemented and verified in production',
-    })
+    await closeIncident(
+      incidentId, userId,
+      'All prevention measures implemented and verified in production'
+    )
     steps.push({
       name: 'Close incident',
       status: 'passed',
@@ -319,7 +315,7 @@ export async function scenario_SecurityBreach(userId: string, platformId: string
     let stepStart = Date.now()
     const createResult = await query(
       `INSERT INTO incidents 
-        (title, description, severity, status, error_source, platform_id) 
+        (title, description, severity, status, detection_source, platform_id) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
@@ -416,7 +412,7 @@ export async function scenario_InvalidStateTransitions(
     // Create incident
     const createResult = await query(
       `INSERT INTO incidents 
-        (title, description, severity, status, error_source, platform_id) 
+        (title, description, severity, status, detection_source, platform_id) 
        VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
@@ -433,11 +429,11 @@ export async function scenario_InvalidStateTransitions(
     // Try invalid transition: open → resolved (should fail)
     let failedAsExpected = false
     try {
-      await resolveIncident(incidentId, userId, {
+      await resolveIncident(incidentId, {
         rootCause: 'Cannot resolve without investigation',
         remediationSteps: 'N/A',
         preventionMeasures: 'N/A',
-      })
+      }, userId)
     } catch (error: any) {
       failedAsExpected = error.message.includes('must be')
     }

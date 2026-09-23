@@ -257,126 +257,6 @@ export async function simulatePartialOutage(
  * Simulate duplicate attendance submissions (idempotency test)
  * Tests that duplicate submissions don't create multiple records
  */
-export async function simulateDuplicateStorm(
-  tenantId: string,
-  scenario: DuplicateStormScenario
-): Promise<SimulationResult> {
-  const startTime = Date.now();
-  const results: SimulationResult = {
-    scenario: 'duplicate_storm',
-    status: 'passed',
-    tests_run: 0,
-    tests_passed: 0,
-    tests_failed: 0,
-    issues_found: [],
-    metrics_collected: 0,
-    duration_ms: 0,
-    timestamp: new Date(),
-  };
-
-  try {
-    // Create a test school attendance record
-    const createResult = await query(
-      `INSERT INTO school_attendance (
-        school_id, student_id, attendance_date, is_present, 
-        marked_at, marked_by_user_id, attendance_state
-      ) VALUES (
-        'test-school-001', 'test-student-001', $1, true,
-        CURRENT_TIMESTAMP, 'test-user-001', 'VERIFIED'
-      ) RETURNING id`,
-      [new Date()]
-    );
-
-    const attendanceId = createResult.rows[0].id;
-
-    // Simulate rapid duplicate submissions
-    const duplicatePromises = [];
-    for (let batch = 0; batch < Math.ceil(scenario.duplicate_submissions / scenario.batch_size); batch++) {
-      for (let i = 0; i < scenario.batch_size && batch * scenario.batch_size + i < scenario.duplicate_submissions; i++) {
-        results.tests_run++;
-
-        // All submissions reference same attendance record (duplicate)
-        const promise = (async () => {
-          try {
-            // Try to update the same record multiple times (idempotency test)
-            await query(
-              `UPDATE school_attendance 
-               SET face_verified = true, face_verification_at = CURRENT_TIMESTAMP
-               WHERE id = $1`,
-              [attendanceId]
-            );
-
-            results.metrics_collected++;
-            results.tests_passed++;
-          } catch (error: any) {
-            results.tests_failed++;
-            results.issues_found.push(
-              `Duplicate submission ${batch}-${i} failed: ${error.message}`
-            );
-          }
-        })();
-
-        duplicatePromises.push(promise);
-
-        // Batch interval
-        if ((batch * scenario.batch_size + i + 1) % scenario.batch_size === 0) {
-          await new Promise(resolve => setTimeout(resolve, scenario.interval_ms));
-        }
-      }
-    }
-
-    // Wait for all submissions to complete
-    await Promise.all(duplicatePromises);
-
-    // Verify only one record exists for this attendance
-    const recordCount = await query(
-      `SELECT COUNT(*) as count FROM school_attendance 
-       WHERE id = $1 AND created_at >= NOW() - INTERVAL '5 minutes'`,
-      [attendanceId]
-    );
-
-    if (recordCount.rows[0].count !== 1) {
-      results.issues_found.push(
-        `Duplicate record creation detected: ${recordCount.rows[0].count} records found, expected 1`
-      );
-      results.status = 'failed';
-    }
-
-    // Verify no orphaned records
-    const orphanedRecords = await query(
-      `SELECT COUNT(*) as count FROM school_attendance 
-       WHERE student_id = 'test-student-001' AND school_id = 'test-school-001'
-       AND created_at >= NOW() - INTERVAL '5 minutes'`
-    );
-
-    if (orphanedRecords.rows[0].count > 1) {
-      results.issues_found.push(
-        `Duplicate records created: ${orphanedRecords.rows[0].count} records for same student`
-      );
-      results.status = 'failed';
-    }
-
-    // Cleanup test record
-    await query(`DELETE FROM school_attendance WHERE id = $1 RETURNING id`, [attendanceId]);
-
-    results.status = results.issues_found.length === 0 ? 'passed' : results.status === 'failed' ? 'failed' : 'warning';
-  } catch (error: any) {
-    results.status = 'failed';
-    results.issues_found.push(`Simulation error: ${error.message}`);
-  }
-
-  results.duration_ms = Date.now() - startTime;
-  return results;
-}
-
-// ============================================================================
-// NETWORK INSTABILITY SIMULATION
-// ============================================================================
-
-/**
- * Simulate network instability: random failures, latency spikes, timeouts
- * Tests retry logic, circuit breakers, and graceful degradation
- */
 export async function simulateNetworkInstability(
   tenantId: string,
   scenario: NetworkInstabilityScenario
@@ -508,6 +388,8 @@ export async function simulateNetworkInstability(
 export interface SimulationSuite {
   tenant_id: string;
   scenarios: string[];
+  /** Scenarios that could not run, so a reader knows what is not covered. */
+  scenarios_unavailable?: string[];
   total_duration_ms: number;
   overall_status: 'passed' | 'failed' | 'warning';
   results: SimulationResult[];
@@ -555,20 +437,10 @@ export async function runComprehensiveSimulation(
   }
   console.log(`  ✓ Partial outage: ${outageResult.tests_passed}/${outageResult.tests_run} passed`);
 
-  // Duplicate Storm Simulation
-  console.log('[SIMULATION] Running duplicate storm scenario...');
-  const duplicateResult = await simulateDuplicateStorm(tenantId, {
-    duplicate_submissions: 50,
-    batch_size: 10,
-    interval_ms: 100,
-  });
-  results.push(duplicateResult);
-  if (duplicateResult.status === 'failed') {
-    overallStatus = 'failed';
-  } else if (duplicateResult.status === 'warning' && overallStatus === 'passed') {
-    overallStatus = 'warning';
-  }
-  console.log(`  ✓ Duplicate storm: ${duplicateResult.tests_passed}/${duplicateResult.tests_run} passed`);
+  // The duplicate-storm scenario is deliberately absent. It was written
+  // against columns school_attendance does not have, so its insert always
+  // threw and it reported its own error as a finding about the platform — a
+  // scenario that cannot run must not contribute a verdict.
 
   // Network Instability Simulation
   console.log('[SIMULATION] Running network instability scenario...');
@@ -588,7 +460,10 @@ export async function runComprehensiveSimulation(
 
   const suite: SimulationSuite = {
     tenant_id: tenantId,
-    scenarios: ['time_drift', 'partial_outage', 'duplicate_storm', 'network_instability'],
+    scenarios: ['time_drift', 'partial_outage', 'network_instability'],
+    // Named so a reader of the report knows what was not covered rather than
+    // assuming the three that ran are the whole set.
+    scenarios_unavailable: ['duplicate_storm'],
     total_duration_ms: Date.now() - startTime,
     overall_status: overallStatus,
     results,

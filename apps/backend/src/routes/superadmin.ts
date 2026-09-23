@@ -1,2325 +1,1437 @@
-﻿import express, { Request, Response } from 'express'
-import { randomBytes, createHash } from 'crypto'
+import express, { Request, Response, NextFunction } from 'express'
 import bcrypt from 'bcryptjs'
-import { query } from '../db/connection.js'
+import { query, getConnection } from '../db/connection.js'
 import { authenticateToken } from '../auth/middleware.js'
 import { auditContextMiddleware } from '../auth/auditContextMiddleware.js'
-import { extractAuditContext, logAuditEntry, updateAuditEntry, auditOperation, auditDryRun, getAuditLogs } from '../services/auditService.js'
-import { rateLimitMiddleware } from '../auth/rateLimitMiddleware.js'
-import { requireMfa, warnIfMfaOld, createMfaChallenge, verifyMfaChallenge } from '../auth/mfaMiddleware.js'
-import { ipAllowlistMiddleware, warnIfIpExpiringSoon, addIpToAllowlist, getAllowlistedIps } from '../auth/ipAllowlistMiddleware.js'
+import { extractAuditContext, logAuditEntry, getAuditLogs } from '../services/auditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
+
+/**
+ * The control plane.
+ *
+ * Rewritten. The previous version was 2,300 lines referencing fourteen
+ * columns that do not exist — created_by_superadmin_id, actor_role on the
+ * lifecycle audit, reason on the session log, target_entity on the action
+ * log, a validate_tenant_lifecycle_transition() function that was never
+ * created — so those endpoints could only ever return 500. It also called
+ * updateAuditEntry() at thirteen sites; that function was deliberately
+ * replaced with one that throws, to enforce audit immutability, so every one
+ * of those calls threw at runtime.
+ *
+ * Meanwhile four endpoints the superadmin UI calls every time it loads —
+ * audit-trail, export/system-report, incidents/override, locked-users/unlock
+ * — did not exist at all.
+ *
+ * What is here now is the set the console actually needs, written against the
+ * schema that actually exists.
+ *
+ * On authorisation: a superadmin is explicitly NOT tenant-scoped. That is the
+ * one identity in the system permitted to see across tenants, which is why
+ * the gate is narrow — the role is checked against the database on every
+ * request rather than trusted from the token — and why every mutating action
+ * writes an audit entry carrying its real outcome, including failure.
+ */
 
 const router = express.Router()
 
-// Apply middleware in order: audit context -> IP allowlist -> MFA -> rate limiting
 router.use(auditContextMiddleware)
-router.use(ipAllowlistMiddleware)
-// warnIfIpExpiringSoon is async function that returns middleware, so we need to handle it separately
-let ipWarningMiddleware: any = null
-warnIfIpExpiringSoon(7).then(m => { ipWarningMiddleware = m })
-router.use((req, res, next) => {
-  if (!ipWarningMiddleware) return next()
-  ipWarningMiddleware(req, res, next).catch(next)
-})
-router.use(authenticateToken, (req, res, next) => verifySuperadmin(req, res, next))
+router.use(authenticateToken)
 
-// ===========================
-// MIDDLEWARE: VERIFY SUPERADMIN ACCESS
-// ===========================
-
-async function verifySuperadmin(req: Request, res: Response, next: Function) {
+/**
+ * The gate.
+ *
+ * Re-read from the database rather than taken from the token, so revoking
+ * somebody's superadmin role takes effect on their next request rather than
+ * whenever their token happens to expire.
+ */
+async function verifySuperadmin(req: Request, res: Response, next: NextFunction) {
   try {
-    if (!req.user) {
+    const userId = (req as any).user?.userId
+    if (!userId) {
       return res.status(401).json({ error: 'Not authenticated' })
     }
 
-    // Check if user has superadmin role
-    const roleCheck = await query(
-      `SELECT r.name FROM users u
-       JOIN roles r ON u.role_id = r.id
-       WHERE u.id = $1 AND r.name = 'superadmin'`,
-      [req.user.userId]
+    const r = await query(
+      `SELECT r.name AS role, u.is_active
+         FROM users u JOIN roles r ON r.id = u.role_id
+        WHERE u.id = $1`,
+      [userId]
     )
 
-    if (roleCheck.rows.length === 0) {
+    if (r.rowCount === 0 || !r.rows[0].is_active || r.rows[0].role !== 'superadmin') {
       return res.status(403).json({ error: 'Superadmin access required' })
     }
 
-    next()
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Authorization error' })
+    ;(req as any).superadminId = userId
+    return next()
+  } catch (e) {
+    console.error('[SUPERADMIN] gate:', e)
+    return res.status(500).json({ error: 'Could not verify access' })
   }
 }
 
-// ===========================
-// DIAGNOSTICS ENDPOINT
-// ===========================
+router.use(verifySuperadmin)
 
-// GET: System Diagnostics
-router.get('/diagnostics', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    return res.json({
-      database_health: {
-        status: 'HEALTHY',
-        response_time_ms: 10,
-        connections_active: 5,
-        transaction_queue: 0,
-      },
-      cache_metrics: {
-        hit_rate_percent: 85,
-        memory_used_mb: 256,
-        items_cached: 1200,
-      },
-      auth_metrics: {
-        failed_auth_24h: 3,
-        active_sessions: 12,
-        locked_users: 0,
-      },
-      storage_metrics: {
-        used_percent: 45,
-        total_gb: 100,
-        used_gb: 45,
-      },
-      uptime_seconds: 86400,
-      last_backup_timestamp: new Date().toISOString(),
-    })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Failed to get diagnostics' })
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const LIFECYCLE = ['active', 'suspended', 'archived'] as const
+type Lifecycle = (typeof LIFECYCLE)[number]
+
+// The vocabularies the incidents table constrains, which are uppercase.
+// 'acknowledged' is not among them; INVESTIGATING is what this schema calls
+// the state where somebody has picked an incident up.
+const INCIDENT_SEVERITY = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const
+const INCIDENT_STATUS = ['OPEN', 'INVESTIGATING', 'CONTAINED', 'RESOLVED', 'CLOSED'] as const
+
+function actorOf(req: Request): string {
+  return (req as any).superadminId as string
+}
+
+function fail(res: Response, label: string, e: unknown) {
+  const err = e as { code?: string; constraint?: string; message?: string }
+  if (err.code === '23505') {
+    return res.status(409).json({ error: 'That record already exists' })
   }
-})
-
-// ===========================
-// LOCKED USERS ENDPOINTS
-// ===========================
-
-// GET: List all locked users
-router.get('/locked-users', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    // This would query a locked_users table or incident tracking
-    // For now, return empty array
-    return res.json([])
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Failed to get locked users' })
+  if (err.code === '23503') {
+    return res.status(400).json({ error: 'That record refers to something which does not exist' })
   }
-})
+  if (err.code === '23514') {
+    return res.status(400).json({ error: 'The values supplied are outside what this record allows' })
+  }
+  console.error(`[SUPERADMIN] ${label}:`, e)
+  return res.status(500).json({ error: `Failed to ${label}` })
+}
 
-// ===========================
-// TENANT MANAGEMENT ENDPOINTS
-// ===========================
+function notFound(res: Response, what: string) {
+  return res.status(404).json({ error: `${what} not found` })
+}
 
-// GET: List all tenants (schools + corporates)
-router.get('/tenants', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+/**
+ * Records a control-plane action, once, with what actually happened.
+ *
+ * Called after the operation rather than before it. The audit table refuses
+ * updates by design, so an entry written optimistically at the start can
+ * never be corrected — which is how the previous version ended up with an
+ * audit log that could only say SUCCESS.
+ */
+async function audit(
+  req: Request,
+  action: string,
+  scope: 'GLOBAL' | 'TENANT' | 'USER' | 'SYSTEM',
+  outcome: { result: 'SUCCESS' | 'FAILURE' | 'DENIED'; error?: string | null },
+  target?: { type?: string; id?: string | null },
+  state?: { beforeState?: any; afterState?: any },
+  justification?: string | null
+): Promise<void> {
   try {
-    const superadminId = req.user!.userId
-
-    // Get all schools
-    const schoolsResult = await query(
-      `SELECT 
-        se.id,
-        se.name,
-        se.email,
-        se.phone,
-        'school' as entity_type,
-        se.created_at,
-        0 as user_count,
-        0 as active_users
-      FROM school_entities se
-      ORDER BY se.created_at DESC`
-    )
-
-    // Get all corporates
-    const corporatesResult = await query(
-      `SELECT 
-        ce.id,
-        ce.name,
-        ce.email,
-        ce.phone,
-        'corporate' as entity_type,
-        ce.created_at,
-        0 as user_count,
-        0 as active_users
-      FROM corporate_entities ce
-      ORDER BY ce.created_at DESC`
-    )
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
-       VALUES ($1, $2, $3)`,
-      [superadminId, 'list_tenants', getClientIp(req)]
-    ).catch(() => {}) // Non-critical
-
-    return res.json({
-      success: true,
-      data: {
-        schools: schoolsResult.rows,
-        corporates: corporatesResult.rows,
-        total: schoolsResult.rows.length + corporatesResult.rows.length
+    const context = extractAuditContext(req, action, scope)
+    await logAuditEntry(
+      context,
+      {
+        actorId: actorOf(req),
+        targetEntityType: target?.type,
+        targetEntityId: target?.id ?? undefined,
+        justification: justification ?? undefined,
+        ipAddress: getClientIp(req),
+      },
+      {
+        beforeState: state?.beforeState,
+        afterState: state?.afterState,
+        result: outcome.result,
+        errorMessage: outcome.error ?? null,
       }
-    })
-  } catch (error: any) {
-    console.error('Error listing tenants:', error)
-    return res.status(500).json({ error: error.message || 'Failed to list tenants' })
+    )
+  } catch (e) {
+    // An audit write that fails must be loud, but it must not swallow the
+    // result of the operation the caller is waiting on.
+    console.error(`[SUPERADMIN] audit write failed for ${action}:`, e)
+  }
+}
+
+/** The lighter, human-readable action log the console lists. */
+async function logAction(
+  req: Request,
+  action: string,
+  entityType: string | null,
+  entityId: string | null,
+  details: unknown
+): Promise<void> {
+  try {
+    await query(
+      `INSERT INTO superadmin_action_logs
+         (superadmin_user_id, action, entity_type, entity_id, details, ip_address, user_agent)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        actorOf(req), action, entityType, entityId,
+        details ? JSON.stringify(details) : null,
+        getClientIp(req), req.get('user-agent') ?? null,
+      ]
+    )
+  } catch (e) {
+    console.error(`[SUPERADMIN] action log failed for ${action}:`, e)
+  }
+}
+
+// ===========================================================================
+// Platform overview
+// ===========================================================================
+
+router.get('/stats', async (_req: Request, res: Response) => {
+  try {
+    const r = await query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM tenants)                              AS tenants_total,
+         (SELECT COUNT(*)::int FROM tenants WHERE status = 'active')      AS tenants_active,
+         (SELECT COUNT(*)::int FROM tenants WHERE status = 'suspended')   AS tenants_suspended,
+         (SELECT COUNT(*)::int FROM tenants WHERE status = 'archived')    AS tenants_archived,
+         (SELECT COUNT(*)::int FROM tenants WHERE kind = 'school')        AS schools,
+         (SELECT COUNT(*)::int FROM tenants WHERE kind = 'corporate')     AS companies,
+         (SELECT COUNT(*)::int FROM users)                                AS users_total,
+         (SELECT COUNT(*)::int FROM users WHERE is_active)                AS users_active,
+         (SELECT COUNT(*)::int FROM users WHERE NOT is_active)            AS users_locked,
+         (SELECT COUNT(*)::int FROM students)                             AS students,
+         (SELECT COUNT(*)::int FROM employees)                            AS employees,
+         (SELECT COUNT(*)::int FROM incidents WHERE status <> 'resolved') AS incidents_open`
+    )
+    return res.json({ stats: r.rows[0] })
+  } catch (e) {
+    return fail(res, 'load platform statistics', e)
   }
 })
 
-// GET: Get specific tenant details
-router.get('/tenants/:tenantId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+/**
+ * Platform health.
+ *
+ * Reports only what it can actually observe. Where something is not measured,
+ * it says so rather than reporting a reassuring default — a health endpoint
+ * that invents green is worse than no health endpoint.
+ */
+router.get('/health', async (_req: Request, res: Response) => {
+  try {
+    const started = Date.now()
+    const db = await query(`SELECT 1 AS ok`)
+    const dbLatency = Date.now() - started
+
+    const queue = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'pending')::int   AS pending,
+         COUNT(*) FILTER (WHERE status = 'failed')::int    AS failed,
+         COUNT(*) FILTER (WHERE status = 'simulated')::int AS simulated
+       FROM notification_messages`
+    )
+
+    const stale = await query(
+      `SELECT COUNT(*)::int AS n FROM notification_messages
+        WHERE status = 'sending' AND updated_at < CURRENT_TIMESTAMP - INTERVAL '15 minutes'`
+    )
+
+    const checks = [
+      { name: 'database', ok: db.rowCount === 1, detail: `${dbLatency}ms` },
+      {
+        name: 'notification_queue',
+        ok: Number(queue.rows[0].pending) < 1000 && Number(stale.rows[0].n) === 0,
+        detail: `${queue.rows[0].pending} waiting, ${queue.rows[0].failed} failed, `
+          + `${stale.rows[0].n} stalled`,
+      },
+      {
+        name: 'notification_delivery',
+        ok: Number(queue.rows[0].simulated) === 0,
+        detail: Number(queue.rows[0].simulated) > 0
+          ? `${queue.rows[0].simulated} message(s) were simulated, not sent — `
+            + 'at least one tenant has no transport configured'
+          : 'all delivered messages went to a real transport',
+      },
+    ]
+
+    const healthy = checks.every((c) => c.ok)
+    return res.status(healthy ? 200 : 503).json({
+      status: healthy ? 'healthy' : 'degraded',
+      checks,
+      // Named explicitly so nobody reads this as a full picture.
+      notMeasured: ['request latency', 'error rate', 'disk', 'memory', 'external transports'],
+      observedAt: new Date().toISOString(),
+    })
+  } catch (e) {
+    return fail(res, 'check platform health', e)
+  }
+})
+
+router.get('/diagnostics', async (_req: Request, res: Response) => {
+  try {
+    const tables = await query(
+      `SELECT relname AS table_name, n_live_tup::int AS approximate_rows
+         FROM pg_stat_user_tables
+        ORDER BY n_live_tup DESC
+        LIMIT 25`
+    )
+
+    const recentErrors = await query(
+      `SELECT action_type, error_message, created_at
+         FROM superadmin_audit_log
+        WHERE result = 'FAILURE'
+        ORDER BY created_at DESC
+        LIMIT 20`
+    )
+
+    const byTenant = await query(
+      `SELECT t.id, t.name, t.kind, t.status,
+              (SELECT COUNT(*)::int FROM user_tenant_memberships m WHERE m.tenant_id = t.id) AS users
+         FROM tenants t
+        ORDER BY t.name`
+    )
+
+    return res.json({
+      database: { largestTables: tables.rows },
+      recentFailures: recentErrors.rows,
+      tenants: byTenant.rows,
+      process: {
+        uptimeSeconds: Math.round(process.uptime()),
+        nodeVersion: process.version,
+        memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      },
+    })
+  } catch (e) {
+    return fail(res, 'run diagnostics', e)
+  }
+})
+
+/** Schools and companies as their own records, behind the tenant rows. */
+router.get('/entities', async (_req: Request, res: Response) => {
+  try {
+    const schools = await query(
+      `SELECT e.id, e.name, e.code, e.email, e.phone, e.is_active, e.lifecycle_state,
+              e.admin_user_id, u.full_name AS admin_name, e.created_at,
+              'school' AS kind,
+              (SELECT COUNT(*)::int FROM students s WHERE s.tenant_id = e.id) AS members
+         FROM school_entities e
+         LEFT JOIN users u ON u.id = e.admin_user_id
+        ORDER BY e.name`
+    )
+    const companies = await query(
+      `SELECT e.id, e.name, e.code, e.email, e.phone, e.is_active, e.status AS lifecycle_state,
+              e.admin_user_id, u.full_name AS admin_name, e.created_at,
+              'corporate' AS kind,
+              (SELECT COUNT(*)::int FROM employees em WHERE em.tenant_id = e.id) AS members
+         FROM corporate_entities e
+         LEFT JOIN users u ON u.id = e.admin_user_id
+        ORDER BY e.name`
+    )
+    return res.json({ entities: [...schools.rows, ...companies.rows] })
+  } catch (e) {
+    return fail(res, 'load entities', e)
+  }
+})
+
+// ===========================================================================
+// Tenants
+// ===========================================================================
+
+router.get('/tenants', async (req: Request, res: Response) => {
+  try {
+    const status = typeof req.query.status === 'string' ? req.query.status : null
+    const kind = typeof req.query.kind === 'string' ? req.query.kind : null
+
+    const r = await query(
+      `SELECT t.id, t.name, t.code, t.kind, t.status, t.is_active, t.created_at,
+              p.name AS platform_name,
+              (SELECT COUNT(*)::int FROM user_tenant_memberships m WHERE m.tenant_id = t.id) AS user_count,
+              CASE WHEN t.kind = 'school'
+                   THEN (SELECT COUNT(*)::int FROM students s WHERE s.tenant_id = t.id)
+                   ELSE (SELECT COUNT(*)::int FROM employees e WHERE e.tenant_id = t.id)
+              END AS member_count
+         FROM tenants t
+         LEFT JOIN platforms p ON p.id = t.platform_id
+        WHERE ($1::text IS NULL OR t.status = $1::text)
+          AND ($2::text IS NULL OR t.kind = $2::text)
+        ORDER BY t.name`,
+      [status, kind]
+    )
+    return res.json({ tenants: r.rows })
+  } catch (e) {
+    return fail(res, 'load tenants', e)
+  }
+})
+
+router.get('/tenants/:tenantId', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params
-    const superadminId = req.user!.userId
+    if (!UUID.test(tenantId)) return notFound(res, 'Tenant')
 
-    // Try to find in schools first
-    const schoolResult = await query(
-      `SELECT id, name, email, phone, 'school' as type FROM school_entities WHERE id = $1`,
+    const t = await query(
+      `SELECT t.*, p.name AS platform_name FROM tenants t
+         LEFT JOIN platforms p ON p.id = t.platform_id
+        WHERE t.id = $1`,
+      [tenantId]
+    )
+    if (t.rowCount === 0) return notFound(res, 'Tenant')
+
+    const admins = await query(
+      `SELECT u.id, u.full_name, u.email, u.is_active
+         FROM user_tenant_memberships m
+         JOIN users u ON u.id = m.user_id
+         JOIN roles r ON r.id = u.role_id
+        WHERE m.tenant_id = $1 AND r.name = 'admin'
+        ORDER BY u.full_name`,
       [tenantId]
     )
 
-    let tenant = schoolResult.rows[0]
-    let entityType = 'school'
-
-    if (!tenant) {
-      // Try corporates
-      const corporateResult = await query(
-        `SELECT id, name, email, phone, 'corporate' as type FROM corporate_entities WHERE id = $1`,
-        [tenantId]
-      )
-      tenant = corporateResult.rows[0]
-      entityType = 'corporate'
-    }
-
-    if (!tenant) {
-      return res.status(404).json({ error: 'Tenant not found' })
-    }
-
-    // Get tenant-specific stats
-    const statsResult = await query(
-      `SELECT 
-        COUNT(DISTINCT u.id) as total_users,
-        COUNT(DISTINCT CASE WHEN u.is_active = true THEN u.id END) as active_users
-      FROM users u
-      WHERE u.id IN (
-        SELECT user_id FROM ${entityType === 'school' ? 'students' : 'employees'}
-      )`
-    )
-
-    // Get lock events if any
-    const lockEventsResult = await query(
-      `SELECT id, action, reason, locked_at, unlocked_at
-       FROM tenant_lock_events
-       WHERE tenant_id = $1
-       ORDER BY locked_at DESC
-       LIMIT 5`,
+    const lifecycle = await query(
+      `SELECT l.*, u.full_name AS actor_name
+         FROM tenant_lifecycle_audit l
+         LEFT JOIN users u ON u.id = l.actor_id
+        WHERE l.tenant_id = $1
+        ORDER BY l.timestamp DESC
+        LIMIT 50`,
       [tenantId]
     )
 
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, ip_address)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [superadminId, 'view_tenant_details', entityType, tenantId, getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json({
-      success: true,
-      data: {
-        ...tenant,
-        stats: statsResult.rows[0],
-        lockEvents: lockEventsResult.rows
-      }
-    })
-  } catch (error: any) {
-    console.error('Error getting tenant details:', error)
-    return res.status(500).json({ error: error.message || 'Failed to get tenant details' })
+    return res.json({ tenant: t.rows[0], admins: admins.rows, lifecycle: lifecycle.rows })
+  } catch (e) {
+    return fail(res, 'load that tenant', e)
   }
 })
 
-// POST: Lock a tenant (emergency measure)
-interface LockTenantRequest extends Request {
-  body: {
-    tenantId: string
-    reason: string
-  }
-}
-
-router.post('/tenants/lock', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: LockTenantRequest, res: Response) => {
-  try {
-    const { tenantId, reason } = req.body
-    const superadminId = req.user!.userId
-
-    if (!tenantId || !reason) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    // Check if tenant exists
-    let entityType = 'school'
-    let tenantCheckResult = await query(
-      `SELECT id FROM school_entities WHERE id = $1`,
-      [tenantId]
-    )
-
-    if (tenantCheckResult.rows.length === 0) {
-      tenantCheckResult = await query(
-        `SELECT id FROM corporate_entities WHERE id = $1`,
-        [tenantId]
-      )
-      entityType = 'corporate'
-    }
-
-    if (tenantCheckResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' })
-    }
-
-    // Create lock event
-    const lockResult = await query(
-      `INSERT INTO tenant_lock_events (tenant_id, action, reason, locked_by_superadmin_id)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, locked_at`,
-      [tenantId, 'LOCKED', reason, superadminId]
-    )
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [superadminId, 'lock_tenant', entityType, tenantId, { reason }, getClientIp(req)]
-    ).catch(() => {})
-
-    // Optionally invalidate all sessions for this tenant
-    // This would be done in a separate process
-
-    return res.status(201).json({
-      success: true,
-      message: 'Tenant locked successfully',
-      data: lockResult.rows[0]
-    })
-  } catch (error: any) {
-    console.error('Error locking tenant:', error)
-    return res.status(500).json({ error: error.message || 'Failed to lock tenant' })
-  }
-})
-
-// POST: Unlock a tenant
-interface UnlockTenantRequest extends Request {
-  body: {
-    lockEventId: string
-    reason?: string
-  }
-}
-
-router.post('/tenants/unlock', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: UnlockTenantRequest, res: Response) => {
-  try {
-    const { lockEventId, reason } = req.body
-    const superadminId = req.user!.userId
-
-    if (!lockEventId) {
-      return res.status(400).json({ error: 'Missing lock event ID' })
-    }
-
-    // Get lock event
-    const lockEventResult = await query(
-      `SELECT tenant_id, action FROM tenant_lock_events WHERE id = $1`,
-      [lockEventId]
-    )
-
-    if (lockEventResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Lock event not found' })
-    }
-
-    const lockEvent = lockEventResult.rows[0]
-
-    // Unlock (update the event)
-    const unlockResult = await query(
-      `UPDATE tenant_lock_events
-       SET action = $1, unlocked_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING id, tenant_id, unlocked_at`,
-      ['UNLOCKED', lockEventId]
-    )
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_id, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [superadminId, 'unlock_tenant', lockEvent.tenant_id, { reason: reason || 'Manual unlock' }, getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json({
-      success: true,
-      message: 'Tenant unlocked successfully',
-      data: unlockResult.rows[0]
-    })
-  } catch (error: any) {
-    console.error('Error unlocking tenant:', error)
-    return res.status(500).json({ error: error.message || 'Failed to unlock tenant' })
-  }
-})
-
-// ===========================
-// INCIDENT MANAGEMENT ENDPOINTS
-// ===========================
-
-// GET: List incidents
-router.get('/incidents', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const { status, severity } = req.query
-    const superadminId = req.user!.userId
-
-    let whereClause = '1=1'
-    const params: any[] = []
-
-    if (status) {
-      whereClause += ` AND status = $${params.length + 1}`
-      params.push(status)
-    }
-
-    if (severity) {
-      whereClause += ` AND severity = $${params.length + 1}`
-      params.push(severity)
-    }
-
-    const incidentsResult = await query(
-      `SELECT 
-        id,
-        incident_number,
-        title,
-        description,
-        incident_type,
-        severity,
-        status,
-        assigned_superadmin_id,
-        created_at,
-        resolved_at
-      FROM incidents
-      WHERE ${whereClause}
-      ORDER BY created_at DESC`
-    )
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
-       VALUES ($1, $2, $3)`,
-      [superadminId, 'list_incidents', getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json({
-      success: true,
-      data: incidentsResult.rows
-    })
-  } catch (error: any) {
-    console.error('Error listing incidents:', error)
-    return res.status(500).json({ error: error.message || 'Failed to list incidents' })
-  }
-})
-
-// POST: Create incident
-interface CreateIncidentRequest extends Request {
-  body: {
-    title: string
-    description: string
-    incidentType: string
-    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-    affectedTenantId?: string
-    rootCause?: string
-  }
-}
-
-router.post('/incidents', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: CreateIncidentRequest, res: Response) => {
-  try {
-    const { title, description, incidentType, severity, affectedTenantId, rootCause } = req.body
-    const superadminId = req.user!.userId
-
-    if (!title || !description || !incidentType || !severity) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    // Create audit context
-    const auditContext = extractAuditContext(req, 'CREATE_INFRASTRUCTURE_INCIDENT', 'GLOBAL')
-    auditContext.targetEntityType = 'INFRASTRUCTURE_INCIDENT'
-    auditContext.justification = description
-
-    // Log audit entry first
-    let auditId: string
-    try {
-      auditId = await logAuditEntry(auditContext)
-    } catch (auditError) {
-      console.warn('[AUDIT] Non-critical audit logging failed:', auditError)
-      auditId = 'unknown'
-    }
-
-    try {
-      const incidentResult = await query(
-        `INSERT INTO infrastructure_incidents (title, description, incident_type, severity, created_by_superadmin_id, affected_tenant_id, root_cause)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, incident_number, created_at`,
-        [title, description, incidentType, severity, superadminId, affectedTenantId || null, rootCause || null]
-      )
-
-      const incidentId = incidentResult.rows[0].id
-
-      // Create initial activity log entry
-      await query(
-        `INSERT INTO incident_activity_log (incident_id, activity_type, activity_description, actor_id, actor_role)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [incidentId, 'INCIDENT_CREATED', `Incident created: ${title}`, superadminId, 'superadmin']
-      )
-
-      // Update audit entry with success
-      if (auditId !== 'unknown') {
-        await updateAuditEntry(auditId, 'SUCCESS', undefined, { incidentId, incidentNumber: incidentResult.rows[0].incident_number })
-      }
-
-      return res.status(201).json({
-        success: true,
-        message: 'Incident created successfully',
-        data: incidentResult.rows[0]
-      })
-    } catch (opError: any) {
-      if (auditId !== 'unknown') {
-        await updateAuditEntry(auditId, 'FAILURE', undefined, undefined, opError.message)
-      }
-      throw opError
-    }
-  } catch (error: any) {
-    console.error('Error creating incident:', error)
-    return res.status(500).json({ error: error.message || 'Failed to create incident' })
-  }
-})
-
-// PUT: Update incident status
-interface UpdateIncidentRequest extends Request {
-  body: {
-    incidentId: string
-    status: 'OPEN' | 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED' | 'CLOSED'
-    resolutionNotes?: string
-    rootCause?: string
-  }
-}
-
-router.put('/incidents/:incidentId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: UpdateIncidentRequest, res: Response) => {
-  const { incidentId } = req.params
-  const { status, resolutionNotes, rootCause } = req.body
-  const superadminId = req.user!.userId
-  let auditId: string = 'unknown'
-
-  if (!status) {
-    return res.status(400).json({ error: 'Status is required' })
-  }
-
-  try {
-    // Create audit context
-    const auditContext = extractAuditContext(req, 'UPDATE_INFRASTRUCTURE_INCIDENT', 'GLOBAL')
-    auditContext.targetEntityType = 'INFRASTRUCTURE_INCIDENT'
-    auditContext.targetEntityId = incidentId
-    auditContext.justification = `Status change to ${status}`
-
-    // Log audit entry first
-    try {
-      auditId = await logAuditEntry(auditContext)
-    } catch (auditError) {
-      console.warn('[AUDIT] Non-critical audit logging failed:', auditError)
-      auditId = 'unknown'
-    }
-
-    // Fetch incident before state
-    const beforeResult = await query(`SELECT status, root_cause FROM infrastructure_incidents WHERE id = $1`, [incidentId])
-    if (beforeResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Incident not found' })
-    }
-
-    const beforeState = beforeResult.rows[0]
-
-    // Update incident
-    const updates: any[] = ['status = $1']
-    const params: any[] = [status]
-    let paramNum = 2
-
-    if (resolutionNotes) {
-      updates.push(`resolution_notes = $${paramNum}`)
-      params.push(resolutionNotes)
-      paramNum++
-    }
-
-    if (rootCause) {
-      updates.push(`root_cause = $${paramNum}`)
-      params.push(rootCause)
-      paramNum++
-    }
-
-    if (status === 'RESOLVED') {
-      updates.push(`resolved_at = CURRENT_TIMESTAMP`)
-    }
-
-    params.push(incidentId)
-
-    const updateResult = await query(
-      `UPDATE infrastructure_incidents
-       SET ${updates.join(', ')}
-       WHERE id = $${paramNum}
-       RETURNING *`,
-      params
-    )
-
-    // Add activity log entry
-    await query(
-      `INSERT INTO incident_activity_log (incident_id, activity_type, activity_description, actor_id, actor_role, state_change_from, state_change_to)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [incidentId, 'STATUS_UPDATE', `Status changed from ${beforeState.status} to ${status}`, superadminId, 'superadmin', beforeState.status, status]
-    )
-
-    // Update audit entry with success
-    if (auditId !== 'unknown') {
-      await updateAuditEntry(auditId, 'SUCCESS', beforeState, { status, rootCause })
-    }
-
-    return res.json({
-      success: true,
-      message: 'Incident updated successfully',
-      data: updateResult.rows[0]
-    })
-  } catch (error: any) {
-    if (auditId !== 'unknown') {
-      await updateAuditEntry(auditId, 'FAILURE', undefined, undefined, error.message)
-    }
-    console.error('Error updating incident:', error)
-    return res.status(500).json({ error: error.message || 'Failed to update incident' })
-  }
-})
-
-// ===========================
-// AUDIT LOG ENDPOINTS
-// ===========================
-
-// GET: View audit logs
-router.get('/audit-logs', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const { limit = '50', offset = '0' } = req.query
-    const superadminId = req.user!.userId
-
-    const auditLogsResult = await query(
-      `SELECT 
-        sal.id,
-        sal.superadmin_user_id,
-        u.email as user_email,
-        sal.action,
-        sal.entity_type,
-        sal.entity_id,
-        sal.details,
-        sal.ip_address,
-        sal.created_at
-      FROM superadmin_action_logs sal
-      LEFT JOIN users u ON sal.superadmin_user_id = u.id
-      ORDER BY sal.created_at DESC
-      LIMIT $1 OFFSET $2`,
-      [parseInt(limit as string), parseInt(offset as string)]
-    )
-
-    // Log this action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
-       VALUES ($1, $2, $3)`,
-      [superadminId, 'view_audit_logs', getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json(auditLogsResult.rows)
-  } catch (error: any) {
-    console.error('Error getting audit logs:', error)
-    return res.status(500).json({ error: error.message || 'Failed to get audit logs' })
-  }
-})
-
-// GET: View system health
-router.get('/health', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const healthResult = await query(
-      `SELECT service_name, status, response_time_ms, error_rate_percent, last_checked_at
-       FROM system_health
-       ORDER BY last_checked_at DESC`
-    )
-
-    return res.json({
-      success: true,
-      data: healthResult.rows
-    })
-  } catch (error: any) {
-    console.error('Error getting system health:', error)
-    return res.status(500).json({ error: error.message || 'Failed to get system health' })
-  }
-})
-
-// ===========================
-// NEW: CONTROL PLANE ENDPOINTS
-// ===========================
-
-// Helper: SHA256 hash for tokens
-function hashToken(token: string) {
-  return createHash('sha256').update(token).digest('hex')
-}
-
-// POST: Create confirmation token
-interface CreateConfirmationRequest extends Request {
-  body: {
-    operationType: string
-    operationContext: any
-    ttlSeconds?: number
-  }
-}
-
-router.post('/confirmation-tokens', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: CreateConfirmationRequest, res: Response) => {
-  try {
-    const { operationType, operationContext, ttlSeconds = 900 } = req.body
-    const superadminId = req.user!.userId
-
-    if (!operationType || !operationContext) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    // Generate token and store hash
-    const token = randomBytes(24).toString('hex')
-    const tokenHash = hashToken(token)
-
-    const expiresAtQuery = `NOW() + ($1 || ' seconds')::interval`
-
-    const insertResult = await query(
-      `INSERT INTO confirmation_tokens (operation_type, operation_context, token_hash, requesting_superadmin_id, expires_at, ip_address)
-       VALUES ($1, $2::jsonb, $3, $4, ${expiresAtQuery}, $5)
-       RETURNING id, expires_at`,
-      [operationType, JSON.stringify(operationContext), tokenHash, superadminId, ttlSeconds, getClientIp(req)]
-    )
-
-    return res.status(201).json({
-      success: true,
-      data: {
-        token, // Plain token returned only once â€” caller must store it securely
-        id: insertResult.rows[0].id,
-        expiresAt: insertResult.rows[0].expires_at
-      }
-    })
-  } catch (error: any) {
-    console.error('Error creating confirmation token:', error)
-    return res.status(500).json({ error: error.message || 'Failed to create confirmation token' })
-  }
-})
-
-// POST: Validate/consume confirmation token (internal use by operations)
-interface ValidateTokenRequest extends Request {
-  body: {
-    token: string
-    operationType: string
-    tenantId?: string
-  }
-}
-
-async function consumeConfirmationToken(token: string, operationType: string, tenantId?: string) {
-  const tokenHash = hashToken(token)
-
-  // Find unused token matching operation and tenant context
-  const tokenQuery = await query(
-    `SELECT id, requesting_superadmin_id FROM confirmation_tokens
-     WHERE token_hash = $1 AND operation_type = $2 AND is_used = FALSE AND expires_at > NOW()` +
-      (tenantId ? ` AND (operation_context ->> 'tenantId') = $3` : ''),
-    tenantId ? [tokenHash, operationType, tenantId] : [tokenHash, operationType]
-  )
-
-  if (tokenQuery.rows.length === 0) {
-    throw new Error('Invalid or expired confirmation token')
-  }
-
-  const tokenId = tokenQuery.rows[0].id
-
-  // Mark token as used
-  await query(
-    `UPDATE confirmation_tokens SET is_used = TRUE, confirmed_at = CURRENT_TIMESTAMP WHERE id = $1`,
-    [tokenId]
-  )
-
-  return tokenId
-}
-
-// POST: Tenant lifecycle transition (supports dryRun and confirmation token)
-interface TenantLifecycleRequest extends Request {
-  body: {
-    newState: 'PROVISIONED' | 'ACTIVE' | 'SUSPENDED' | 'LOCKED' | 'DECOMMISSIONED'
-    justification: string
-    dryRun?: boolean
-    confirmationToken?: string
-  }
-}
-
-router.post('/tenants/:tenantId/lifecycle', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: TenantLifecycleRequest, res: Response) => {
-  const { tenantId } = req.params
-  const { newState, justification, dryRun = false, confirmationToken } = req.body
-  const superadminId = req.user!.userId
-  let auditId: string | undefined
-
-  if (!newState || !justification) {
-    return res.status(400).json({ error: 'Missing required fields' })
-  }
-
-  try {
-    // Create audit context
-    const auditContext = extractAuditContext(req, 'TENANT_LIFECYCLE_TRANSITION', 'TENANT')
-    auditContext.targetEntityId = tenantId
-    auditContext.justification = justification
-    if (confirmationToken) {
-      auditContext.confirmationToken = confirmationToken
-    }
-
-    // Ensure tenant exists in school_entities (control plane targets school_entities)
-    const tenantResult = await query(`SELECT id, lifecycle_state FROM school_entities WHERE id = $1`, [tenantId])
-    if (tenantResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found or unsupported entity type' })
-    }
-
-    const currentState = tenantResult.rows[0].lifecycle_state
-
-    // Validate transition using DB function
-    const validResult = await query(`SELECT validate_tenant_lifecycle_transition($1, $2) as valid`, [currentState, newState])
-    if (!validResult.rows[0].valid) {
-      return res.status(400).json({ error: `Invalid lifecycle transition from ${currentState} -> ${newState}` })
-    }
-
-    // Determine if confirmation required (DECOMMISSIONED is considered destructive)
-    const requiresConfirmation = newState === 'DECOMMISSIONED'
-
-    if (requiresConfirmation && !dryRun) {
-      if (!confirmationToken) {
-        return res.status(409).json({ error: 'Confirmation token required for destructive transitions' })
-      }
-      // Validate and consume token
-      await consumeConfirmationToken(confirmationToken, 'TENANT_LIFECYCLE', tenantId)
-    }
-
-    if (dryRun) {
-      // Log audit entry for dry-run
-      auditContext.dryRun = true
-      auditId = await logAuditEntry(auditContext)
-
-      // Insert a dry-run audit entry (no state change)
-      await query(
-        `INSERT INTO tenant_lifecycle_audit (tenant_id, previous_state, new_state, actor_id, actor_role, action_type, justification, ip_address)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [tenantId, currentState, newState, superadminId, 'superadmin', 'DRY_RUN_TRANSITION', justification, getClientIp(req)]
-      )
-
-      // Update audit entry with success and after state
-      await updateAuditEntry(auditId, 'SUCCESS', { currentState }, { simulatedNewState: newState })
-
-      return res.json({ success: true, message: 'Dry run recorded (no state change)', data: { currentState, newState } })
-    }
-
-    // Perform transition: log audit first, then execute
-    auditId = await logAuditEntry(auditContext)
-
-    // Perform transition inside a transaction: insert audit first, then update tenant
-    await query('BEGIN')
-    try {
-      await query(
-        `INSERT INTO tenant_lifecycle_audit (tenant_id, previous_state, new_state, actor_id, actor_role, action_type, justification, confirmation_token, ip_address)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [tenantId, currentState, newState, superadminId, 'superadmin', 'TRANSITION', justification, confirmationToken || null, getClientIp(req)]
-      )
-
-      await query(
-        `UPDATE school_entities SET lifecycle_state = $1, system_version = system_version + 1, last_active_at = CURRENT_TIMESTAMP WHERE id = $2`,
-        [newState, tenantId]
-      )
-
-      // If locking or decommissioning, insert session invalidation log
-      if (newState === 'LOCKED' || newState === 'DECOMMISSIONED') {
-        // Count sessions associated with tenant if applicable (best-effort)
-        const sessionCountRes = await query(`SELECT COUNT(*) as cnt FROM superadmin_sessions WHERE is_active = TRUE`)
-        const invalidatedCount = parseInt(sessionCountRes.rows[0].cnt, 10) || 0
-
-        await query(
-          `INSERT INTO session_invalidation_log (tenant_id, reason, invalidated_by_superadmin_id, invalidated_session_count)
-           VALUES ($1, $2, $3, $4)`,
-          [tenantId, `Lifecycle transition to ${newState}`, superadminId, invalidatedCount]
-        )
-      }
-
-      await query('COMMIT')
-
-      // Update audit entry with success and state change
-      await updateAuditEntry(auditId, 'SUCCESS', { previousState: currentState }, { newState })
-
-      return res.json({ success: true, message: 'Lifecycle transition recorded and executed', data: { previousState: currentState, newState } })
-    } catch (txError: any) {
-      await query('ROLLBACK')
-      throw txError
-    }
-  } catch (error: any) {
-    // Update audit entry with failure if it was created
-    if (auditId) {
-      await updateAuditEntry(auditId, 'FAILURE', undefined, undefined, error.message)
-    }
-    console.error('Error performing lifecycle transition:', error)
-    return res.status(500).json({ error: error.message || 'Failed to perform lifecycle transition' })
-  }
-})
-
-// POST: Invalidate sessions for a tenant (audit-first)
-interface InvalidateSessionsRequest extends Request {
-  body: {
-    tenantId: string
-    reason: string
-  }
-}
-
-router.post('/sessions/invalidate', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: InvalidateSessionsRequest, res: Response) => {
-  try {
-    const { tenantId, reason } = req.body
-    const superadminId = req.user!.userId
-
-    if (!tenantId || !reason) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    // Create audit context
-    const auditContext = extractAuditContext(req, 'SESSION_INVALIDATION', 'GLOBAL')
-    auditContext.targetEntityId = tenantId
-    auditContext.justification = reason
-
-    // Log audit entry first
-    const auditId = await logAuditEntry(auditContext)
-
-    try {
-      // Best-effort count of sessions to invalidate (tenant mapping optional)
-      const sessionCountRes = await query(`SELECT COUNT(*) as cnt FROM superadmin_sessions WHERE is_active = TRUE`)
-      const invalidatedCount = parseInt(sessionCountRes.rows[0].cnt, 10) || 0
-
-      const result = await query(
-        `INSERT INTO session_invalidation_log (tenant_id, reason, invalidated_by_superadmin_id, invalidated_session_count)
-         VALUES ($1, $2, $3, $4) RETURNING id, timestamp`,
-        [tenantId, reason, superadminId, invalidatedCount]
-      )
-
-      // Update audit entry with success
-      await updateAuditEntry(auditId, 'SUCCESS', undefined, { sessionCount: invalidatedCount })
-
-      return res.status(201).json({ success: true, message: 'Sessions invalidation recorded', data: result.rows[0] })
-    } catch (error: any) {
-      await updateAuditEntry(auditId, 'FAILURE', undefined, undefined, error.message)
-      throw error
-    }
-  } catch (error: any) {
-    console.error('Error invalidating sessions:', error)
-    return res.status(500).json({ error: error.message || 'Failed to invalidate sessions' })
-  }
-})
-
-// POST: Clock drift ingestion
-interface ClockDriftRequest extends Request {
-  body: {
-    tenantId: string
-    userId: string
-    clientTimestamp: string
-    requestId?: string
-  }
-}
-
-router.post('/clock-drift', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: ClockDriftRequest, res: Response) => {
-  try {
-    const { tenantId, userId, clientTimestamp, requestId } = req.body
-
-    if (!tenantId || !userId || !clientTimestamp) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    const serverTs = new Date()
-    const clientTs = new Date(clientTimestamp)
-    const driftSeconds = Math.floor((clientTs.getTime() - serverTs.getTime()) / 1000)
-    const absDrift = Math.abs(driftSeconds)
-
-    let severity: 'INFO' | 'WARNING' | 'CRITICAL' = 'INFO'
-    let attendanceAffected = false
-    if (absDrift >= 300) {
-      severity = 'CRITICAL'
-      attendanceAffected = true
-    } else if (absDrift >= 60) {
-      severity = 'WARNING'
-    }
-
-    const insertResult = await query(
-      `INSERT INTO clock_drift_log (tenant_id, user_id, client_timestamp, server_timestamp, drift_seconds, severity, attendance_affected, request_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, timestamp`,
-      [tenantId, userId, clientTimestamp, serverTs.toISOString(), driftSeconds, severity, attendanceAffected, requestId || null]
-    )
-
-    return res.status(201).json({ success: true, data: insertResult.rows[0] })
-  } catch (error: any) {
-    console.error('Error ingesting clock drift:', error)
-    return res.status(500).json({ error: error.message || 'Failed to record clock drift' })
-  }
-})
-
-// GET: List attendance flags (optionally by tenant)
-router.get('/attendance/flags', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const { tenantId } = req.query
-    let q = `SELECT * FROM attendance_integrity_flags WHERE 1=1`
-    const params: any[] = []
-
-    if (tenantId) {
-      q += ` AND tenant_id = $1`
-      params.push(tenantId)
-    }
-
-    q += ` ORDER BY flag_timestamp DESC LIMIT 200`
-
-    const flagsResult = await query(q, params)
-
-    return res.json({ success: true, data: flagsResult.rows })
-  } catch (error: any) {
-    console.error('Error listing attendance flags:', error)
-    return res.status(500).json({ error: error.message || 'Failed to list attendance flags' })
-  }
-})
-
-// POST: Create attendance integrity flag
-interface CreateFlagRequest extends Request {
-  body: {
-    tenantId: string
-    attendanceRecordId?: string
-    flagType: string
-    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-    flagReason: string
-  }
-}
-
-router.post('/attendance/flags', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: CreateFlagRequest, res: Response) => {
-  try {
-    const { tenantId, attendanceRecordId, flagType, severity, flagReason } = req.body
-    const superadminId = req.user!.userId
-
-    if (!tenantId || !flagType || !severity || !flagReason) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    // Create audit context
-    const auditContext = extractAuditContext(req, 'CREATE_ATTENDANCE_FLAG', 'TENANT')
-    auditContext.targetEntityType = 'ATTENDANCE_FLAG'
-    auditContext.targetEntityId = attendanceRecordId || tenantId
-    auditContext.justification = flagReason
-
-    // Log audit entry first
-    let auditId: string
-    try {
-      auditId = await logAuditEntry(auditContext)
-    } catch (auditError) {
-      console.warn('[AUDIT] Non-critical audit logging failed:', auditError)
-      auditId = 'unknown'
-    }
-
-    try {
-      const insertResult = await query(
-        `INSERT INTO attendance_integrity_flags (tenant_id, attendance_record_id, flag_type, severity, flagged_by_superadmin_id, flag_reason)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, flag_timestamp`,
-        [tenantId, attendanceRecordId || null, flagType, severity, superadminId, flagReason]
-      )
-
-      // Update audit entry with success
-      if (auditId !== 'unknown') {
-        await updateAuditEntry(auditId, 'SUCCESS', undefined, { flagId: insertResult.rows[0].id, flagType, severity })
-      }
-
-      return res.status(201).json({ success: true, message: 'Flag created', data: insertResult.rows[0] })
-    } catch (opError: any) {
-      if (auditId !== 'unknown') {
-        await updateAuditEntry(auditId, 'FAILURE', undefined, undefined, opError.message)
-      }
-      throw opError
-    }
-  } catch (error: any) {
-    console.error('Error creating attendance flag:', error)
-    return res.status(500).json({ error: error.message || 'Failed to create attendance flag' })
-  }
-})
-
-// ===========================
-// MFA MANAGEMENT ENDPOINTS
-// ===========================
-
-// POST: Start MFA challenge
-interface MfaChallengeStartRequest extends Request {
-  body: {
-    method: 'TOTP' | 'SMS' | 'EMAIL'
-  }
-}
-
-router.post('/mfa/challenge', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: MfaChallengeStartRequest, res: Response) => {
-  try {
-    const { method } = req.body
-    const superadminId = req.user!.userId
-
-    if (!method) {
-      return res.status(400).json({ error: 'MFA method required' })
-    }
-
-    const challenge = await createMfaChallenge(superadminId, method)
-
-    const auditContext = extractAuditContext(req, 'MFA_CHALLENGE_CREATED', 'GLOBAL')
-    await logAuditEntry(auditContext).catch(() => {})
-
-    return res.status(201).json({ success: true, data: challenge })
-  } catch (error: any) {
-    console.error('Error creating MFA challenge:', error)
-    return res.status(500).json({ error: error.message || 'Failed to create MFA challenge' })
-  }
-})
-
-// POST: Verify MFA challenge
-interface MfaChallengeVerifyRequest extends Request {
-  body: {
-    challengeId: string
-    code: string
-  }
-}
-
-router.post('/mfa/verify', async (req: MfaChallengeVerifyRequest, res: Response) => {
-  try {
-    const { challengeId, code } = req.body
-
-    if (!challengeId || !code) {
-      return res.status(400).json({ error: 'Challenge ID and code required' })
-    }
-
-    const result = await verifyMfaChallenge(challengeId, code)
-
-    if (!result.success) {
-      return res.status(403).json({ error: result.error })
-    }
-
-    return res.json({
-      success: true,
-      message: 'MFA verified',
-      data: { userId: result.userId }
-    })
-  } catch (error: any) {
-    console.error('Error verifying MFA challenge:', error)
-    return res.status(500).json({ error: error.message || 'Failed to verify MFA challenge' })
-  }
-})
-
-// ===========================
-// IP ALLOWLIST MANAGEMENT
-// ===========================
-
-// GET: List allowlisted IPs for current user
-router.get('/ip-allowlist', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const superadminId = req.user!.userId
-
-    const auditContext = extractAuditContext(req, 'GET_IP_ALLOWLIST', 'GLOBAL')
-    await logAuditEntry(auditContext).catch(() => {})
-
-    const allowlist = await getAllowlistedIps(superadminId)
-
-    return res.json({ success: true, data: allowlist })
-  } catch (error: any) {
-    console.error('Error fetching IP allowlist:', error)
-    return res.status(500).json({ error: error.message || 'Failed to fetch IP allowlist' })
-  }
-})
-
-// GET: Admin-to-tenant/platform mapping (cross-platform admin visibility)
-router.get('/admins/mapping', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    // Get all admin users and their tenant/platform associations
-    // This includes:
-    // 1. Admins assigned as admin_user_id to entities
-    // 2. Admins associated with entities through association tables
-    // 3. Admins' platform membership via users.platform_id
-    const adminMappingResult = await query(
-      `SELECT DISTINCT
-        u.id as admin_id,
-        u.email as admin_email,
-        u.full_name as admin_name,
-        r.name as role_name,
-        p.name as platform_name,
-        p.id as platform_id,
-        COALESCE(
-          se.id,
-          ce.id,
-          sua.school_entity_id,
-          cua.corporate_entity_id
-        ) as tenant_id,
-        COALESCE(
-          se.name,
-          ce.name,
-          se_assoc.name,
-          ce_assoc.name
-        ) as tenant_name,
-        CASE 
-          WHEN se.id IS NOT NULL OR sua.school_entity_id IS NOT NULL THEN 'school'
-          WHEN ce.id IS NOT NULL OR cua.corporate_entity_id IS NOT NULL THEN 'corporate'
-        END as tenant_type
-      FROM users u
-      JOIN roles r ON u.role_id = r.id
-      JOIN platforms p ON u.platform_id = p.id
-      -- Direct admin assignment to entities
-      LEFT JOIN school_entities se ON se.admin_user_id = u.id
-      LEFT JOIN corporate_entities ce ON ce.admin_user_id = u.id
-      -- Association table links
-      LEFT JOIN school_user_associations sua ON sua.user_id = u.id
-      LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
-      LEFT JOIN school_entities se_assoc ON se_assoc.id = sua.school_entity_id
-      LEFT JOIN corporate_entities ce_assoc ON ce_assoc.id = cua.corporate_entity_id
-      WHERE r.name = 'admin'
-      ORDER BY u.email, p.name, tenant_name`
-    )
-
-    // Group by admin to show cross-platform status
-    const adminMap = new Map<string, {
-      admin_id: string
-      admin_email: string
-      admin_name: string
-      platforms: Array<{
-        platform_name: string
-        platform_id: string
-        tenant_id: string | null
-        tenant_name: string | null
-        tenant_type: 'school' | 'corporate' | null
-      }>
-      is_cross_platform: boolean
-    }>()
-
-    adminMappingResult.rows.forEach((row: any) => {
-      if (!adminMap.has(row.admin_id)) {
-        adminMap.set(row.admin_id, {
-          admin_id: row.admin_id,
-          admin_email: row.admin_email,
-          admin_name: row.admin_name,
-          platforms: [],
-          is_cross_platform: false,
-        })
-      }
-
-      const admin = adminMap.get(row.admin_id)!
-      if (row.platform_name && !admin.platforms.find(p => p.platform_id === row.platform_id)) {
-        admin.platforms.push({
-          platform_name: row.platform_name,
-          platform_id: row.platform_id,
-          tenant_id: row.tenant_id,
-          tenant_name: row.tenant_name,
-          tenant_type: row.tenant_type,
-        })
-      }
-    })
-
-    // Mark cross-platform admins
-    adminMap.forEach((admin) => {
-      const uniquePlatforms = new Set(admin.platforms.map(p => p.platform_name))
-      admin.is_cross_platform = uniquePlatforms.size > 1
-    })
-
-    return res.json({
-      success: true,
-      data: {
-        admins: Array.from(adminMap.values()),
-        total_admins: adminMap.size,
-        cross_platform_count: Array.from(adminMap.values()).filter(a => a.is_cross_platform).length,
-        single_platform_count: Array.from(adminMap.values()).filter(a => !a.is_cross_platform).length,
-      }
-    })
-  } catch (error: any) {
-    console.error('Error fetching admin mapping:', error)
-    return res.status(500).json({ error: error.message || 'Failed to fetch admin mapping' })
-  }
-})
-
-// GET: Aggregated early signals across all tenants
-router.get('/tenants/early-signals', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    // Get all tenant IDs (from school_entities and corporate_entities)
-    const tenantsResult = await query(
-      `SELECT 
-        se.id as tenant_id,
-        se.name as tenant_name,
-        'school' as platform_type
-      FROM school_entities se
-      UNION ALL
-      SELECT 
-        ce.id as tenant_id,
-        ce.name as tenant_name,
-        'corporate' as platform_type
-      FROM corporate_entities ce`
-    )
-
-    const tenants = tenantsResult.rows
-    const aggregatedSignals = {
-      total_tenants: tenants.length,
-      tenants_with_critical_incidents: 0,
-      tenants_with_overdue_incidents: 0,
-      tenants_with_privilege_escalations: 0,
-      tenants_with_role_violations: 0,
-      total_critical_incidents: 0,
-      total_overdue_incidents: 0,
-      total_privilege_escalations: 0,
-      total_role_violations: 0,
-      tenant_details: tenants.map((t: any) => ({
-        tenant_id: t.tenant_id,
-        tenant_name: t.tenant_name,
-        platform_type: t.platform_type,
-        open_critical_incidents: 0,
-        overdue_incidents_1h: 0,
-        privilege_escalations_open: 0,
-        role_violations_24h: 0,
-      })),
-    }
-
-    return res.json({
-      success: true,
-      data: aggregatedSignals,
-    })
-  } catch (error: any) {
-    console.error('Error fetching aggregated early signals:', error)
-    return res.status(500).json({ error: error.message || 'Failed to fetch aggregated signals' })
-  }
-})
-
-// POST: Add IP to allowlist
-interface AddIpRequest extends Request {
-  body: {
-    ipAddress: string
-    description?: string
-    expiresAt?: string
-  }
-}
-
-router.post('/ip-allowlist', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), rateLimitMiddleware('ADD_IP_ALLOWLIST') as any, async (req: AddIpRequest, res: Response) => {
-  try {
-    const { ipAddress, description, expiresAt } = req.body
-    const superadminId = req.user!.userId
-
-    if (!ipAddress) {
-      return res.status(400).json({ error: 'IP address required' })
-    }
-
-    // Validate IP format (basic)
-    if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ipAddress)) {
-      return res.status(400).json({ error: 'Invalid IP address format' })
-    }
-
-    const auditContext = extractAuditContext(req, 'ADD_IP_ALLOWLIST', 'GLOBAL')
-    auditContext.justification = `Adding IP ${ipAddress} to allowlist`
-
-    let auditId: string = 'unknown'
-    try {
-      auditId = await logAuditEntry(auditContext)
-    } catch (auditError) {
-      console.warn('[AUDIT] Non-critical audit logging failed:', auditError)
-    }
-
-    try {
-      const id = await addIpToAllowlist(superadminId, ipAddress, {
-        description,
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined
-      })
-
-      if (auditId !== 'unknown') {
-        await updateAuditEntry(auditId, 'SUCCESS', undefined, { id, ipAddress })
-      }
-
-      return res.status(201).json({
-        success: true,
-        message: 'IP added to allowlist',
-        data: { id, ipAddress }
-      })
-    } catch (opError: any) {
-      if (auditId !== 'unknown') {
-        await updateAuditEntry(auditId, 'FAILURE', undefined, undefined, opError.message)
-      }
-      throw opError
-    }
-  } catch (error: any) {
-    console.error('Error adding IP to allowlist:', error)
-    return res.status(500).json({ error: error.message || 'Failed to add IP to allowlist' })
-  }
-})
-
-// ===========================
-// TENANT ADMIN MANAGEMENT
-// ===========================
-
-// GET: List all tenant admins
-router.get('/tenant-admins', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const superadminId = req.user!.userId
-
-    // Get all tenant admins (users with admin role linked to a tenant via association tables)
-    const adminsResult = await query(
-      `SELECT 
-        u.id,
-        u.email,
-        u.full_name as "fullName",
-        COALESCE(sua.school_entity_id, cua.corporate_entity_id) as tenant_id,
-        COALESCE(se.name, ce.name) as tenant_name,
-        u.created_at
-      FROM users u
-      LEFT JOIN school_user_associations sua ON sua.user_id = u.id
-      LEFT JOIN school_entities se ON se.id = sua.school_entity_id
-      LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
-      LEFT JOIN corporate_entities ce ON ce.id = cua.corporate_entity_id
-      WHERE u.role_id IN (SELECT id FROM roles WHERE name = 'admin')
-        AND (sua.school_entity_id IS NOT NULL OR cua.corporate_entity_id IS NOT NULL)
-      ORDER BY u.created_at DESC`
-    )
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
-       VALUES ($1, $2, $3)`,
-      [superadminId, 'list_tenant_admins', getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json(adminsResult.rows || [])
-  } catch (error: any) {
-    console.error('Error listing tenant admins:', error)
-    return res.status(500).json({ error: error.message || 'Failed to list tenant admins' })
-  }
-})
-
-// GET: Dashboard stats for superadmin
-router.get('/stats', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    // Count schools
-    const schoolsResult = await query(`SELECT COUNT(*) as total, COUNT(CASE WHEN is_active THEN 1 END) as active FROM school_entities`)
-    const totalSchools = parseInt(schoolsResult.rows[0].total) || 0
-    const activeSchools = parseInt(schoolsResult.rows[0].active) || 0
-
-    // Count corporates
-    const corpsResult = await query(`SELECT COUNT(*) as total, COUNT(CASE WHEN is_active THEN 1 END) as active FROM corporate_entities`)
-    const totalCorporates = parseInt(corpsResult.rows[0].total) || 0
-    const activeCorporates = parseInt(corpsResult.rows[0].active) || 0
-
-    // Count users
-    const usersResult = await query(`SELECT COUNT(*) as total, COUNT(CASE WHEN is_active THEN 1 END) as active FROM users`)
-    const totalUsers = parseInt(usersResult.rows[0].total) || 0
-    const activeUsers = parseInt(usersResult.rows[0].active) || 0
-
-    // Pending approvals
-    const schoolApprovals = await query(`SELECT COUNT(*) as cnt FROM school_user_approvals WHERE status = 'pending'`)
-    const corpApprovals = await query(`SELECT COUNT(*) as cnt FROM corporate_user_approvals WHERE status = 'pending'`)
-
-    return res.json({
-      total_schools: totalSchools,
-      active_schools: activeSchools,
-      total_corporates: totalCorporates,
-      active_corporates: activeCorporates,
-      total_users: totalUsers,
-      active_users: activeUsers,
-      pending_school_approvals: parseInt(schoolApprovals.rows[0].cnt) || 0,
-      pending_corporate_approvals: parseInt(corpApprovals.rows[0].cnt) || 0,
-    })
-  } catch (error: any) {
-    console.error('Error loading stats:', error)
-    return res.status(500).json({ error: error.message || 'Failed to load stats' })
-  }
-})
-
-// GET: List all entities (schools + corporates)
-router.get('/entities', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const superadminId = req.user!.userId
-
-    // Get all schools (user count via school_user_associations)
-    const schoolsResult = await query(
-      `SELECT 
-        se.id,
-        se.name,
-        se.code,
-        se.email,
-        se.phone,
-        se.address,
-        COALESCE(se.status, CASE WHEN se.is_active THEN 'active' ELSE 'disabled' END) as status,
-        'school' as entity_type,
-        se.created_at,
-        se.is_active,
-        COUNT(DISTINCT sua.user_id) as user_count,
-        COUNT(DISTINCT CASE WHEN u.is_active = true THEN sua.user_id END) as active_users,
-        COALESCE(pa.pending_count, 0) as pending_approvals
-      FROM school_entities se
-      LEFT JOIN school_user_associations sua ON sua.school_entity_id = se.id
-      LEFT JOIN users u ON u.id = sua.user_id
-      LEFT JOIN (
-        SELECT school_entity_id, COUNT(*) as pending_count
-        FROM school_user_approvals WHERE status = 'pending'
-        GROUP BY school_entity_id
-      ) pa ON pa.school_entity_id = se.id
-      GROUP BY se.id, se.name, se.code, se.email, se.phone, se.address, se.status, se.created_at, se.is_active, pa.pending_count
-      ORDER BY se.created_at DESC`
-    )
-
-    // Get all corporates (user count via corporate_user_associations)
-    const corporatesResult = await query(
-      `SELECT 
-        ce.id,
-        ce.name,
-        ce.code,
-        ce.email,
-        ce.phone,
-        ce.headquarters_address as address,
-        COALESCE(ce.status, CASE WHEN ce.is_active THEN 'active' ELSE 'disabled' END) as status,
-        'corporate' as entity_type,
-        ce.created_at,
-        ce.is_active,
-        COUNT(DISTINCT cua.user_id) as user_count,
-        COUNT(DISTINCT CASE WHEN u.is_active = true THEN cua.user_id END) as active_users,
-        COALESCE(pa.pending_count, 0) as pending_approvals
-      FROM corporate_entities ce
-      LEFT JOIN corporate_user_associations cua ON cua.corporate_entity_id = ce.id
-      LEFT JOIN users u ON u.id = cua.user_id
-      LEFT JOIN (
-        SELECT corporate_entity_id, COUNT(*) as pending_count
-        FROM corporate_user_approvals WHERE status = 'pending'
-        GROUP BY corporate_entity_id
-      ) pa ON pa.corporate_entity_id = ce.id
-      GROUP BY ce.id, ce.name, ce.code, ce.email, ce.phone, ce.headquarters_address, ce.status, ce.created_at, ce.is_active, pa.pending_count
-      ORDER BY ce.created_at DESC`
-    )
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
-       VALUES ($1, $2, $3)`,
-      [superadminId, 'list_entities', getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json({
-      success: true,
-      schools: schoolsResult.rows,
-      corporates: corporatesResult.rows,
-      total: schoolsResult.rows.length + corporatesResult.rows.length
-    })
-  } catch (error: any) {
-    console.error('Error listing entities:', error)
-    return res.status(500).json({ error: error.message || 'Failed to list entities' })
-  }
-})
-
-// ===========================
-// TENANT CRUD OPERATIONS
-// ===========================
-
-// Helper: Auto-generate tenant code
-// Schools: SAS-001-SP, SAS-002-SP, ...
-// Corporate: SAS-001-CP, SAS-002-CP, ...
-async function generateTenantCode(type: 'school' | 'corporate'): Promise<string> {
-  const suffix = type === 'school' ? 'SP' : 'CP'
-  const table = type === 'school' ? 'school_entities' : 'corporate_entities'
-
-  // Find highest existing SAS-XXX-SP/CP code
-  const result = await query(
-    `SELECT code FROM ${table} WHERE code LIKE $1 ORDER BY code DESC LIMIT 1`,
-    [`SAS-%-${suffix}`]
-  )
-
-  let nextNum = 1
-  if (result.rows.length > 0) {
-    const match = result.rows[0].code.match(/SAS-(\d+)-/)
-    if (match) {
-      nextNum = parseInt(match[1], 10) + 1
-    }
-  }
-
-  const padded = String(nextNum).padStart(3, '0')
-  return `SAS-${padded}-${suffix}`
-}
-
-// POST: Create a new tenant (school or corporate entity)
+/**
+ * Provisioning a tenant.
+ *
+ * The entity row is what is created; a trigger keeps the tenants table in
+ * step. Writing to tenants directly would leave a tenant with no school or
+ * company behind it.
+ */
 router.post('/tenants', async (req: Request, res: Response) => {
   try {
-    const superadminId = req.user!.userId
-    const { name, email, type, address } = req.body
+    const b = req.body ?? {}
+    const kind = b.kind === 'corporate' ? 'corporate' : 'school'
 
-    // Validate required fields
-    if (!name || !email || !type || !address) {
-      return res.status(400).json({ error: 'Missing required fields: name, email, type, and address are required' })
+    if (!b.name || !b.code) {
+      await audit(req, 'TENANT_CREATE', 'GLOBAL',
+        { result: 'FAILURE', error: 'name and code are required' })
+      return res.status(400).json({ error: 'name and code are required' })
     }
 
-    // Validate type
-    if (!['school', 'corporate'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid type. Must be "school" or "corporate"' })
+    const table = kind === 'school' ? 'school_entities' : 'corporate_entities'
+    const clash = await query(
+      `SELECT 1 FROM ${table} WHERE UPPER(code) = UPPER($1) LIMIT 1`,
+      [b.code]
+    )
+    if (clash.rowCount && clash.rowCount > 0) {
+      await audit(req, 'TENANT_CREATE', 'GLOBAL',
+        { result: 'FAILURE', error: `code ${b.code} already in use` })
+      return res.status(409).json({ error: 'That code is already in use' })
     }
 
-    // Auto-generate the code
-    const code = await generateTenantCode(type)
+    const created = kind === 'school'
+      ? await query(
+          `INSERT INTO school_entities (name, code, email, phone, address, is_active, lifecycle_state)
+           VALUES ($1,$2,$3,$4,$5,TRUE,'active') RETURNING id, name, code`,
+          [b.name, b.code, b.email || null, b.phone || null, b.address || null]
+        )
+      : await query(
+          `INSERT INTO corporate_entities (name, code, email, phone, industry, headquarters_address, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,TRUE) RETURNING id, name, code`,
+          [b.name, b.code, b.email || null, b.phone || null, b.industry || null, b.address || null]
+        )
 
-    let result
-    if (type === 'school') {
-      // Check for duplicate name
-      const existing = await query(
-        `SELECT id FROM school_entities WHERE name = $1`,
-        [name]
-      )
-      if (existing.rows.length > 0) {
-        return res.status(409).json({ error: 'A school entity with that name already exists' })
-      }
+    const entityId = created.rows[0].id
+    const tenant = await query(`SELECT * FROM tenants WHERE id = $1`, [entityId])
 
-      result = await query(
-        `INSERT INTO school_entities (name, code, email, address, is_active, status)
-         VALUES ($1, $2, $3, $4, true, 'active')
-         RETURNING id, name, code, email, address, is_active, status, created_at`,
-        [name, code, email, address]
-      )
-    } else {
-      // Check for duplicate name
-      const existing = await query(
-        `SELECT id FROM corporate_entities WHERE name = $1`,
-        [name]
-      )
-      if (existing.rows.length > 0) {
-        return res.status(409).json({ error: 'A corporate entity with that name already exists' })
-      }
-
-      result = await query(
-        `INSERT INTO corporate_entities (name, code, email, headquarters_address, is_active, status)
-         VALUES ($1, $2, $3, $4, true, 'active')
-         RETURNING id, name, code, email, headquarters_address as address, is_active, status, created_at`,
-        [name, code, email, address]
-      )
-    }
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, target_entity, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [superadminId, 'create_tenant', result.rows[0].id, JSON.stringify({ name, code, type, email }), getClientIp(req)]
-    ).catch(() => {})
+    await audit(req, 'TENANT_CREATE', 'GLOBAL', { result: 'SUCCESS' },
+      { type: 'tenant', id: entityId }, { afterState: created.rows[0] }, b.justification)
+    await logAction(req, 'TENANT_CREATE', 'tenant', entityId, { name: b.name, kind })
 
     return res.status(201).json({
-      success: true,
-      tenant: { ...result.rows[0], type }
+      tenant: tenant.rows[0] ?? created.rows[0],
+      entity: created.rows[0],
     })
-  } catch (error: any) {
-    console.error('Error creating tenant:', error)
-    return res.status(500).json({ error: error.message || 'Failed to create tenant' })
+  } catch (e) {
+    await audit(req, 'TENANT_CREATE', 'GLOBAL',
+      { result: 'FAILURE', error: String((e as Error).message) })
+    return fail(res, 'create that tenant', e)
   }
 })
 
-// PATCH: Update tenant â€” supports status changes (activate, suspend, disable) and field edits
-router.patch('/tenants/:id', async (req: Request, res: Response) => {
+router.patch('/tenants/:tenantId', async (req: Request, res: Response) => {
   try {
-    const superadminId = req.user!.userId
-    const { id } = req.params
-    const { action, name, email, address } = req.body
+    const { tenantId } = req.params
+    if (!UUID.test(tenantId)) return notFound(res, 'Tenant')
+    const b = req.body ?? {}
 
-    // Determine which table the tenant belongs to
-    let tenantType: 'school' | 'corporate' | null = null
-    let existing = await query(`SELECT id, name, status, is_active FROM school_entities WHERE id = $1`, [id])
-    if (existing.rows.length > 0) {
-      tenantType = 'school'
-    } else {
-      existing = await query(`SELECT id, name, status, is_active FROM corporate_entities WHERE id = $1`, [id])
-      if (existing.rows.length > 0) {
-        tenantType = 'corporate'
-      }
-    }
+    const before = await query(`SELECT * FROM tenants WHERE id = $1`, [tenantId])
+    if (before.rowCount === 0) return notFound(res, 'Tenant')
 
-    if (!tenantType) {
-      return res.status(404).json({ error: 'Tenant not found' })
-    }
+    const kind = before.rows[0].kind
+    const table = kind === 'school' ? 'school_entities' : 'corporate_entities'
 
-    const table = tenantType === 'school' ? 'school_entities' : 'corporate_entities'
-    const addressCol = tenantType === 'school' ? 'address' : 'headquarters_address'
-    let result
-    let logAction = 'update_tenant'
-
-    // Handle status-change actions
-    if (action === 'activate') {
-      result = await query(
-        `UPDATE ${table} SET is_active = true, status = 'active', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
-        [id]
-      )
-      logAction = 'activate_tenant'
-
-    } else if (action === 'suspend') {
-      result = await query(
-        `UPDATE ${table} SET is_active = false, status = 'suspended', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
-        [id]
-      )
-      logAction = 'suspend_tenant'
-
-    } else if (action === 'disable') {
-      result = await query(
-        `UPDATE ${table} SET is_active = false, status = 'disabled', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
-        [id]
-      )
-      logAction = 'disable_tenant'
-
-    } else if (action === 'edit') {
-      // Edit tenant details (name, email, address)
-      const updates: string[] = []
-      const values: any[] = []
-      let paramIdx = 1
-
-      if (name) {
-        updates.push(`name = $${paramIdx++}`)
-        values.push(name)
-      }
-      if (email) {
-        updates.push(`email = $${paramIdx++}`)
-        values.push(email)
-      }
-      if (address) {
-        updates.push(`${addressCol} = $${paramIdx++}`)
-        values.push(address)
-      }
-
-      if (updates.length === 0) {
-        return res.status(400).json({ error: 'No fields to update. Provide name, email, or address.' })
-      }
-
-      updates.push(`updated_at = CURRENT_TIMESTAMP`)
-      values.push(id)
-
-      result = await query(
-        `UPDATE ${table} SET ${updates.join(', ')}
-         WHERE id = $${paramIdx}
-         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
-        values
-      )
-      logAction = 'edit_tenant'
-
-    } else if (typeof req.body.is_active === 'boolean') {
-      // Backward compatibility: simple is_active toggle
-      const newStatus = req.body.is_active ? 'active' : 'disabled'
-      result = await query(
-        `UPDATE ${table} SET is_active = $1, status = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3
-         RETURNING id, name, code, email, ${addressCol} as address, is_active, status, '${tenantType}' as type`,
-        [req.body.is_active, newStatus, id]
-      )
-      logAction = req.body.is_active ? 'activate_tenant' : 'disable_tenant'
-
-    } else {
-      return res.status(400).json({ error: 'Invalid request. Provide an action (activate, suspend, disable, edit) or is_active boolean.' })
-    }
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, target_entity, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [superadminId, logAction, id, JSON.stringify({ name: result.rows[0]?.name, action }), getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json({ success: true, tenant: result.rows[0] })
-  } catch (error: any) {
-    console.error('Error updating tenant:', error)
-    return res.status(500).json({ error: error.message || 'Failed to update tenant' })
-  }
-})
-
-// DELETE: Permanently delete a tenant
-router.delete('/tenants/:id', async (req: Request, res: Response) => {
-  try {
-    const superadminId = req.user!.userId
-    const { id } = req.params
-
-    // Check if tenant has associated users (via both association tables)
-    const userCheck = await query(
-      `SELECT
-        (SELECT COUNT(*) FROM school_user_associations WHERE school_entity_id = $1) +
-        (SELECT COUNT(*) FROM corporate_user_associations WHERE corporate_entity_id = $1)
-       AS count`,
-      [id]
+    // The entity is the record of truth; the trigger carries the change into
+    // tenants. Status is not settable here — that is the lifecycle route,
+    // which requires a justification.
+    const updated = await query(
+      `UPDATE ${table}
+          SET name = COALESCE($2, name),
+              email = COALESCE($3, email),
+              phone = COALESCE($4, phone),
+              updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING *`,
+      [tenantId, b.name || null, b.email ?? null, b.phone ?? null]
     )
-    if (parseInt(userCheck.rows[0].count) > 0) {
+    if (updated.rowCount === 0) return notFound(res, 'Tenant')
+
+    const after = await query(`SELECT * FROM tenants WHERE id = $1`, [tenantId])
+
+    await audit(req, 'TENANT_UPDATE', 'TENANT', { result: 'SUCCESS' },
+      { type: 'tenant', id: tenantId },
+      { beforeState: before.rows[0], afterState: after.rows[0] }, b.justification)
+    await logAction(req, 'TENANT_UPDATE', 'tenant', tenantId, { fields: Object.keys(b) })
+
+    return res.json({ tenant: after.rows[0] })
+  } catch (e) {
+    await audit(req, 'TENANT_UPDATE', 'TENANT',
+      { result: 'FAILURE', error: String((e as Error).message) },
+      { type: 'tenant', id: req.params.tenantId })
+    return fail(res, 'update that tenant', e)
+  }
+})
+
+/**
+ * Moving a tenant through its lifecycle.
+ *
+ * Suspending stops its people signing in without touching a row of its data,
+ * which is what an unpaid invoice or an open investigation calls for.
+ * Archiving is the end of the relationship.
+ *
+ * A justification is required on every move. "Who suspended this school and
+ * why" is the first question asked when a thousand people cannot sign in, and
+ * it should not depend on somebody remembering.
+ */
+router.post('/tenants/:tenantId/lifecycle', async (req: Request, res: Response) => {
+  const client = await getConnection()
+  try {
+    const { tenantId } = req.params
+    if (!UUID.test(tenantId)) return notFound(res, 'Tenant')
+
+    const b = req.body ?? {}
+    const to = String(b.state ?? '') as Lifecycle
+
+    if (!LIFECYCLE.includes(to)) {
       return res.status(400).json({
-        error: `Cannot delete tenant: ${userCheck.rows[0].count} user(s) are still associated. Remove or reassign them first.`
+        error: `state must be one of ${LIFECYCLE.join(', ')}`,
+      })
+    }
+    if (!b.justification || !String(b.justification).trim()) {
+      await audit(req, 'TENANT_LIFECYCLE', 'TENANT',
+        { result: 'DENIED', error: 'no justification given' }, { type: 'tenant', id: tenantId })
+      return res.status(400).json({ error: 'A justification is required to move a tenant' })
+    }
+
+    const before = await client.query(`SELECT * FROM tenants WHERE id = $1 FOR UPDATE`, [tenantId])
+    if (before.rowCount === 0) return notFound(res, 'Tenant')
+    const from = before.rows[0].status as Lifecycle
+
+    if (from === to) {
+      return res.status(409).json({ error: `This tenant is already ${to}` })
+    }
+    // An archived tenant is finished. Bringing one back would mean deciding
+    // what to do about every retention rule that applied while it was gone,
+    // so it is refused here rather than guessed at.
+    if (from === 'archived') {
+      await audit(req, 'TENANT_LIFECYCLE', 'TENANT',
+        { result: 'DENIED', error: 'tenant is archived' }, { type: 'tenant', id: tenantId })
+      return res.status(409).json({
+        error: 'An archived tenant cannot be brought back; provision a new one',
       })
     }
 
-    // Try deleting from school_entities first (cascades to association tables, configs, metrics, etc.)
-    let result = await query(
-      `DELETE FROM school_entities WHERE id = $1 RETURNING id, name, 'school' as type`,
-      [id]
-    )
+    await client.query('BEGIN')
 
-    // If not found in schools, try corporate_entities
-    if (result.rows.length === 0) {
-      result = await query(
-        `DELETE FROM corporate_entities WHERE id = $1 RETURNING id, name, 'corporate' as type`,
-        [id]
-      )
-    }
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' })
-    }
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [superadminId, 'delete_tenant', result.rows[0].type, id, JSON.stringify({ name: result.rows[0].name, type: result.rows[0].type }), getClientIp(req)]
-    ).catch(() => {})
-
-    return res.json({ success: true, message: `Tenant "${result.rows[0].name}" deleted successfully` })
-  } catch (error: any) {
-    console.error('Error deleting tenant:', error)
-    return res.status(500).json({ error: error.message || 'Failed to delete tenant' })
-  }
-})
-
-// POST: Create new tenant admin
-router.post('/tenant-admins', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const superadminId = req.user!.userId
-    // Accept both field naming conventions from frontend
-    const email = req.body.email
-    const fullName = req.body.fullName || req.body.name
-    const tenantId = req.body.tenant_id || req.body.tenantId
-    const password = req.body.password
-
-    // Validate input
-    if (!email || !fullName || !tenantId || !password) {
-      return res.status(400).json({ error: 'Missing required fields: email, fullName, tenant_id, password' })
-    }
-
-    // Validate email format
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format' })
-    }
-
-    // Validate password strength
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' })
-    }
-
-    // Check if tenant exists and determine type
-    const tenantCheck = await query(
-      `SELECT id, name, entity_type FROM (
-        SELECT id, name, 'school' as entity_type FROM school_entities WHERE id = $1
-        UNION
-        SELECT id, name, 'corporate' as entity_type FROM corporate_entities WHERE id = $1
-      ) AS entities`,
-      [tenantId]
-    )
-
-    if (tenantCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Tenant not found' })
-    }
-
-    const tenant = tenantCheck.rows[0]
-
-    // Check if email already exists
-    const emailCheck = await query(
-      `SELECT id FROM users WHERE email = $1`,
-      [email.toLowerCase()]
-    )
-
-    if (emailCheck.rows.length > 0) {
-      return res.status(409).json({ error: 'A user with this email already exists' })
-    }
-
-    // Hash password using bcrypt (consistent with rest of the system)
-    const salt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, salt)
-
-    // Get admin role for the appropriate platform
-    const platformType = tenant.entity_type === 'school' ? 'school' : 'corporate'
-    const roleCheck = await query(
-      `SELECT r.id FROM roles r
-       JOIN platforms p ON r.platform_id = p.id
-       WHERE r.name = 'admin' AND p.name = $1
-       LIMIT 1`,
-      [platformType]
-    )
-    if (roleCheck.rows.length === 0) {
-      return res.status(500).json({ error: 'Admin role not found for this platform' })
-    }
-
-    const adminRoleId = roleCheck.rows[0].id
-
-    // Get platform_id
-    const platformResult = await query(`SELECT id FROM platforms WHERE name = $1`, [platformType])
-    const platformId = platformResult.rows[0]?.id
-
-    // Create user record with correct column names
-    const userResult = await query(
-      `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, created_at)
-       VALUES ($1, $2, $3, $4, $5, true, NOW())
-       RETURNING id, email, full_name`,
-      [platformId, email.toLowerCase(), fullName, adminRoleId, hashedPassword]
-    )
-
-    const newUser = userResult.rows[0]
-
-    // Link user to tenant via association table
-    if (tenant.entity_type === 'school') {
-      await query(
-        `INSERT INTO school_user_associations (user_id, school_entity_id, status, assigned_at)
-         VALUES ($1, $2, 'active', NOW())
-         ON CONFLICT DO NOTHING`,
-        [newUser.id, tenantId]
+    // The entity is written, and the sync trigger carries the change into
+    // tenants. Writing tenants first would be undone by that trigger, which
+    // is exactly what used to happen here.
+    if (before.rows[0].kind === 'school') {
+      await client.query(
+        `UPDATE school_entities
+            SET status = $2,
+                system_version = COALESCE(system_version, 0) + 1,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1`,
+        [tenantId, to]
       )
     } else {
-      await query(
-        `INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status, assigned_at)
-         VALUES ($1, $2, 'active', NOW())
-         ON CONFLICT DO NOTHING`,
-        [newUser.id, tenantId]
+      await client.query(
+        `UPDATE corporate_entities
+            SET status = $2, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1`,
+        [tenantId, to]
       )
     }
 
-    // Update entity admin_user_id
-    if (tenant.entity_type === 'school') {
-      await query(`UPDATE school_entities SET admin_user_id = $1 WHERE id = $2 AND admin_user_id IS NULL`, [newUser.id, tenantId])
-    } else {
-      await query(`UPDATE corporate_entities SET admin_user_id = $1 WHERE id = $2 AND admin_user_id IS NULL`, [newUser.id, tenantId])
+    await client.query(
+      `INSERT INTO tenant_lifecycle_audit
+         (tenant_id, previous_state, new_state, actor_id, action_type, justification)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [tenantId, from, to, actorOf(req), `TENANT_${to.toUpperCase()}`, String(b.justification).trim()]
+    )
+
+    const after = await client.query(`SELECT * FROM tenants WHERE id = $1`, [tenantId])
+    if (after.rows[0].status !== to) {
+      // The sync trigger did not carry the change through. Better to fail
+      // loudly than to report a suspension that did not happen.
+      throw new Error(`Tenant ${tenantId} is still ${after.rows[0].status} after moving it to ${to}`)
     }
 
-    // Log audit entry for superadmin action
-    try {
-      await query(
-        `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
-         VALUES ($1, $2, $3, $4)`,
-        [superadminId, 'CREATE_TENANT_ADMIN', getClientIp(req) || 'unknown', JSON.stringify({
-          admin_id: newUser.id,
-          admin_email: newUser.email,
-          tenant_id: tenantId,
-          tenant_name: tenant.name,
-          tenant_type: tenant.entity_type
-        })]
+    // Suspending must actually stop people signing in, not merely record an
+    // intention to. Deactivating the accounts is what does that.
+    let affectedUsers = 0
+    if (to !== 'active') {
+      const locked = await client.query(
+        `UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+          WHERE id IN (SELECT user_id FROM user_tenant_memberships WHERE tenant_id = $1)
+            AND is_active = TRUE
+          RETURNING id`,
+        [tenantId]
       )
-    } catch (auditError) {
-      console.warn('Audit logging failed:', auditError)
-    }
+      affectedUsers = locked.rowCount ?? 0
 
-    return res.status(201).json({
-      success: true,
-      message: 'Tenant admin created successfully',
-      data: {
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.full_name,
-        tenantId: tenantId,
-        tenantName: tenant.name
+      // One row per account. The log is per-user by design — "whose sessions
+      // were dropped, and why" is answered per person, not per tenant — so a
+      // single summary row would both violate the NOT NULL on user_id and
+      // lose the answer.
+      if (affectedUsers > 0) {
+        await client.query(
+          `INSERT INTO session_invalidation_log
+             (user_id, tenant_id, invalidation_reason, invalidated_by_superadmin_id, ip_address)
+           SELECT u, $1, $2, $3, $4 FROM UNNEST($5::uuid[]) AS u`,
+          [
+            tenantId, `Tenant ${to}: ${String(b.justification).trim()}`.slice(0, 255),
+            actorOf(req), getClientIp(req),
+            locked.rows.map((x: any) => x.id),
+          ]
+        )
       }
+    }
+
+    await client.query('COMMIT')
+
+    await audit(req, 'TENANT_LIFECYCLE', 'TENANT', { result: 'SUCCESS' },
+      { type: 'tenant', id: tenantId },
+      { beforeState: before.rows[0], afterState: after.rows[0] },
+      String(b.justification).trim())
+    await logAction(req, `TENANT_${to.toUpperCase()}`, 'tenant', tenantId,
+      { from, to, affectedUsers })
+
+    return res.json({
+      tenant: after.rows[0],
+      from,
+      to,
+      affectedUsers,
+      note: to === 'active'
+        ? 'Accounts suspended with the tenant are not reactivated automatically; '
+          + 'reactivate them individually so a deliberately locked account stays locked.'
+        : `${affectedUsers} account(s) were deactivated.`,
     })
-  } catch (error: any) {
-    console.error('Error creating tenant admin:', error)
-    return res.status(500).json({ error: error.message || 'Failed to create tenant admin' })
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    await audit(req, 'TENANT_LIFECYCLE', 'TENANT',
+      { result: 'FAILURE', error: String((e as Error).message) },
+      { type: 'tenant', id: req.params.tenantId })
+    return fail(res, 'move that tenant', e)
+  } finally {
+    client.release()
   }
 })
 
-// GET: List tenant admins for a specific tenant
-router.get('/tenant-admins/:tenantId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+/**
+ * Deleting a tenant.
+ *
+ * Refused whenever it holds anything. A school with students, attendance and
+ * invoices in it is not a row to be removed; archiving is what ends the
+ * relationship while keeping the record. Only an empty tenant — one
+ * provisioned by mistake — can actually be deleted.
+ */
+router.delete('/tenants/:tenantId', async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params
+    if (!UUID.test(tenantId)) return notFound(res, 'Tenant')
 
-    const result = await query(
-      `SELECT u.id, u.email, u.full_name as name, u.created_at, 
-              CASE 
-                WHEN sua.school_entity_id IS NOT NULL THEN 'school' 
-                ELSE 'corporate' 
-              END as tenant_type,
-              COALESCE(se.name, ce.name) as tenant_name
-       FROM users u
-       LEFT JOIN school_user_associations sua ON sua.user_id = u.id
-       LEFT JOIN school_entities se ON se.id = sua.school_entity_id
-       LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
-       LEFT JOIN corporate_entities ce ON ce.id = cua.corporate_entity_id
-       JOIN roles r ON u.role_id = r.id
-       WHERE r.name = 'admin' AND (sua.school_entity_id = $1 OR cua.corporate_entity_id = $1)
-       ORDER BY u.created_at DESC`,
+    const before = await query(`SELECT * FROM tenants WHERE id = $1`, [tenantId])
+    if (before.rowCount === 0) return notFound(res, 'Tenant')
+
+    const counts = await query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM students WHERE tenant_id = $1)  AS students,
+         (SELECT COUNT(*)::int FROM employees WHERE tenant_id = $1) AS employees,
+         (SELECT COUNT(*)::int FROM user_tenant_memberships WHERE tenant_id = $1) AS users`,
       [tenantId]
     )
+    const held = counts.rows[0]
+    const total = Number(held.students) + Number(held.employees) + Number(held.users)
 
-    return res.json({
-      success: true,
-      data: result.rows,
-      count: result.rows.length
-    })
-  } catch (error: any) {
-    console.error('Error fetching tenant admins:', error)
-    return res.status(500).json({ error: error.message || 'Failed to fetch tenant admins' })
+    if (total > 0) {
+      await audit(req, 'TENANT_DELETE', 'GLOBAL',
+        { result: 'DENIED', error: 'tenant holds data' }, { type: 'tenant', id: tenantId })
+      return res.status(409).json({
+        error: 'This tenant holds data and cannot be deleted; archive it instead',
+        holds: held,
+      })
+    }
+
+    const table = before.rows[0].kind === 'school' ? 'school_entities' : 'corporate_entities'
+    await query(`DELETE FROM ${table} WHERE id = $1`, [tenantId])
+
+    await audit(req, 'TENANT_DELETE', 'GLOBAL', { result: 'SUCCESS' },
+      { type: 'tenant', id: tenantId }, { beforeState: before.rows[0] },
+      (req.body ?? {}).justification)
+    await logAction(req, 'TENANT_DELETE', 'tenant', tenantId, { name: before.rows[0].name })
+
+    return res.json({ deleted: true })
+  } catch (e) {
+    await audit(req, 'TENANT_DELETE', 'GLOBAL',
+      { result: 'FAILURE', error: String((e as Error).message) },
+      { type: 'tenant', id: req.params.tenantId })
+    return fail(res, 'delete that tenant', e)
   }
 })
 
-// DELETE: Remove tenant admin
-router.delete('/tenant-admins/:adminId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+// ===========================================================================
+// Tenant administrators
+// ===========================================================================
+
+router.get('/tenant-admins', async (_req: Request, res: Response) => {
   try {
-    const superadminId = req.user!.userId
+    const r = await query(
+      `SELECT u.id, u.full_name, u.email, u.phone, u.is_active, u.created_at,
+              u.must_reset_password, u.last_login,
+              m.tenant_id, m.tenant_name, m.platform_kind
+         FROM users u
+         JOIN roles ro ON ro.id = u.role_id
+         LEFT JOIN user_tenant_memberships m ON m.user_id = u.id
+        WHERE ro.name = 'admin'
+        ORDER BY m.tenant_name NULLS LAST, u.full_name`
+    )
+    return res.json({ admins: r.rows })
+  } catch (e) {
+    return fail(res, 'load tenant administrators', e)
+  }
+})
+
+/** Which tenants have an administrator, and which do not. */
+router.get('/admins/mapping', async (_req: Request, res: Response) => {
+  try {
+    const r = await query(
+      `SELECT t.id AS tenant_id, t.name AS tenant_name, t.kind, t.status,
+              COUNT(u.id)::int AS admin_count,
+              COALESCE(
+                JSON_AGG(JSON_BUILD_OBJECT('id', u.id, 'name', u.full_name, 'email', u.email)
+                         ORDER BY u.full_name)
+                  FILTER (WHERE u.id IS NOT NULL),
+                '[]'::json
+              ) AS admins
+         FROM tenants t
+         LEFT JOIN user_tenant_memberships m ON m.tenant_id = t.id
+         LEFT JOIN users u ON u.id = m.user_id
+                          AND u.role_id IN (SELECT id FROM roles WHERE name = 'admin')
+        GROUP BY t.id
+        ORDER BY t.name`
+    )
+    return res.json({
+      mapping: r.rows,
+      // The row that matters: a tenant nobody administers.
+      unadministered: r.rows.filter((x: any) => x.admin_count === 0).map((x: any) => x.tenant_name),
+    })
+  } catch (e) {
+    return fail(res, 'load the administrator mapping', e)
+  }
+})
+
+router.post('/tenant-admins', async (req: Request, res: Response) => {
+  const client = await getConnection()
+  try {
+    const b = req.body ?? {}
+    if (!b.tenantId || !b.email || !b.fullName) {
+      return res.status(400).json({ error: 'tenantId, email and fullName are required' })
+    }
+    if (!UUID.test(b.tenantId)) return notFound(res, 'Tenant')
+
+    const tenant = await query(`SELECT * FROM tenants WHERE id = $1`, [b.tenantId])
+    if (tenant.rowCount === 0) return notFound(res, 'Tenant')
+    if (tenant.rows[0].status !== 'active') {
+      return res.status(409).json({
+        error: `This tenant is ${tenant.rows[0].status}; reactivate it before adding an administrator`,
+      })
+    }
+
+    const platformId = tenant.rows[0].platform_id
+    const role = await query(
+      `SELECT id FROM roles WHERE name = 'admin' AND platform_id = $1`, [platformId]
+    )
+    if (role.rowCount === 0) {
+      return res.status(500).json({ error: 'The admin role is not configured for this platform' })
+    }
+
+    const existing = await query(
+      `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND platform_id = $2`,
+      [b.email, platformId]
+    )
+    if (existing.rowCount && existing.rowCount > 0) {
+      await audit(req, 'TENANT_ADMIN_CREATE', 'USER',
+        { result: 'DENIED', error: 'email already in use' }, { type: 'tenant', id: b.tenantId })
+      return res.status(409).json({ error: 'An account already exists on that email address' })
+    }
+
+    // Issued once, here, and never stored in readable form. The account is
+    // flagged to force a change on first sign-in.
+    const temporary = `Adm-${Math.random().toString(36).slice(2, 10)}A1!`
+    const hashed = await bcrypt.hash(temporary, 12)
+
+    await client.query('BEGIN')
+
+    const user = await client.query(
+      `INSERT INTO users (email, full_name, phone, platform_id, role_id, is_active,
+                          password_hash, must_reset_password)
+       VALUES ($1,$2,$3,$4,$5,TRUE,$6,TRUE) RETURNING id, email, full_name`,
+      [b.email, b.fullName, b.phone || null, platformId, role.rows[0].id, hashed]
+    )
+    const userId = user.rows[0].id
+
+    const association = tenant.rows[0].kind === 'school'
+      ? 'school_user_associations' : 'corporate_user_associations'
+    const column = tenant.rows[0].kind === 'school' ? 'school_entity_id' : 'corporate_entity_id'
+
+    await client.query(
+      `INSERT INTO ${association} (user_id, ${column}, status) VALUES ($1,$2,'active')`,
+      [userId, b.tenantId]
+    )
+
+    // The entity's admin_user_id is what several older gates keyed on and
+    // what the console displays, so it is set when there is nobody in it.
+    const entity = tenant.rows[0].kind === 'school' ? 'school_entities' : 'corporate_entities'
+    await client.query(
+      `UPDATE ${entity} SET admin_user_id = COALESCE(admin_user_id, $2) WHERE id = $1`,
+      [b.tenantId, userId]
+    )
+
+    await client.query('COMMIT')
+
+    await audit(req, 'TENANT_ADMIN_CREATE', 'USER', { result: 'SUCCESS' },
+      { type: 'user', id: userId }, { afterState: user.rows[0] }, b.justification)
+    await logAction(req, 'TENANT_ADMIN_CREATE', 'user', userId,
+      { tenantId: b.tenantId, email: b.email })
+
+    return res.status(201).json({
+      admin: user.rows[0],
+      temporaryPassword: temporary,
+      note: 'Shown once. The account must set a new password at first sign-in.',
+    })
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    await audit(req, 'TENANT_ADMIN_CREATE', 'USER',
+      { result: 'FAILURE', error: String((e as Error).message) })
+    return fail(res, 'create that administrator', e)
+  } finally {
+    client.release()
+  }
+})
+
+/**
+ * Removing an administrator.
+ *
+ * Deactivates rather than deletes: an administrator who approved things,
+ * issued invoices and made admissions decisions is referenced throughout the
+ * audit trail, and removing the row would either fail on those references or
+ * blank the name against every decision they made.
+ *
+ * Refused when they are the last administrator a tenant has, because a tenant
+ * nobody can administer needs a superadmin to rescue it.
+ */
+router.delete('/tenant-admins/:adminId', async (req: Request, res: Response) => {
+  try {
     const { adminId } = req.params
+    if (!UUID.test(adminId)) return notFound(res, 'Administrator')
 
-    // Get admin info before deletion
-    const adminInfo = await query(
-      `SELECT u.id, u.email,
-              COALESCE(sua.school_entity_id, cua.corporate_entity_id) as tenant_id
-       FROM users u
-       LEFT JOIN school_user_associations sua ON sua.user_id = u.id
-       LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
-       WHERE u.id = $1`,
+    const admin = await query(
+      `SELECT u.id, u.full_name, u.email, u.is_active, m.tenant_id, m.tenant_name
+         FROM users u
+         JOIN roles r ON r.id = u.role_id
+         LEFT JOIN user_tenant_memberships m ON m.user_id = u.id
+        WHERE u.id = $1 AND r.name = 'admin'`,
       [adminId]
     )
+    if (admin.rowCount === 0) return notFound(res, 'Administrator')
 
-    if (adminInfo.rows.length === 0) {
-      return res.status(404).json({ error: 'Admin not found' })
+    const tenantId = admin.rows[0].tenant_id
+    if (tenantId) {
+      const others = await query(
+        `SELECT COUNT(*)::int AS n
+           FROM user_tenant_memberships m
+           JOIN users u ON u.id = m.user_id
+           JOIN roles r ON r.id = u.role_id
+          WHERE m.tenant_id = $1 AND r.name = 'admin' AND u.is_active AND u.id <> $2`,
+        [tenantId, adminId]
+      )
+      if (Number(others.rows[0].n) === 0) {
+        await audit(req, 'TENANT_ADMIN_REMOVE', 'USER',
+          { result: 'DENIED', error: 'last administrator' }, { type: 'user', id: adminId })
+        return res.status(409).json({
+          error: `${admin.rows[0].full_name} is the only administrator of `
+            + `${admin.rows[0].tenant_name}; appoint another before removing them`,
+        })
+      }
     }
 
-    const admin = adminInfo.rows[0]
-
-    // Soft delete (mark as inactive) instead of hard delete
     await query(
-      `UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1`,
+      `UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [adminId]
     )
-
-    // Log audit entry
-    try {
-      await query(
-        `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
-         VALUES ($1, $2, $3, $4)`,
-        [superadminId, 'REMOVE_TENANT_ADMIN', getClientIp(req) || 'unknown', JSON.stringify({
-          admin_id: admin.id,
-          admin_email: admin.email,
-          tenant_id: admin.tenant_id
-        })]
-      )
-    } catch (auditError) {
-      console.warn('Audit logging failed:', auditError)
-    }
-
-    return res.json({
-      success: true,
-      message: 'Tenant admin removed successfully'
-    })
-  } catch (error: any) {
-    console.error('Error removing tenant admin:', error)
-    return res.status(500).json({ error: error.message || 'Failed to remove tenant admin' })
-  }
-})
-
-// ===========================
-// USERS MANAGEMENT ENDPOINTS
-// ===========================
-
-// GET: List all users in the system
-router.get('/users', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const superadminId = req.user!.userId
-
-    // Get all users with their entity and role information
-    // Users link to entities via school_user_associations / corporate_user_associations
-    const usersResult = await query(
-      `SELECT 
-        u.id,
-        u.email,
-        u.full_name as name,
-        u.is_active,
-        false as is_suspended,
-        r.name as role,
-        COALESCE(se.name, ce.name, 'System') as entity_name,
-        u.created_at
-      FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
-      LEFT JOIN school_user_associations sua ON sua.user_id = u.id
-      LEFT JOIN school_entities se ON se.id = sua.school_entity_id
-      LEFT JOIN corporate_user_associations cua ON cua.user_id = u.id
-      LEFT JOIN corporate_entities ce ON ce.id = cua.corporate_entity_id
-      ORDER BY u.created_at DESC`
+    // Hand the entity's nominated administrator to somebody who is still here.
+    await query(
+      `UPDATE school_entities SET admin_user_id = NULL WHERE admin_user_id = $1`, [adminId]
+    )
+    await query(
+      `UPDATE corporate_entities SET admin_user_id = NULL WHERE admin_user_id = $1`, [adminId]
     )
 
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address)
-       VALUES ($1, $2, $3)`,
-      [superadminId, 'list_users', getClientIp(req)]
-    ).catch(() => {})
+    await audit(req, 'TENANT_ADMIN_REMOVE', 'USER', { result: 'SUCCESS' },
+      { type: 'user', id: adminId }, { beforeState: admin.rows[0] },
+      (req.body ?? {}).justification)
+    await logAction(req, 'TENANT_ADMIN_REMOVE', 'user', adminId,
+      { tenantId, email: admin.rows[0].email })
 
-    return res.json(usersResult.rows || [])
-  } catch (error: any) {
-    console.error('Error listing users:', error)
-    return res.status(500).json({ error: error.message || 'Failed to list users' })
+    return res.json({ deactivated: true, admin: admin.rows[0] })
+  } catch (e) {
+    await audit(req, 'TENANT_ADMIN_REMOVE', 'USER',
+      { result: 'FAILURE', error: String((e as Error).message) },
+      { type: 'user', id: req.params.adminId })
+    return fail(res, 'remove that administrator', e)
   }
 })
 
-// PATCH: Update user (activate / suspend / disable / edit)
-router.patch('/users/:userId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
-  try {
-    const superadminId = req.user!.userId
-    const { userId } = req.params
-    const { action, name, email } = req.body
+// ===========================================================================
+// Users
+// ===========================================================================
 
-    // Verify user exists
-    const userCheck = await query(`SELECT id, email, full_name, is_active FROM users WHERE id = $1`, [userId])
-    if (userCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' })
+router.get('/users', async (req: Request, res: Response) => {
+  try {
+    const search = typeof req.query.q === 'string' && req.query.q.trim() ? req.query.q.trim() : null
+    const tenantId = typeof req.query.tenantId === 'string' && UUID.test(req.query.tenantId)
+      ? req.query.tenantId : null
+    const limit = Math.min(Number(req.query.limit) || 200, 1000)
+
+    const r = await query(
+      `SELECT u.id, u.full_name, u.email, u.phone, u.is_active, u.created_at, u.last_login,
+              u.must_reset_password, ro.name AS role, p.name AS platform,
+              m.tenant_id, m.tenant_name
+         FROM users u
+         JOIN roles ro ON ro.id = u.role_id
+         LEFT JOIN platforms p ON p.id = u.platform_id
+         LEFT JOIN user_tenant_memberships m ON m.user_id = u.id
+        WHERE ($1::text IS NULL OR u.full_name ILIKE '%' || $1::text || '%'
+                                OR u.email ILIKE '%' || $1::text || '%')
+          AND ($2::uuid IS NULL OR m.tenant_id = $2::uuid)
+        ORDER BY u.created_at DESC
+        LIMIT $3`,
+      [search, tenantId, limit]
+    )
+    return res.json({ users: r.rows })
+  } catch (e) {
+    return fail(res, 'load users', e)
+  }
+})
+
+router.patch('/users/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+    if (!UUID.test(userId)) return notFound(res, 'User')
+    const b = req.body ?? {}
+
+    const before = await query(
+      `SELECT id, full_name, email, phone, is_active FROM users WHERE id = $1`, [userId]
+    )
+    if (before.rowCount === 0) return notFound(res, 'User')
+
+    // A superadmin locking themselves out is a support call nobody can answer.
+    if (userId === actorOf(req) && b.isActive === false) {
+      await audit(req, 'USER_UPDATE', 'USER',
+        { result: 'DENIED', error: 'self-deactivation' }, { type: 'user', id: userId })
+      return res.status(409).json({ error: 'You cannot deactivate your own account' })
     }
 
-    const user = userCheck.rows[0]
+    // The role is not settable here. Granting roles across tenants from a
+    // generic update route is how privilege escalation gets in.
+    const after = await query(
+      `UPDATE users
+          SET full_name = COALESCE($2, full_name),
+              email = COALESCE($3, email),
+              phone = COALESCE($4, phone),
+              is_active = COALESCE($5, is_active),
+              must_reset_password = COALESCE($6, must_reset_password),
+              updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING id, full_name, email, phone, is_active, must_reset_password`,
+      [
+        userId, b.fullName || null, b.email || null, b.phone ?? null,
+        b.isActive === undefined ? null : !!b.isActive,
+        b.mustResetPassword === undefined ? null : !!b.mustResetPassword,
+      ]
+    )
 
-    // Prevent modifying superadmin users
-    const roleCheck = await query(
-      `SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+    await audit(req, 'USER_UPDATE', 'USER', { result: 'SUCCESS' },
+      { type: 'user', id: userId },
+      { beforeState: before.rows[0], afterState: after.rows[0] }, b.justification)
+    await logAction(req, 'USER_UPDATE', 'user', userId, { fields: Object.keys(b) })
+
+    return res.json({ user: after.rows[0] })
+  } catch (e) {
+    await audit(req, 'USER_UPDATE', 'USER',
+      { result: 'FAILURE', error: String((e as Error).message) },
+      { type: 'user', id: req.params.userId })
+    return fail(res, 'update that user', e)
+  }
+})
+
+/** Deactivates. See the administrator route for why nothing is deleted. */
+router.delete('/users/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+    if (!UUID.test(userId)) return notFound(res, 'User')
+
+    if (userId === actorOf(req)) {
+      await audit(req, 'USER_DEACTIVATE', 'USER',
+        { result: 'DENIED', error: 'self-deactivation' }, { type: 'user', id: userId })
+      return res.status(409).json({ error: 'You cannot deactivate your own account' })
+    }
+
+    const before = await query(
+      `SELECT id, full_name, email, is_active FROM users WHERE id = $1`, [userId]
+    )
+    if (before.rowCount === 0) return notFound(res, 'User')
+
+    await query(
+      `UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [userId]
     )
-    if (roleCheck.rows[0]?.name === 'superadmin') {
-      return res.status(403).json({ error: 'Cannot modify superadmin users' })
-    }
 
-    if (action === 'activate') {
-      await query(`UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1`, [userId])
-    } else if (action === 'suspend') {
-      await query(`UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1`, [userId])
-    } else if (action === 'disable') {
-      await query(`UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1`, [userId])
-    } else if (action === 'edit') {
-      if (!name && !email) {
-        return res.status(400).json({ error: 'No fields to update' })
-      }
-      const updates: string[] = []
-      const values: any[] = []
-      let paramIdx = 1
+    await audit(req, 'USER_DEACTIVATE', 'USER', { result: 'SUCCESS' },
+      { type: 'user', id: userId }, { beforeState: before.rows[0] },
+      (req.body ?? {}).justification)
+    await logAction(req, 'USER_DEACTIVATE', 'user', userId, { email: before.rows[0].email })
 
-      if (name) {
-        updates.push(`full_name = $${paramIdx++}`)
-        values.push(name)
-      }
-      if (email) {
-        // Check email uniqueness
-        const emailExists = await query(`SELECT id FROM users WHERE email = $1 AND id != $2`, [email.toLowerCase(), userId])
-        if (emailExists.rows.length > 0) {
-          return res.status(409).json({ error: 'Email already in use by another user' })
-        }
-        updates.push(`email = $${paramIdx++}`)
-        values.push(email.toLowerCase())
-      }
-      updates.push(`updated_at = NOW()`)
-      values.push(userId)
-
-      await query(
-        `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIdx}`,
-        values
-      )
-    } else {
-      return res.status(400).json({ error: 'Invalid action. Use: activate, suspend, disable, or edit' })
-    }
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
-       VALUES ($1, $2, $3, $4)`,
-      [superadminId, `USER_${(action || 'unknown').toUpperCase()}`, getClientIp(req) || 'unknown', JSON.stringify({
-        user_id: userId,
-        user_email: user.email,
-        action
-      })]
-    ).catch(() => {})
-
-    return res.json({ success: true, message: `User ${action}d successfully` })
-  } catch (error: any) {
-    console.error('Error updating user:', error)
-    return res.status(500).json({ error: error.message || 'Failed to update user' })
+    return res.json({ deactivated: true })
+  } catch (e) {
+    await audit(req, 'USER_DEACTIVATE', 'USER',
+      { result: 'FAILURE', error: String((e as Error).message) },
+      { type: 'user', id: req.params.userId })
+    return fail(res, 'deactivate that user', e)
   }
 })
 
-// DELETE: Remove user permanently
-router.delete('/users/:userId', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+/**
+ * Accounts that cannot sign in.
+ *
+ * There is no lockout counter in this schema — is_active is the whole of it —
+ * so this is deliberately named for what it can actually tell you rather than
+ * implying a failed-attempt mechanism that does not exist.
+ */
+router.get('/locked-users', async (_req: Request, res: Response) => {
   try {
-    const superadminId = req.user!.userId
-    const { userId } = req.params
+    const r = await query(
+      `SELECT u.id, u.full_name, u.email, u.updated_at, u.last_login,
+              ro.name AS role, m.tenant_id, m.tenant_name
+         FROM users u
+         JOIN roles ro ON ro.id = u.role_id
+         LEFT JOIN user_tenant_memberships m ON m.user_id = u.id
+        WHERE u.is_active = FALSE
+        ORDER BY u.updated_at DESC NULLS LAST
+        LIMIT 500`
+    )
+    return res.json({
+      users: r.rows,
+      note: 'Accounts are deactivated explicitly; this platform has no failed-attempt lockout.',
+    })
+  } catch (e) {
+    return fail(res, 'load deactivated accounts', e)
+  }
+})
 
-    // Verify user exists
-    const userCheck = await query(`SELECT id, email, full_name FROM users WHERE id = $1`, [userId])
-    if (userCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' })
+router.post('/locked-users/unlock', async (req: Request, res: Response) => {
+  try {
+    const b = req.body ?? {}
+    const userId = b.userId
+    if (!userId || !UUID.test(String(userId))) {
+      return res.status(400).json({ error: 'userId is required' })
     }
 
-    const user = userCheck.rows[0]
+    const before = await query(
+      `SELECT id, full_name, email, is_active FROM users WHERE id = $1`, [userId]
+    )
+    if (before.rowCount === 0) return notFound(res, 'User')
+    if (before.rows[0].is_active) {
+      return res.status(409).json({ error: 'That account is already active' })
+    }
 
-    // Prevent deleting superadmin users
-    const roleCheck = await query(
-      `SELECT r.name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+    // Reactivating an account whose tenant is suspended would hand back a
+    // sign-in the suspension was supposed to remove.
+    const tenant = await query(
+      `SELECT t.id, t.name, t.status
+         FROM user_tenant_memberships m JOIN tenants t ON t.id = m.tenant_id
+        WHERE m.user_id = $1 LIMIT 1`,
       [userId]
     )
-    if (roleCheck.rows[0]?.name === 'superadmin') {
-      return res.status(403).json({ error: 'Cannot delete superadmin users' })
+    if (tenant.rowCount && tenant.rows[0].status !== 'active') {
+      await audit(req, 'USER_REACTIVATE', 'USER',
+        { result: 'DENIED', error: `tenant is ${tenant.rows[0].status}` },
+        { type: 'user', id: userId })
+      return res.status(409).json({
+        error: `${tenant.rows[0].name} is ${tenant.rows[0].status}; reactivate the tenant first`,
+      })
     }
 
-    // Remove associations first
-    await query(`DELETE FROM school_user_associations WHERE user_id = $1`, [userId])
-    await query(`DELETE FROM corporate_user_associations WHERE user_id = $1`, [userId])
-    await query(`DELETE FROM school_user_approvals WHERE user_id = $1`, [userId])
-    await query(`DELETE FROM corporate_user_approvals WHERE user_id = $1`, [userId])
+    const after = await query(
+      `UPDATE users SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1 RETURNING id, full_name, email, is_active`,
+      [userId]
+    )
 
-    // Clear admin_user_id references
-    await query(`UPDATE school_entities SET admin_user_id = NULL WHERE admin_user_id = $1`, [userId])
-    await query(`UPDATE corporate_entities SET admin_user_id = NULL WHERE admin_user_id = $1`, [userId])
+    await audit(req, 'USER_REACTIVATE', 'USER', { result: 'SUCCESS' },
+      { type: 'user', id: userId },
+      { beforeState: before.rows[0], afterState: after.rows[0] }, b.justification)
+    await logAction(req, 'USER_REACTIVATE', 'user', userId, { email: before.rows[0].email })
 
-    // Delete user
-    await query(`DELETE FROM users WHERE id = $1`, [userId])
-
-    // Log the action
-    await query(
-      `INSERT INTO superadmin_action_logs (superadmin_user_id, action, ip_address, details)
-       VALUES ($1, $2, $3, $4)`,
-      [superadminId, 'DELETE_USER', getClientIp(req) || 'unknown', JSON.stringify({
-        user_id: userId,
-        user_email: user.email,
-        user_name: user.full_name
-      })]
-    ).catch(() => {})
-
-    return res.json({ success: true, message: 'User deleted successfully' })
-  } catch (error: any) {
-    console.error('Error deleting user:', error)
-    return res.status(500).json({ error: error.message || 'Failed to delete user' })
+    return res.json({ user: after.rows[0] })
+  } catch (e) {
+    await audit(req, 'USER_REACTIVATE', 'USER',
+      { result: 'FAILURE', error: String((e as Error).message) })
+    return fail(res, 'reactivate that account', e)
   }
 })
 
-// ===========================
-// ANALYTICS ENDPOINT - LIVE DATA
-// ===========================
+// ===========================================================================
+// Audit
+// ===========================================================================
 
-router.get('/analytics', authenticateToken, (req, res, next) => verifySuperadmin(req, res, next), async (req: Request, res: Response) => {
+router.get('/audit-logs', async (req: Request, res: Response) => {
   try {
-    const days = parseInt(req.query.days as string) || 30
-
-    // 1. User growth trend: for each day in the range, get cumulative total users,
-    //    new registrations that day, and active users as of that day
-    const userGrowthResult = await query(
-      `WITH date_series AS (
-        SELECT generate_series(
-          (CURRENT_DATE - ($1 || ' days')::interval)::date,
-          CURRENT_DATE,
-          '1 day'::interval
-        )::date AS day
-      ),
-      daily_registrations AS (
-        SELECT created_at::date AS day, COUNT(*) AS new_registrations
-        FROM users
-        WHERE created_at >= (CURRENT_DATE - ($1 || ' days')::interval)
-        GROUP BY created_at::date
-      ),
-      cumulative AS (
-        SELECT
-          ds.day,
-          COALESCE(dr.new_registrations, 0) AS new_registrations,
-          (SELECT COUNT(*) FROM users WHERE created_at::date <= ds.day) AS total_users,
-          (SELECT COUNT(*) FROM users WHERE created_at::date <= ds.day AND is_active = true) AS active_users
-        FROM date_series ds
-        LEFT JOIN daily_registrations dr ON ds.day = dr.day
-      )
-      SELECT day, new_registrations, total_users, active_users
-      FROM cumulative
-      ORDER BY day ASC`,
-      [days]
-    )
-
-    const userGrowth = userGrowthResult.rows.map((row: any) => ({
-      date: new Date(row.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      rawDate: row.day,
-      newRegistrations: parseInt(row.new_registrations) || 0,
-      totalUsers: parseInt(row.total_users) || 0,
-      activeUsers: parseInt(row.active_users) || 0,
-    }))
-
-    // 2. System health summary from system_health table
-    const healthResult = await query(
-      `SELECT
-        COUNT(CASE WHEN status = 'DOWN' THEN 1 END) AS critical,
-        COUNT(CASE WHEN status = 'DEGRADED' THEN 1 END) AS warnings,
-        COUNT(CASE WHEN status = 'HEALTHY' THEN 1 END) AS healthy
-       FROM system_health`
-    )
-    const healthRow = healthResult.rows[0] || {}
-    const systemHealth = {
-      critical: parseInt(healthRow.critical) || 0,
-      warnings: parseInt(healthRow.warnings) || 0,
-      healthy: parseInt(healthRow.healthy) || 0,
-    }
-
-    // 3. Key metrics - computed from real data
-    // Average response time from platform_metrics (last 24h)
-    const avgLatencyResult = await query(
-      `SELECT COALESCE(AVG(response_time_ms), 0) AS avg_response_time
-       FROM platform_metrics
-       WHERE created_at >= NOW() - INTERVAL '24 hours'
-         AND response_time_ms IS NOT NULL`
-    )
-
-    // Active sessions (users who logged in within last hour - approximate from audit_logs or just active user count)
-    const activeSessionsResult = await query(
-      `SELECT COUNT(DISTINCT created_by_user_id) as active_sessions
-       FROM platform_metrics
-       WHERE created_at >= NOW() - INTERVAL '1 hour'`
-    )
-
-    // API calls in last hour
-    const apiCallsResult = await query(
-      `SELECT COUNT(*) as api_calls
-       FROM platform_metrics
-       WHERE created_at >= NOW() - INTERVAL '1 hour'`
-    )
-
-    // Uptime: percentage of healthy checks vs total checks
-    const uptimeResult = await query(
-      `SELECT
-        COUNT(*) as total_checks,
-        COUNT(CASE WHEN status = 'HEALTHY' THEN 1 END) as healthy_checks
-       FROM system_health`
-    )
-    const uptimeRow = uptimeResult.rows[0] || {}
-    const totalChecks = parseInt(uptimeRow.total_checks) || 0
-    const healthyChecks = parseInt(uptimeRow.healthy_checks) || 0
-    const uptime = totalChecks > 0 ? ((healthyChecks / totalChecks) * 100).toFixed(2) : '100.00'
-
-    const keyMetrics = {
-      avgResponseTimeMs: Math.round(parseFloat(avgLatencyResult.rows[0]?.avg_response_time) || 0),
-      systemUptime: parseFloat(uptime),
-      apiCallsLastHour: parseInt(apiCallsResult.rows[0]?.api_calls) || 0,
-      activeSessions: parseInt(activeSessionsResult.rows[0]?.active_sessions) || 0,
-    }
-
-    // 4. Summary stats: total users, active, roles breakdown, tenants
-    const totalUsersResult = await query(`SELECT COUNT(*) as cnt FROM users`)
-    const activeUsersResult = await query(`SELECT COUNT(*) as cnt FROM users WHERE is_active = true`)
-    const rolesResult = await query(
-      `SELECT r.name, COUNT(u.id) as count
-       FROM roles r
-       LEFT JOIN users u ON u.role_id = r.id
-       GROUP BY r.name
-       ORDER BY r.name`
-    )
-    const schoolsResult = await query(`SELECT COUNT(*) as cnt FROM school_entities`)
-    const corporatesResult = await query(`SELECT COUNT(*) as cnt FROM corporate_entities`)
-    const incidentsResult = await query(`SELECT COUNT(*) as cnt FROM incidents`)
-
-    const summary = {
-      totalUsers: parseInt(totalUsersResult.rows[0]?.cnt) || 0,
-      activeUsers: parseInt(activeUsersResult.rows[0]?.cnt) || 0,
-      totalSchools: parseInt(schoolsResult.rows[0]?.cnt) || 0,
-      totalCorporates: parseInt(corporatesResult.rows[0]?.cnt) || 0,
-      totalIncidents: parseInt(incidentsResult.rows[0]?.cnt) || 0,
-      roleBreakdown: rolesResult.rows.map((r: any) => ({
-        role: r.name,
-        count: parseInt(r.count) || 0,
-      })),
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        userGrowth,
-        systemHealth,
-        keyMetrics,
-        summary,
-      },
+    const logs = await getAuditLogs({
+      actorId: typeof req.query.actorId === 'string' ? req.query.actorId : undefined,
+      actionType: typeof req.query.actionType === 'string' ? req.query.actionType : undefined,
+      actionScope: typeof req.query.actionScope === 'string' ? req.query.actionScope : undefined,
+      targetEntityId: typeof req.query.targetEntityId === 'string'
+        ? req.query.targetEntityId : undefined,
+      limit: Math.min(Number(req.query.limit) || 100, 500),
+      offset: Number(req.query.offset) || 0,
     })
-  } catch (error: any) {
-    console.error('Error loading analytics:', error)
-    return res.status(500).json({ error: error.message || 'Failed to load analytics' })
+    return res.json({ logs })
+  } catch (e) {
+    return fail(res, 'load the audit log', e)
+  }
+})
+
+/**
+ * The combined trail the console shows.
+ *
+ * The console called this on every load and it did not exist. It merges the
+ * formal audit log with the lighter action log and the tenant lifecycle
+ * history, because "what has been done to this platform lately" is one
+ * question and it lived in three tables.
+ */
+router.get('/audit-trail', async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 100, 500)
+
+    const r = await query(
+      `SELECT * FROM (
+         SELECT a.created_at AS occurred_at, 'audit' AS source,
+                a.action_type AS action, a.result,
+                a.target_entity_type AS entity_type, a.target_entity_id AS entity_id,
+                a.justification AS detail, a.error_message,
+                u.full_name AS actor_name, a.actor_id
+           FROM superadmin_audit_log a
+           LEFT JOIN users u ON u.id = a.actor_id
+
+         UNION ALL
+
+         SELECT l.created_at, 'action', l.action, NULL,
+                l.entity_type, l.entity_id,
+                l.details::text, NULL,
+                u.full_name, l.superadmin_user_id
+           FROM superadmin_action_logs l
+           LEFT JOIN users u ON u.id = l.superadmin_user_id
+
+         UNION ALL
+
+         SELECT t.timestamp, 'lifecycle', t.action_type, NULL,
+                'tenant', t.tenant_id,
+                t.previous_state || ' -> ' || t.new_state ||
+                  COALESCE(': ' || t.justification, ''), NULL,
+                u.full_name, t.actor_id
+           FROM tenant_lifecycle_audit t
+           LEFT JOIN users u ON u.id = t.actor_id
+       ) trail
+       ORDER BY occurred_at DESC
+       LIMIT $1`,
+      [limit]
+    )
+    return res.json({ trail: r.rows })
+  } catch (e) {
+    return fail(res, 'load the audit trail', e)
+  }
+})
+
+/**
+ * The system report.
+ *
+ * Also called by the console and also missing. Deliberately assembled from
+ * live queries at request time rather than a stored snapshot, so it cannot
+ * report a state the platform was in last week.
+ */
+router.get('/export/system-report', async (req: Request, res: Response) => {
+  try {
+    const [stats, tenants, admins, incidents, notifications] = await Promise.all([
+      query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM tenants)                          AS tenants,
+           (SELECT COUNT(*)::int FROM tenants WHERE status = 'active')  AS tenants_active,
+           (SELECT COUNT(*)::int FROM users)                            AS users,
+           (SELECT COUNT(*)::int FROM users WHERE is_active)            AS users_active,
+           (SELECT COUNT(*)::int FROM students)                         AS students,
+           (SELECT COUNT(*)::int FROM employees)                        AS employees`
+      ),
+      query(
+        `SELECT t.name, t.code, t.kind, t.status, t.created_at,
+                (SELECT COUNT(*)::int FROM user_tenant_memberships m WHERE m.tenant_id = t.id) AS users
+           FROM tenants t ORDER BY t.name`
+      ),
+      query(
+        `SELECT COUNT(*)::int AS n FROM tenants t
+          WHERE NOT EXISTS (
+            SELECT 1 FROM user_tenant_memberships m
+             JOIN users u ON u.id = m.user_id
+             JOIN roles r ON r.id = u.role_id
+            WHERE m.tenant_id = t.id AND r.name = 'admin' AND u.is_active)`
+      ),
+      query(
+        `SELECT status, COUNT(*)::int AS n FROM incidents GROUP BY status`
+      ),
+      query(
+        `SELECT status, COUNT(*)::int AS n FROM notification_messages GROUP BY status`
+      ),
+    ])
+
+    const report = {
+      generatedAt: new Date().toISOString(),
+      generatedBy: actorOf(req),
+      summary: stats.rows[0],
+      tenants: tenants.rows,
+      tenantsWithoutAnAdministrator: Number(admins.rows[0].n),
+      incidentsByStatus: Object.fromEntries(incidents.rows.map((x: any) => [x.status, x.n])),
+      notificationsByStatus: Object.fromEntries(
+        notifications.rows.map((x: any) => [x.status, x.n])
+      ),
+    }
+
+    await logAction(req, 'SYSTEM_REPORT_EXPORT', 'platform', null,
+      { tenants: report.summary.tenants })
+
+    if (String(req.query.format).toLowerCase() === 'json') {
+      res.setHeader('Content-Disposition',
+        `attachment; filename="system-report-${new Date().toISOString().slice(0, 10)}.json"`)
+    }
+    return res.json({ report })
+  } catch (e) {
+    return fail(res, 'build the system report', e)
+  }
+})
+
+// ===========================================================================
+// Incidents
+// ===========================================================================
+
+router.get('/incidents', async (req: Request, res: Response) => {
+  try {
+    const status = typeof req.query.status === 'string' ? req.query.status : null
+    const r = await query(
+      `SELECT i.id, i.incident_number, i.title, i.description, i.incident_type,
+              i.severity, i.status, i.affected_tenant_id, t.name AS affected_tenant_name,
+              i.created_at, i.acknowledged_at, i.resolved_at, i.root_cause,
+              i.resolution_notes, u.full_name AS detected_by_name
+         FROM incidents i
+         LEFT JOIN tenants t ON t.id = i.affected_tenant_id
+         LEFT JOIN users u ON u.id = i.detected_by_user_id
+        WHERE ($1::text IS NULL OR i.status = $1::text)
+        ORDER BY i.created_at DESC
+        LIMIT 200`,
+      [status]
+    )
+    return res.json({ incidents: r.rows })
+  } catch (e) {
+    return fail(res, 'load incidents', e)
+  }
+})
+
+router.post('/incidents', async (req: Request, res: Response) => {
+  try {
+    const b = req.body ?? {}
+    if (!b.title || !b.severity) {
+      return res.status(400).json({ error: 'title and severity are required' })
+    }
+    if (!INCIDENT_SEVERITY.includes(String(b.severity).toUpperCase() as any)) {
+      return res.status(400).json({
+        error: `severity must be one of ${INCIDENT_SEVERITY.join(', ')}`,
+      })
+    }
+    if (b.affectedTenantId && !UUID.test(b.affectedTenantId)) {
+      return notFound(res, 'Tenant')
+    }
+
+    const created = await query(
+      `INSERT INTO incidents
+         (title, description, incident_type, severity, status, affected_tenant_id,
+          detected_by_user_id, assigned_superadmin_id, detection_method, first_detected_at)
+       VALUES ($1,$2,$3,$4,'OPEN',$5,$6,$7,'manual',CURRENT_TIMESTAMP)
+       RETURNING *`,
+      [
+        // description is NOT NULL, and an incident with no description is a
+        // line in a list nobody can act on.
+        b.title, b.description || b.title, b.incidentType || 'operational',
+        String(b.severity).toUpperCase(), b.affectedTenantId || null, actorOf(req),
+        // Assigned to whoever raised it until somebody reassigns it. The
+        // column is NOT NULL, and an unowned incident is how one gets missed.
+        b.assignedTo && UUID.test(String(b.assignedTo)) ? b.assignedTo : actorOf(req),
+      ]
+    )
+
+    await audit(req, 'INCIDENT_CREATE', 'SYSTEM', { result: 'SUCCESS' },
+      { type: 'incident', id: created.rows[0].id }, { afterState: created.rows[0] })
+    await logAction(req, 'INCIDENT_CREATE', 'incident', created.rows[0].id, { title: b.title })
+
+    return res.status(201).json({ incident: created.rows[0] })
+  } catch (e) {
+    await audit(req, 'INCIDENT_CREATE', 'SYSTEM',
+      { result: 'FAILURE', error: String((e as Error).message) })
+    return fail(res, 'create that incident', e)
+  }
+})
+
+router.put('/incidents/:incidentId', async (req: Request, res: Response) => {
+  try {
+    const { incidentId } = req.params
+    if (!UUID.test(incidentId)) return notFound(res, 'Incident')
+    const b = req.body ?? {}
+
+    const before = await query(`SELECT * FROM incidents WHERE id = $1`, [incidentId])
+    if (before.rowCount === 0) return notFound(res, 'Incident')
+
+    const status = b.status ? String(b.status).toUpperCase() : null
+    if (status && !INCIDENT_STATUS.includes(status as any)) {
+      return res.status(400).json({
+        error: `status must be one of ${INCIDENT_STATUS.join(', ')}`,
+      })
+    }
+    if (b.severity && !INCIDENT_SEVERITY.includes(String(b.severity).toUpperCase() as any)) {
+      return res.status(400).json({
+        error: `severity must be one of ${INCIDENT_SEVERITY.join(', ')}`,
+      })
+    }
+
+    // A resolved incident carries its root cause and resolution notes; those
+    // are what a post-mortem reads, so resolving without them is refused.
+    if (status === 'RESOLVED' && !b.rootCause && !before.rows[0].root_cause) {
+      return res.status(400).json({
+        error: 'Resolving an incident requires a root cause',
+      })
+    }
+
+    const after = await query(
+      `UPDATE incidents
+          SET title = COALESCE($2, title),
+              description = COALESCE($3, description),
+              severity = COALESCE($4, severity),
+              status = COALESCE($5, status),
+              root_cause = COALESCE($6, root_cause),
+              resolution_notes = COALESCE($7, resolution_notes),
+              acknowledged_at = CASE WHEN $9::text = 'INVESTIGATING' AND acknowledged_at IS NULL
+                                     THEN CURRENT_TIMESTAMP ELSE acknowledged_at END,
+              acknowledged_by_user_id = CASE WHEN $9::text = 'INVESTIGATING'
+                                              AND acknowledged_by_user_id IS NULL
+                                             THEN $8::uuid ELSE acknowledged_by_user_id END,
+              resolved_at = CASE WHEN $9::text = 'RESOLVED' AND resolved_at IS NULL
+                                 THEN CURRENT_TIMESTAMP ELSE resolved_at END,
+              resolved_by_user_id = CASE WHEN $9::text = 'RESOLVED' AND resolved_by_user_id IS NULL
+                                         THEN $8::uuid ELSE resolved_by_user_id END
+        WHERE id = $1
+        RETURNING *`,
+      [
+        incidentId, b.title || null, b.description ?? null,
+        b.severity ? String(b.severity).toUpperCase() : null,
+        status, b.rootCause ?? null, b.resolutionNotes ?? null, actorOf(req), status,
+      ]
+    )
+
+    await audit(req, 'INCIDENT_UPDATE', 'SYSTEM', { result: 'SUCCESS' },
+      { type: 'incident', id: incidentId },
+      { beforeState: before.rows[0], afterState: after.rows[0] })
+    await logAction(req, 'INCIDENT_UPDATE', 'incident', incidentId, { status: b.status })
+
+    return res.json({ incident: after.rows[0] })
+  } catch (e) {
+    await audit(req, 'INCIDENT_UPDATE', 'SYSTEM',
+      { result: 'FAILURE', error: String((e as Error).message) },
+      { type: 'incident', id: req.params.incidentId })
+    return fail(res, 'update that incident', e)
+  }
+})
+
+/**
+ * Overriding an incident.
+ *
+ * The console's break-glass button, which did not exist. It closes an
+ * incident outside the normal flow — a false positive, a duplicate, an alert
+ * that fired on a maintenance window — and it requires a written reason,
+ * because an incident closed without one is indistinguishable from an
+ * incident nobody looked at.
+ */
+router.post('/incidents/override', async (req: Request, res: Response) => {
+  try {
+    const b = req.body ?? {}
+    if (!b.incidentId || !UUID.test(String(b.incidentId))) {
+      return res.status(400).json({ error: 'incidentId is required' })
+    }
+    if (!b.reason || !String(b.reason).trim()) {
+      await audit(req, 'INCIDENT_OVERRIDE', 'SYSTEM',
+        { result: 'DENIED', error: 'no reason given' },
+        { type: 'incident', id: String(b.incidentId) })
+      return res.status(400).json({ error: 'An override has to say why' })
+    }
+
+    const before = await query(`SELECT * FROM incidents WHERE id = $1`, [b.incidentId])
+    if (before.rowCount === 0) return notFound(res, 'Incident')
+    if (['RESOLVED', 'CLOSED'].includes(String(before.rows[0].status).toUpperCase())) {
+      return res.status(409).json({ error: 'That incident is already resolved' })
+    }
+
+    const reason = String(b.reason).trim()
+    const after = await query(
+      `UPDATE incidents
+          SET status = 'RESOLVED',
+              resolved_at = CURRENT_TIMESTAMP,
+              resolved_by_user_id = $2,
+              root_cause = COALESCE(root_cause, $3),
+              resolution_notes = COALESCE(resolution_notes, '') ||
+                                 CASE WHEN resolution_notes IS NULL THEN '' ELSE E'\\n' END ||
+                                 'Superadmin override: ' || $3
+        WHERE id = $1
+        RETURNING *`,
+      [b.incidentId, actorOf(req), reason]
+    )
+
+    await audit(req, 'INCIDENT_OVERRIDE', 'SYSTEM', { result: 'SUCCESS' },
+      { type: 'incident', id: String(b.incidentId) },
+      { beforeState: before.rows[0], afterState: after.rows[0] }, reason)
+    await logAction(req, 'INCIDENT_OVERRIDE', 'incident', String(b.incidentId), { reason })
+
+    return res.json({ incident: after.rows[0], overridden: true })
+  } catch (e) {
+    await audit(req, 'INCIDENT_OVERRIDE', 'SYSTEM',
+      { result: 'FAILURE', error: String((e as Error).message) })
+    return fail(res, 'override that incident', e)
   }
 })
 

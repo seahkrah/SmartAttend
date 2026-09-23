@@ -28,6 +28,7 @@ seed() {
 
 seed seedTwoTenants.manual.ts seed.json
 seed seedCorporate.manual.ts corp.json
+seed seedSuperadmin.manual.ts superadmin.json
 
 SUITES=(
   adminApi
@@ -46,6 +47,7 @@ SUITES=(
   admissionsApi
   feesApi
   notificationsApi
+  controlPlaneApi
 )
 
 fail=0

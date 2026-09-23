@@ -289,8 +289,8 @@ router.get('/status', async (req: ExtendedRequest, res: Response) => {
     const metricsHealth = await query(
       `SELECT 
         COUNT(*) as total_metrics,
-        COUNT(CASE WHEN metric_type LIKE '%failure%' THEN 1 END) as failures,
-        COUNT(CASE WHEN metric_type LIKE '%success%' THEN 1 END) as successes,
+        COUNT(CASE WHEN metric_type::TEXT LIKE '%failure%' THEN 1 END) as failures,
+        COUNT(CASE WHEN metric_type::TEXT LIKE '%success%' THEN 1 END) as successes,
         AVG(response_time_ms) as avg_latency_ms
       FROM platform_metrics
       WHERE tenant_id = $1

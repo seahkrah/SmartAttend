@@ -44,6 +44,7 @@ SUITES=(
   authFlow
   academicsGradebook
   leaveApi
+  payrollApi
   admissionsApi
   feesApi
   notificationsApi

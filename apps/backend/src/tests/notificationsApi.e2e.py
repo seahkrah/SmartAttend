@@ -411,7 +411,17 @@ if STOK:
           co == 200 and not any('100.00' in (n.get('body') or '')
                                 for n in r.get('notifications', [])), f"({co} {r})")
 
-    co, r = call("POST", "/dispatch", AT, {})
+    # Swept until it comes back empty, not once. The outbox is global and a
+    # sweep claims a bounded batch oldest-first, so on a database where other
+    # suites have already queued a batch's worth, one sweep never reaches a
+    # message queued a moment ago. That is the dispatcher working as designed;
+    # assuming a single sweep drains everything is what put this assertion on
+    # a knife edge.
+    co = 0
+    for _ in range(10):
+        co, r = call("POST", "/dispatch", AT, {})
+        if co != 200 or (r.get('swept', {}).get('claimed') or 0) == 0:
+            break
     check("drain the outbox", co == 200, f"({co} {r})")
 
     co, r = call("GET", "/inbox", STOK)

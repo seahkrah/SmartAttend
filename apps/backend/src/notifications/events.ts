@@ -371,6 +371,72 @@ export async function leaveDecided(
 }
 
 // ---------------------------------------------------------------------------
+// Payroll
+// ---------------------------------------------------------------------------
+
+/**
+ * Tells everyone in an approved run that their payslip is ready.
+ *
+ * Only on approval, never on calculation: a calculated run is a draft that
+ * may still be recalculated, and telling somebody what they are being paid
+ * and then changing it is worse than telling them a day later.
+ *
+ * No amount goes in the message. The figure is behind the link.
+ */
+export async function payrollApproved(ctx: NotifyContext, runId: string): Promise<void> {
+  const run = await query(
+    `SELECT p.name AS period_name, p.pay_date
+       FROM payroll_runs r
+       JOIN payroll_periods p ON p.id = r.period_id AND p.tenant_id = r.tenant_id
+      WHERE r.id = $1 AND r.tenant_id = $2`,
+    [runId, ctx.tenantId]
+  )
+  if (run.rowCount === 0) return
+  const period = run.rows[0]
+
+  const slips = await query(
+    `SELECT ps.id, e.user_id, e.first_name, e.last_name, e.email, e.phone
+       FROM payslips ps
+       JOIN employees e ON e.id = ps.employee_id AND e.tenant_id = ps.tenant_id
+      WHERE ps.run_id = $1 AND ps.tenant_id = $2`,
+    [runId, ctx.tenantId]
+  )
+  if (slips.rowCount === 0) return
+
+  // One message per person, keyed on their own payslip rather than the run,
+  // so a retry cannot fan a second copy out to everybody.
+  for (const row of slips.rows) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'payroll.payslip_ready',
+      recipients: [{
+        userId: row.user_id,
+        name: [row.first_name, row.last_name].filter(Boolean).join(' '),
+        email: row.email,
+        phone: row.phone,
+        data: { firstName: row.first_name, lastName: row.last_name },
+      }],
+      relatedType: 'payslip',
+      relatedId: row.id,
+      dedupeKey: `payslip:${row.id}:ready`,
+      data: {
+        periodName: period.period_name,
+        payDate: isoDayOf(period.pay_date),
+      },
+    })
+  }
+}
+
+/** A DATE column as YYYY-MM-DD; see payrollService.isoDay for why. */
+function isoDayOf(value: unknown): string {
+  if (value instanceof Date) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`
+      + `-${String(value.getDate()).padStart(2, '0')}`
+  }
+  const s = String(value ?? '')
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : s
+}
+
+// ---------------------------------------------------------------------------
 // Academic
 // ---------------------------------------------------------------------------
 

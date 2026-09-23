@@ -204,6 +204,28 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
     },
   },
 
+  // ------------------------------------------------------------------- payroll
+  // Deliberately no figures in the in-app line: a payslip notification is
+  // read over somebody's shoulder more often than any other message the
+  // platform sends. The amount is behind the link, where the recipient chose
+  // to look at it.
+  'payroll.payslip_ready': {
+    in_app: {
+      body: 'Your payslip for {{ periodName }} is ready.',
+      required: ['periodName'],
+      category: 'payroll',
+    },
+    email: {
+      subject: 'Your payslip for {{ periodName }}',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + 'Your payslip for {{ periodName }} is ready, and payment is due on {{ payDate }}.\n\n'
+        + 'Sign in to see the full breakdown.' + SIGN_OFF,
+      required: ['firstName', 'periodName', 'payDate', 'tenantName'],
+      category: 'payroll',
+    },
+  },
+
   // ------------------------------------------------------------------ academic
   'results.published': {
     in_app: {

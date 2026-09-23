@@ -7,6 +7,9 @@ async function main() {
   const cp = (await query(`SELECT id FROM platforms WHERE name='corporate'`)).rows[0]
   const hrRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='hr'`, [cp.id])).rows[0]
   const empRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='employee'`, [cp.id])).rows[0]
+  // Payroll needs two distinct people: one who calculates and one who signs
+  // off. A single role that can do both makes the approval step decorative.
+  const dirRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='hr_director'`, [cp.id])).rows[0]
 
   await query(`DELETE FROM notifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_campaigns WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
@@ -18,6 +21,20 @@ async function main() {
   await query(`DELETE FROM notification_channels WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_preferences WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_suppressions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  // Payroll clears before employees: payslips hold employees under RESTRICT.
+  //
+  // The run is the unit of deletion, not the payslip. An approved run's
+  // payslips refuse to be deleted on their own — that is the immutability
+  // rule doing its job — but deleting the run cascades through them, which is
+  // the only way a tenant's payroll can ever be removed. Trying the slips
+  // first fails outright and takes the whole fixture with it.
+  await query(`DELETE FROM payroll_runs WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM payroll_inputs WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM payroll_periods WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM employee_salary_components WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM employee_compensation WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM salary_components WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM tax_brackets WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   // Leave rows reference employees and types, so they clear first.
   await query(`DELETE FROM leave_request_days WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM leave_requests WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
@@ -44,6 +61,13 @@ async function main() {
       [cp.id, `hr.${tag.toLowerCase()}@c2e.test`, `HR ${tag}`, hrRole.id, hash])).rows[0]
     await query(`INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status) VALUES ($1,$2,'active')`,
       [hr.id, ent.id])
+
+    const dir = (await query(
+      `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
+       VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+      [cp.id, `dir.${tag.toLowerCase()}@c2e.test`, `Director ${tag}`, dirRole.id, hash])).rows[0]
+    await query(`INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status) VALUES ($1,$2,'active')`,
+      [dir.id, ent.id])
 
     const dept = (await query(
       `INSERT INTO corporate_departments (name, code, platform_id, tenant_id) VALUES ($1,$2,$3,$4) RETURNING id`,
@@ -87,6 +111,7 @@ async function main() {
       tenantId: ent.id, deptId: dept.id, employees: empIds,
       hrEmpId: hrEmp.id,
       token: generateAccessToken(hr.id, cp.id, hrRole.id),
+      dirToken: generateAccessToken(dir.id, cp.id, dirRole.id),
       empToken: generateAccessToken(firstEmpUserId!, cp.id, empRole.id),
       empId: empIds[0],
     }

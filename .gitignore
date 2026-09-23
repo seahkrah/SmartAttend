@@ -206,3 +206,8 @@ docker-compose.override.yml
 *Passwords*.txt
 rotated-credentials-*.txt
 .e2e-fixtures/
+
+# Locally stored documents. FILE_STORAGE_ROOT points elsewhere in a real
+# deployment; this is where it lands by default in development.
+.file-storage/
+apps/backend/.file-storage/

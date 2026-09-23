@@ -48,6 +48,7 @@ SUITES=(
   feesApi
   notificationsApi
   controlPlaneApi
+  filesApi
 )
 
 fail=0

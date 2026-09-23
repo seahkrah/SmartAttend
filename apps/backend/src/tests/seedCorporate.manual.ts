@@ -10,6 +10,8 @@ async function main() {
 
   await query(`DELETE FROM notifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_campaigns WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM stored_files WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM tenant_storage_quota WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   // The outbox, after the inbox rows that point at it.
   await query(`DELETE FROM notification_messages WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_templates WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)

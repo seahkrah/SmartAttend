@@ -444,6 +444,52 @@ check("a requested document starts awaited",
 co, r = call("POST", f"/applications/{app_3}/documents", AT, {"kind": "id"})
 check("a document without a label is refused", co == 400, f"({co} {r})")
 
+# A document is an upload now, identified by the file it produced. fileUrl
+# used to be free text: any string at all, including a URL pointing somewhere
+# else entirely, shown in the registry as this applicant's transcript.
+co, r = call("POST", "/files", AT, None, base="")
+upload_cmd = [
+    "curl", "-s", "-w", "\n%{http_code}", "--max-time", "25", "-X", "POST",
+    "-H", f"Authorization: Bearer {AT}",
+    "-F", "file=@/dev/stdin;filename=t.pdf;type=application/pdf",
+    "-F", "category=application_document",
+    ROOT + "/files",
+]
+proc = subprocess.run(upload_cmd, input=b"%PDF-1.7\ntrailer\n", capture_output=True)
+out = proc.stdout.decode()
+txt, _, code = out.rpartition("\n")
+uploaded = json.loads(txt) if code.strip() == "201" else {}
+file_id = uploaded.get('file', {}).get('id')
+check("upload a document file", bool(file_id), f"({code} {txt[:120]})")
+
+co, r = call("POST", f"/applications/{app_3}/documents", AT,
+             {"kind": "transcript", "label": "Uploaded transcript", "fileId": file_id})
+check("attach a document by the file it produced", co == 201, f"({co} {r})")
+check("the URL is derived from the file rather than typed",
+      co == 201 and r.get('document', {}).get('file_url') == f"/api/files/{file_id}/download",
+      f"({r.get('document', {}).get('file_url')})")
+check("and the document points at the file",
+      co == 201 and r.get('document', {}).get('file_id') == file_id, f"({r})")
+uploaded_doc = r.get('document', {}).get('id') if co == 201 else None
+
+co, r = call("POST", f"/applications/{app_3}/documents", AT,
+             {"kind": "x", "label": "Ghost file", "fileId": GHOST})
+check("a fileId that names no file is 404", co == 404, f"({co} {r})")
+
+# Both branches of the update, because they bind different parameters and a
+# mismatch there only shows at runtime.
+co, r = call("PATCH", f"/applications/{app_3}/documents/{uploaded_doc}", AT,
+             {"note": "Checked against the original"})
+check("updating a document without verifying it works", co == 200, f"({co} {r})")
+
+co, r = call("PATCH", f"/applications/{app_3}/documents/{uploaded_doc}", AT,
+             {"status": "verified"})
+check("and verifying it works", co == 200, f"({co} {r})")
+check("verification records who",
+      co == 200 and r.get('document', {}).get('verified_by') is not None, f"({r})")
+check("and the file survives the update",
+      co == 200 and r.get('document', {}).get('file_id') == file_id, f"({r})")
+
 co, r = call("PATCH", f"/applications/{app_3}/documents/{doc_id}", AT,
              {"status": "received", "fileUrl": f"https://files.e2e.test/{RUN}.pdf"})
 check("record a document as received", co == 200, f"({co} {r})")

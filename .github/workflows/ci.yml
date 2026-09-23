@@ -82,6 +82,10 @@ jobs:
       JWT_SECRET: ci-only-not-a-real-secret
       REFRESH_TOKEN_SECRET: ci-only-not-a-real-secret
       PORT: '5000'
+      # Uploaded documents land here rather than in the checkout, so a build
+      # that writes files does not leave them in the working tree.
+      FILE_STORAGE_ROOT: /tmp/ci-file-storage
+      FILE_STORAGE_BACKEND: local
 
     steps:
       - uses: actions/checkout@v4

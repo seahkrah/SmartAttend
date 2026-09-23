@@ -21,6 +21,8 @@ import {
   type IntakeFunnel,
 } from '../services/admissionsService';
 import { academicsService, type Programme, type AcademicYear } from '../services/academicsService';
+import FileUpload from '../components/FileUpload';
+import { filesService, type StoredFile } from '../services/filesService';
 
 /**
  * Admissions.
@@ -95,6 +97,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [decision, setDecision] = useState<{ to: ApplicationStatus } | null>(null);
   const [enrolling, setEnrolling] = useState(false);
+  const [docForm, setDocForm] = useState({ kind: 'transcript', label: '' });
 
   const { addToast } = useToastStore();
   const { showConfirmDialog, ConfirmDialog } = useConfirmDialog();
@@ -376,6 +379,54 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
     }
   };
 
+  /**
+   * Attaches an uploaded file to the application as a document.
+   *
+   * The file is uploaded first and the record created from its id; the server
+   * derives the URL. Nothing here types a URL, which is what the field used
+   * to be — free text a caller could point anywhere.
+   */
+  const attachDocument = async (stored: StoredFile) => {
+    if (!detail) return;
+    try {
+      setSaving(true);
+      await admissionsService.addDocument(detail.application.id, {
+        kind: docForm.kind || 'other',
+        label: docForm.label || stored.name,
+        fileId: stored.id,
+      });
+      setDocForm({ kind: 'transcript', label: '' });
+      await openApplication(detail.application.id);
+      addToast({ type: 'success', title: 'Document attached' });
+    } catch (error) {
+      addToast({ type: 'error', title: 'Could not attach it', message: getErrorMessage(error) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setDocumentStatus = async (
+    documentId: string,
+    status: 'received' | 'verified' | 'rejected'
+  ) => {
+    if (!detail) return;
+    try {
+      await admissionsService.updateDocument(detail.application.id, documentId, { status });
+      await openApplication(detail.application.id);
+      addToast({ type: 'success', title: `Document ${status}` });
+    } catch (error) {
+      addToast({ type: 'error', title: 'Could not update it', message: getErrorMessage(error) });
+    }
+  };
+
+  const downloadDocument = async (fileId: string, name: string) => {
+    try {
+      await filesService.download({ id: fileId, name } as StoredFile);
+    } catch (error) {
+      addToast({ type: 'error', title: 'Could not download', message: getErrorMessage(error) });
+    }
+  };
+
   const filteredApplications = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return applications;
@@ -618,6 +669,105 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                       </ol>
                     </div>
                   )}
+
+                  <div className="mt-4 border-t border-slate-800 pt-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Documents</p>
+
+                    {detail.documents.length > 0 ? (
+                      <ul className="mt-2 space-y-2">
+                        {detail.documents.map((doc) => (
+                          <li
+                            key={doc.id}
+                            className="rounded-lg border border-slate-800 bg-slate-950/40 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm text-slate-200">{doc.label}</p>
+                                <p className="text-xs text-slate-500">
+                                  {doc.kind}
+                                  {doc.is_required ? ' · required' : ' · optional'}
+                                </p>
+                              </div>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                                doc.status === 'verified' ? 'bg-emerald-500/15 text-emerald-300'
+                                : doc.status === 'rejected' ? 'bg-rose-500/15 text-rose-300'
+                                : doc.status === 'received' ? 'bg-amber-500/15 text-amber-300'
+                                : 'bg-slate-700/60 text-slate-400'
+                              }`}>
+                                {doc.status}
+                              </span>
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {doc.file_id && (
+                                <button
+                                  onClick={() => void downloadDocument(doc.file_id!, doc.label)}
+                                  className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                                >
+                                  Download
+                                </button>
+                              )}
+                              {doc.status !== 'verified' && doc.file_id && (
+                                <button
+                                  onClick={() => void setDocumentStatus(doc.id, 'verified')}
+                                  className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-emerald-300 hover:bg-slate-800"
+                                >
+                                  Verify
+                                </button>
+                              )}
+                              {doc.status !== 'rejected' && doc.file_id && (
+                                <button
+                                  onClick={() => void setDocumentStatus(doc.id, 'rejected')}
+                                  className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-rose-300 hover:bg-slate-800"
+                                >
+                                  Reject
+                                </button>
+                              )}
+                              {!doc.file_id && (
+                                <span className="text-xs text-slate-500">
+                                  Nothing uploaded yet
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-500">
+                        No documents on this application yet.
+                      </p>
+                    )}
+
+                    <div className="mt-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={docForm.kind}
+                          onChange={(e) => setDocForm({ ...docForm, kind: e.target.value })}
+                          className={inputClass}
+                        >
+                          <option value="transcript">Transcript</option>
+                          <option value="certificate">Certificate</option>
+                          <option value="identity">Identity document</option>
+                          <option value="reference">Reference</option>
+                          <option value="other">Other</option>
+                        </select>
+                        <input
+                          value={docForm.label}
+                          onChange={(e) => setDocForm({ ...docForm, label: e.target.value })}
+                          placeholder="Label (optional)"
+                          className={inputClass}
+                        />
+                      </div>
+                      <FileUpload
+                        category="application_document"
+                        ownerType="application"
+                        ownerId={detail.application.id}
+                        label="Attach a document"
+                        onUploaded={(stored) => void attachDocument(stored)}
+                        disabled={saving}
+                      />
+                    </div>
+                  </div>
 
                   {/* The server says what is possible; nothing else is offered. */}
                   {detail.allowedTransitions.length > 0 && (

@@ -31,6 +31,11 @@ async function main() {
   // Academic records reference courses, students and terms, so they clear
   // first: results before scores, scores before assessments, curriculum
   // before programmes.
+  // Stored files. The access log refuses a direct delete and cascades from
+  // the file, so the files go first and take their log with them.
+  await query(`DELETE FROM stored_files WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM tenant_storage_quota WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+
   // Notifications. Deliveries refuse a direct delete and cascade from the
   // messages, and the inbox rows point back at those messages, so the inbox
   // is cleared of its link before the outbox goes.

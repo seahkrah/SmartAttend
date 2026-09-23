@@ -153,6 +153,28 @@ router.param('applicantId', async (req: TenantRequest, res: Response, next: Next
   }
 })
 
+/**
+ * Resolves an uploaded file for a document record.
+ *
+ * fileUrl was free text: a caller could put any string in it, including a
+ * URL pointing somewhere else entirely, and the registry would show it as
+ * this applicant's transcript. A fileId has to name a file this tenant owns,
+ * and the URL is derived from it.
+ */
+async function resolveDocumentFile(
+  ctx: AdmissionsContext,
+  fileId: unknown
+): Promise<{ id: string; url: string } | null> {
+  if (!fileId || !UUID.test(String(fileId))) return null
+  const r = await query(
+    `SELECT id FROM stored_files
+      WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
+    [String(fileId), ctx.tenantId]
+  )
+  if (r.rowCount === 0) return null
+  return { id: r.rows[0].id, url: `/api/files/${r.rows[0].id}/download` }
+}
+
 function appOf(req: TenantRequest): ApplicationRow {
   return (req as any).application as ApplicationRow
 }
@@ -829,17 +851,27 @@ router.post('/applications/:applicationId/documents', async (req: TenantRequest,
     const b = req.body ?? {}
     if (!b.kind || !b.label) return res.status(400).json({ error: 'kind and label are required' })
 
-    const status = b.fileUrl ? (b.status || 'received') : 'awaited'
-    if (status !== 'awaited' && !b.fileUrl) {
-      return res.status(400).json({ error: 'A document that is not awaited must have a fileUrl' })
+    // A document arrives as an upload, identified by the file it produced.
+    // fileUrl is still accepted for a record of something held outside this
+    // system, but a fileId is what makes it retrievable.
+    const stored = await resolveDocumentFile(ctx, b.fileId)
+    if (b.fileId && !stored) return notFound(res, 'File')
+
+    const url = stored?.url ?? (b.fileUrl || null)
+    const status = url ? (b.status || 'received') : 'awaited'
+    if (status !== 'awaited' && !url) {
+      return res.status(400).json({
+        error: 'A document that is not awaited needs a fileId from an upload',
+      })
     }
 
     const created = await query(
       `INSERT INTO application_documents
-         (tenant_id, application_id, kind, label, file_url, is_required, status, note)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+         (tenant_id, application_id, kind, label, file_url, file_id,
+          is_required, status, note)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [
-        ctx.tenantId, application.id, b.kind, b.label, b.fileUrl || null,
+        ctx.tenantId, application.id, b.kind, b.label, url, stored?.id ?? null,
         b.isRequired !== undefined ? !!b.isRequired : true, status, b.note || null,
       ]
     )
@@ -860,9 +892,13 @@ router.patch('/applications/:applicationId/documents/:documentId', async (req: T
     // Verification records who did it; the rest of the fields do not.
     const verifying = b.status === 'verified' || b.status === 'rejected'
 
+    const stored = await resolveDocumentFile(ctx, b.fileId)
+    if (b.fileId && !stored) return notFound(res, 'File')
+
     const updated = await query(
       `UPDATE application_documents
           SET file_url = COALESCE($4, file_url),
+              file_id = COALESCE(${verifying ? '$9' : '$8'}::uuid, file_id),
               status = COALESCE($5, status),
               note = COALESCE($6, note),
               is_required = COALESCE($7, is_required),
@@ -872,14 +908,18 @@ router.patch('/applications/:applicationId/documents/:documentId', async (req: T
         RETURNING *`,
       verifying
         ? [
-            documentId, application.id, ctx.tenantId, b.fileUrl || null,
+            documentId, application.id, ctx.tenantId,
+            stored?.url ?? b.fileUrl ?? null,
             b.status || null, b.note ?? null,
             b.isRequired === undefined ? null : !!b.isRequired, ctx.userId,
+            stored?.id ?? null,
           ]
         : [
-            documentId, application.id, ctx.tenantId, b.fileUrl || null,
+            documentId, application.id, ctx.tenantId,
+            stored?.url ?? b.fileUrl ?? null,
             b.status || null, b.note ?? null,
             b.isRequired === undefined ? null : !!b.isRequired,
+            stored?.id ?? null,
           ]
     )
     if (updated.rowCount === 0) return notFound(res, 'Document')

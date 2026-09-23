@@ -40,6 +40,8 @@ import admissionsRoutes from './routes/admissions.js'
 import feesRoutes from './routes/fees.js'
 // Notification delivery: channels, templates, outbox, preferences, inbox.
 import notificationRoutes from './routes/notifications.js'
+// Document storage: upload, download, quota, access log.
+import fileRoutes from './routes/files.js'
 import { startDispatcher, stopDispatcher } from './notifications/service.js'
 import { closeSmtpPools } from './notifications/providers/index.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
@@ -136,6 +138,7 @@ app.use('/api/gradebook', gradebookRoutes)
 app.use('/api/admissions', admissionsRoutes)
 app.use('/api/fees', feesRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/files', fileRoutes)
 app.use('/api/face', faceVerificationRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/time', timeRoutes)

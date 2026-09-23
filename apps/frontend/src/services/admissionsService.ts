@@ -116,6 +116,8 @@ export interface ApplicationDocument {
   kind: string;
   label: string;
   file_url?: string | null;
+  /** The stored file behind this record, once one has been uploaded. */
+  file_id?: string | null;
   is_required: boolean;
   status: 'awaited' | 'received' | 'verified' | 'rejected';
   verified_by?: string | null;
@@ -333,6 +335,9 @@ export const admissionsService = {
   async addDocument(applicationId: string, input: {
     kind: string;
     label: string;
+    /** From an upload. The server derives the URL from it. */
+    fileId?: string;
+    /** For a document held outside this system. Not retrievable. */
     fileUrl?: string;
     isRequired?: boolean;
     note?: string;
@@ -343,6 +348,7 @@ export const admissionsService = {
 
   async updateDocument(applicationId: string, documentId: string, input: {
     status?: ApplicationDocument['status'];
+    fileId?: string;
     fileUrl?: string;
     note?: string;
     isRequired?: boolean;

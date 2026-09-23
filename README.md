@@ -1,4 +1,4 @@
-# SMARTATTEND - Monorepo
+# JJELOTECH - Monorepo
 
 A modern attendance tracking system with a React frontend, Express backend, and PostgreSQL database.
 

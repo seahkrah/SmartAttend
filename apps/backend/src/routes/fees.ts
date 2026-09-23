@@ -23,6 +23,7 @@ import {
   toMinor,
   voidInvoice,
 } from '../services/feesService.js'
+import { invoiceIssued, paymentReceived } from '../notifications/events.js'
 
 /**
  * SMS — fees, invoices and payments.
@@ -489,6 +490,10 @@ router.post('/invoices', bursar, async (req: TenantRequest, res: Response) => {
     })
     await client.query('COMMIT')
 
+    if (raised.invoice.status === 'issued') {
+      await invoiceIssued({ tenantId: ctx.tenantId, userId: ctx.userId }, raised.invoice.id)
+    }
+
     return res.status(201).json(raised)
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined)
@@ -552,6 +557,9 @@ router.post('/invoices/:invoiceId/issue', bursar, async (req: TenantRequest, res
     await client.query('BEGIN')
     const issued = await issueInvoice(client, ctx, invoice.id)
     await client.query('COMMIT')
+
+    await invoiceIssued({ tenantId: ctx.tenantId, userId: ctx.userId }, issued.id)
+
     return res.json({ invoice: issued })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined)
@@ -628,6 +636,13 @@ router.post('/invoices/:invoiceId/payments', bursar, async (req: TenantRequest, 
       allowOverpayment: b.allowOverpayment === true,
     })
     await client.query('COMMIT')
+
+    // A receipt is worth having even when the payment was taken at a counter
+    // with the student standing there: it is what they keep.
+    await paymentReceived(
+      { tenantId: ctx.tenantId, userId: ctx.userId },
+      invoice.id, String(b.amount), result.balance
+    )
 
     return res.status(201).json(result)
   } catch (e) {

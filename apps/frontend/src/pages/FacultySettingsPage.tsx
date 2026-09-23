@@ -11,6 +11,7 @@ import { FacultyLayout } from '../components/FacultyLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 import { useAuthStore } from '../store/authStore'
+import NotificationPreferences from '../components/NotificationPreferences'
 
 export const FacultySettingsPage: React.FC = () => {
   const addToast = useToastStore((s) => s.addToast)
@@ -256,6 +257,23 @@ export const FacultySettingsPage: React.FC = () => {
               </button>
             </div>
           </form>
+        </div>
+
+        {/* ═════════════════════════════════════ */}
+        {/* NOTIFICATIONS                        */}
+        {/* ═════════════════════════════════════ */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700">
+          <div className="px-6 py-4 border-b border-slate-700">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              🔔 Notifications
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Choose what you hear about, and where.
+            </p>
+          </div>
+          <div className="p-6">
+            <NotificationPreferences />
+          </div>
         </div>
       </div>
     </FacultyLayout>

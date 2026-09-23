@@ -16,6 +16,7 @@ import {
   computeGpa,
   GradingError,
 } from '../services/gradingService.js'
+import { resultsPublished } from '../notifications/events.js'
 
 /**
  * SMS — the gradebook: assessments, marks, results and transcripts.
@@ -611,6 +612,11 @@ router.post('/courses/:courseId/results/publish', registrar, async (req: TenantR
     }
 
     await client.query('COMMIT')
+
+    if (published > 0) {
+      await resultsPublished({ tenantId: ctx.tenantId, userId: ctx.userId }, course.id)
+    }
+
     return res.json({
       message: `Published ${published} result(s)`,
       published,

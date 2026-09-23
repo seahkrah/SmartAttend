@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react'
 import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import { LoadingOverlay } from '../components/LoadingStates'
 import axios from 'axios'
+import NotificationPreferences from '../components/NotificationPreferences'
 import {
   Settings,
   Bell,
@@ -390,6 +391,23 @@ const SchoolAdminSettingsPage: React.FC = () => {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* ═════════════════════════════════════ */}
+        {/* NOTIFICATIONS                        */}
+        {/* ═════════════════════════════════════ */}
+        <div className="bg-slate-800 rounded-xl border border-slate-700">
+          <div className="px-6 py-4 border-b border-slate-700">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              🔔 Notifications
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Choose what you hear about, and where.
+            </p>
+          </div>
+          <div className="p-6">
+            <NotificationPreferences />
           </div>
         </div>
       </div>

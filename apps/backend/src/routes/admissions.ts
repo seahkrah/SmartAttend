@@ -23,6 +23,7 @@ import {
   remainingCapacity,
   transition,
 } from '../services/admissionsService.js'
+import { applicationChanged, studentEnrolled } from '../notifications/events.js'
 
 /**
  * SMS — admissions.
@@ -530,6 +531,12 @@ router.post('/applications', async (req: TenantRequest, res: Response) => {
     await recordEvent(client, ctx, application.id, null, status, b.note ?? 'Application created')
 
     await client.query('COMMIT')
+
+    if (status === 'submitted') {
+      await applicationChanged({ tenantId: ctx.tenantId, userId: ctx.userId },
+                               application.id, 'submitted')
+    }
+
     return res.status(201).json({ application })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined)
@@ -655,6 +662,11 @@ router.post('/applications/:applicationId/transition', async (req: TenantRequest
     })
     await client.query('COMMIT')
 
+    // After the commit, never inside it: an applicant told they have an offer
+    // by a transaction that then rolls back is the worst thing this can do.
+    await applicationChanged({ tenantId: ctx.tenantId, userId: ctx.userId },
+                             application.id, updated.status)
+
     return res.json({
       application: updated,
       allowedTransitions: nextStatuses(updated.status),
@@ -697,6 +709,9 @@ router.post('/applications/:applicationId/enrol', async (req: TenantRequest, res
       note: b.note ?? null,
     })
     await client.query('COMMIT')
+
+    await studentEnrolled({ tenantId: ctx.tenantId, userId: ctx.userId },
+                          application.id, result.studentId)
 
     return res.status(201).json({
       application: result.application,

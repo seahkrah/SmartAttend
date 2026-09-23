@@ -45,6 +45,7 @@ SUITES=(
   leaveApi
   admissionsApi
   feesApi
+  notificationsApi
 )
 
 fail=0

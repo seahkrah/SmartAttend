@@ -16,6 +16,7 @@ import {
   expandRange,
   LeaveError,
 } from '../services/leaveService.js'
+import { leaveDecided, leaveRequested } from '../notifications/events.js'
 
 /**
  * EMS — leave types, balances, requests and approvals.
@@ -407,6 +408,10 @@ router.post('/requests', async (req: TenantRequest, res: Response) => {
     })
 
     await client.query('COMMIT')
+
+    // A request nobody is told about waits until somebody happens to look.
+    await leaveRequested({ tenantId: ctx.tenantId, userId: ctx.userId }, request.id)
+
     return res.status(201).json({ request, totalDays: total })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
@@ -466,6 +471,9 @@ router.post('/requests/:id/decision', approvers, async (req: TenantRequest, res:
       decision === 'approved' ? { pending: -total, taken: total } : { pending: -total })
 
     await client.query('COMMIT')
+
+    await leaveDecided({ tenantId: ctx.tenantId, userId: ctx.userId },
+                       request.id, decision, note || null)
 
     const updated = await query(`SELECT * FROM leave_requests WHERE id = $1`, [request.id])
     return res.json({ request: updated.rows[0] })

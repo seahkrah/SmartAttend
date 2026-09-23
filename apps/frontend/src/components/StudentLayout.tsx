@@ -18,13 +18,13 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Bell,
   GraduationCap,
   LucideIcon,
   Award,
   CalendarCheck,
   Receipt,
 } from 'lucide-react'
+import NotificationBell from './NotificationBell'
 
 // ── Sidebar items ──
 
@@ -212,7 +212,7 @@ export const StudentLayout: React.FC<StudentLayoutProps> = ({ children, currentP
         {/* Top bar */}
         <div className="bg-slate-900 border-b border-slate-800 px-8 py-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">{currentLabel}</h2>
-          <Bell className="w-6 h-6 text-slate-400 hover:text-white cursor-pointer transition-colors" />
+          <NotificationBell />
         </div>
 
         {/* Content */}

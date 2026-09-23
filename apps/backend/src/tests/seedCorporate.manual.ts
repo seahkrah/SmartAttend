@@ -10,6 +10,12 @@ async function main() {
 
   await query(`DELETE FROM notifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_campaigns WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  // The outbox, after the inbox rows that point at it.
+  await query(`DELETE FROM notification_messages WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM notification_templates WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM notification_channels WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM notification_preferences WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM notification_suppressions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   // Leave rows reference employees and types, so they clear first.
   await query(`DELETE FROM leave_request_days WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM leave_requests WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)

@@ -38,6 +38,10 @@ import gradebookRoutes from './routes/gradebook.js'
 import admissionsRoutes from './routes/admissions.js'
 // SMS fees: structures, invoices, payments, statements, clearance.
 import feesRoutes from './routes/fees.js'
+// Notification delivery: channels, templates, outbox, preferences, inbox.
+import notificationRoutes from './routes/notifications.js'
+import { startDispatcher, stopDispatcher } from './notifications/service.js'
+import { closeSmtpPools } from './notifications/providers/index.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
 import auditRoutes from './routes/audit.js'
 import timeRoutes from './routes/time.js'
@@ -131,6 +135,7 @@ app.use('/api/academics', academicsRoutes)
 app.use('/api/gradebook', gradebookRoutes)
 app.use('/api/admissions', admissionsRoutes)
 app.use('/api/fees', feesRoutes)
+app.use('/api/notifications', notificationRoutes)
 app.use('/api/face', faceVerificationRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/time', timeRoutes)
@@ -164,6 +169,16 @@ async function startServer() {
       console.log(`[SERVER] Binding address:`, addr)
       console.log(`[SERVER] ✅ Access at http://localhost:${PORT}/api/health`)
       console.log('[SERVER] Ready to accept requests')
+
+      // The outbox only moves if something drains it. Off unless
+      // NOTIFICATION_DISPATCH is 'on', so a test run or a migration script
+      // attached to a shared database does not start sending real mail as a
+      // side effect of importing this file.
+      if (startDispatcher()) {
+        console.log('[SERVER] Notification dispatcher running')
+      } else {
+        console.log('[SERVER] Notification dispatcher off (set NOTIFICATION_DISPATCH=on)')
+      }
     })
 
     server.on('listening', () => {
@@ -194,6 +209,10 @@ async function startServer() {
     // Only listen for SIGTERM
     process.on('SIGTERM', () => {
       console.log('[SHUTDOWN] SIGTERM received')
+      // Stop claiming new messages, and close the pooled SMTP connections so
+      // the relay sees a clean QUIT rather than a dropped socket.
+      stopDispatcher()
+      closeSmtpPools()
       server.close(() => process.exit(0))
     })
 

@@ -52,6 +52,7 @@ import SchoolAdminCoursesPage from './pages/SchoolAdminCoursesPage';
 import SchoolAdminProgrammesPage from './pages/SchoolAdminProgrammesPage';
 import SchoolAdminAdmissionsPage from './pages/SchoolAdminAdmissionsPage';
 import SchoolAdminFinancePage from './pages/SchoolAdminFinancePage';
+import AdminNotificationsPage from './pages/AdminNotificationsPage';
 import FacultyGradebookPage from './pages/FacultyGradebookPage';
 import StudentResultsPage from './pages/StudentResultsPage';
 import StudentFeesPage from './pages/StudentFeesPage';
@@ -166,6 +167,7 @@ export default function App() {
                   <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
                   <Route path="/admissions" element={<SchoolAdminAdmissionsPage />} />
                   <Route path="/finance" element={<SchoolAdminFinancePage />} />
+                  <Route path="/notifications" element={<AdminNotificationsPage />} />
                   <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
                   <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                   <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
@@ -193,6 +195,7 @@ export default function App() {
                   <Route path="/attendance" element={<CorporateAdminAttendancePage />} />
                   <Route path="/reports" element={<CorporateAdminReportsPage />} />
                   <Route path="/approvals" element={<CorporateAdminApprovalsPage />} />
+                  <Route path="/notifications" element={<AdminNotificationsPage />} />
                   <Route path="/settings" element={<CorporateAdminSettingsPage />} />
                 </Routes>
               </RoleRoute>

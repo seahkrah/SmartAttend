@@ -31,6 +31,16 @@ async function main() {
   // Academic records reference courses, students and terms, so they clear
   // first: results before scores, scores before assessments, curriculum
   // before programmes.
+  // Notifications. Deliveries refuse a direct delete and cascade from the
+  // messages, and the inbox rows point back at those messages, so the inbox
+  // is cleared of its link before the outbox goes.
+  await query(`DELETE FROM notifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM notification_messages WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM notification_templates WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM notification_channels WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM notification_preferences WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM notification_suppressions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+
   // Admissions. Deleting the applications cascades to their events, choices
   // and documents; the events table refuses a direct delete, so the cascade is
   // the only way out and the order here is not optional.

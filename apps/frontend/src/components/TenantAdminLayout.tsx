@@ -32,6 +32,7 @@ import {
   Layers,
   Receipt,
 } from 'lucide-react'
+import NotificationBell from './NotificationBell'
 
 interface SidebarItem {
   id: string
@@ -49,6 +50,7 @@ const SCHOOL_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'programmes', label: 'Programmes', icon: Layers, color: 'from-fuchsia-500 to-fuchsia-600' },
   { id: 'admissions', label: 'Admissions', icon: ClipboardCheck, color: 'from-sky-500 to-sky-600' },
   { id: 'finance', label: 'Fees', icon: Receipt, color: 'from-lime-500 to-lime-600' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'from-rose-500 to-rose-600' },
   { id: 'rooms', label: 'Rooms', icon: DoorOpen, color: 'from-cyan-500 to-cyan-600' },
   { id: 'schedules', label: 'Schedules', icon: CalendarDays, color: 'from-violet-500 to-violet-600' },
   { id: 'enrollment', label: 'Enrollment', icon: UserPlus, color: 'from-teal-500 to-teal-600' },
@@ -65,6 +67,7 @@ const CORPORATE_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'attendance', label: 'Attendance', icon: ClipboardList, color: 'from-violet-500 to-violet-600' },
   { id: 'reports', label: 'Reports', icon: BarChart3, color: 'from-green-500 to-green-600' },
   { id: 'approvals', label: 'Approvals', icon: ClipboardCheck, color: 'from-orange-500 to-orange-600' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, color: 'from-rose-500 to-rose-600' },
   { id: 'settings', label: 'Settings', icon: Settings, color: 'from-slate-500 to-slate-600' },
 ]
 
@@ -77,6 +80,7 @@ const SCHOOL_PAGE_ROUTES: Record<string, string> = {
   programmes: '/admin/school/programmes',
   admissions: '/admin/school/admissions',
   finance: '/admin/school/finance',
+  notifications: '/admin/school/notifications',
   rooms: '/admin/school/rooms',
   schedules: '/admin/school/schedules',
   enrollment: '/admin/school/enrollment',
@@ -93,6 +97,7 @@ const CORPORATE_PAGE_ROUTES: Record<string, string> = {
   attendance: '/admin/corporate/attendance',
   reports: '/admin/corporate/reports',
   approvals: '/admin/corporate/approvals',
+  notifications: '/admin/corporate/notifications',
   settings: '/admin/corporate/settings',
 }
 
@@ -231,7 +236,7 @@ export const TenantAdminLayout: React.FC<TenantAdminLayoutProps> = ({
             <h2 className="text-2xl font-bold text-white">{currentPageLabel}</h2>
           </div>
           <div className="flex items-center gap-4">
-            <Bell className="w-6 h-6 text-slate-400 hover:text-white cursor-pointer transition-colors" />
+            <NotificationBell />
           </div>
         </div>
 

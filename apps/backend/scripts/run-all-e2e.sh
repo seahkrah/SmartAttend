@@ -44,6 +44,7 @@ SUITES=(
   academicsGradebook
   leaveApi
   admissionsApi
+  feesApi
 )
 
 fail=0

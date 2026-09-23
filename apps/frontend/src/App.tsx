@@ -51,8 +51,10 @@ import SchoolAdminFacultyPage from './pages/SchoolAdminFacultyPage';
 import SchoolAdminCoursesPage from './pages/SchoolAdminCoursesPage';
 import SchoolAdminProgrammesPage from './pages/SchoolAdminProgrammesPage';
 import SchoolAdminAdmissionsPage from './pages/SchoolAdminAdmissionsPage';
+import SchoolAdminFinancePage from './pages/SchoolAdminFinancePage';
 import FacultyGradebookPage from './pages/FacultyGradebookPage';
 import StudentResultsPage from './pages/StudentResultsPage';
+import StudentFeesPage from './pages/StudentFeesPage';
 import EmployeeLeavePage from './pages/EmployeeLeavePage';
 import HRLeavePage from './pages/HRLeavePage';
 import SchoolAdminRoomsPage from './pages/SchoolAdminRoomsPage';
@@ -163,6 +165,7 @@ export default function App() {
                   <Route path="/courses" element={<SchoolAdminCoursesPage />} />
                   <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
                   <Route path="/admissions" element={<SchoolAdminAdmissionsPage />} />
+                  <Route path="/finance" element={<SchoolAdminFinancePage />} />
                   <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
                   <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                   <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
@@ -263,6 +266,7 @@ export default function App() {
                   <Route path="/attendance" element={<StudentAttendancePage />} />
                   <Route path="/schedule" element={<StudentSchedulePage />} />
                   <Route path="/results" element={<StudentResultsPage />} />
+                  <Route path="/fees" element={<StudentFeesPage />} />
                   <Route path="/leave" element={<EmployeeLeavePage />} />
                   <Route path="/settings" element={<StudentSettingsPage />} />
                 </Routes>

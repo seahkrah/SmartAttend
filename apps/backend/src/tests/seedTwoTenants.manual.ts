@@ -34,6 +34,20 @@ async function main() {
   // Admissions. Deleting the applications cascades to their events, choices
   // and documents; the events table refuses a direct delete, so the cascade is
   // the only way out and the order here is not optional.
+  // Fees. Payments block the invoice delete (ON DELETE RESTRICT) and refuse a
+  // direct delete of their own at trigger depth 0, so the cascade order is:
+  // payments first with the guard suspended, then invoices (which cascades to
+  // their lines), then the structures the lines were copied from.
+  await query(`ALTER TABLE payments DISABLE TRIGGER trg_payments_guard`)
+  await query(`ALTER TABLE invoice_lines DISABLE TRIGGER trg_invoice_lines_guard`)
+  await query(`DELETE FROM payments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM invoice_lines WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM invoices WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`ALTER TABLE payments ENABLE TRIGGER trg_payments_guard`)
+  await query(`ALTER TABLE invoice_lines ENABLE TRIGGER trg_invoice_lines_guard`)
+  await query(`DELETE FROM fee_items WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM fee_structures WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+
   await query(`DELETE FROM applications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM applicants WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM admission_intakes WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
@@ -133,11 +147,18 @@ async function main() {
       [fac.id, course.id, ent.id])
 
     const studentIds: string[] = []
+    // The first student's own token, so the surfaces a student reads about
+    // themselves — their statement, their invoices — can be tested as a
+    // student rather than only as staff.
+    let studentToken = ''
+    const studentRole = (await query(
+      `SELECT id FROM roles WHERE platform_id = $1 AND name = 'student'`, [sp.id])).rows[0]
     for (let i = 1; i <= 2; i++) {
       const su = (await query(
         `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
          VALUES ($1,$2,$3,(SELECT id FROM roles WHERE platform_id=$1 AND name='student'),$4,true) RETURNING id`,
         [sp.id, `stu${i}.${tag.toLowerCase()}@e2e.test`, `Stu${i} ${tag}`, hash])).rows[0]
+      if (i === 1) studentToken = generateAccessToken(su.id, sp.id, studentRole.id)
       await query(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1,$2,'active')`,
         [su.id, ent.id])
       const st = (await query(
@@ -152,6 +173,7 @@ async function main() {
     out[tag] = {
       tenantId: ent.id, deptId: dept.id, semId: sem.id, courseId: course.id, facultyId: fac.id,
       scheduleId: sched.id, students: studentIds,
+      studentToken,
       token: generateAccessToken(admin.id, sp.id, adminRole.id),
       facToken: generateAccessToken(fuser.id, sp.id, facRole.id),
     }

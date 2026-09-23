@@ -90,8 +90,7 @@ export const schoolNav: NavGroup[] = [
   {
     label: 'Finance',
     items: [
-      // Needs fee schedules, invoices, payments and clearance status.
-      { label: 'Fees & Invoices', to: '/finance', icon: Receipt, status: 'planned' },
+      { label: 'Fees & Invoices', to: '/finance', icon: Receipt, status: 'ready' },
     ],
   },
   {

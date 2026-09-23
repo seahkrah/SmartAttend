@@ -36,6 +36,8 @@ import academicsRoutes from './routes/academics.js'
 import gradebookRoutes from './routes/gradebook.js'
 // SMS admissions: intakes, applicants, applications, decisions, enrolment.
 import admissionsRoutes from './routes/admissions.js'
+// SMS fees: structures, invoices, payments, statements, clearance.
+import feesRoutes from './routes/fees.js'
 import faceVerificationRoutes from './routes/faceVerification.js'
 import auditRoutes from './routes/audit.js'
 import timeRoutes from './routes/time.js'
@@ -128,6 +130,7 @@ app.use('/api/student', studentRoutes)
 app.use('/api/academics', academicsRoutes)
 app.use('/api/gradebook', gradebookRoutes)
 app.use('/api/admissions', admissionsRoutes)
+app.use('/api/fees', feesRoutes)
 app.use('/api/face', faceVerificationRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/time', timeRoutes)

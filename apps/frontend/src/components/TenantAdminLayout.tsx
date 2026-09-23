@@ -30,6 +30,7 @@ import {
   ClipboardList,
   FolderTree,
   Layers,
+  Receipt,
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -47,6 +48,7 @@ const SCHOOL_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'courses', label: 'Courses', icon: BookOpen, color: 'from-pink-500 to-pink-600' },
   { id: 'programmes', label: 'Programmes', icon: Layers, color: 'from-fuchsia-500 to-fuchsia-600' },
   { id: 'admissions', label: 'Admissions', icon: ClipboardCheck, color: 'from-sky-500 to-sky-600' },
+  { id: 'finance', label: 'Fees', icon: Receipt, color: 'from-lime-500 to-lime-600' },
   { id: 'rooms', label: 'Rooms', icon: DoorOpen, color: 'from-cyan-500 to-cyan-600' },
   { id: 'schedules', label: 'Schedules', icon: CalendarDays, color: 'from-violet-500 to-violet-600' },
   { id: 'enrollment', label: 'Enrollment', icon: UserPlus, color: 'from-teal-500 to-teal-600' },
@@ -74,6 +76,7 @@ const SCHOOL_PAGE_ROUTES: Record<string, string> = {
   courses: '/admin/school/courses',
   programmes: '/admin/school/programmes',
   admissions: '/admin/school/admissions',
+  finance: '/admin/school/finance',
   rooms: '/admin/school/rooms',
   schedules: '/admin/school/schedules',
   enrollment: '/admin/school/enrollment',

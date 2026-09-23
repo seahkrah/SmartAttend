@@ -39,6 +39,7 @@
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.16.0",
     "@vitest/ui": "^4.0.18",
+    "node-mocks-http": "^1.18.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0",
     "vitest": "^4.0.18"

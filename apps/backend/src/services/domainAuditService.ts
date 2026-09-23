@@ -30,6 +30,8 @@ export interface AuditLogEntry {
   /** The tenant this entry belongs to. Omitted only for platform-level
    *  events, which no tenant administrator should see. */
   tenantId?: string
+  /** Defaults to the actor's platform, which is what the column means. */
+  platformId?: string
 }
 
 /**
@@ -68,11 +70,17 @@ function shift(visibility: AuditVisibility, startAt: number): string {
 export async function logAudit(entry: AuditLogEntry): Promise<string> {
   try {
     const result = await query(
-      `INSERT INTO audit_logs 
-       (actor_id, actor_role, action_type, action_scope, resource_type, resource_id, 
+      // platform_id and action are both NOT NULL and neither was supplied, so
+      // this writer could never insert a row — it has no production caller,
+      // so nothing had exercised it. platform_id is derived from the actor,
+      // which is what the column means; action mirrors action_type, which is
+      // the older of the two names for the same fact.
+      `INSERT INTO audit_logs
+       (actor_id, actor_role, action_type, action, action_scope, resource_type, resource_id,
         before_state, after_state, justification, request_id, ip_address, user_agent,
-        tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        tenant_id, platform_id)
+       VALUES ($1, $2, $3, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+               COALESCE($14::uuid, (SELECT platform_id FROM users WHERE id = $1)))
        RETURNING id`,
       [
         entry.actorId,
@@ -87,7 +95,8 @@ export async function logAudit(entry: AuditLogEntry): Promise<string> {
         entry.requestId || null,
         entry.ipAddress,
         entry.userAgent || null,
-        entry.tenantId || null
+        entry.tenantId || null,
+        entry.platformId || null
       ]
     )
 

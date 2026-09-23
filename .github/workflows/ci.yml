@@ -110,15 +110,18 @@ jobs:
 
       # Hands every literal SQL statement to PostgreSQL's parser. Catches a
       # query naming a column that does not exist before a user does.
+      # Both of these carried continue-on-error until the count reached zero.
+      # A gate that cannot fail is not a gate: CI reported green for months
+      # while 104 unit tests failed and 154 statements named columns that do
+      # not exist. They are real now, and a regression in either fails the
+      # build.
       - name: Validate SQL against the live schema
         working-directory: apps/backend
         run: node scripts/validate-sql.mjs
-        continue-on-error: true
 
       - name: Unit tests
         working-directory: apps/backend
         run: npm test -- --run
-        continue-on-error: true
 
       - name: Start API
         working-directory: apps/backend

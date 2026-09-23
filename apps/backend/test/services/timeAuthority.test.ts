@@ -7,9 +7,10 @@
  * Tests cover drift calculation, classification, logging, incidents, and enforcement.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Client } from 'pg'
 import {
+
   validateTimeAuthority,
   calculateClockDrift,
   classifyDriftSeverity,
@@ -22,18 +23,77 @@ import {
   shouldBlockAttendanceAction,
   TimeAuthorityContext,
   DriftCalculation,
-} from '../src/services/timeAuthorityService'
+} from '../../src/services/timeAuthorityService.js'
+// The drift log's user_id is a uuid column; these were string literals, so
+// every test that recorded a drift event threw and was caught by the
+// service's own error handling. Fixed values, so a failure names the same
+// account each run.
+const USER_123 = 'b51cd8ea-2a7b-5f08-b22f-b32cd3e80322'
+const USER_456 = 'c7842578-9d70-57ee-9287-b1097706a525'
+const USER_789 = '40464d86-9562-5f9a-8d59-743bd4f1edab'
+const USER_AHEAD = '2720560b-c47f-5756-9e11-cbd842b95567'
+const USER_BEHIND = 'e0da2484-4e4b-59b5-b905-61151aec0e36'
+const USER_CRITICAL = 'ca9cf2a2-3fdf-5f56-b6e0-bc51a4cfe423'
+
+const CRITICAL_USER = '3141d932-5e98-580e-9d7c-d671b9897452'
+const DEVICE_TRACKING_USER = '7c559e61-dd37-5df8-8f0c-79b44c241ed7'
+const FORENSIC_USER = '7eaa01e5-5adc-5d19-aa20-718cefb91366'
+const HISTORY_TEST_USER = '0f32e398-093e-5d5d-996a-15ddf728032d'
+const TEST_USER_IDS = [
+  USER_123, USER_456, USER_789, USER_AHEAD, USER_BEHIND, USER_CRITICAL,
+  CRITICAL_USER, DEVICE_TRACKING_USER, FORENSIC_USER, HISTORY_TEST_USER,
+]
+
 
 describe('Time Authority Service', () => {
   let db: Client
+  let platformName: string
 
   beforeEach(async () => {
-    db = new Client()
+    // new Client() with no arguments connects to localhost:5432 with the OS
+    // user, ignoring DATABASE_URL entirely — so this suite has only ever
+    // worked on a machine that happened to have a default Postgres there.
+    db = new Client({ connectionString: process.env.DATABASE_URL })
     await db.connect()
-    // Execute migration 017 if not already done
+
+    // drift_audit_log.user_id is a foreign key. Without real accounts behind
+    // these ids, every logged drift event violated it and the service's own
+    // catch swallowed the error — so the tests saw a null result and no
+    // explanation.
+    platformName = `tas-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+    const platform = await db.query(
+      `INSERT INTO platforms (name, display_name) VALUES ($1, $1) RETURNING id`,
+      [platformName]
+    )
+    const role = await db.query(
+      `INSERT INTO roles (platform_id, name, permissions) VALUES ($1, 'user', '["read"]'::jsonb)
+       RETURNING id`,
+      [platform.rows[0].id]
+    )
+    for (const id of TEST_USER_IDS) {
+      await db.query(
+        // $1 cannot be both a uuid and a text operand in one statement;
+        // Postgres refuses to deduce a single type for it (42P08).
+        `INSERT INTO users (id, platform_id, email, full_name, role_id, password_hash, is_active)
+         VALUES ($1, $2, $4, 'Drift Test', $3, 'x', TRUE)
+         ON CONFLICT (id) DO NOTHING`,
+        [id, platform.rows[0].id, role.rows[0].id, `${id}@ut.test`]
+      )
+    }
   })
 
   afterEach(async () => {
+    // Leaves nothing behind: the next run starts from the same place.
+    await db.query(`DELETE FROM drift_audit_log WHERE user_id = ANY($1::uuid[])`,
+      [TEST_USER_IDS]).catch(() => undefined)
+    await db.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`,
+      [TEST_USER_IDS]).catch(() => undefined)
+    await db.query(
+      `DELETE FROM roles WHERE platform_id IN (SELECT id FROM platforms WHERE name = $1)`,
+      [platformName]
+    ).catch(() => undefined)
+    await db.query(`DELETE FROM platforms WHERE name = $1`, [platformName])
+      .catch(() => undefined)
     await db.end()
   })
 
@@ -198,7 +258,7 @@ describe('Time Authority Service', () => {
           device_model: 'iPhone 13',
           platform: 'MOBILE_IOS',
         },
-        userId: 'user-123',
+        userId: USER_123,
         actionType: 'ATTENDANCE_MARK',
       }
 
@@ -221,7 +281,7 @@ describe('Time Authority Service', () => {
           device_id: 'test-device-002',
           platform: 'MOBILE_ANDROID',
         },
-        userId: 'user-456',
+        userId: USER_456,
         actionType: 'ATTENDANCE_MARK',
       }
 
@@ -235,7 +295,7 @@ describe('Time Authority Service', () => {
 
     it('should handle BLOCKED drift', async () => {
       const serverTime = getServerTime()
-      const clientTime = new Date(serverTime.getTime() + 700000) // 700 seconds
+      const clientTime = new Date(serverTime.getTime() + 450_000) // 450s: BLOCKED band (300-600s)
 
       const context: TimeAuthorityContext = {
         clientTime,
@@ -244,7 +304,7 @@ describe('Time Authority Service', () => {
           device_id: 'test-device-003',
           platform: 'WEB_BROWSER',
         },
-        userId: 'user-789',
+        userId: USER_789,
         actionType: 'ATTENDANCE_MARK',
       }
 
@@ -258,7 +318,7 @@ describe('Time Authority Service', () => {
 
     it('should handle CRITICAL drift', async () => {
       const serverTime = getServerTime()
-      const clientTime = new Date(serverTime.getTime() + 5000000) // Very far ahead
+      const clientTime = new Date(serverTime.getTime() + 5_000_000) // 5000s: CRITICAL band (>600s)
 
       const context: TimeAuthorityContext = {
         clientTime,
@@ -267,7 +327,7 @@ describe('Time Authority Service', () => {
           device_id: 'test-device-critical',
           platform: 'KIOSK_DEVICE',
         },
-        userId: 'user-critical',
+        userId: USER_CRITICAL,
         actionType: 'ATTENDANCE_MARK',
       }
 
@@ -277,7 +337,7 @@ describe('Time Authority Service', () => {
       expect(result.drift.actionTaken).toBe('ESCALATED')
       expect(result.shouldProceed).toBe(false)
       expect(result.incidentId).toBeDefined()
-      expect(result.incidentSeverity).toBe('CRITICAL')
+      expect(result.drift.incidentSeverity).toBe('CRITICAL')
     })
 
     it('should detect direction correctly', async () => {
@@ -289,7 +349,7 @@ describe('Time Authority Service', () => {
         clientTime: aheadClient,
         serverTime,
         deviceInfo: { device_id: 'dev-ahead', platform: 'WEB_BROWSER' },
-        userId: 'user-ahead',
+        userId: USER_AHEAD,
         actionType: 'TEST',
       })
 
@@ -297,7 +357,7 @@ describe('Time Authority Service', () => {
         clientTime: behindClient,
         serverTime,
         deviceInfo: { device_id: 'dev-behind', platform: 'WEB_BROWSER' },
-        userId: 'user-behind',
+        userId: USER_BEHIND,
         actionType: 'TEST',
       })
 
@@ -367,7 +427,7 @@ describe('Time Authority Service', () => {
         clientTime,
         serverTime,
         deviceInfo: { device_id: 'forensic-test', platform: 'MOBILE_IOS' },
-        userId: 'forensic-user',
+        userId: FORENSIC_USER,
         actionType: 'ATTENDANCE',
       }
 
@@ -398,7 +458,7 @@ describe('Time Authority Service', () => {
           os_version: '12.0',
           platform: 'MOBILE_ANDROID',
         },
-        userId: 'device-tracking-user',
+        userId: DEVICE_TRACKING_USER,
         actionType: 'ATTENDANCE_MARK',
         ipAddress: '192.168.1.1',
         userAgent: 'Mozilla/5.0...',
@@ -428,7 +488,7 @@ describe('Time Authority Service', () => {
 
   describe('Historical Queries', () => {
     it('should retrieve user drift history', async () => {
-      const userId = 'history-test-user'
+      const userId = HISTORY_TEST_USER
 
       // Log a few drift events
       for (let i = 0; i < 3; i++) {
@@ -457,7 +517,7 @@ describe('Time Authority Service', () => {
         clientTime: criticalTime,
         serverTime,
         deviceInfo: { device_id: 'critical-device', platform: 'MOBILE_IOS' },
-        userId: 'critical-user',
+        userId: CRITICAL_USER,
         actionType: 'CRITICAL_TEST',
       })
 
@@ -477,9 +537,12 @@ describe('Time Authority Service', () => {
 
       const result = await db.query(
         `SELECT 
-          COUNT(*) as total_events,
-          AVG(ABS(drift_seconds)) as avg_drift,
-          MAX(ABS(drift_seconds)) as max_drift
+          COUNT(*)::int as total_events,
+          -- AVG and MAX over numeric come back as strings for the same
+          -- reason COUNT does; cast so the comparisons below are numeric
+          -- rather than lexicographic.
+          COALESCE(AVG(ABS(drift_seconds)), 0)::float8 as avg_drift,
+          COALESCE(MAX(ABS(drift_seconds)), 0)::float8 as max_drift
          FROM drift_audit_log
          LIMIT 1`
       )

@@ -557,11 +557,13 @@ export async function getTenantClockDriftStats(tenantId: string): Promise<any> {
   try {
     const result = await query(
       `SELECT 
-        COUNT(*) as total_drift_events,
-        COUNT(*) FILTER (WHERE drift_category = 'CRITICAL') as critical_count,
-        COUNT(*) FILTER (WHERE drift_category = 'BLOCKED') as blocked_count,
-        COUNT(*) FILTER (WHERE drift_category = 'WARNING') as warning_count,
-        COUNT(*) FILTER (WHERE drift_category = 'ACCEPTABLE') as acceptable_count,
+        -- ::int because pg returns bigint as a string, and a caller adding
+        -- these together would concatenate them instead.
+        COUNT(*)::int as total_drift_events,
+        COUNT(*) FILTER (WHERE drift_category = 'CRITICAL')::int as critical_count,
+        COUNT(*) FILTER (WHERE drift_category = 'BLOCKED')::int as blocked_count,
+        COUNT(*) FILTER (WHERE drift_category = 'WARNING')::int as warning_count,
+        COUNT(*) FILTER (WHERE drift_category = 'ACCEPTABLE')::int as acceptable_count,
         AVG(ABS(drift_seconds)) as avg_drift_seconds,
         MAX(ABS(drift_seconds)) as max_drift_seconds
        FROM drift_audit_log
@@ -653,7 +655,11 @@ export function shouldBlockAttendanceAction(
   const severity = classifyDriftSeverity(driftSeconds)
   const ATTENDANCE_DRIFT_THRESHOLD_SECONDS = 300 // 5 minutes
 
-  if (absDrift > ATTENDANCE_DRIFT_THRESHOLD_SECONDS && actionType?.includes('attendance')) {
+  // Case-insensitive: the obvious action names a caller would pass are
+  // ATTENDANCE_MARK and attendance_checkin, and matching only the lowercase
+  // spelling would let the uppercase one through the drift block silently.
+  if (absDrift > ATTENDANCE_DRIFT_THRESHOLD_SECONDS
+      && actionType?.toLowerCase().includes('attendance')) {
     return {
       shouldBlock: true,
       reason: `Clock drift exceeds threshold: ${absDrift}s (max ${ATTENDANCE_DRIFT_THRESHOLD_SECONDS}s)`,

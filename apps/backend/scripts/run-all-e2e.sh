@@ -43,6 +43,7 @@ SUITES=(
   authFlow
   academicsGradebook
   leaveApi
+  admissionsApi
 )
 
 fail=0

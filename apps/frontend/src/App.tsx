@@ -50,6 +50,7 @@ import SchoolAdminStudentsPage from './pages/SchoolAdminStudentsPage';
 import SchoolAdminFacultyPage from './pages/SchoolAdminFacultyPage';
 import SchoolAdminCoursesPage from './pages/SchoolAdminCoursesPage';
 import SchoolAdminProgrammesPage from './pages/SchoolAdminProgrammesPage';
+import SchoolAdminAdmissionsPage from './pages/SchoolAdminAdmissionsPage';
 import FacultyGradebookPage from './pages/FacultyGradebookPage';
 import StudentResultsPage from './pages/StudentResultsPage';
 import EmployeeLeavePage from './pages/EmployeeLeavePage';
@@ -161,6 +162,7 @@ export default function App() {
                   <Route path="/faculty" element={<SchoolAdminFacultyPage />} />
                   <Route path="/courses" element={<SchoolAdminCoursesPage />} />
                   <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
+                  <Route path="/admissions" element={<SchoolAdminAdmissionsPage />} />
                   <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
                   <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                   <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />

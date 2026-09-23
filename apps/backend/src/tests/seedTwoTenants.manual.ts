@@ -31,6 +31,12 @@ async function main() {
   // Academic records reference courses, students and terms, so they clear
   // first: results before scores, scores before assessments, curriculum
   // before programmes.
+  // Admissions. Deleting the applications cascades to their events, choices
+  // and documents; the events table refuses a direct delete, so the cascade is
+  // the only way out and the order here is not optional.
+  await query(`DELETE FROM applications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM applicants WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM admission_intakes WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM course_results WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM assessment_scores WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM assessments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)

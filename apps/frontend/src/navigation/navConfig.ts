@@ -84,8 +84,7 @@ export const schoolNav: NavGroup[] = [
       { label: 'Rooms & Schedules', to: '/schedules', icon: CalendarDays, status: 'ready' },
       { label: 'Enrollment', to: '/enrollment', icon: UserPlus, status: 'ready' },
       { label: 'Attendance', to: '/attendance', icon: ClipboardList, status: 'ready' },
-      // Needs applicants, intakes, rounds and review decisions.
-      { label: 'Admissions', to: '/admissions', icon: ClipboardCheck, status: 'planned' },
+      { label: 'Admissions', to: '/admissions', icon: ClipboardCheck, status: 'ready' },
     ],
   },
   {

@@ -59,6 +59,10 @@ import StudentFeesPage from './pages/StudentFeesPage';
 import EmployeeLeavePage from './pages/EmployeeLeavePage';
 import HRLeavePage from './pages/HRLeavePage';
 import HRPayrollPage from './pages/HRPayrollPage';
+import HRContractsPage from './pages/HRContractsPage';
+import HRRosterPage from './pages/HRRosterPage';
+import HRTimesheetsPage from './pages/HRTimesheetsPage';
+import EmployeeWorkPage from './pages/EmployeeWorkPage';
 import EmployeePayslipsPage from './pages/EmployeePayslipsPage';
 import SchoolAdminRoomsPage from './pages/SchoolAdminRoomsPage';
 import SchoolAdminSchedulesPage from './pages/SchoolAdminSchedulesPage';
@@ -85,6 +89,9 @@ import { useAuthStore } from './store/authStore';
 export default function App() {
   const loadUserFromToken = useAuthStore((state) => state.loadUserFromToken);
   const user = useAuthStore((state) => state.user);
+  // The two actions the API reserves for a director: ending somebody's
+  // employment, and spending money by sending hours to payroll.
+  const isDirector = user?.role === 'hr_director' || user?.role === 'admin';
 
   // Load user from stored token on mount
   useEffect(() => {
@@ -254,6 +261,14 @@ export default function App() {
                   <Route path="/analytics" element={<HREmployeeAttendanceDashboard />} />
                   <Route path="/leave" element={<HRLeavePage />} />
                   <Route path="/payroll" element={<HRPayrollPage />} />
+                  {/* Ending a contract and sending hours to payroll both need a
+                      director; the pages withhold those controls rather than
+                      offering them and having the API refuse. */}
+                  <Route path="/contracts" element={
+                    <HRContractsPage canEnd={isDirector} />} />
+                  <Route path="/shifts" element={<HRRosterPage />} />
+                  <Route path="/timesheets" element={
+                    <HRTimesheetsPage canExport={isDirector} />} />
                 </Routes>
               </RoleRoute>
             </ProtectedRoute>
@@ -275,6 +290,7 @@ export default function App() {
                   <Route path="/fees" element={<StudentFeesPage />} />
                   <Route path="/leave" element={<EmployeeLeavePage />} />
                   <Route path="/payslips" element={<EmployeePayslipsPage />} />
+                  <Route path="/work" element={<EmployeeWorkPage />} />
                   <Route path="/settings" element={<StudentSettingsPage />} />
                 </Routes>
               </RoleRoute>

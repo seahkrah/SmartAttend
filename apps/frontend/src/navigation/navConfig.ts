@@ -125,18 +125,18 @@ export const corporateNav: NavGroup[] = [
     items: [
       { label: 'Employees', to: '/employees', icon: Users, status: 'ready', countKey: 'employees' },
       { label: 'Departments', to: '/departments', icon: Building2, status: 'ready' },
-      // Needs a contracts model; roles today are a flat string on the user.
-      { label: 'Roles & contracts', to: '/contracts', icon: FileText, status: 'planned' },
+      { label: 'Roles & contracts', to: '/contracts', icon: FileText, status: 'ready',
+        roles: ['hr', 'hr_director', 'admin'] },
     ],
   },
   {
     label: 'Time & attendance',
     items: [
       { label: 'Attendance', to: '/attendance', icon: ClipboardList, status: 'ready' },
-      // Needs rosters and shift coverage.
-      { label: 'Shifts & rosters', to: '/shifts', icon: CalendarDays, status: 'planned' },
-      // Needs verified-hours aggregation and payroll export.
-      { label: 'Timesheets', to: '/timesheets', icon: Clock, status: 'planned' },
+      { label: 'Shifts & rosters', to: '/shifts', icon: CalendarDays, status: 'ready',
+        roles: ['hr', 'hr_director', 'admin', 'manager'] },
+      { label: 'Timesheets', to: '/timesheets', icon: Clock, status: 'ready',
+        roles: ['hr', 'hr_director', 'admin', 'manager'] },
       { label: 'Leave requests', to: '/leave', icon: ClipboardCheck, status: 'ready', countKey: 'leave' },
     ],
   },
@@ -148,6 +148,8 @@ export const corporateNav: NavGroup[] = [
       { label: 'Payroll', to: '/payroll', icon: Banknote, status: 'ready',
         roles: ['hr', 'hr_director', 'admin'] },
       { label: 'My payslips', to: '/payslips', icon: Receipt, status: 'ready',
+        roles: ['employee', 'manager'] },
+      { label: 'My work', to: '/work', icon: CalendarDays, status: 'ready',
         roles: ['employee', 'manager'] },
     ],
   },

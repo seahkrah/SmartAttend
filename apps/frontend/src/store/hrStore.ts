@@ -35,7 +35,7 @@ export interface HRState {
   // Actions
   fetchOverview: () => Promise<void>;
   fetchDepartmentMetrics: () => Promise<void>;
-  fetchMembers: (limit?: number, offset?: number, filters?: any) => Promise<void>;
+  fetchMembers: (page?: number, pageSize?: number, filters?: any) => Promise<void>;
   fetchPatterns: () => Promise<void>;
   fetchCampaigns: (status?: 'DRAFT' | 'SCHEDULED' | 'SENT') => Promise<void>;
   sendNotification: (memberId: string, message: string, type: 'WARNING' | 'ALERT' | 'INFO') => Promise<void>;
@@ -77,10 +77,10 @@ export const useHRStore = create<HRState>((set, get) => ({
     }
   },
 
-  fetchMembers: async (limit = 50, offset = 0, filters) => {
+  fetchMembers: async (page = 1, pageSize = 50, filters) => {
     set({ isLoading: true, error: null });
     try {
-      const data = await hrService.listMembers(limit, offset, filters);
+      const data = await hrService.listMembers(page, pageSize, filters);
       set({ members: data.members, membersTotal: data.total, isLoading: false });
     } catch (error: any) {
       set({ error: error.message, isLoading: false });

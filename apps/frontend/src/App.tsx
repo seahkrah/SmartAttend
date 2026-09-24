@@ -58,6 +58,8 @@ import StudentResultsPage from './pages/StudentResultsPage';
 import StudentFeesPage from './pages/StudentFeesPage';
 import EmployeeLeavePage from './pages/EmployeeLeavePage';
 import HRLeavePage from './pages/HRLeavePage';
+import HRPayrollPage from './pages/HRPayrollPage';
+import EmployeePayslipsPage from './pages/EmployeePayslipsPage';
 import SchoolAdminRoomsPage from './pages/SchoolAdminRoomsPage';
 import SchoolAdminSchedulesPage from './pages/SchoolAdminSchedulesPage';
 import SchoolAdminEnrollmentPage from './pages/SchoolAdminEnrollmentPage';
@@ -246,11 +248,12 @@ export default function App() {
           path="/hr/*"
           element={
             <ProtectedRoute>
-              <RoleRoute requiredRole="hr">
+              <RoleRoute requiredRole={['hr', 'hr_director', 'admin']}>
                 <Routes>
                   <Route path="/" element={<HREmployeeAttendanceDashboard />} />
                   <Route path="/analytics" element={<HREmployeeAttendanceDashboard />} />
                   <Route path="/leave" element={<HRLeavePage />} />
+                  <Route path="/payroll" element={<HRPayrollPage />} />
                 </Routes>
               </RoleRoute>
             </ProtectedRoute>
@@ -271,6 +274,7 @@ export default function App() {
                   <Route path="/results" element={<StudentResultsPage />} />
                   <Route path="/fees" element={<StudentFeesPage />} />
                   <Route path="/leave" element={<EmployeeLeavePage />} />
+                  <Route path="/payslips" element={<EmployeePayslipsPage />} />
                   <Route path="/settings" element={<StudentSettingsPage />} />
                 </Routes>
               </RoleRoute>

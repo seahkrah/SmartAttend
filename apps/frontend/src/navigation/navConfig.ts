@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle,
+  Banknote,
   BarChart3,
   BookOpen,
   Building2,
@@ -137,6 +138,17 @@ export const corporateNav: NavGroup[] = [
       // Needs verified-hours aggregation and payroll export.
       { label: 'Timesheets', to: '/timesheets', icon: Clock, status: 'planned' },
       { label: 'Leave requests', to: '/leave', icon: ClipboardCheck, status: 'ready', countKey: 'leave' },
+    ],
+  },
+  {
+    label: 'Pay',
+    items: [
+      // Approval and payment need hr_director or admin; plain HR reaches the
+      // page and the API withholds those two actions.
+      { label: 'Payroll', to: '/payroll', icon: Banknote, status: 'ready',
+        roles: ['hr', 'hr_director', 'admin'] },
+      { label: 'My payslips', to: '/payslips', icon: Receipt, status: 'ready',
+        roles: ['employee', 'manager'] },
     ],
   },
   {

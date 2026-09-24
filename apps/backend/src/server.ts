@@ -28,6 +28,8 @@ import hrRoutes from './routes/hr.js'
 import leaveRoutes from './routes/leave.js'
 // EMS payroll: components, compensation, tax bands, periods, runs, payslips.
 import payrollRoutes from './routes/payroll.js'
+// EMS workforce: contracts, shift patterns, the roster, timesheets.
+import workforceRoutes from './routes/workforce.js'
 import attendanceSelfServiceRoutes from './routes/attendanceSelfService.js'
 import facultyRoutes from './routes/faculty.js'
 import facultyWorkflowRoutes from './routes/facultyWorkflow.js'
@@ -130,6 +132,7 @@ app.use('/api/admin', adminTenantRoutes)
 app.use('/api/hr', hrRoutes)
 app.use('/api/leave', leaveRoutes)
 app.use('/api/payroll', payrollRoutes)
+app.use('/api/workforce', workforceRoutes)
 app.use('/api/admin', tenantAdminRoutes)
 // Attendance lifecycle (draft/submit/lock/export/bulk-edit/facial-match/qr).
 // Mounted first; the original faculty router keeps its own paths.

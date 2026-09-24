@@ -45,6 +45,7 @@ SUITES=(
   academicsGradebook
   leaveApi
   payrollApi
+  workforceApi
   admissionsApi
   feesApi
   notificationsApi

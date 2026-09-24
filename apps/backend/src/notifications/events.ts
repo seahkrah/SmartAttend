@@ -371,6 +371,105 @@ export async function leaveDecided(
 }
 
 // ---------------------------------------------------------------------------
+// Workforce
+// ---------------------------------------------------------------------------
+
+/**
+ * Tells everybody who gained a shift that the rota is out.
+ *
+ * One message per person covering the whole range, not one per shift. A dozen
+ * notifications for a dozen shifts is a dozen notifications somebody turns
+ * off, and then they miss the one that mattered.
+ *
+ * Only people who actually have a published shift in the range are written to.
+ * A rota that says nothing about you is not news.
+ */
+export async function rosterPublished(
+  ctx: NotifyContext,
+  fromDate: string,
+  toDate: string
+): Promise<void> {
+  const rows = await query(
+    `SELECT s.employee_id, COUNT(*)::int AS shift_count,
+            SUM(s.paid_hours)::float8 AS total_hours,
+            e.user_id, e.first_name, e.last_name, e.email, e.phone
+       FROM roster_shifts s
+       JOIN employees e ON e.id = s.employee_id AND e.tenant_id = s.tenant_id
+      WHERE s.tenant_id = $1
+        AND s.status = 'published'
+        AND s.work_date BETWEEN $2::date AND $3::date
+      GROUP BY s.employee_id, e.user_id, e.first_name, e.last_name, e.email, e.phone`,
+    [ctx.tenantId, fromDate, toDate]
+  )
+  if (rows.rowCount === 0) return
+
+  for (const row of rows.rows) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'roster.published',
+      recipients: [{
+        userId: row.user_id,
+        name: [row.first_name, row.last_name].filter(Boolean).join(' '),
+        email: row.email,
+        phone: row.phone,
+        data: { firstName: row.first_name, lastName: row.last_name },
+      }],
+      relatedType: 'roster',
+      relatedId: row.employee_id,
+      // Keyed on the person and the range, so republishing the same week after
+      // adding one shift does not send everybody a second copy.
+      dedupeKey: `roster:${row.employee_id}:${fromDate}:${toDate}`,
+      data: {
+        fromDate,
+        toDate,
+        shiftCount: String(row.shift_count),
+        totalHours: Number(row.total_hours).toFixed(2),
+      },
+    })
+  }
+}
+
+/** Tells an employee what was decided about their timesheet. */
+export async function timesheetDecided(
+  ctx: NotifyContext,
+  timesheetId: string,
+  decision: string,
+  note?: string | null
+): Promise<void> {
+  const r = await query(
+    `SELECT t.period_start, t.period_end, t.approved_hours, t.overtime_hours,
+            e.user_id, e.first_name, e.last_name, e.email, e.phone
+       FROM timesheets t
+       JOIN employees e ON e.id = t.employee_id AND e.tenant_id = t.tenant_id
+      WHERE t.id = $1 AND t.tenant_id = $2`,
+    [timesheetId, ctx.tenantId]
+  )
+  if (r.rowCount === 0) return
+  const row = r.rows[0]
+
+  await notifyQuietly({ query }, ctx, {
+    eventKey: 'timesheet.decided',
+    recipients: [{
+      userId: row.user_id,
+      name: [row.first_name, row.last_name].filter(Boolean).join(' '),
+      email: row.email,
+      phone: row.phone,
+      data: { firstName: row.first_name, lastName: row.last_name },
+    }],
+    relatedType: 'timesheet',
+    relatedId: timesheetId,
+    dedupeKey: `timesheet:${timesheetId}:${decision}`,
+    data: {
+      fromDate: isoDayOf(row.period_start),
+      toDate: isoDayOf(row.period_end),
+      decision,
+      approvedHours: String(row.approved_hours),
+      overtimeHours: String(row.overtime_hours),
+      noteLine: note ? `\n\nNote: ${note}` : '',
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Payroll
 // ---------------------------------------------------------------------------
 

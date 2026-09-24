@@ -204,6 +204,49 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
     },
   },
 
+  // ----------------------------------------------------------------- workforce
+  // The roster is published as a block, so the message names the range rather
+  // than each shift. A list of twelve shifts in an email is a list nobody
+  // reads; the count and the dates are enough to send somebody to look.
+  'roster.published': {
+    in_app: {
+      body: 'Your shifts for {{ fromDate }} to {{ toDate }} are published ({{ shiftCount }} shift(s)).',
+      required: ['fromDate', 'toDate', 'shiftCount'],
+      category: 'roster',
+    },
+    email: {
+      subject: 'Your shifts for {{ fromDate }} to {{ toDate }}',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + 'Your rota for {{ fromDate }} to {{ toDate }} has been published: '
+        + '{{ shiftCount }} shift(s), {{ totalHours }} hours.\n\n'
+        + 'Sign in to see the detail.' + SIGN_OFF,
+      required: ['firstName', 'fromDate', 'toDate', 'shiftCount', 'totalHours', 'tenantName'],
+      category: 'roster',
+    },
+  },
+
+  'timesheet.decided': {
+    in_app: {
+      body: 'Your timesheet for {{ fromDate }} to {{ toDate }} was {{ decision }}.{{ noteLine }}',
+      required: ['fromDate', 'toDate', 'decision'],
+      category: 'timesheet',
+    },
+    email: {
+      subject: 'Your timesheet for {{ fromDate }} to {{ toDate }} was {{ decision }}',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + 'Your timesheet for {{ fromDate }} to {{ toDate }} was {{ decision }}: '
+        + '{{ approvedHours }} hours, of which {{ overtimeHours }} overtime.'
+        + '{{ noteLine }}' + SIGN_OFF,
+      required: [
+        'firstName', 'fromDate', 'toDate', 'decision',
+        'approvedHours', 'overtimeHours', 'tenantName',
+      ],
+      category: 'timesheet',
+    },
+  },
+
   // ------------------------------------------------------------------- payroll
   // Deliberately no figures in the in-app line: a payslip notification is
   // read over somebody's shoulder more often than any other message the

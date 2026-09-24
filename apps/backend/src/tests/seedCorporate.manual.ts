@@ -21,6 +21,13 @@ async function main() {
   await query(`DELETE FROM notification_channels WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_preferences WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_suppressions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  // Workforce clears before payroll: a timesheet points at a payroll input.
+  // Timesheets cascade to their days; the day guard refuses a direct delete
+  // once a sheet is approved, but deleting the sheet carries them with it.
+  await query(`DELETE FROM timesheets WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM roster_shifts WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM shift_patterns WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM employment_contracts WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   // Payroll clears before employees: payslips hold employees under RESTRICT.
   //
   // The run is the unit of deletion, not the payslip. An approved run's
@@ -107,8 +114,94 @@ async function main() {
       }
     }
 
+    // ---------------------------------------------------------------------
+    // A deterministic week for the timesheet suite.
+    //
+    // Timesheets are computed from closed check-ins, so a suite that asserts
+    // real arithmetic needs real evidence at known times. The check-ins the
+    // loop above creates are open — no check-out — which is correct for the
+    // attendance suites and contributes nothing to hours, so this adds a
+    // separate, closed set in a week far enough out that no other suite's
+    // RUN-derived dates reach it.
+    //
+    //   Mon-Thu  08:00-16:30 verified   4 x 8.5 = 34.00 h
+    //   Fri      08:00-18:00 verified             10.00 h  -> 44.00 h worked
+    //   Sat      09:00-13:00 FLAGGED               4.00 h  -> reported, not counted
+    //   Sun      09:00-12:00 REVOKED               3.00 h  -> not counted at all
+    //
+    // Against a 40-hour contract that is four hours of overtime, and the two
+    // excluded days are there so the suite can prove they are excluded for
+    // different reasons.
+    const tsEmp = empIds[1]
+    await query(
+      `INSERT INTO employment_contracts
+         (tenant_id, employee_id, reference, contract_type, job_title, department_id,
+          start_date, weekly_hours, working_days, status, signed_at)
+       VALUES ($1,$2,$3,'permanent','Operations Analyst',$4,'2029-01-01',40,5,'active',CURRENT_TIMESTAMP)`,
+      [ent.id, tsEmp, `C2E-${tag}-BASE`, dept.id])
+
+    // 2080 a month over a 40-hour week is exactly 12.00 an hour, so an export
+    // to payroll has a figure that can be checked by hand.
+    await query(
+      `INSERT INTO employee_compensation
+         (tenant_id, employee_id, effective_from, currency, basic_salary, pay_frequency)
+       VALUES ($1,$2,'2029-01-01','USD',2080.00,'monthly')`,
+      [ent.id, tsEmp])
+
+    // Six of these weeks, a fortnight apart. The suite transitions a sheet to
+    // exported, which by design cannot be undone, so a single week would make
+    // the suite runnable once per seed. Six weeks, picked by the suite's run
+    // id, give it six; the fortnight gap leaves the week after each one free
+    // of check-ins, which is what the leave assertions measure against.
+    const SHAPE: Array<[number, string, string, string]> = [
+      [0, '08:00', '16:30', 'VERIFIED'],
+      [1, '08:00', '16:30', 'VERIFIED'],
+      [2, '08:00', '16:30', 'VERIFIED'],
+      [3, '08:00', '16:30', 'VERIFIED'],
+      [4, '08:00', '18:00', 'VERIFIED'],
+      [5, '09:00', '13:00', 'FLAGGED'],
+      [6, '09:00', '12:00', 'REVOKED'],
+    ]
+    const ANCHOR = Date.UTC(2029, 2, 5)   // a Monday
+    const day = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+
+    const weeks: Array<Record<string, string>> = []
+    for (let k = 0; k < 6; k += 1) {
+      const start = ANCHOR + k * 14 * 86400000
+      for (const [offset, inAt, outAt, state] of SHAPE) {
+        await query(
+          `INSERT INTO corporate_checkins
+             (employee_id, check_in_type, check_in_time, check_out_time,
+              face_verified, checkin_state, tenant_id)
+           VALUES ($1,'office',($2 || ' ' || $3)::timestamp,($2 || ' ' || $4)::timestamp,
+                   true,$5,$6)`,
+          [tsEmp, day(start + offset * 86400000), inAt, outAt, state, ent.id])
+      }
+      weeks.push({
+        start: day(start),
+        end: day(start + 6 * 86400000),
+        // The week after, deliberately empty of check-ins.
+        nextStart: day(start + 7 * 86400000),
+        nextEnd: day(start + 13 * 86400000),
+        leaveDay: day(start + 9 * 86400000),
+      })
+    }
+
+    // The payroll period an exported timesheet lands in. Created here rather
+    // than by the suite because payroll periods of one frequency cannot
+    // overlap, so a suite creating its own would clash with its own last run.
+    // 2029 is left clear by every other suite.
+    await query(
+      `INSERT INTO payroll_periods
+         (tenant_id, code, name, start_date, end_date, pay_date, frequency, status)
+       VALUES ($1,$2,'Workforce test quarter 2029','2029-03-01','2029-06-30',
+               '2029-06-30','monthly','open')`,
+      [ent.id, `C2E-${tag}-WF`])
+
     out[tag] = {
       tenantId: ent.id, deptId: dept.id, employees: empIds,
+      timesheetEmpId: tsEmp,
+      timesheetWeeks: weeks,
       hrEmpId: hrEmp.id,
       token: generateAccessToken(hr.id, cp.id, hrRole.id),
       dirToken: generateAccessToken(dir.id, cp.id, dirRole.id),

@@ -33,6 +33,16 @@ axiosClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // The instance defaults to JSON, and axios turns a FormData body into
+    // JSON when the content type says JSON — so every upload (documents,
+    // face captures) arrived as a JSON object with no files in it. For
+    // FormData the browser must set the type, because only it knows the
+    // multipart boundary.
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      config.headers.delete?.('Content-Type');
+      delete (config.headers as any)['Content-Type'];
+    }
     
     // Dev logging
     if (import.meta.env.DEV) {

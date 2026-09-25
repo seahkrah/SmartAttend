@@ -11,6 +11,7 @@ import {
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import { TenantScopeError } from '../db/tenantScoped.js'
+import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 
 /**
  * SMS — the faculty attendance workflow.
@@ -374,25 +375,31 @@ router.post('/attendance/bulk-edit', async (req: TenantRequest, res: Response) =
 // ---------------------------------------------------------------------------
 // POST /api/faculty/attendance/facial-match
 // ---------------------------------------------------------------------------
+// Records a student present on the strength of a face match.
+//
+// This took a "confidence" number from the request and, above 0.85, wrote the
+// student present and face-verified. The number was whatever the client sent.
+// It now takes face_match_id: a match /api/biometrics/identify made for this
+// student, in one of this course's classes, by this lecturer, moments ago.
+// The match is spent here and cannot back another record.
 router.post('/attendance/facial-match', async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   const courseId = String(req.body?.course_id ?? '')
   const date = parseDate(req.body?.date)
   const studentId = String(req.body?.student_id ?? '')
-  const confidence = Number(req.body?.confidence)
+  const matchId = req.body?.face_match_id
 
   if (!courseId) return res.status(400).json({ error: 'Validation failed', message: 'course_id is required' })
   if (!date) return res.status(400).json({ error: 'Validation failed', message: 'date must be YYYY-MM-DD' })
   if (!studentId) return res.status(400).json({ error: 'Validation failed', message: 'student_id is required' })
-  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-    return res.status(400).json({ error: 'Validation failed', message: 'confidence must be between 0 and 1' })
+  if (!matchId) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      message: 'face_match_id is required: identify the student with /api/biometrics/identify first',
+    })
   }
 
-  // A low-confidence match is not an attendance record. Marking it present
-  // would put an unverified claim into the register under the label
-  // "face verified", which is the one thing this workflow exists to prevent.
-  const THRESHOLD = 0.85
-
+  const client = await pool.connect()
   try {
     const course = await authorisedCourse(ctx, courseId)
     if (!course) {
@@ -404,7 +411,6 @@ router.post('/attendance/facial-match', async (req: TenantRequest, res: Response
     }
 
     const schedules = await scheduleIdsFor(ctx, courseId)
-    // The student must be on this course's roster, in this tenant.
     const enrolled = await query(
       `SELECT sc.schedule_id
          FROM student_courses sc
@@ -418,15 +424,6 @@ router.post('/attendance/facial-match', async (req: TenantRequest, res: Response
       return res.status(404).json({ error: 'Not found', message: 'That student is not enrolled on this course in this tenant' })
     }
 
-    if (confidence < THRESHOLD) {
-      return res.status(422).json({
-        success: false,
-        error: 'Low confidence',
-        message: `Match confidence ${confidence} is below the ${THRESHOLD} threshold; mark manually or retry`,
-        threshold: THRESHOLD,
-      })
-    }
-
     const markerId = await callerFacultyId(ctx)
     if (markerId === null) {
       return res.status(403).json({
@@ -436,34 +433,34 @@ router.post('/attendance/facial-match', async (req: TenantRequest, res: Response
     }
 
     const scheduleId = enrolled.rows[0].schedule_id
-    const existing = await query(
-      `SELECT id FROM school_attendance
-        WHERE tenant_id = $1 AND student_id = $2 AND schedule_id = $3 AND attendance_date = $4`,
-      [ctx.tenantId, studentId, scheduleId, date]
+    await client.query('BEGIN')
+    const cited = await assertUsableMatch(client, ctx as any, matchId, {
+      action: 'identified',
+      subject: { type: 'student', id: studentId },
+      scheduleId: schedules,
+    })
+    await client.query(
+      `INSERT INTO school_attendance
+         (schedule_id, student_id, marked_by_id, attendance_date, status,
+          face_verified, face_match_event_id, verification_method, attendance_state, tenant_id)
+       VALUES ($1,$2,$3,$4,'present',TRUE,$5,'FACE_MATCH','VERIFIED',$6)
+       ON CONFLICT (schedule_id, student_id, attendance_date)
+       DO UPDATE SET status = 'present', face_verified = TRUE, face_match_event_id = EXCLUDED.face_match_event_id,
+                     marked_by_id = EXCLUDED.marked_by_id, marked_at = CURRENT_TIMESTAMP,
+                     verification_method = 'FACE_MATCH', attendance_state = 'VERIFIED'`,
+      [scheduleId, studentId, markerId, date, cited, ctx.tenantId]
     )
-
-    if (existing.rows.length > 0) {
-      await query(
-        `UPDATE school_attendance
-            SET status = 'present', face_verified = TRUE, marked_by_id = $1,
-                marked_at = CURRENT_TIMESTAMP, verification_method = 'face',
-                attendance_state = 'VERIFIED'
-          WHERE id = $2 AND tenant_id = $3`,
-        [markerId, existing.rows[0].id, ctx.tenantId]
-      )
-    } else {
-      await query(
-        `INSERT INTO school_attendance
-           (schedule_id, student_id, marked_by_id, attendance_date, status,
-            face_verified, verification_method, attendance_state, tenant_id)
-         VALUES ($1,$2,$3,$4,'present',TRUE,'face','VERIFIED',$5)`,
-        [scheduleId, studentId, markerId, date, ctx.tenantId]
-      )
+    await client.query('COMMIT')
+    res.json({ success: true, status: 'present', face_verified: true, face_match_id: cited })
+  } catch (e: any) {
+    await client.query('ROLLBACK').catch(() => {})
+    if (e instanceof BiometricError) return res.status(e.status).json({ error: e.message, code: e.code })
+    if (e?.code === '23505') {
+      return res.status(409).json({ error: 'A face match can back only one attendance record', code: 'match_used' })
     }
-
-    res.json({ success: true, status: 'present', face_verified: true, confidence })
-  } catch (e) {
     fail(res, e)
+  } finally {
+    client.release()
   }
 })
 

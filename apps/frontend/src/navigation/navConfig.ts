@@ -22,6 +22,7 @@ import {
   UserCog,
   UserPlus,
   Users,
+  ScanFace,
 } from 'lucide-react';
 
 /**
@@ -141,6 +142,7 @@ const schoolAdminNav: AudienceNav = {
         { label: 'Schedules', to: '/admin/school/schedules', icon: CalendarDays, status: 'ready' },
         { label: 'Enrollment', to: '/admin/school/enrollment', icon: UserPlus, status: 'ready' },
         { label: 'Attendance', to: '/admin/school/attendance', icon: ClipboardList, status: 'ready' },
+        { label: 'Face matching', to: '/admin/school/face-matching', icon: ScanFace, status: 'ready' },
         { label: 'Admissions', to: '/admin/school/admissions', icon: ClipboardCheck, status: 'ready' },
       ],
     },
@@ -276,6 +278,7 @@ const corporateAdminNav: AudienceNav = {
         { label: 'Shifts & rosters', to: '/hr/shifts', icon: CalendarDays, status: 'ready' },
         { label: 'Timesheets', to: '/hr/timesheets', icon: Clock, status: 'ready' },
         { label: 'Leave requests', to: '/hr/leave', icon: CalendarCheck, status: 'ready', countKey: 'leave' },
+        { label: 'Face matching', to: '/hr/face-matching', icon: ScanFace, status: 'ready' },
       ],
     },
     {
@@ -327,6 +330,7 @@ const hrNav: AudienceNav = {
         { label: 'Shifts & rosters', to: '/hr/shifts', icon: CalendarDays, status: 'ready' },
         { label: 'Timesheets', to: '/hr/timesheets', icon: Clock, status: 'ready' },
         { label: 'Leave requests', to: '/hr/leave', icon: CalendarCheck, status: 'ready', countKey: 'leave' },
+        { label: 'Face matching', to: '/hr/face-matching', icon: ScanFace, status: 'ready' },
       ],
     },
     {

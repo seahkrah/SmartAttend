@@ -5,19 +5,16 @@
  * 1. Faculty sees their assigned schedules
  * 2. Selects a schedule and date
  * 3. Marks each student present/absent/late/excused
- * 4. OR uses facial recognition to auto-identify and mark present
+ * 4. OR identifies a student by face (server-side matching, /api/biometrics)
+ *    and marks them present; the save cites the match it relied on
  * 5. Submits attendance (persisted to school_attendance table)
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useToastStore } from '../components/Toast';
 import { axiosClient } from '../utils/axiosClient';
-import {
-  getCameraStream,
-  stopCameraStream,
-  captureFaceFromVideo,
-  type FaceCapture,
-} from '../services/faceEncodingService';
+import FaceChallengeCapture from '../components/face/FaceChallengeCapture';
+import type { IdentifyResult } from '../services/biometricsService';
 
 // ──────── Types ────────
 
@@ -102,25 +99,13 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  // ── Face Recognition state ──
+  // ── Face matching state ──
+  // A scan returns a match id; the save cites it, and the server checks it
+  // is a recent match for that student in this class. Matches are usable
+  // for five minutes and once.
   const [showFaceScan, setShowFaceScan] = useState(false);
-  const [faceScanStream, setFaceScanStream] = useState<MediaStream | null>(null);
-  const faceScanVideoRef = useRef<HTMLVideoElement>(null);
-  const [faceScanStatus, setFaceScanStatus] = useState<'idle' | 'scanning' | 'matched' | 'no-match' | 'error'>('idle');
-  const [faceScanResult, setFaceScanResult] = useState<{
-    student_id: string;
-    student_code: string;
-    first_name: string;
-    last_name: string;
-    confidence: number;
-  } | null>(null);
-  const [faceVerifiedStudents, setFaceVerifiedStudents] = useState<Set<string>>(new Set());
-
-  // Face enrollment state
+  const [faceMatches, setFaceMatches] = useState<Record<string, string>>({});
   const [enrollingStudentId, setEnrollingStudentId] = useState<string | null>(null);
-  const [enrollStream, setEnrollStream] = useState<MediaStream | null>(null);
-  const enrollVideoRef = useRef<HTMLVideoElement>(null);
-  const [enrollStatus, setEnrollStatus] = useState<'idle' | 'capturing' | 'saving'>('idle');
 
   // ──── Load schedules on mount ────
   useEffect(() => {
@@ -194,6 +179,14 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
 
   const handleMarkStudent = (studentId: string, status: Status) => {
     setLocalStatuses((prev) => ({ ...prev, [studentId]: status }));
+    // A face match is evidence of presence; it does not travel with another status.
+    if (status !== 'present') {
+      setFaceMatches((prev) => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+    }
     setHasUnsavedChanges(true);
   };
 
@@ -226,7 +219,8 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
         date: attendanceDate,
         entries: entries.map((e) => ({
           ...e,
-          face_verified: faceVerifiedStudents.has(e.student_id),
+          ...(faceMatches[e.student_id] && e.status === 'present'
+            ? { face_match_id: faceMatches[e.student_id] } : {}),
         })),
       });
       addToast({
@@ -235,11 +229,16 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
         message: `${res.data.marked_count} record(s) saved successfully`,
       });
       setHasUnsavedChanges(false);
+      setFaceMatches({});
       // Reload to reflect saved state
       loadStudents(selectedSchedule.id, attendanceDate);
       loadHistory(selectedSchedule.id);
-    } catch {
-      addToast({ type: 'error', title: 'Error', message: 'Failed to save attendance' });
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Not saved',
+        message: err?.response?.data?.error ?? 'Failed to save attendance',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -249,159 +248,40 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
     if (hasUnsavedChanges) {
       if (!window.confirm('You have unsaved changes. Discard them?')) return;
     }
-    closeFaceScan();
-    closeEnrollModal();
+    setShowFaceScan(false);
+    setEnrollingStudentId(null);
     setSelectedSchedule(null);
     setStudents([]);
     setLocalStatuses({});
     setHasUnsavedChanges(false);
     setShowHistory(false);
-    setFaceVerifiedStudents(new Set());
+    setFaceMatches({});
   };
 
   // ══════════════════════════════════
-  // FACE RECOGNITION HANDLERS
+  // FACE MATCHING
   // ══════════════════════════════════
 
-  const openFaceScan = async () => {
-    setShowFaceScan(true);
-    setFaceScanStatus('idle');
-    setFaceScanResult(null);
-    try {
-      const stream = await getCameraStream();
-      setFaceScanStream(stream);
-      // Wait for ref to be available
-      setTimeout(() => {
-        if (faceScanVideoRef.current) {
-          faceScanVideoRef.current.srcObject = stream;
-        }
-      }, 100);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Camera Error', message: err.message || 'Failed to access camera' });
-      setFaceScanStatus('error');
-    }
-  };
-
-  const closeFaceScan = () => {
-    if (faceScanStream) {
-      stopCameraStream(faceScanStream);
-      setFaceScanStream(null);
-    }
+  const onIdentified = (result: IdentifyResult) => {
+    const id = result.student.id;
+    setLocalStatuses((prev) => ({ ...prev, [id]: 'present' }));
+    setFaceMatches((prev) => ({ ...prev, [id]: result.matchId }));
+    setHasUnsavedChanges(true);
     setShowFaceScan(false);
-    setFaceScanStatus('idle');
-    setFaceScanResult(null);
+    addToast({
+      type: 'success',
+      title: 'Face matched',
+      message: `${result.student.first_name} ${result.student.last_name} marked present. Save within five minutes.`,
+    });
   };
 
-  const handleFaceScan = async () => {
-    if (!faceScanVideoRef.current || !selectedSchedule) return;
-    setFaceScanStatus('scanning');
-    setFaceScanResult(null);
-
-    try {
-      const capture: FaceCapture = await captureFaceFromVideo(faceScanVideoRef.current);
-
-      const res = await axiosClient.post('/faculty/attendance/face-scan', {
-        schedule_id: selectedSchedule.id,
-        embedding: capture.embedding,
-      });
-
-      if (res.data.matched) {
-        const student = res.data.student;
-        setFaceScanResult(student);
-        setFaceScanStatus('matched');
-
-        // Auto-mark as present
-        setLocalStatuses((prev) => ({ ...prev, [student.student_id]: 'present' }));
-        setFaceVerifiedStudents((prev) => new Set(prev).add(student.student_id));
-        setHasUnsavedChanges(true);
-
-        addToast({
-          type: 'success',
-          title: 'Face Matched',
-          message: `${student.first_name} ${student.last_name} — ${student.confidence}% confidence`,
-        });
-      } else {
-        setFaceScanStatus('no-match');
-      }
-    } catch (err: any) {
-      setFaceScanStatus('error');
-      addToast({ type: 'error', title: 'Scan Failed', message: err.response?.data?.error || 'Face scan error' });
-    }
-  };
-
-  const resetFaceScan = async () => {
-    setFaceScanStatus('idle');
-    setFaceScanResult(null);
-    // Restart camera if it was stopped
-    if (!faceScanStream) {
-      try {
-        const stream = await getCameraStream();
-        setFaceScanStream(stream);
-        setTimeout(() => {
-          if (faceScanVideoRef.current) {
-            faceScanVideoRef.current.srcObject = stream;
-          }
-        }, 100);
-      } catch {
-        setFaceScanStatus('error');
-      }
-    }
-  };
-
-  // ── Face Enrollment Handlers ──
-
-  const openEnrollModal = async (studentId: string) => {
-    setEnrollingStudentId(studentId);
-    setEnrollStatus('idle');
-    try {
-      const stream = await getCameraStream();
-      setEnrollStream(stream);
-      setTimeout(() => {
-        if (enrollVideoRef.current) {
-          enrollVideoRef.current.srcObject = stream;
-        }
-      }, 100);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Camera Error', message: err.message || 'Failed to access camera' });
-    }
-  };
-
-  const closeEnrollModal = () => {
-    if (enrollStream) {
-      stopCameraStream(enrollStream);
-      setEnrollStream(null);
-    }
+  const onEnrolled = () => {
+    const id = enrollingStudentId;
     setEnrollingStudentId(null);
-    setEnrollStatus('idle');
-  };
-
-  const handleEnrollFace = async () => {
-    if (!enrollVideoRef.current || !enrollingStudentId) return;
-    setEnrollStatus('capturing');
-
-    try {
-      const capture: FaceCapture = await captureFaceFromVideo(enrollVideoRef.current);
-      setEnrollStatus('saving');
-
-      await axiosClient.post('/faculty/face-enroll', {
-        student_id: enrollingStudentId,
-        embedding: capture.embedding,
-        liveness_score: capture.imageMetadata.brightness > 30 ? 0.92 : 0.6,
-      });
-
-      addToast({ type: 'success', title: 'Face Enrolled', message: 'Student face registered successfully' });
-
-      // Update student record locally
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.student_id === enrollingStudentId ? { ...s, has_face_enrolled: true } : s
-        )
-      );
-      closeEnrollModal();
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Enrollment Failed', message: err.response?.data?.error || 'Failed to enroll face' });
-      setEnrollStatus('idle');
+    if (id) {
+      setStudents((prev) => prev.map((s) => (s.student_id === id ? { ...s, has_face_enrolled: true } : s)));
     }
+    addToast({ type: 'success', title: 'Face enrolled', message: 'This student can now be identified in class.' });
   };
 
   // Computed: how many students have face enrolled
@@ -553,7 +433,9 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
           </button>
 
           <button
-            onClick={openFaceScan}
+            onClick={() => setShowFaceScan(true)}
+            disabled={faceEnrolledCount === 0}
+            title={faceEnrolledCount === 0 ? 'No student in this class has an enrolled face' : undefined}
             className="px-3 py-1.5 bg-purple-700/30 border border-purple-600/50 text-purple-400 rounded text-xs font-medium hover:bg-purple-700/50 transition-colors flex items-center gap-1"
           >
             📷 Face Scan {faceEnrolledCount > 0 && <span className="bg-purple-600/40 px-1 rounded">{faceEnrolledCount}</span>}
@@ -684,15 +566,15 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
                         {student.student_code || '—'}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {faceVerifiedStudents.has(student.student_id) ? (
-                          <span className="inline-flex items-center gap-0.5 text-green-400 text-xs font-medium" title="Face verified this session">
+                        {faceMatches[student.student_id] ? (
+                          <span className="inline-flex items-center gap-0.5 text-green-400 text-xs font-medium" title="Face matched; saved with the next save">
                             ✅
                           </span>
                         ) : student.has_face_enrolled ? (
                           <span className="text-purple-400 text-xs" title="Face enrolled">📷</span>
                         ) : (
                           <button
-                            onClick={() => openEnrollModal(student.student_id)}
+                            onClick={() => setEnrollingStudentId(student.student_id)}
                             className="text-xs text-slate-500 hover:text-purple-400 transition-colors"
                             title="Enroll face"
                           >
@@ -779,174 +661,29 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════ */}
-        {/* FACE SCAN MODAL                        */}
-        {/* ═══════════════════════════════════════ */}
-        {showFaceScan && (
-          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-lg overflow-hidden">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-                <div>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">📷 Face Recognition Scan</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {faceEnrolledCount} student{faceEnrolledCount !== 1 ? 's' : ''} with enrolled faces
-                  </p>
-                </div>
-                <button onClick={closeFaceScan} className="text-slate-400 hover:text-white text-xl transition-colors">✕</button>
-              </div>
-
-              {/* Camera Feed */}
-              <div className="relative bg-black aspect-video">
-                <video
-                  ref={faceScanVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-                {/* Scanning overlay */}
-                {faceScanStatus === 'scanning' && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                    <div className="text-center">
-                      <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                      <p className="text-white text-sm mt-3">Scanning face...</p>
-                    </div>
-                  </div>
-                )}
-                {/* Match result overlay */}
-                {faceScanStatus === 'matched' && faceScanResult && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-green-900/50">
-                    <div className="text-center bg-slate-900/90 rounded-lg p-5 border border-green-500">
-                      <div className="text-3xl mb-2">✅</div>
-                      <p className="text-green-400 font-semibold text-lg">
-                        {faceScanResult.first_name} {faceScanResult.last_name}
-                      </p>
-                      <p className="text-sm text-slate-400 mt-1">
-                        {faceScanResult.student_code} — {faceScanResult.confidence}% confidence
-                      </p>
-                      <p className="text-xs text-green-500 mt-2">Marked as Present ✓</p>
-                    </div>
-                  </div>
-                )}
-                {/* No match overlay */}
-                {faceScanStatus === 'no-match' && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-red-900/40">
-                    <div className="text-center bg-slate-900/90 rounded-lg p-5 border border-red-500">
-                      <div className="text-3xl mb-2">❌</div>
-                      <p className="text-red-400 font-semibold">No Match Found</p>
-                      <p className="text-xs text-slate-400 mt-1">Face not recognized. Student may not be enrolled.</p>
-                    </div>
-                  </div>
-                )}
-                {/* Error overlay */}
-                {faceScanStatus === 'error' && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
-                    <div className="text-center">
-                      <div className="text-3xl mb-2">⚠️</div>
-                      <p className="text-amber-400 font-semibold">Camera Error</p>
-                      <p className="text-xs text-slate-400 mt-1">Unable to access camera. Please check permissions.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Actions */}
-              <div className="px-5 py-4 border-t border-slate-700 flex items-center justify-between">
-                <div className="text-xs text-slate-500">
-                  {faceVerifiedStudents.size > 0 && (
-                    <span className="text-green-400">{faceVerifiedStudents.size} verified this session</span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {(faceScanStatus === 'matched' || faceScanStatus === 'no-match') && (
-                    <button
-                      onClick={resetFaceScan}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
-                    >
-                      Scan Next
-                    </button>
-                  )}
-                  {(faceScanStatus === 'idle') && (
-                    <button
-                      onClick={handleFaceScan}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
-                    >
-                      Capture & Identify
-                    </button>
-                  )}
-                  <button
-                    onClick={closeFaceScan}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+        {showFaceScan && selectedSchedule && (
+          <FaceChallengeCapture<IdentifyResult>
+            purpose="identify"
+            title="Identify a student"
+            subtitle={`${selectedSchedule.course_code} — ${faceEnrolledCount} student${faceEnrolledCount !== 1 ? 's' : ''} with an enrolled face`}
+            scheduleId={selectedSchedule.id}
+            onDone={onIdentified}
+            onClose={() => setShowFaceScan(false)}
+          />
         )}
 
-        {/* ═══════════════════════════════════════ */}
-        {/* FACE ENROLLMENT MODAL                  */}
-        {/* ═══════════════════════════════════════ */}
         {enrollingStudentId && (() => {
-          const enrollStudent = students.find((s) => s.student_id === enrollingStudentId);
+          const st = students.find((x) => x.student_id === enrollingStudentId);
           return (
-            <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-md overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">Enroll Face</h3>
-                    {enrollStudent && (
-                      <p className="text-sm text-slate-400 mt-0.5">
-                        {enrollStudent.first_name} {enrollStudent.last_name} ({enrollStudent.student_code})
-                      </p>
-                    )}
-                  </div>
-                  <button onClick={closeEnrollModal} className="text-slate-400 hover:text-white text-xl transition-colors">✕</button>
-                </div>
-
-                {/* Camera */}
-                <div className="relative bg-black aspect-video">
-                  <video
-                    ref={enrollVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  {enrollStatus === 'capturing' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
-                  {enrollStatus === 'saving' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <p className="text-white text-sm">Saving enrollment...</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="px-5 py-4 border-t border-slate-700 flex justify-end gap-2">
-                  <button
-                    onClick={handleEnrollFace}
-                    disabled={enrollStatus !== 'idle'}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm rounded-lg transition-colors"
-                  >
-                    {enrollStatus === 'idle' ? 'Capture & Enroll' : 'Processing...'}
-                  </button>
-                  <button
-                    onClick={closeEnrollModal}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
+            <FaceChallengeCapture
+              purpose="enroll"
+              title="Enrol a face"
+              subtitle={st ? `${st.first_name} ${st.last_name} (${st.student_code}). Consent must already be on record.` : undefined}
+              subjectType="student"
+              subjectId={enrollingStudentId}
+              onDone={onEnrolled}
+              onClose={() => setEnrollingStudentId(null)}
+            />
           );
         })()}
       </div>

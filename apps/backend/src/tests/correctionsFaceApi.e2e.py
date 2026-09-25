@@ -138,42 +138,16 @@ check("an EMS identity gets only its own, not SMS corrections",
       all(x.get('tenant_id') not in (A['tenantId'], B['tenantId']) for x in hr_stats),
       f"({[x.get('tenant_id') for x in hr_stats]})")
 
-print("-- face: no enrolment as a side effect of verifying --")
+print("-- face: the client-embedding API is gone --")
+# /api/face took 128 numbers from the browser as a "face". It is removed;
+# faceMatchingApi drives the replacement with real images.
 ENC = [0.02 * (i % 5) for i in range(128)]
-co, r = call("GET", f"/enrollment-status/{A['students'][0]}", FA, base="/face")
-check("enrollment status 200 (service queried columns that do not exist)", co == 200, f"({co} {r})")
-was_enrolled = r.get('data', {}).get('enrolled') if co == 200 else None
-
-co, r = call("POST", "/verify", FA,
-             {"sessionId": "00000000-0000-4000-8000-000000000000",
-              "studentId": A['students'][0], "embedding": ENC}, base="/face")
-check("verify against an unknown session does not succeed",
-      co == 200 and r.get('data', {}).get('verified') is False, f"({co} {r})")
-check("verify never reports a first enrolment",
-      co == 200 and r.get('data', {}).get('isFirstEnrollment') is False, f"({r})")
-
-co, r = call("GET", f"/enrollment-status/{A['students'][0]}", FA, base="/face")
-check("verifying did not enrol the student",
-      co == 200 and r.get('data', {}).get('enrolled') == was_enrolled, f"({co} {r})")
-
-print("-- face: isolation --")
-co, r = call("GET", f"/enrollment-status/{B['students'][0]}", FA, base="/face")
-check("B's student status is 404 to A", co == 404, f"({co} {r})")
-co, r = call("POST", "/enroll", FA, {"studentId": B['students'][0], "embedding": ENC}, base="/face")
-check("A cannot enrol B's student", co == 404, f"({co} {r})")
-co, r = call("POST", "/enroll", FA, {"studentId": A['students'][0], "embedding": ENC}, base="/face")
-check("A enrols its own student", co == 201, f"({co} {r})")
-check("the enrolment awaits a second person",
-      co == 201 and r.get('data', {}).get('requiresVerification') is True, f"({r})")
-
-co, r = call("POST", "/enroll", FA, {"studentId": A['students'][0], "embedding": ENC[:4]}, base="/face")
-check("a short embedding is refused", co == 400, f"({co} {r})")
-
-print("-- face: role and platform --")
-co, r = call("POST", "/verify", HR,
-             {"sessionId": "00000000-0000-4000-8000-000000000000",
-              "studentId": A['students'][0], "embedding": ENC}, base="/face")
-check("an EMS identity is refused from the SMS face API", co == 403, f"({co} {r})")
+for m, path, body in [("GET", f"/enrollment-status/{A['students'][0]}", None),
+                      ("POST", "/verify", {"sessionId": "00000000-0000-4000-8000-000000000000",
+                                           "studentId": A['students'][0], "embedding": ENC}),
+                      ("POST", "/enroll", {"studentId": A['students'][0], "embedding": ENC})]:
+    co, r = call(m, path, FA, body, base="/face")
+    check(f"{m} /api/face/{path.split('/')[1]} is gone", co == 404, f"({co} {r})")
 
 print(f"\n{P} passed, {F} failed")
 sys.exit(1 if F else 0)

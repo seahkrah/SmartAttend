@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle, Clock, LogIn, LogOut, MapPin, ShieldAlert, UserX,
+  ScanFace,
 } from 'lucide-react';
 import { useToastStore } from '../components/Toast';
+import FaceChallengeCapture from '../components/face/FaceChallengeCapture';
+import { biometricsService, type VerifyResult } from '../services/biometricsService';
 import { getErrorMessage } from '../utils/errorHandler';
 import { LoadingOverlay } from '../components/LoadingStates';
 import { EmptyState, ErrorAlert } from '../components/ErrorDisplay';
@@ -65,6 +68,11 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
   const [checkInType, setCheckInType] = useState<CheckInType>('office');
   const [site, setSite] = useState('');
   const [now, setNow] = useState(() => Date.now());
+  // Face check-in: available when the organisation has it on and HR has
+  // enrolled this employee. The match is made on the server; the check-in
+  // then cites it.
+  const [face, setFace] = useState<{ enabled: boolean; consent: boolean; enrolled: boolean } | null>(null);
+  const [faceOpen, setFaceOpen] = useState(false);
 
   const { addToast } = useToastStore();
 
@@ -81,7 +89,23 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      setData(await workforceService.myAttendance(30));
+      const d = await workforceService.myAttendance(30);
+      setData(d);
+      if (d.employee) {
+        try {
+          const [settings, status] = await Promise.all([
+            biometricsService.settings(),
+            biometricsService.status('employee', d.employee.id),
+          ]);
+          setFace({
+            enabled: settings.enabled && settings.configured,
+            consent: !!status.consent,
+            enrolled: !!status.enrolment,
+          });
+        } catch {
+          setFace(null); // face check-in simply is not offered
+        }
+      }
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {
@@ -89,14 +113,19 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
     }
   };
 
-  const doCheckIn = async () => {
+  const doCheckIn = async (faceMatchId?: string) => {
     try {
       setBusy(true);
       const row = await workforceService.checkIn({
         checkInType,
         siteLocation: site.trim() || undefined,
+        faceMatchId,
       });
-      addToast({ type: 'success', title: `Checked in at ${timeOf(row.checkInTime)}` });
+      addToast({
+        type: 'success',
+        title: `Checked in at ${timeOf(row.checkInTime)}`,
+        message: row.faceVerified ? 'Face matched.' : undefined,
+      });
       setSite('');
       await load();
     } catch (e) {
@@ -219,19 +248,30 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                     onChange={(e) => setSite(e.target.value)} />
                 </div>
               </div>
-              <button
-                onClick={() => void doCheckIn()}
-                disabled={busy}
-                className="inline-flex items-center gap-2 rounded-xl bg-success-600 px-6 py-3 text-base font-semibold text-white hover:bg-success-500 disabled:opacity-50"
-              >
-                <LogIn className="h-5 w-5" /> Check in now
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => void doCheckIn()}
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 rounded-xl bg-success-600 px-6 py-3 text-base font-semibold text-white hover:bg-success-500 disabled:opacity-50"
+                >
+                  <LogIn className="h-5 w-5" /> Check in now
+                </button>
+                {face?.enabled && face.enrolled && (
+                  <button
+                    onClick={() => setFaceOpen(true)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-2 rounded-xl border border-brand-500 px-6 py-3 text-base font-semibold text-brand-200 hover:bg-brand-600/20 disabled:opacity-50"
+                  >
+                    <ScanFace className="h-5 w-5" /> Check in with face
+                  </button>
+                )}
+              </div>
             </div>
           )}
           <p className="mt-5 flex items-start gap-2 text-xs text-slate-500">
             <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            The time is taken from the server, not this device. Check-ins made here are not
-            face-verified.
+            The time is taken from the server, not this device. A check-in is recorded as
+            face-matched only when it follows a face match made on the server moments before.
           </p>
         </div>
 
@@ -322,7 +362,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                         {CHECKIN_STATE_LABEL[c.state] ?? c.state}
                       </span>
                       {c.faceVerified && (
-                        <span className="ml-2 text-xs text-slate-500">face verified</span>
+                        <span className="ml-2 text-xs text-slate-500">face matched</span>
                       )}
                     </td>
                   </tr>
@@ -331,7 +371,55 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
             </table>
           </div>
         )}
+
+        {face?.enabled && data?.employee && (
+          <div className={`${card} p-6 space-y-2`}>
+            <div className="text-xs uppercase tracking-wider text-slate-500">Face check-in</div>
+            <p className="text-sm text-slate-300">
+              {face.enrolled
+                ? 'You can check in with your face. The photos are compared on the server and not kept.'
+                : face.consent
+                  ? 'You have agreed to face check-in. HR enrols your face in person before you can use it.'
+                  : 'Face check-in is optional. If you agree, HR enrols your face in person; you can withdraw at any time, which deletes it.'}
+            </p>
+            <button
+              className="text-sm text-brand-300 hover:underline disabled:opacity-50"
+              disabled={busy}
+              onClick={async () => {
+                const id = data.employee!.id;
+                try {
+                  setBusy(true);
+                  if (face.consent) {
+                    await biometricsService.withdrawConsent('employee', id, 'Withdrawn by the employee');
+                    addToast({ type: 'success', title: 'Face check-in withdrawn', message: 'Your enrolled face has been deleted.' });
+                  } else {
+                    await biometricsService.grantConsent('employee', id,
+                      `Given by the employee in self-service on ${new Date().toISOString().slice(0, 10)}`);
+                    addToast({ type: 'success', title: 'Consent recorded', message: 'Ask HR to enrol your face.' });
+                  }
+                } catch (e) {
+                  addToast({ type: 'error', title: 'Not changed', message: getErrorMessage(e) });
+                } finally {
+                  setBusy(false);
+                  await load();
+                }
+              }}
+            >
+              {face.consent ? 'Withdraw consent and delete my face' : 'I agree to face check-in'}
+            </button>
+          </div>
+        )}
       </div>
+
+      {faceOpen && (
+        <FaceChallengeCapture<VerifyResult>
+          purpose="verify"
+          title="Check in with your face"
+          subtitle="Follow each instruction; one photo is taken per step."
+          onDone={(r) => { setFaceOpen(false); void doCheckIn(r.matchId); }}
+          onClose={() => setFaceOpen(false)}
+        />
+      )}
     </div>
   );
 };

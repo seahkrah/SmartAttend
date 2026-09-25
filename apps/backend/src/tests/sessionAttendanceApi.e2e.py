@@ -154,48 +154,25 @@ check("student course attendance 200", co == 200, f"({co} {r})")
 co, r = call("GET", f"/students/{B['students'][0]}/courses/{B['courseId']}/attendance", FA)
 check("B's student history is empty to A", co == 200 and r.get('total') == 0, f"({co} {r})")
 
-print("-- face enrolment --")
+print("-- face: numbers from the client are not a face --")
+# /attendance/face/* accepted a client-computed "encoding"; it is removed, and
+# marking by face now needs a match the server made (faceMatchingApi covers
+# the real flow).
 ENC = [0.01 * (i % 7) for i in range(128)]
-co, r = call("POST", "/face/enroll", FA, {
-    "studentId": A['students'][1], "faceEncoding": ENC,
-    "encodingDimension": 128, "faceConfidence": 0.95})
-check("enrol own student 201 (wrote user ids into a students FK)", co == 201, f"({co} {r})")
-enrolment = r.get('data', {}).get('enrollmentId') if co == 201 else None
-
-co, r = call("POST", "/face/enroll", FA, {
-    "studentId": B['students'][0], "faceEncoding": ENC,
-    "encodingDimension": 128, "faceConfidence": 0.95})
-check("cannot enrol B's student", co == 400 and 'not found' in str(r).lower(), f"({co} {r})")
-
-co, r = call("POST", "/face/enroll", FA, {
-    "studentId": A['students'][1], "faceEncoding": ENC[:10],
-    "encodingDimension": 128, "faceConfidence": 0.95})
-check("wrong-length encoding refused 400", co == 400, f"({co} {r})")
-
-if enrolment:
-    # The capturer may not also be the verifier.
-    co, r = call("POST", "/face/verify", FA, {"enrollmentId": enrolment})
-    check("self-verification refused", co == 400, f"({co} {r})")
-    co, r = call("POST", "/face/verify", FB, {"enrollmentId": enrolment})
-    check("B cannot verify A's enrolment", co == 400 and 'not found' in str(r).lower(), f"({co} {r})")
-    co, r = call("POST", "/face/verify", AT, {"enrollmentId": enrolment})
-    check("A's admin verifies it 200", co == 200, f"({co} {r})")
-
+co, r = call("POST", "/face/enroll", FA, {"studentId": A['students'][1], "faceEncoding": ENC,
+                                          "encodingDimension": 128, "faceConfidence": 0.95})
+check("client-encoding enrolment is gone", co == 404, f"({co} {r})")
 co, r = call("GET", f"/face/enrollment-status/{A['students'][1]}", FA)
-check("enrolment status 200", co == 200, f"({co} {r})")
-if co == 200:
-    check("shows an active, verified enrolment",
-          r.get('data', {}).get('hasActiveEnrollment') and r.get('data', {}).get('isVerified'), f"({r})")
-co, r = call("GET", f"/face/enrollment-status/{B['students'][0]}", FA)
-check("B's student status is 404 to A", co == 404, f"({co} {r})")
-
-print("-- face verification during marking --")
+check("its status route is gone too", co == 404, f"({co} {r})")
 if session_a:
     co, r = call("POST", "/mark-with-face", FA, {
         "studentId": A['students'][1], "sessionId": session_a,
-        "verificationMethod": "FACE_RECOGNITION",
-        "faceEncoding": ENC, "encodingDimension": 128})
-    check("matching face marks present", co == 201 and r.get('data', {}).get('faceVerified') is True, f"({co} {r})")
+        "verificationMethod": "FACE_RECOGNITION", "faceEncoding": ENC, "encodingDimension": 128})
+    check("a face mark without a server match is refused", co == 400 and 'faceMatchId' in str(r), f"({co} {r})")
+    co, r = call("POST", "/mark-with-face", FA, {
+        "studentId": A['students'][1], "sessionId": session_a,
+        "verificationMethod": "FACE_RECOGNITION", "faceMatchId": "00000000-0000-4000-8000-000000000000"})
+    check("and a made-up match id is refused", co == 400, f"({co} {r})")
 
 print(f"\n{P} passed, {F} failed")
 sys.exit(1 if F else 0)

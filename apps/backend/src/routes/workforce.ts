@@ -34,6 +34,7 @@ import {
 } from '../services/workforceService.js'
 import { fromMinor } from '../services/payrollService.js'
 import { rosterPublished, timesheetDecided } from '../notifications/events.js'
+import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 
 /**
  * EMS — contracts, rosters and timesheets.
@@ -85,6 +86,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function fail(res: Response, label: string, e: unknown) {
   if (e instanceof WorkforceError) return res.status(e.status).json({ error: e.message })
+  if (e instanceof BiometricError) return res.status(e.status).json({ error: e.message, code: e.code })
+  if ((e as any)?.code === '23505' && (e as any)?.constraint === 'uq_corporate_checkins_face_match') {
+    return res.status(409).json({ error: 'That face match has already been used', code: 'match_used' })
+  }
 
   const err = e as { code?: string; constraint?: string; message?: string }
 
@@ -914,9 +919,19 @@ router.post('/my/check-in', async (req: TenantRequest, res: Response) => {
 
     client = await getConnection()
     await client.query('BEGIN')
+    // A face match is optional. When one is cited it must be this employee's
+    // own, made by them, in this tenant, within the last few minutes.
+    let faceMatchId: string | null = null
+    if (req.body?.faceMatchId) {
+      faceMatchId = await assertUsableMatch(client, ctx as any, req.body.faceMatchId, {
+        action: 'verified',
+        subject: { type: 'employee', id: employee.id },
+      })
+    }
     const row = await checkIn(client, svcCtx(req), employee.id, {
       checkInType: req.body?.checkInType,
       siteLocation: req.body?.siteLocation,
+      faceMatchId,
     })
     await client.query('COMMIT')
     return res.status(201).json({ checkIn: row })

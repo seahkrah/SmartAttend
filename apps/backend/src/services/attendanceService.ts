@@ -22,6 +22,7 @@
  * tenant is never a parameter the caller may choose.
  */
 
+import { assertUsableMatch } from '../biometrics/service.js';
 import pool, { query } from '../db/connection.js';
 import {
   CourseSession,
@@ -32,7 +33,6 @@ import {
   MarkAttendanceWithFaceResponse,
   AttendanceStatus,
 } from '@jjelotech/types';
-import { verifyStudentFace } from './faceRecognitionService.js';
 
 /** What the service needs from the resolved request context. */
 export interface ServiceContext {
@@ -74,7 +74,7 @@ function toAttendanceRecord(row: any): SessionAttendanceRecord {
     sessionId: row.session_id,
     verificationMethod: row.verification_method,
     faceVerified: row.face_verified,
-    faceVerificationId: row.face_verification_id,
+    faceMatchId: row.face_match_event_id ?? undefined,
     markedAt: row.marked_at,
     markedBy: row.marked_by_id,
     createdAt: row.marked_at,
@@ -327,33 +327,13 @@ export async function markAttendanceWithFace(
     );
   }
 
-  let attendanceStatus: AttendanceStatus = 'absent';
-  let faceVerified = false;
-  let faceVerificationId: string | undefined;
-
-  if (req.verificationMethod === 'FACE_RECOGNITION') {
-    if (!req.faceEncoding || !req.encodingDimension) {
-      return refuse('Face encoding required for FACE_RECOGNITION verification');
-    }
-
-    const verifyResult = await verifyStudentFace(
-      ctx,
-      req.studentId,
-      req.sessionId,
-      req.faceEncoding,
-      req.encodingDimension
-    );
-
-    faceVerified = verifyResult.isVerified;
-    if (verifyResult.success) {
-      faceVerificationId = verifyResult.verificationId;
-      // An unverified face is left absent for a human to correct through the
-      // audit trail, rather than quietly recorded as present.
-      attendanceStatus = faceVerified ? 'present' : 'absent';
-    }
-  } else {
-    attendanceStatus = 'present';
+  // A face mark cites a match the server made for this student in this
+  // class. Nothing the client says about a face is taken as evidence.
+  const byFace = req.verificationMethod === 'FACE_RECOGNITION';
+  if (byFace && !req.faceMatchId) {
+    return refuse('Face attendance needs faceMatchId, from /api/biometrics/identify');
   }
+  const attendanceStatus: AttendanceStatus = 'present';
 
   // One client for the whole write, so the attendance row and its audit entry
   // commit or roll back together. The previous BEGIN/COMMIT went through the
@@ -362,10 +342,25 @@ export async function markAttendanceWithFace(
   try {
     await client.query('BEGIN');
 
+    let faceMatchId: string | null = null;
+    if (byFace) {
+      try {
+        faceMatchId = await assertUsableMatch(client, ctx as any, req.faceMatchId, {
+          action: 'identified',
+          subject: { type: 'student', id: req.studentId },
+          scheduleId,
+        });
+      } catch (e: any) {
+        await client.query('ROLLBACK').catch(() => {});
+        return refuse(e?.message ?? 'That face match cannot be used');
+      }
+    }
+    const faceVerified = faceMatchId !== null;
+
     const attendanceResult = await client.query(
       `INSERT INTO school_attendance (
          schedule_id, student_id, session_id, marked_by_id, attendance_date,
-         status, verification_method, face_verified, face_verification_id,
+         status, verification_method, face_verified, face_match_event_id,
          remarks, tenant_id
        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING id`,
@@ -378,7 +373,7 @@ export async function markAttendanceWithFace(
         attendanceStatus,
         req.verificationMethod,
         faceVerified,
-        faceVerificationId || null,
+        faceMatchId,
         req.notes || null,
         ctx.tenantId,
       ]
@@ -442,7 +437,7 @@ export async function getSessionAttendance(
   const result = await query(
     `SELECT sa.id, sa.student_id, sa.status, sa.attendance_date,
             sa.session_id, sa.verification_method, sa.face_verified,
-            sa.face_verification_id, sa.marked_at, sa.marked_by_id, sa.remarks
+            sa.face_match_event_id, sa.marked_at, sa.marked_by_id, sa.remarks
        FROM school_attendance sa
       WHERE sa.session_id = $1 AND sa.tenant_id = $2
       ORDER BY sa.marked_at ASC`,
@@ -461,7 +456,7 @@ export async function getStudentCourseAttendance(
   const result = await query(
     `SELECT sa.id, sa.student_id, sa.status, sa.attendance_date,
             sa.session_id, sa.verification_method, sa.face_verified,
-            sa.face_verification_id, sa.marked_at, sa.marked_by_id, sa.remarks
+            sa.face_match_event_id, sa.marked_at, sa.marked_by_id, sa.remarks
        FROM school_attendance sa
        JOIN course_sessions cs ON cs.id = sa.session_id AND cs.tenant_id = $3
       WHERE sa.student_id = $1 AND cs.course_id = $2 AND sa.tenant_id = $3

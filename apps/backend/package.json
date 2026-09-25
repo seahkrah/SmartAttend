@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@jjelotech/types": "file:../../packages/types",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

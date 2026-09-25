@@ -112,112 +112,26 @@ export interface UpdateSessionRequest {
 }
 
 // ===========================
-// FACE RECOGNITION ENROLLMENTS
+// FACE MATCHING (/api/biometrics)
 // ===========================
-export interface FaceRecognitionEnrollment {
-  id: string;
-  studentId: string | null;  // Can be null for system enrollment
-  platformId: string;
-  
-  // Face data (stored as array for distance calculations)
-  faceEncoding: number[];
-  encodingDimension: number;
-  
-  // Enrollment metadata
-  enrolledById: string;
-  enrolledAt: string;
-  
-  // Quality
-  faceConfidence: number;
-  enrollmentQualityScore?: number;
-  
-  // Status
-  isActive: boolean;
-  isVerified: boolean;
-  verifiedAt?: string;
-  verifiedById?: string;
-  
-  // Re-enrollment tracking
-  supersededById?: string;
-  
-  createdAt: string;
-  updatedAt: string;
+// The server derives faces from camera images. No type here carries a face
+// descriptor: the client never sends one and never receives one.
+
+export type FacePose = 'center' | 'left' | 'right';
+
+export interface FaceChallenge {
+  challengeId: string;
+  /** The poses to capture, one image each, in this order. */
+  steps: FacePose[];
+  expiresAt: string;
 }
 
-export interface EnrollFaceRequest {
-  studentId: string;
-  faceEncoding: number[];
-  encodingDimension: number;
-  faceConfidence: number;
-  enrollmentQualityScore?: number;
-}
-
-export interface EnrollFaceResponse {
-  success: boolean;
-  enrollmentId: string;
-  message: string;
-  requiresVerification: boolean;
-}
-
-// ===========================
-// FACE RECOGNITION VERIFICATIONS
-// ===========================
-export interface FaceRecognitionVerification {
-  id: string;
-  studentId: string;
-  sessionId: string;
-  
-  // Matching results
-  matchDistance: number | null;
-  similarityScore: number | null;
-  
-  // Verification result
-  isVerified: boolean;
-  verificationConfidence: number;
-  
-  // Thresholds
-  distanceThresholdUsed: number;
-  
-  // Context
-  verifiedAt: string;
-  clientIp?: string;
-  attemptNumber: number;
-  
-  createdAt: string;
-}
-
-export interface VerifyFaceRequest {
-  studentId: string;
-  sessionId: string;
-  faceEncoding: number[];
-  encodingDimension: number;
-  clientIp?: string;
-}
-
-export interface VerifyFaceResponse {
-  success: boolean;
-  isVerified: boolean;
-  similarityScore: number;
-  matchDistance: number;
-  verificationConfidence: number;
-  message: string;
-  verificationId: string;
-  requiresManualReview: boolean;
-}
-
-// ===========================
-// ENROLLMENT STATUS
-// ===========================
-export interface StudentFaceEnrollmentStatus {
-  studentId: string;
-  platformId: string;
-  hasActiveEnrollment: boolean;
-  enrollmentId?: string;
-  isVerified: boolean;
-  enrolledAt?: string;
-  faceConfidence?: number;
-  verificationAttempts: number;
-  successfulVerifications: number;
+export interface FaceMatchResult {
+  matched: true;
+  /** Cite this when recording attendance; usable once, for five minutes. */
+  matchId: string;
+  distance: number;
+  threshold: number;
 }
 
 // ===========================
@@ -226,8 +140,8 @@ export interface StudentFaceEnrollmentStatus {
 export interface SessionAttendanceRecord extends AttendanceRecord {
   sessionId: string;
   verificationMethod: VerificationMethod;
-  faceVerificationId?: string;
-  faceEnrollmentId?: string;
+  /** The biometric event the face check cited, when there was one. */
+  faceMatchId?: string;
   faceVerified: boolean;
   /** When the mark was recorded. school_attendance.marked_at is the column
    *  that carries this; the table has no created_at/updated_at pair. */
@@ -238,8 +152,8 @@ export interface MarkAttendanceWithFaceRequest {
   studentId: string;
   sessionId: string;
   verificationMethod: VerificationMethod;
-  faceEncoding?: number[];  // Required if verification_method is FACE_RECOGNITION
-  encodingDimension?: number;
+  /** Required for FACE_RECOGNITION: a match from /api/biometrics/identify. */
+  faceMatchId?: string;
   notes?: string;
 }
 

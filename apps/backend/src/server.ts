@@ -48,7 +48,7 @@ import notificationRoutes from './routes/notifications.js'
 import fileRoutes from './routes/files.js'
 import { startDispatcher, stopDispatcher } from './notifications/service.js'
 import { closeSmtpPools } from './notifications/providers/index.js'
-import faceVerificationRoutes from './routes/faceVerification.js'
+import biometricsRoutes from './routes/biometrics.js'
 import auditRoutes from './routes/audit.js'
 import timeRoutes from './routes/time.js'
 import {
@@ -145,7 +145,7 @@ app.use('/api/admissions', admissionsRoutes)
 app.use('/api/fees', feesRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/files', fileRoutes)
-app.use('/api/face', faceVerificationRoutes)
+app.use('/api/biometrics', biometricsRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/time', timeRoutes)
 

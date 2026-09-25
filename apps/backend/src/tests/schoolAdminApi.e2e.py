@@ -296,19 +296,13 @@ check("cannot enrol B's student", co == 404, f"({co} {r})")
 co, r = call("POST", "/enrollment/add", FA, {"schedule_id": B['scheduleId'], "student_id": A['students'][0]}, base="/faculty")
 check("cannot enrol into B's schedule", co == 403, f"({co} {r})")
 
-co, r = call("POST", "/face-enroll", FA, {"student_id": B['students'][0], "embedding": [0.1] * 128}, base="/faculty")
-check("cannot enrol B student's face", co == 404, f"({co} {r})")
-co, r = call("POST", "/face-enroll", FA, {"student_id": A['students'][0], "embedding": [0.1] * 128}, base="/faculty")
-check("own student's face enrols 200", co == 200, f"({co} {r})")
-co, r = call("POST", "/face-enroll", FA, {"student_id": A['students'][0], "embedding": [0.2] * 128}, base="/faculty")
-check("re-enrolling replaces rather than erroring", co == 200, f"({co} {r})")
-co, r = call("POST", "/face-enroll", FA, {"student_id": A['students'][0], "embedding": ["x"] * 128}, base="/faculty")
-check("non-numeric embedding refused 400", co == 400, f"({co} {r})")
-
-co, r = call("GET", f"/face-status?schedule_id={A['scheduleId']}", FA, base="/faculty")
-check("face-status 200", co == 200, f"({co} {r})")
-co, r = call("GET", f"/face-status?schedule_id={B['scheduleId']}", FA, base="/faculty")
-check("cannot read B schedule's face status", co == 403, f"({co} {r})")
+# The face routes that took an "embedding" from the browser are gone; face
+# enrolment and matching are tested against real images in faceMatchingApi.
+for m, path in [("POST", "/face-enroll"), ("GET", f"/face-status?schedule_id={A['scheduleId']}"),
+                ("POST", "/attendance/face-scan")]:
+    co, r = call(m, path, FA, {"student_id": A['students'][0], "embedding": [0.1] * 128} if m == "POST" else None,
+                 base="/faculty")
+    check(f"client-embedding route {path.split('?')[0]} is gone", co == 404, f"({co} {r})")
 
 co, r = call("GET", "/dashboard", FA, base="/faculty")
 check("faculty dashboard 200", co == 200, f"({co} {r})")

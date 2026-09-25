@@ -50,14 +50,17 @@ co,r=call("GET",f"/attendance/draft?course_id={A['courseId']}&date={DATE}",FA)
 check("marks visible in draft", co==200 and r.get('marked_count')==2, f"({r.get('marked_count')})")
 
 print("-- facial match --")
+# This route used to take a "confidence" number from the client and, above
+# 0.85, write the student present and face-verified. The real flow (identify,
+# then cite the match) is in faceMatchingApi; here, what must be refused.
 co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":A['students'][0],"confidence":0.97})
-check("high-confidence match accepted", co==200, f"({co} {r})")
-co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":A['students'][0],"confidence":0.40})
-check("low confidence refused 422", co==422, f"({co} {r})")
-co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":B['students'][0],"confidence":0.97})
+check("a confidence number from the client is not a face match", co==400 and 'face_match_id' in str(r), f"({co} {r})")
+co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":A['students'][0],
+                                                "face_match_id":"00000000-0000-4000-8000-000000000000"})
+check("a made-up match id is refused", co==409 and r.get('code')=='match_unusable', f"({co} {r})")
+co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":B['students'][0],
+                                                "face_match_id":"00000000-0000-4000-8000-000000000000"})
 check("cannot mark B student", co==404, f"({co})")
-co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":A['students'][0],"confidence":5})
-check("rejects out-of-range confidence", co==400, f"({co})")
 
 print("-- qr code --")
 co,r=call("GET",f"/courses/{A['courseId']}/qr-code?date={DATE}",FA)
@@ -78,8 +81,9 @@ co,r=call("POST","/attendance/lock",FA,{"course_id":A['courseId'],"date":DATE})
 check("relock refused 409", co==409, f"({co})")
 co,r=call("POST","/attendance/bulk-edit",FA,{"course_id":A['courseId'],"date":DATE,"action":"CLEAR"})
 check("locked register refuses edits", co==409, f"({co} {r})")
-co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":A['students'][0],"confidence":0.97})
-check("locked register refuses facial match", co==409, f"({co})")
+co,r=call("POST","/attendance/facial-match",FA,{"course_id":A['courseId'],"date":DATE,"student_id":A['students'][0],
+                                                "face_match_id":"00000000-0000-4000-8000-000000000000"})
+check("locked register refuses facial match", co==409 and 'locked' in str(r).lower(), f"({co} {r})")
 co,r=call("GET",f"/attendance/draft?course_id={A['courseId']}&date={DATE}",FA)
 check("draft reports locked + not editable", co==200 and r.get('status')=='LOCKED' and r.get('editable') is False, f"({r.get('status')})")
 

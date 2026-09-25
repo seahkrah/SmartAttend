@@ -1096,7 +1096,7 @@ export async function checkIn(
   client: PoolClient,
   ctx: WorkforceContext,
   employeeId: string,
-  input: { checkInType?: unknown; siteLocation?: unknown }
+  input: { checkInType?: unknown; siteLocation?: unknown; faceMatchId?: string | null }
 ): Promise<CheckInRow> {
   const type = input.checkInType === undefined || input.checkInType === null || input.checkInType === ''
     ? 'office'
@@ -1115,12 +1115,16 @@ export async function checkIn(
     throw new WorkforceError('You are already checked in; check out first', 409)
   }
 
+  // face_verified is true only when the caller cites a match the server made
+  // for this employee moments ago (validated by the route, and spendable once:
+  // a unique index refuses a second use). The database refuses the flag
+  // without the citation.
   const created = await client.query(
     `INSERT INTO corporate_checkins
-       (tenant_id, employee_id, check_in_type, check_in_time, site_location, face_verified)
-     VALUES ($1, $2, $3, LOCALTIMESTAMP, $4, FALSE)
+       (tenant_id, employee_id, check_in_type, check_in_time, site_location, face_verified, face_match_event_id)
+     VALUES ($1, $2, $3, LOCALTIMESTAMP, $4, $5, $6)
      RETURNING ${CHECKIN_COLUMNS}`,
-    [ctx.tenantId, employeeId, type, site]
+    [ctx.tenantId, employeeId, type, site, !!input.faceMatchId, input.faceMatchId ?? null]
   )
   return toCheckInRow(created.rows[0])
 }

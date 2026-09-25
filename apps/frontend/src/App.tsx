@@ -43,6 +43,7 @@ import StudentSettingsPage from './pages/StudentSettingsPage';
 
 // School Admin Pages
 import SchoolAdminDashboardPage from './pages/SchoolAdminDashboardPage';
+import FaceMatchingAdminPage from './pages/FaceMatchingAdminPage';
 import SchoolAdminUsersPage from './pages/SchoolAdminUsersPage';
 import SchoolAdminApprovalsPage from './pages/SchoolAdminApprovalsPage';
 import SchoolAdminSettingsPage from './pages/SchoolAdminSettingsPage';
@@ -186,6 +187,7 @@ export default function App() {
                     <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                     <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
                     <Route path="/attendance" element={<SchoolAdminAttendancePage />} />
+                    <Route path="/face-matching" element={<FaceMatchingAdminPage subjectType="student" />} />
                     <Route path="/reports" element={<SchoolAdminReportsPage />} />
                     <Route path="/approvals" element={<SchoolAdminApprovalsPage />} />
                     <Route path="/settings" element={<SchoolAdminSettingsPage />} />
@@ -277,6 +279,7 @@ export default function App() {
                     <Route path="/" element={<HREmployeeAttendanceDashboard />} />
                     <Route path="/analytics" element={<HREmployeeAttendanceDashboard />} />
                     <Route path="/leave" element={<HRLeavePage />} />
+                    <Route path="/face-matching" element={<FaceMatchingAdminPage subjectType="employee" />} />
                     <Route path="/payroll" element={<HRPayrollPage />} />
                     {/* Ending a contract and sending hours to payroll both need a
                         director; the pages withhold those controls rather than

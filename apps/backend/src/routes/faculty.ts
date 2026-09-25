@@ -1,5 +1,6 @@
 import express, { Response } from 'express'
-import { query } from '../db/connection.js'
+import pool, { query } from '../db/connection.js'
+import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 import { authenticateToken, requireRole } from '../auth/middleware.js'
 import {
   resolveTenantContext,
@@ -695,13 +696,14 @@ router.get('/schedules/:scheduleId/students', requireRole('faculty'), async (req
         sa.remarks,
         sa.marked_at,
         sa.face_verified,
-        CASE WHEN sfe.id IS NOT NULL THEN true ELSE false END as has_face_enrolled
+        (ft.id IS NOT NULL) AS has_face_enrolled
        FROM student_courses ss
-       JOIN students s ON ss.student_id = s.id
+       JOIN students s ON ss.student_id = s.id AND s.tenant_id = ss.tenant_id
        LEFT JOIN school_attendance sa
          ON sa.schedule_id = $1 AND sa.student_id = s.id AND sa.attendance_date = $2
-       LEFT JOIN student_face_embeddings sfe
-         ON sfe.student_id = s.id AND sfe.tenant_id = $3 AND sfe.is_verified = true
+            AND sa.tenant_id = ss.tenant_id
+       LEFT JOIN face_templates ft
+         ON ft.subject_type = 'student' AND ft.subject_id = s.id AND ft.tenant_id = $3
        WHERE ss.schedule_id = $1 AND ss.status = 'enrolled' AND ss.tenant_id = $3
        ORDER BY s.last_name, s.first_name`,
       [scheduleId, date, ctx.tenantId]
@@ -724,7 +726,7 @@ router.get('/schedules/:scheduleId/students', requireRole('faculty'), async (req
 /**
  * POST /faculty/attendance/mark
  * Mark/update attendance for students in a schedule on a given date.
- * Body: { schedule_id, date, entries: [{ student_id, status, remarks? }] }
+ * Body: { schedule_id, date, entries: [{ student_id, status, remarks?, face_match_id? }] }
  */
 router.post('/attendance/mark', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
@@ -766,18 +768,45 @@ router.post('/attendance/mark', requireRole('faculty'), async (req: TenantReques
       return res.status(400).json({ error: `Students not enrolled: ${notEnrolled.length} student(s)` })
     }
 
-    // Upsert attendance records
+    // Upsert attendance records, all or none. A face check is recorded only
+    // when the entry cites a match the server made for this student in this
+    // class (face_match_id); a face_verified flag in the body is not evidence
+    // and is ignored.
     let markedCount = 0
-    for (const entry of entries) {
-      const faceVerified = entry.face_verified === true
-      await query(
-        `INSERT INTO school_attendance (schedule_id, student_id, marked_by_id, attendance_date, status, remarks, face_verified, marked_at, tenant_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
-         ON CONFLICT (schedule_id, student_id, attendance_date)
-         DO UPDATE SET status = $5, remarks = $6, face_verified = $7, marked_by_id = $3, marked_at = NOW()`,
-        [schedule_id, entry.student_id, facultyId, date, entry.status.toLowerCase(), entry.remarks || null, faceVerified, ctx.tenantId]
-      )
-      markedCount++
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (const entry of entries) {
+        let matchId: string | null = null
+        if (entry.face_match_id) {
+          matchId = await assertUsableMatch(client, ctx as any, entry.face_match_id, {
+            action: 'identified',
+            subject: { type: 'student', id: entry.student_id },
+            scheduleId: schedule_id,
+          })
+        }
+        await client.query(
+          `INSERT INTO school_attendance (schedule_id, student_id, marked_by_id, attendance_date, status, remarks,
+                                          face_verified, face_match_event_id, verification_method, marked_at, tenant_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
+           ON CONFLICT (schedule_id, student_id, attendance_date)
+           DO UPDATE SET status = $5, remarks = $6, face_verified = $7, face_match_event_id = $8,
+                         verification_method = $9, marked_by_id = $3, marked_at = NOW()`,
+          [schedule_id, entry.student_id, facultyId, date, entry.status.toLowerCase(), entry.remarks || null,
+           matchId !== null, matchId, matchId ? 'FACE_MATCH' : 'MANUAL', ctx.tenantId]
+        )
+        markedCount++
+      }
+      await client.query('COMMIT')
+    } catch (e: any) {
+      await client.query('ROLLBACK').catch(() => {})
+      if (e instanceof BiometricError) return res.status(e.status).json({ error: e.message, code: e.code })
+      if (e.code === '23505') {
+        return res.status(409).json({ error: 'A face match can back only one attendance record', code: 'match_used' })
+      }
+      throw e
+    } finally {
+      client.release()
     }
 
     return res.json({ success: true, marked_count: markedCount })
@@ -825,193 +854,14 @@ router.get('/attendance/history', requireRole('faculty'), async (req: TenantRequ
 })
 
 // ===========================
-// FACE RECOGNITION
+// FACE RECOGNITION — moved
 // ===========================
-
-/**
- * GET /faculty/face-status?schedule_id=X
- * Returns which students in a schedule have enrolled face embeddings
- */
-router.get('/face-status', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
-  try {
-    const ctx = ctxOf(req)
-    const scheduleId = req.query.schedule_id as string
-    if (!scheduleId) return res.status(400).json({ error: 'schedule_id required' })
-
-    const facultyId = await resolveFacultyId(ctx)
-    if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
-
-    const owns = await verifyScheduleOwnership(scheduleId, facultyId, ctx)
-    if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
-
-    // Get enrolled students with face enrollment status
-    const result = await query(
-      `SELECT
-        s.id as student_id,
-        s.student_id as student_code,
-        s.first_name,
-        s.last_name,
-        CASE WHEN sfe.id IS NOT NULL THEN true ELSE false END as has_face
-       FROM student_courses ss
-       JOIN students s ON ss.student_id = s.id AND s.tenant_id = $2
-       LEFT JOIN student_face_embeddings sfe
-         ON sfe.student_id = s.id AND sfe.tenant_id = $2 AND sfe.is_verified = true
-       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled' AND ss.tenant_id = $2
-       ORDER BY s.last_name, s.first_name`,
-      [scheduleId, ctx.tenantId]
-    )
-
-    return res.json(result.rows)
-  } catch (error: any) {
-    console.error('[faculty/face-status] Error:', error)
-    return res.status(500).json({ error: 'Failed to fetch face status' })
-  }
-})
-
-/**
- * POST /faculty/face-enroll
- * Enroll a student's face embedding for future recognition
- * Body: { student_id, embedding (number[128]), liveness_score? }
- */
-router.post('/face-enroll', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
-  try {
-    const ctx = ctxOf(req)
-
-    const { student_id, embedding, liveness_score } = req.body
-    if (!student_id || !Array.isArray(embedding)) {
-      return res.status(400).json({ error: 'student_id and embedding[] required' })
-    }
-    if (embedding.length !== 128 || embedding.some((n: unknown) => typeof n !== 'number' || !Number.isFinite(n))) {
-      return res.status(400).json({ error: 'Embedding must be 128 finite numbers' })
-    }
-
-    const facultyId = await resolveFacultyId(ctx)
-    if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
-
-    // Enrolling a face writes biometric data against a person. The previous
-    // version checked only that the caller was faculty somewhere, then wrote
-    // against whatever student_id arrived — a cross-tenant write on the most
-    // sensitive table in the system.
-    if (!(await studentInTenant(student_id, ctx))) {
-      return res.status(404).json({ error: 'Student not found' })
-    }
-
-    const embeddingJson = JSON.stringify(embedding)
-    const crypto = await import('crypto')
-    const embeddingHash = crypto.createHash('sha256').update(embeddingJson).digest('hex')
-
-    // One current template per student, so this is a real upsert rather than
-    // the delete-and-reinsert that the old ON CONFLICT (student_id) fell back
-    // to on every single call.
-    await query(
-      `INSERT INTO student_face_embeddings
-         (student_id, embedding_url, embedding_hash, liveness_score, is_verified, captured_at, tenant_id)
-       VALUES ($1, $2, $3, $4, true, NOW(), $5)
-       ON CONFLICT (student_id)
-       DO UPDATE SET embedding_url = $2, embedding_hash = $3, liveness_score = $4,
-                     is_verified = true, captured_at = NOW()`,
-      [student_id, embeddingJson, embeddingHash, liveness_score ?? 0.9, ctx.tenantId]
-    )
-
-    return res.json({ success: true, message: 'Face enrolled successfully' })
-  } catch (error: any) {
-    console.error('[faculty/face-enroll] Error:', error)
-    return res.status(500).json({ error: 'Failed to enroll face' })
-  }
-})
-
-/**
- * POST /faculty/attendance/face-scan
- * Scan a captured face against all enrolled students in a schedule.
- * Returns the best matching student (if any).
- * Body: { schedule_id, embedding (number[128]) }
- */
-router.post('/attendance/face-scan', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
-  try {
-    const ctx = ctxOf(req)
-
-    const { schedule_id, embedding } = req.body
-    if (!schedule_id || !embedding || !Array.isArray(embedding)) {
-      return res.status(400).json({ error: 'schedule_id and embedding[] required' })
-    }
-
-    const facultyId = await resolveFacultyId(ctx)
-    if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
-
-    const owns = await verifyScheduleOwnership(schedule_id, facultyId, ctx)
-    if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
-
-    // Get all enrolled students with face embeddings for this schedule
-    const result = await query(
-      `SELECT s.id as student_id, s.student_id as student_code,
-              s.first_name, s.last_name,
-              sfe.embedding_url
-       FROM student_courses ss
-       JOIN students s ON ss.student_id = s.id AND s.tenant_id = $2
-       JOIN student_face_embeddings sfe
-         ON sfe.student_id = s.id AND sfe.tenant_id = $2 AND sfe.is_verified = true
-       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled' AND ss.tenant_id = $2`,
-      [schedule_id, ctx.tenantId]
-    )
-
-    if (result.rows.length === 0) {
-      return res.json({ matched: false, message: 'No students with enrolled faces in this schedule' })
-    }
-
-    // Compare against each enrolled face
-    let bestMatch: any = null
-    let bestConfidence = 0
-
-    for (const row of result.rows) {
-      try {
-        const storedEmbedding: number[] = JSON.parse(row.embedding_url)
-        if (!Array.isArray(storedEmbedding) || storedEmbedding.length !== 128) continue
-
-        // Compute Euclidean distance
-        let sum = 0
-        for (let i = 0; i < 128; i++) {
-          const diff = embedding[i] - storedEmbedding[i]
-          sum += diff * diff
-        }
-        const distance = Math.sqrt(sum)
-
-        // Convert to confidence (0-100)
-        const confidence = Math.max(0, Math.round(100 - (distance / 3) * 100))
-
-        if (confidence > bestConfidence) {
-          bestConfidence = confidence
-          bestMatch = {
-            student_id: row.student_id,
-            student_code: row.student_code,
-            first_name: row.first_name,
-            last_name: row.last_name,
-            confidence,
-            distance: Math.round(distance * 1000) / 1000,
-          }
-        }
-      } catch {
-        // Skip malformed embeddings
-      }
-    }
-
-    const MATCH_THRESHOLD = 60 // 60% confidence threshold
-
-    if (bestMatch && bestMatch.confidence >= MATCH_THRESHOLD) {
-      return res.json({
-        matched: true,
-        student: bestMatch,
-      })
-    }
-
-    return res.json({
-      matched: false,
-      message: 'No matching face found',
-      best_confidence: bestConfidence,
-    })
-  } catch (error: any) {
-    console.error('[faculty/attendance/face-scan] Error:', error)
-    return res.status(500).json({ error: 'Failed to scan face' })
-  }
-})
+//
+// Face enrolment and the in-class face scan now live at /api/biometrics.
+// The three routes that were here took a list of numbers from the browser
+// and treated it as a face; the browser computed it by averaging the colour
+// of 128 patches of the camera image, and any caller could send any numbers.
+// A lecturer now asks /api/biometrics/identify who is in front of the camera,
+// and cites the match it returns when saving attendance (face_match_id).
 
 export default router

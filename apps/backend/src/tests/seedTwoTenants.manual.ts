@@ -95,12 +95,21 @@ async function main() {
   await query(`ALTER TABLE attendance_corrections ENABLE TRIGGER USER`)
   await query(`DELETE FROM attendance_submissions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM school_attendance WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  // Face matching records. The event log is append-only and attendance cites
+  // it, so it goes after attendance and with its guard suspended for exactly
+  // these rows, the same exception the audit-log teardown makes.
+  await query(`DELETE FROM face_templates WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM biometric_consents WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`ALTER TABLE biometric_events DISABLE TRIGGER trg_biometric_events_append_only`)
+  try {
+    await query(`DELETE FROM biometric_events WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  } finally {
+    await query(`ALTER TABLE biometric_events ENABLE TRIGGER trg_biometric_events_append_only`)
+  }
+  await query(`DELETE FROM biometric_challenges WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   // Face templates and their verification attempts hang off students and
   // sessions; course_sessions.lecturer_id is RESTRICT, so sessions have to go
   // before the faculty rows they name.
-  await query(`DELETE FROM face_recognition_verifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
-  await query(`DELETE FROM face_recognition_enrollments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
-  await query(`DELETE FROM student_face_embeddings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM course_sessions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM tenant_settings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM student_courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)

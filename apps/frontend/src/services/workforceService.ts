@@ -268,7 +268,7 @@ export const workforceService = {
   },
 
   /** The time is the server's; nothing here sends one. */
-  async checkIn(input: { checkInType?: CheckInType; siteLocation?: string } = {}): Promise<CheckIn> {
+  async checkIn(input: { checkInType?: CheckInType; siteLocation?: string; faceMatchId?: string } = {}): Promise<CheckIn> {
     const { data } = await axiosClient.post('/workforce/my/check-in', input);
     return data.checkIn;
   },

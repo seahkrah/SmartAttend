@@ -55,6 +55,18 @@ async function main() {
   await query(`DELETE FROM leave_balances WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM leave_types WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM corporate_checkins WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  // Face matching records. The event log is append-only and attendance cites
+  // it, so it goes after attendance and with its guard suspended for exactly
+  // these rows, the same exception the audit-log teardown makes.
+  await query(`DELETE FROM face_templates WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`DELETE FROM biometric_consents WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  await query(`ALTER TABLE biometric_events DISABLE TRIGGER trg_biometric_events_append_only`)
+  try {
+    await query(`DELETE FROM biometric_events WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
+  } finally {
+    await query(`ALTER TABLE biometric_events ENABLE TRIGGER trg_biometric_events_append_only`)
+  }
+  await query(`DELETE FROM biometric_challenges WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM employees WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM corporate_departments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM corporate_user_associations WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@c2e.test')`)
@@ -66,6 +78,7 @@ async function main() {
   await query(`ALTER TABLE audit_access_log ENABLE TRIGGER USER`)
   await query(`DELETE FROM users WHERE email LIKE '%@c2e.test'`)
   await query(`DELETE FROM corporate_entities WHERE code LIKE 'C2E-%'`)
+  await query(`DELETE FROM tenant_settings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM tenants WHERE code LIKE 'C2E-%'`)
 
   const hash = await bcrypt.hash('Passw0rd!x', 10)
@@ -144,7 +157,9 @@ async function main() {
         await query(
           `INSERT INTO corporate_checkins (employee_id, check_in_type, check_in_time, face_verified, tenant_id)
            VALUES ($1,'office', NOW() - ($2 || ' days')::interval, $3, $4)`,
-          [emp.id, d, d % 2 === 0, ent.id])
+          // Never face-verified: a fixture has no match to cite, and the
+          // database refuses the flag without one (migration 056).
+          [emp.id, d, false, ent.id])
       }
     }
 
@@ -208,7 +223,7 @@ async function main() {
              (employee_id, check_in_type, check_in_time, check_out_time,
               face_verified, checkin_state, tenant_id)
            VALUES ($1,'office',($2 || ' ' || $3)::timestamp,($2 || ' ' || $4)::timestamp,
-                   true,$5,$6)`,
+                   false,$5,$6)`,
           [tsEmp, day(start + offset * 86400000), inAt, outAt, state, ent.id])
       }
       weeks.push({

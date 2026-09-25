@@ -1,21 +1,18 @@
 /**
- * Attendance API Routes (Face Recognition Enabled)
- * 
+ * Session attendance.
+ *
  * Endpoints:
  * - POST /sessions - Create a course session
  * - PUT /sessions/:id - Update session
  * - GET /sessions/:id - Get session details
  * - GET /courses/:courseId/sessions - Get all sessions for course
- * 
- * - POST /face/enroll - Enroll student face (faculty-initiated)
- * - POST /face/verify - Faculty verifies enrollment
- * - GET /face/enrollment-status/:studentId - Check enrollment status
- * 
- * - POST /attendance/mark-with-face - Mark attendance with face verification
+ *
+ * - POST /mark-with-face - Mark a student in a session. MANUAL marks present;
+ *   FACE_RECOGNITION needs faceMatchId, a match /api/biometrics/identify made
+ *   for this student moments earlier.
  * - GET /sessions/:sessionId/attendance - Get attendance for session
  * - GET /students/:studentId/courses/:courseId/attendance - Get student attendance for course
  */
-
 import { Router, Response } from 'express'
 import { query } from '../db/connection.js'
 import { authenticateToken, requireRole } from '../auth/middleware.js'
@@ -23,7 +20,6 @@ import {
   resolveTenantContext,
   requireTenant,
   requirePlatform,
-  requireRoles,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import {
@@ -37,11 +33,6 @@ import {
   AttendanceScopeError,
   type ServiceContext,
 } from '../services/attendanceService.js'
-import {
-  enrollStudentFace,
-  verifyEnrollment,
-  getEnrollmentStatus,
-} from '../services/faceRecognitionService.js'
 import { CreateSessionRequest, UpdateSessionRequest, MarkAttendanceWithFaceRequest } from '@jjelotech/types'
 
 const router = Router()
@@ -205,131 +196,12 @@ router.get('/courses/:courseId/sessions', async (req: TenantRequest, res: Respon
 })
 
 // ===========================
-// FACE ENROLLMENT ENDPOINTS
+// FACE ENROLMENT — moved to /api/biometrics
 // ===========================
-
-/**
- * POST /api/attendance/face/enroll
- * Enroll a student's face (Faculty-initiated)
- */
-router.post('/face/enroll', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
-  try {
-    const { studentId, faceEncoding, encodingDimension, faceConfidence, enrollmentQualityScore } = req.body
-
-    if (!studentId || !faceEncoding || !encodingDimension || faceConfidence === undefined) {
-      res.status(400).json({
-        error: 'Missing required fields: studentId, faceEncoding, encodingDimension, faceConfidence',
-      })
-      return
-    }
-
-    if (!Array.isArray(faceEncoding) || faceEncoding.length !== encodingDimension) {
-      res.status(400).json({
-        error: `Face encoding must be an array of length ${encodingDimension}`,
-      })
-      return
-    }
-
-    const enrollResult = await enrollStudentFace(
-      svc(req),
-      studentId,
-      faceEncoding,
-      encodingDimension,
-      faceConfidence,
-      req.ctx!.userId,
-      enrollmentQualityScore
-    )
-
-    if (!enrollResult.success) {
-      res.status(400).json(enrollResult)
-      return
-    }
-
-    res.status(201).json({
-      success: true,
-      data: {
-        enrollmentId: enrollResult.enrollmentId,
-        requiresVerification: enrollResult.requiresVerification,
-      },
-      message: enrollResult.message,
-    })
-  } catch (error: any) {
-    console.error('[attendanceRoutes] Enroll face error:', error)
-    res.status(500).json({
-      error: 'Failed to enroll face',
-      details: error.message,
-    })
-  }
-})
-
-/**
- * POST /api/attendance/face/verify
- * Confirm an enrolment's quality so it may be used to mark attendance.
- *
- * Open to faculty and to the school's administrators. The service refuses
- * self-verification, so the check is always a second pair of eyes; restricting
- * it to faculty alone left a school with one lecturer unable to approve any
- * enrolment at all.
- */
-router.post('/face/verify', requireRoles('faculty', 'admin'), async (req: TenantRequest, res: Response) => {
-  try {
-    const { enrollmentId } = req.body
-
-    if (!enrollmentId) {
-      res.status(400).json({ error: 'Missing required field: enrollmentId' })
-      return
-    }
-
-    const verifyResult = await verifyEnrollment(svc(req), enrollmentId, req.ctx!.userId)
-
-    if (!verifyResult.success) {
-      res.status(400).json(verifyResult)
-      return
-    }
-
-    res.json({
-      success: true,
-      message: verifyResult.message,
-    })
-  } catch (error: any) {
-    console.error('[attendanceRoutes] Verify enrollment error:', error)
-    res.status(500).json({
-      error: 'Failed to verify enrollment',
-      details: error.message,
-    })
-  }
-})
-
-/**
- * GET /api/attendance/face/enrollment-status/:studentId
- * Get student face enrollment status
- */
-router.get(
-  '/face/enrollment-status/:studentId',
-  async (req: TenantRequest, res: Response) => {
-    try {
-      const { studentId } = req.params
-
-      const status = await getEnrollmentStatus(svc(req), studentId)
-
-      if (!status) {
-        res.status(404).json({ error: 'Student not found' })
-        return
-      }
-
-      res.json({
-        success: true,
-        data: status,
-      })
-    } catch (error: any) {
-      console.error('[attendanceRoutes] Get enrollment status error:', error)
-      res.status(500).json({
-        error: 'Failed to get enrollment status',
-        details: error.message,
-      })
-    }
-  }
-)
+//
+// /face/enroll, /face/verify and /face/enrollment-status accepted a list of
+// numbers from the client as a "face encoding". They are replaced by
+// /api/biometrics, where the server derives the face from camera images.
 
 // ===========================
 // ATTENDANCE MARKING ENDPOINTS

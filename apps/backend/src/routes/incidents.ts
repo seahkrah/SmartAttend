@@ -12,8 +12,10 @@ import {
   contextOf,
   IncidentAccessError,
   type IncidentVisibility,
+  shiftVisibility,
 } from '../auth/incidentVisibility.js'
 import { withIncidentTracking } from '../middleware/errorToIncidentMiddleware.js'
+import { query } from '../db/connection.js'
 import {
   getIncident,
   getOpenIncidents,
@@ -98,6 +100,46 @@ function requireIncidentRole(req: ExtendedRequest, res: Response, next: NextFunc
   }
   next()
 }
+
+/**
+ * GET /api/incidents?status=active|resolved|all&limit=
+ * The caller's incidents, newest first. `/open` only ever answered the
+ * active ones, so a tenant could not look back at what had happened.
+ */
+const STATUS_SETS: Record<string, string[]> = {
+  active: ['OPEN', 'INVESTIGATING', 'CONTAINED'],
+  resolved: ['RESOLVED', 'CLOSED'],
+  all: ['OPEN', 'INVESTIGATING', 'CONTAINED', 'RESOLVED', 'CLOSED'],
+}
+router.get(
+  '/',
+  withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
+    const view = visibility(req)
+    if (!view.any) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions to view incidents' })
+      return
+    }
+    const statuses = STATUS_SETS[String(req.query.status ?? 'active')]
+    if (!statuses) {
+      res.status(400).json({ success: false, error: 'status must be active, resolved or all' })
+      return
+    }
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '100'), 10) || 100, 1), 500)
+    const v = shiftVisibility(view, 3)
+    const rows = await query(
+      `SELECT id, incident_number, title, description, severity, status, category, created_at,
+              acknowledged_at, contained_at, resolved_at, root_cause, affected_users
+         FROM incidents
+        WHERE status = ANY($1::text[]) AND (${v.sql})
+        ORDER BY CASE WHEN status IN ('RESOLVED', 'CLOSED') THEN 1 ELSE 0 END,
+                 CASE severity WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END DESC,
+                 created_at DESC
+        LIMIT $2`,
+      [statuses, limit, ...v.params]
+    )
+    res.json({ success: true, data: { incidents: rows.rows, count: rows.rows.length } })
+  })
+)
 
 /**
  * GET /api/incidents/critical

@@ -1,19 +1,29 @@
 /**
- * PHASE 5, STEP 5.2: Incident Lifecycle Management Service
- * Enforces incident state transitions and operational requirements
+ * Incident lifecycle: the transitions an incident may make, and the record
+ * each one leaves.
+ *
+ * This used to work in a vocabulary of its own: lower-case statuses, and
+ * 'acknowledged', 'escalated' and 'mitigating', none of which the incidents
+ * table allows. Its status check admits only OPEN, INVESTIGATING, CONTAINED,
+ * RESOLVED and CLOSED. Every precondition compared lower case with the
+ * stored upper case and refused, and every status it wrote would have failed
+ * the constraint, so no incident could be acknowledged, escalated,
+ * investigated, mitigated, resolved or closed through this service.
+ *
+ * Now:
+ *   OPEN ──investigate / root cause──▶ INVESTIGATING ──mitigate──▶ CONTAINED
+ *     └────────────── resolve (from any of the three) ──────────▶ RESOLVED ──close──▶ CLOSED
+ *
+ * Acknowledging and escalating are facts about an incident, not states: an
+ * acknowledgement stamps acknowledged_at/by once, and an escalation is a
+ * record of its own. Each transition is a single UPDATE guarded by the
+ * status it expects, so two people acting at once cannot both succeed.
  */
 
-import { query } from '../db/connection.js'
+import { getConnection, query } from '../db/connection.js'
 import { createTimelineEvent } from './incidentService.js'
 
-export type IncidentStatus =
-  | 'open'
-  | 'acknowledged'
-  | 'investigating'
-  | 'escalated'
-  | 'mitigating'
-  | 'resolved'
-  | 'closed'
+export type IncidentStatus = 'OPEN' | 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED' | 'CLOSED'
 
 export type EscalationLevel = 'level_1' | 'level_2' | 'level_3' | 'executive'
 
@@ -44,454 +54,204 @@ export interface ResolutionSummary {
   postMortemUrl?: string
 }
 
+const ACTIVE: IncidentStatus[] = ['OPEN', 'INVESTIGATING', 'CONTAINED']
+
+/** Why a transition was refused. The message is shown to whoever asked. */
+export class IncidentTransitionError extends Error {}
+
+async function currentStatus(incidentId: string): Promise<{ status: IncidentStatus; severity: string } | null> {
+  const r = await query('SELECT status, severity FROM incidents WHERE id = $1', [incidentId])
+  return r.rows[0] ?? null
+}
+
 /**
- * Acknowledge an incident
- * Transitions: open -> acknowledged, investigating -> acknowledged
+ * Moves an incident from one of `from` to `to` in one guarded statement.
+ * Returns the status it moved from; throws if it was in none of `from`.
  */
+async function transition(
+  incidentId: string,
+  from: IncidentStatus[],
+  to: IncidentStatus,
+  extraSet = '',
+  extraParams: any[] = []
+): Promise<IncidentStatus> {
+  const before = await currentStatus(incidentId)
+  if (!before) throw new IncidentTransitionError('Incident not found')
+  const r = await query(
+    `UPDATE incidents SET status = $2${extraSet ? ', ' + extraSet : ''}
+      WHERE id = $1 AND status = ANY($3::text[])
+      RETURNING id`,
+    [incidentId, to, from, ...extraParams]
+  )
+  if (r.rows.length === 0) {
+    const now = await currentStatus(incidentId)
+    throw new IncidentTransitionError(
+      `This incident is ${String(now?.status ?? before.status).toLowerCase()}; `
+      + `only ${from.map((f) => f.toLowerCase()).join(' or ')} incidents can become ${to.toLowerCase()}`
+    )
+  }
+  return before.status
+}
+
+function required(value: unknown, name: string, min = 1): string {
+  const v = typeof value === 'string' ? value.trim() : ''
+  if (v.length < min) {
+    throw new IncidentTransitionError(min > 1 ? `${name} must be at least ${min} characters` : `${name} is required`)
+  }
+  return v
+}
+
+/** Records that someone has seen the incident and is on it. Once only. */
 export async function acknowledgeIncident(
   incidentId: string,
   acknowledgement: IncidentAcknowledgement
 ): Promise<void> {
+  const note = acknowledgement.acknowledgementNote?.trim() || null
+  const r = await query(
+    `UPDATE incidents
+        SET acknowledged_at = CURRENT_TIMESTAMP, acknowledged_by_user_id = $2
+      WHERE id = $1 AND acknowledged_at IS NULL AND status = ANY($3::text[])
+      RETURNING status`,
+    [incidentId, acknowledgement.acknowledgedByUserId, ACTIVE]
+  )
+  if (r.rows.length === 0) {
+    const now = await currentStatus(incidentId)
+    if (!now) throw new IncidentTransitionError('Incident not found')
+    throw new IncidentTransitionError(
+      ACTIVE.includes(now.status) ? 'This incident has already been acknowledged' : `A ${now.status.toLowerCase()} incident cannot be acknowledged`
+    )
+  }
+  await query(
+    `INSERT INTO incident_acknowledgements (incident_id, acknowledged_by_user_id, acknowledgement_note)
+     VALUES ($1, $2, $3)`,
+    [incidentId, acknowledgement.acknowledgedByUserId, note]
+  )
+  await createTimelineEvent(incidentId, 'acknowledged', null, r.rows[0].status,
+    `Acknowledged${note ? ': ' + note : ''}`, acknowledgement.acknowledgedByUserId)
+}
+
+const SEVERITY_RANK: Record<string, number> = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 }
+const ESCALATION_RANK: Record<EscalationLevel, number> = { level_1: 1, level_2: 2, level_3: 3, executive: 4 }
+
+/** Records an escalation. The incident's status does not change. */
+export async function escalateIncident(incidentId: string, escalation: IncidentEscalation): Promise<void> {
+  const incident = await currentStatus(incidentId)
+  if (!incident) throw new IncidentTransitionError('Incident not found')
+  if (!ACTIVE.includes(incident.status)) {
+    throw new IncidentTransitionError(`A ${incident.status.toLowerCase()} incident cannot be escalated`)
+  }
+  if (!(escalation.escalationLevel in ESCALATION_RANK)) {
+    throw new IncidentTransitionError(`escalationLevel must be one of ${Object.keys(ESCALATION_RANK).join(', ')}`)
+  }
+  const reason = required(escalation.escalationReason, 'escalationReason')
+  if (ESCALATION_RANK[escalation.escalationLevel] < (SEVERITY_RANK[incident.severity] ?? 1)) {
+    throw new IncidentTransitionError(
+      `A ${incident.severity.toLowerCase()} incident needs escalation level ${Object.keys(ESCALATION_RANK)[(SEVERITY_RANK[incident.severity] ?? 1) - 1]} or higher`
+    )
+  }
+  await query(
+    `INSERT INTO incident_escalations (incident_id, escalation_level, reason, escalated_by_user_id, escalation_note)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [incidentId, escalation.escalationLevel, reason, escalation.escalatedByUserId, escalation.escalationNote || null]
+  )
+  await createTimelineEvent(incidentId, 'escalated', null, escalation.escalationLevel,
+    `Escalated to ${escalation.escalationLevel}: ${reason}`, escalation.escalatedByUserId)
+}
+
+/** Records a root-cause finding; an open incident moves to investigating. */
+export async function assignRootCause(incidentId: string, rootCause: RootCauseAssignment): Promise<void> {
+  const cause = required(rootCause.rootCause, 'Root cause', 10)
+  if (!['low', 'medium', 'high'].includes(rootCause.confidence)) {
+    throw new IncidentTransitionError('confidence must be low, medium or high')
+  }
+  const incident = await currentStatus(incidentId)
+  if (!incident) throw new IncidentTransitionError('Incident not found')
+  if (!ACTIVE.includes(incident.status)) {
+    throw new IncidentTransitionError(`A ${incident.status.toLowerCase()} incident's root cause is recorded in its resolution`)
+  }
+  const r = await query(
+    `UPDATE incidents SET root_cause = $2,
+            status = CASE WHEN status = 'OPEN' THEN 'INVESTIGATING' ELSE status END
+      WHERE id = $1 AND status = ANY($3::text[]) RETURNING status`,
+    [incidentId, cause, ACTIVE]
+  )
+  if (r.rows.length === 0) throw new IncidentTransitionError('The incident changed while this was being saved; try again')
+  await query(
+    `INSERT INTO incident_root_cause_analyses (incident_id, root_cause, assigned_by_user_id, confidence_level, analysis_notes)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [incidentId, cause, rootCause.assignedByUserId, rootCause.confidence, rootCause.analysisNotes || null]
+  )
+  await createTimelineEvent(incidentId, 'root_cause_assigned', incident.status, r.rows[0].status,
+    `Root cause (${rootCause.confidence} confidence): ${cause}`, rootCause.assignedByUserId)
+}
+
+/** OPEN → INVESTIGATING. */
+export async function startInvestigation(incidentId: string, userId: string, investigationNote?: string): Promise<void> {
+  const from = await transition(incidentId, ['OPEN'], 'INVESTIGATING')
+  await createTimelineEvent(incidentId, 'investigation_started', from, 'INVESTIGATING',
+    `Investigation started${investigationNote?.trim() ? ': ' + investigationNote.trim() : ''}`, userId)
+}
+
+/** INVESTIGATING → CONTAINED: the harm has stopped, the cause may not be fixed yet. */
+export async function beginMitigation(incidentId: string, userId: string, mitigationPlan?: string): Promise<void> {
+  const from = await transition(incidentId, ['INVESTIGATING'], 'CONTAINED', 'contained_at = CURRENT_TIMESTAMP')
+  await createTimelineEvent(incidentId, 'contained', from, 'CONTAINED',
+    `Contained${mitigationPlan?.trim() ? ': ' + mitigationPlan.trim() : ''}`, userId)
+}
+
+/** Any active status → RESOLVED, with the account of what happened and what changes. */
+export async function resolveIncident(incidentId: string, resolution: ResolutionSummary, userId: string): Promise<void> {
+  const rootCause = required(resolution.rootCause, 'rootCause')
+  const remediation = required(resolution.remediationSteps, 'remediationSteps')
+  const prevention = required(resolution.preventionMeasures, 'preventionMeasures')
+  const postMortem = resolution.postMortemUrl?.trim() || null
+  if (postMortem && !/^https?:\/\//i.test(postMortem)) {
+    throw new IncidentTransitionError('postMortemUrl must be an http(s) address')
+  }
+
+  const client = await getConnection()
   try {
-    // Get current incident
-    const result = await query('SELECT status, platform_id FROM incidents WHERE id = $1', [
-      incidentId,
-    ])
-
-    if (result.rows.length === 0) {
-      throw new Error(`Incident ${incidentId} not found`)
+    await client.query('BEGIN')
+    const before = await client.query('SELECT status FROM incidents WHERE id = $1 FOR UPDATE', [incidentId])
+    if (before.rows.length === 0) throw new IncidentTransitionError('Incident not found')
+    if (!ACTIVE.includes(before.rows[0].status)) {
+      throw new IncidentTransitionError(`This incident is already ${String(before.rows[0].status).toLowerCase()}`)
     }
-
-    const incident = result.rows[0]
-
-    // Validate state transition
-    if (!['open', 'investigating'].includes(incident.status)) {
-      throw new Error(
-        `Cannot acknowledge incident with status '${incident.status}'. Only 'open' or 'investigating' incidents can be acknowledged.`
-      )
-    }
-
-    // Update incident
-    await query(
-      `UPDATE incidents 
-       SET status = 'acknowledged', 
-           acknowledged_by_user_id = $1, 
-           acknowledged_at = CURRENT_TIMESTAMP 
-       WHERE id = $2`,
-      [acknowledgement.acknowledgedByUserId, incidentId]
+    await client.query(
+      `UPDATE incidents
+          SET status = 'RESOLVED', root_cause = $2, remediation_steps = $3, prevention_measures = $4,
+              post_mortem_url = COALESCE($5, post_mortem_url), resolved_by_user_id = $6,
+              resolved_at = CURRENT_TIMESTAMP
+        WHERE id = $1`,
+      [incidentId, rootCause, remediation, prevention, postMortem, userId]
     )
-
-    // Create timeline event
-    await createTimelineEvent(
-      incidentId,
-      'acknowledged',
-      incident.status,
-      'acknowledged',
-      `Incident acknowledged${acknowledgement.acknowledgementNote ? ': ' + acknowledgement.acknowledgementNote : ''}`,
-      acknowledgement.acknowledgedByUserId
+    await client.query(
+      `INSERT INTO incident_resolution_summaries
+         (incident_id, root_cause, remediation_steps, prevention_measures, post_mortem_url, estimated_impact, resolved_by_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [incidentId, rootCause, remediation, prevention, postMortem, resolution.estimatedImpact?.trim() || null, userId]
     )
-
-    console.log(`[LIFECYCLE] Incident ${incidentId} acknowledged by ${acknowledgement.acknowledgedByUserId}`)
-  } catch (error) {
-    console.error('Error acknowledging incident:', error)
-    throw error
+    await client.query('COMMIT')
+    await createTimelineEvent(incidentId, 'resolved', before.rows[0].status, 'RESOLVED',
+      `Resolved. Root cause: ${rootCause}`, userId)
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    throw e
+  } finally {
+    client.release()
   }
 }
 
-/**
- * Escalate an incident
- * Creates escalation record and updates status to 'escalated'
- */
-export async function escalateIncident(
-  incidentId: string,
-  escalation: IncidentEscalation
-): Promise<void> {
-  try {
-    // Get current incident
-    const incidentResult = await query(
-      'SELECT status, severity, platform_id FROM incidents WHERE id = $1',
-      [incidentId]
-    )
-
-    if (incidentResult.rows.length === 0) {
-      throw new Error(`Incident ${incidentId} not found`)
-    }
-
-    const incident = incidentResult.rows[0]
-
-    // Validate current status can be escalated
-    const escalatableStatuses = ['open', 'acknowledged', 'investigating', 'mitigating']
-    if (!escalatableStatuses.includes(incident.status)) {
-      throw new Error(
-        `Cannot escalate incident with status '${incident.status}'. Only ${escalatableStatuses.join(', ')} incidents can be escalated.`
-      )
-    }
-
-    // Validate escalation level vs severity
-    const severityLevels: Record<string, number> = {
-      critical: 4,
-      high: 3,
-      medium: 2,
-      low: 1,
-    }
-    const escalationLevels: Record<EscalationLevel, number> = {
-      level_1: 1,
-      level_2: 2,
-      level_3: 3,
-      executive: 4,
-    }
-
-    if (escalationLevels[escalation.escalationLevel] < severityLevels[incident.severity]) {
-      throw new Error(
-        `Escalation level '${escalation.escalationLevel}' is insufficient for '${incident.severity}' severity incident`
-      )
-    }
-
-    // Create escalation record
-    const escalationResult = await query(
-      `INSERT INTO incident_escalations 
-        (incident_id, escalation_level, reason, escalated_by_user_id, escalation_note) 
-       VALUES ($1, $2, $3, $4, $5) 
-       RETURNING id`,
-      [
-        incidentId,
-        escalation.escalationLevel,
-        escalation.escalationReason,
-        escalation.escalatedByUserId,
-        escalation.escalationNote || null,
-      ]
-    )
-
-    // Update incident status to escalated
-    await query('UPDATE incidents SET status = $1 WHERE id = $2', ['escalated', incidentId])
-
-    // Create timeline event
-    await createTimelineEvent(
-      incidentId,
-      'escalated',
-      incident.status,
-      'escalated',
-      `Escalated to ${escalation.escalationLevel}: ${escalation.escalationReason}`,
-      escalation.escalatedByUserId
-    )
-
-    console.log(
-      `[LIFECYCLE] Incident ${incidentId} escalated to ${escalation.escalationLevel} by ${escalation.escalatedByUserId}`
-    )
-  } catch (error) {
-    console.error('Error escalating incident:', error)
-    throw error
-  }
-}
-
-/**
- * Assign root cause to incident
- * Transitions: acknowledged/investigating -> investigating
- */
-export async function assignRootCause(
-  incidentId: string,
-  rootCause: RootCauseAssignment
-): Promise<void> {
-  try {
-    // Get current incident
-    const result = await query('SELECT status, root_cause FROM incidents WHERE id = $1', [
-      incidentId,
-    ])
-
-    if (result.rows.length === 0) {
-      throw new Error(`Incident ${incidentId} not found`)
-    }
-
-    const incident = result.rows[0]
-
-    // Validate state transition
-    const validStatuses = ['open', 'acknowledged', 'investigating', 'escalated']
-    if (!validStatuses.includes(incident.status)) {
-      throw new Error(
-        `Cannot assign root cause to incident with status '${incident.status}'. Only ${validStatuses.join(', ')} incidents can have root causes assigned.`
-      )
-    }
-
-    // Validate root cause length
-    if (!rootCause.rootCause || rootCause.rootCause.trim().length < 10) {
-      throw new Error('Root cause must be at least 10 characters long')
-    }
-
-    // Update incident with root cause
-    const newStatus = incident.status === 'open' ? 'investigating' : incident.status
-    await query(
-      `UPDATE incidents 
-       SET root_cause = $1, 
-           status = $2 
-       WHERE id = $3`,
-      [rootCause.rootCause, newStatus, incidentId]
-    )
-
-    // Create root cause analysis record
-    await query(
-      `INSERT INTO incident_root_cause_analyses 
-        (incident_id, root_cause, assigned_by_user_id, confidence_level, analysis_notes) 
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        incidentId,
-        rootCause.rootCause,
-        rootCause.assignedByUserId,
-        rootCause.confidence,
-        rootCause.analysisNotes || null,
-      ]
-    )
-
-    // Create timeline event
-    await createTimelineEvent(
-      incidentId,
-      'root_cause_assigned',
-      incident.root_cause || null,
-      rootCause.rootCause,
-      `Root cause assigned (${rootCause.confidence} confidence): ${rootCause.rootCause}`,
-      rootCause.assignedByUserId
-    )
-
-    console.log(`[LIFECYCLE] Root cause assigned to incident ${incidentId}`)
-  } catch (error) {
-    console.error('Error assigning root cause:', error)
-    throw error
-  }
-}
-
-/**
- * Start investigation of incident
- * Transitions: acknowledged -> investigating
- */
-export async function startInvestigation(
-  incidentId: string,
-  userId: string,
-  investigationNote?: string
-): Promise<void> {
-  try {
-    // Get current incident
-    const result = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
-
-    if (result.rows.length === 0) {
-      throw new Error(`Incident ${incidentId} not found`)
-    }
-
-    const incident = result.rows[0]
-
-    // Validate state transition
-    const validStatuses = ['open', 'acknowledged', 'escalated']
-    if (!validStatuses.includes(incident.status)) {
-      throw new Error(
-        `Cannot start investigation on incident with status '${incident.status}'. Only ${validStatuses.join(', ')} incidents can be investigated.`
-      )
-    }
-
-    // Update incident
-    await query('UPDATE incidents SET status = $1 WHERE id = $2', ['investigating', incidentId])
-
-    // Create timeline event
-    await createTimelineEvent(
-      incidentId,
-      'investigation_started',
-      incident.status,
-      'investigating',
-      `Investigation started${investigationNote ? ': ' + investigationNote : ''}`,
-      userId
-    )
-
-    console.log(`[LIFECYCLE] Investigation started for incident ${incidentId}`)
-  } catch (error) {
-    console.error('Error starting investigation:', error)
-    throw error
-  }
-}
-
-/**
- * Begin mitigation of incident
- * Transitions: investigating -> mitigating
- */
-export async function beginMitigation(
-  incidentId: string,
-  userId: string,
-  mitigationPlan?: string
-): Promise<void> {
-  try {
-    // Get current incident
-    const result = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
-
-    if (result.rows.length === 0) {
-      throw new Error(`Incident ${incidentId} not found`)
-    }
-
-    const incident = result.rows[0]
-
-    // Validate state transition
-    if (incident.status !== 'investigating') {
-      throw new Error(
-        `Cannot begin mitigation on incident with status '${incident.status}'. Only 'investigating' incidents can be mitigated.`
-      )
-    }
-
-    // Update incident
-    await query('UPDATE incidents SET status = $1 WHERE id = $2', ['mitigating', incidentId])
-
-    // Create timeline event
-    await createTimelineEvent(
-      incidentId,
-      'mitigation_started',
-      incident.status,
-      'mitigating',
-      `Mitigation started${mitigationPlan ? ': ' + mitigationPlan : ''}`,
-      userId
-    )
-
-    console.log(`[LIFECYCLE] Mitigation started for incident ${incidentId}`)
-  } catch (error) {
-    console.error('Error beginning mitigation:', error)
-    throw error
-  }
-}
-
-/**
- * Resolve an incident
- * Requires: root cause, remediation steps, prevention measures
- * Transitions: * -> resolved
- */
-export async function resolveIncident(
-  incidentId: string,
-  resolution: ResolutionSummary,
-  userId: string
-): Promise<void> {
-  try {
-    // Get current incident
-    const result = await query(
-      'SELECT status, root_cause, remediation_steps, prevention_measures FROM incidents WHERE id = $1',
-      [incidentId]
-    )
-
-    if (result.rows.length === 0) {
-      throw new Error(`Incident ${incidentId} not found`)
-    }
-
-    const incident = result.rows[0]
-
-    // Validate all required resolution fields are provided
-    const missingFields: string[] = []
-    if (!resolution.rootCause || resolution.rootCause.trim().length === 0) {
-      missingFields.push('rootCause')
-    }
-    if (!resolution.remediationSteps || resolution.remediationSteps.trim().length === 0) {
-      missingFields.push('remediationSteps')
-    }
-    if (!resolution.preventionMeasures || resolution.preventionMeasures.trim().length === 0) {
-      missingFields.push('preventionMeasures')
-    }
-
-    if (missingFields.length > 0) {
-      throw new Error(
-        `Cannot resolve incident without required fields: ${missingFields.join(', ')}. All fields must be non-empty.`
-      )
-    }
-
-    // Update incident with resolution details
-    await query(
-      `UPDATE incidents 
-       SET status = $1, 
-           root_cause = $2, 
-           remediation_steps = $3, 
-           prevention_measures = $4, 
-           resolved_by_user_id = $5, 
-           resolved_at = CURRENT_TIMESTAMP 
-       WHERE id = $6`,
-      [
-        'resolved',
-        resolution.rootCause,
-        resolution.remediationSteps,
-        resolution.preventionMeasures,
-        userId,
-        incidentId,
-      ]
-    )
-
-    // If post mortem URL provided, update it
-    if (resolution.postMortemUrl) {
-      await query('UPDATE incidents SET post_mortem_url = $1 WHERE id = $2', [
-        resolution.postMortemUrl,
-        incidentId,
-      ])
-    }
-
-    // Create timeline event
-    await createTimelineEvent(
-      incidentId,
-      'resolved',
-      incident.status,
-      'resolved',
-      `Incident resolved with comprehensive summary provided${resolution.postMortemUrl ? ' and post-mortem URL' : ''}`,
-      userId
-    )
-
-    console.log(`[LIFECYCLE] Incident ${incidentId} resolved by ${userId}`)
-  } catch (error) {
-    console.error('Error resolving incident:', error)
-    throw error
-  }
-}
-
-/**
- * Close a resolved incident
- * Can only close 'resolved' incidents
- * Transitions: resolved -> closed
- */
-export async function closeIncident(
-  incidentId: string,
-  userId: string,
-  closureNote?: string
-): Promise<void> {
-  try {
-    // Get current incident
-    const result = await query(
-      'SELECT status, resolved_at, root_cause, remediation_steps, prevention_measures FROM incidents WHERE id = $1',
-      [incidentId]
-    )
-
-    if (result.rows.length === 0) {
-      throw new Error(`Incident ${incidentId} not found`)
-    }
-
-    const incident = result.rows[0]
-
-    // Validate state transition - can only close resolved incidents
-    if (incident.status !== 'resolved') {
-      throw new Error(
-        `Cannot close incident with status '${incident.status}'. Only 'resolved' incidents can be closed.`
-      )
-    }
-
-    // Verify all required resolution fields exist
-    if (!incident.root_cause || !incident.remediation_steps || !incident.prevention_measures) {
-      throw new Error(
-        'Cannot close incident without complete resolution summary (root cause, remediation steps, prevention measures)'
-      )
-    }
-
-    // Update incident to closed
-    await query('UPDATE incidents SET status = $1 WHERE id = $2', ['closed', incidentId])
-
-    // Create timeline event
-    await createTimelineEvent(
-      incidentId,
-      'closed',
-      incident.status,
-      'closed',
-      `Incident closed${closureNote ? ': ' + closureNote : ''}`,
-      userId
-    )
-
-    console.log(`[LIFECYCLE] Incident ${incidentId} closed by ${userId}`)
-  } catch (error) {
-    console.error('Error closing incident:', error)
-    throw error
-  }
+/** RESOLVED → CLOSED: nothing further is expected. */
+export async function closeIncident(incidentId: string, userId: string, closureNote?: string): Promise<void> {
+  const from = await transition(incidentId, ['RESOLVED'], 'CLOSED')
+  await query(
+    `UPDATE incident_resolution_summaries SET closed_at = CURRENT_TIMESTAMP, closed_by_user_id = $2
+      WHERE id = (SELECT id FROM incident_resolution_summaries WHERE incident_id = $1 ORDER BY resolved_at DESC LIMIT 1)`,
+    [incidentId, userId]
+  )
+  await createTimelineEvent(incidentId, 'closed', from, 'CLOSED',
+    `Closed${closureNote?.trim() ? ': ' + closureNote.trim() : ''}`, userId)
 }
 
 /**

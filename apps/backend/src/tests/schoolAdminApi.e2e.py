@@ -223,6 +223,45 @@ co, r = call("GET", "/admin/school/users", BT)
 b_emails = {u['email'] for u in r.get('users', [])} if co == 200 else set()
 check("user lists do not overlap", not (a_emails & b_emails), f"({a_emails & b_emails})")
 
+print("-- departments --")
+# There was no way to list, correct or remove a department; they appeared
+# only as a side effect of typing a new name on a student form.
+co, r = call("GET", "/admin/school/departments", AT)
+check("departments list 200", co == 200 and isinstance(r.get('departments'), list), f"({co} {r})")
+a_depts = r.get('departments', []) if co == 200 else []
+seeded = next((d for d in a_depts if d['id'] == A['deptId']), None)
+check("with what is in each", seeded is not None and seeded['students'] >= 1, f"({seeded})")
+co, r = call("GET", "/admin/school/departments", BT)
+check("school B does not see A's departments", co == 200 and all(d['id'] != A['deptId'] for d in r.get('departments', [])), f"({co})")
+co, r = call("POST", "/admin/school/departments", AT, {"name": f"Geography {RUN}", "code": f"GEO{RUN[-3:]}"})
+check("a department is created", co == 201, f"({co} {r})")
+geo = r.get('department', {}).get('id') if co == 201 else None
+co, r = call("POST", "/admin/school/departments", AT, {"name": f"geography {RUN}"})
+check("names are unique within a school, whatever the case", co == 409, f"({co} {r})")
+co, r = call("POST", "/admin/school/departments", BT, {"name": f"Geography {RUN}", "code": f"GEO{RUN[-3:]}"})
+check("but another school may use the same name and code", co == 201, f"({co} {r})")
+geo_b = r.get('department', {}).get('id') if co == 201 else None
+co, r = call("PUT", f"/admin/school/departments/{geo}", BT, {"name": "Taken over"})
+check("another school cannot rename it", co == 404, f"({co} {r})")
+co, r = call("DELETE", f"/admin/school/departments/{geo}", BT)
+check("or remove it", co == 404, f"({co} {r})")
+co, r = call("GET", "/admin/school/faculty", BT)
+b_lecturer = r['faculty'][0]['user_id'] if co == 200 and r.get('faculty') else None
+co, r = call("PUT", f"/admin/school/departments/{geo}", AT, {"headUserId": b_lecturer})
+check("the head cannot be another school's lecturer", co == 404, f"({co} {r})")
+co, r = call("GET", "/admin/school/faculty", AT)
+a_lecturer = r['faculty'][0]['user_id'] if co == 200 and r.get('faculty') else None
+co, r = call("PUT", f"/admin/school/departments/{geo}", AT, {"headUserId": a_lecturer, "description": "Maps and people"})
+check("but can be one of its own", co == 200 and r['department']['head_id'] == a_lecturer, f"({co} {r})")
+co, r = call("DELETE", f"/admin/school/departments/{A['deptId']}", AT)
+check("a department with students in it is not removed", co == 409 and r.get('inUse', {}).get('students', 0) >= 1, f"({co} {r})")
+co, r = call("DELETE", f"/admin/school/departments/{geo}", AT)
+check("an empty one is", co == 200, f"({co} {r})")
+if geo_b:
+    call("DELETE", f"/admin/school/departments/{geo_b}", BT)
+co, r = call("GET", "/admin/school/departments", A['facToken'])
+check("a lecturer cannot manage departments", co == 403, f"({co})")
+
 print("-- removing someone from the school --")
 # The page's delete button called a route that did not exist.
 co, r = call("GET", "/me", AT, base="/auth")

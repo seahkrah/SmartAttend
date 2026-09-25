@@ -152,14 +152,16 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
           business_impact,
           affected_tenant_id
         ) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, 1, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $11, $12, $13, $14) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'OPEN', $7, 1, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $11, $12, $13, $14) 
        RETURNING id`,
       [
         input.platformId,
         incidentType,
         title,
         input.errorMessage,
-        errorClassification.severity,
+        // The table's vocabulary is upper case; the classifier's is not, so
+        // every automatic incident failed the severity check and was lost.
+        String(errorClassification.severity).toUpperCase(),
         errorClassification.category,
         fingerprintId,
         input.detectedByUserId || null,
@@ -178,7 +180,7 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
     await logError(incidentId, input, errorClassification, fingerprintId)
 
     // Create timeline event
-    await createTimelineEvent(incidentId, 'created', null, 'open', 'Incident automatically created from error')
+    await createTimelineEvent(incidentId, 'created', null, 'OPEN', 'Incident automatically created from error')
 
     console.log(`[INCIDENT] Created incident ${incidentId} for error:`, input.errorMessage)
 
@@ -294,11 +296,11 @@ export async function updateIncident(
 
     if (input.status !== undefined) {
       updates.push(`status = $${paramIndex++}`)
-      values.push(input.status)
+      values.push(String(input.status).toUpperCase())
     }
     if (input.severity !== undefined) {
       updates.push(`severity = $${paramIndex++}`)
-      values.push(input.severity)
+      values.push(String(input.severity).toUpperCase())
     }
     if (input.acknowledgedByUserId !== undefined) {
       updates.push(`acknowledged_by_user_id = $${paramIndex++}`)
@@ -377,8 +379,9 @@ export async function getOpenIncidents(visibility: IncidentVisibility): Promise<
     if (!visibility.any) return []
     const result = await query(
       `SELECT * FROM incidents 
-       WHERE (${visibility.sql}) AND status IN ('open', 'investigating', 'escalated') 
-       ORDER BY severity DESC, created_at DESC`,
+       WHERE (${visibility.sql}) AND status IN ('OPEN', 'INVESTIGATING', 'CONTAINED')
+       ORDER BY CASE severity WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END DESC,
+                created_at DESC`,
       visibility.params
     )
     return result.rows
@@ -396,7 +399,7 @@ export async function getCriticalIncidents(visibility: IncidentVisibility): Prom
     if (!visibility.any) return []
     const result = await query(
       `SELECT * FROM incidents 
-       WHERE (${visibility.sql}) AND status IN ('open', 'investigating') AND severity = 'critical'
+       WHERE (${visibility.sql}) AND status IN ('OPEN', 'INVESTIGATING', 'CONTAINED') AND severity = 'CRITICAL'
        ORDER BY created_at DESC`,
       visibility.params
     )
@@ -414,19 +417,19 @@ export async function getIncidentStatistics(visibility: IncidentVisibility): Pro
   try {
     if (!visibility.any) {
       return {
-        total_incidents: '0', critical_count: '0', high_count: '0', medium_count: '0',
-        open_count: '0', resolved_count: '0', avg_resolution_time_minutes: null,
+        total_incidents: 0, critical_count: 0, high_count: 0, medium_count: 0,
+        open_count: 0, resolved_count: 0, avg_resolution_time_minutes: null,
       }
     }
     const result = await query(
       `SELECT 
-         COUNT(*) as total_incidents,
-         SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical_count,
-         SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) as high_count,
-         SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) as medium_count,
-         SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_count,
-         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count,
-         AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60) as avg_resolution_time_minutes
+         COUNT(*)::int as total_incidents,
+         COUNT(*) FILTER (WHERE severity = 'CRITICAL')::int as critical_count,
+         COUNT(*) FILTER (WHERE severity = 'HIGH')::int as high_count,
+         COUNT(*) FILTER (WHERE severity = 'MEDIUM')::int as medium_count,
+         SUM(CASE WHEN status IN ('OPEN', 'INVESTIGATING', 'CONTAINED') THEN 1 ELSE 0 END)::int as open_count,
+         SUM(CASE WHEN status IN ('RESOLVED', 'CLOSED') THEN 1 ELSE 0 END)::int as resolved_count,
+         ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60)::numeric, 1) as avg_resolution_time_minutes
        FROM incidents 
        WHERE (${visibility.sql})`,
       visibility.params

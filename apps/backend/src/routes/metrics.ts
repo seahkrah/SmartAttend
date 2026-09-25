@@ -10,6 +10,7 @@ import { authenticateToken } from '../auth/middleware.js';
 import {
   resolveTenantContext,
   requireTenant,
+  requireRoles,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js';
 import {
@@ -44,6 +45,17 @@ const router = Router();
  * superadmin, as a deliberate and recorded selection.
  */
 router.use(authenticateToken, resolveTenantContext, requireTenant);
+// Operational figures, including which people's attendance keeps failing,
+// are for the people who run the tenant. Any member, a student included,
+// could read them.
+router.use(requireRoles('admin', 'it'));
+
+// Query windows are bounded: an unbounded `hours` or `limit` is an
+// expensive scan anyone with access can ask for.
+function bounded(value: unknown, fallback: number, max: number): number {
+  const n = parseInt(String(value ?? ''), 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, max) : fallback;
+}
 
 /** The server-resolved tenant. Never a value the caller supplied. */
 function tenantOf(req: ExtendedRequest): string {
@@ -60,7 +72,7 @@ router.get('/failure-rates', async (req: ExtendedRequest, res: Response) => {
   try {
     const tenantId = tenantOf(req);
 
-    const hours = parseInt(req.query.hours as string) || 24;
+    const hours = bounded(req.query.hours, 24, 720);
 
     const failureRates = await getTenantFailureRate(tenantId, hours);
 
@@ -88,7 +100,7 @@ router.get('/api-latency', async (req: ExtendedRequest, res: Response) => {
     const tenantId = tenantOf(req);
 
     const endpoint = req.query.endpoint as string | undefined;
-    const hours = parseInt(req.query.hours as string) || 1;
+    const hours = bounded(req.query.hours, 1, 720);
 
     const latencyData = await getAPILatencyPercentiles(tenantId, endpoint, hours);
 
@@ -115,7 +127,7 @@ router.get('/api-latency-by-endpoint', async (req: ExtendedRequest, res: Respons
   try {
     const tenantId = tenantOf(req);
 
-    const hours = parseInt(req.query.hours as string) || 1;
+    const hours = bounded(req.query.hours, 1, 720);
 
     const latencyByEndpoint = await getAPILatencyByEndpoint(tenantId, hours);
 
@@ -142,7 +154,7 @@ router.get('/clock-drift', async (req: ExtendedRequest, res: Response) => {
   try {
     const tenantId = tenantOf(req);
 
-    const hours = parseInt(req.query.hours as string) || 24;
+    const hours = bounded(req.query.hours, 24, 720);
 
     const clockDriftStats = await getClockDriftStatistics(tenantId, hours);
 
@@ -169,8 +181,8 @@ router.get('/verification-mismatches', async (req: ExtendedRequest, res: Respons
   try {
     const tenantId = tenantOf(req);
 
-    const limit = parseInt(req.query.limit as string) || 100;
-    const hours = parseInt(req.query.hours as string) || 24;
+    const limit = bounded(req.query.limit, 100, 100);
+    const hours = bounded(req.query.hours, 24, 720);
 
     const mismatches = await getVerificationMismatches(tenantId, limit, hours);
 
@@ -228,7 +240,7 @@ router.get('/summary', async (req: ExtendedRequest, res: Response) => {
   try {
     const tenantId = tenantOf(req);
 
-    const hours = parseInt(req.query.hours as string) || 1;
+    const hours = bounded(req.query.hours, 1, 720);
 
     const summary = await getMetricsSummaryByCategory(tenantId, hours);
 
@@ -255,8 +267,8 @@ router.get('/failure-reasons', async (req: ExtendedRequest, res: Response) => {
   try {
     const tenantId = tenantOf(req);
 
-    const limit = parseInt(req.query.limit as string) || 10;
-    const hours = parseInt(req.query.hours as string) || 24;
+    const limit = bounded(req.query.limit, 10, 100);
+    const hours = bounded(req.query.hours, 24, 720);
 
     const reasons = await getTopFailureReasons(tenantId, limit, hours);
 
@@ -284,8 +296,8 @@ router.get('/problematic-records', async (req: ExtendedRequest, res: Response) =
   try {
     const tenantId = tenantOf(req);
 
-    const limit = parseInt(req.query.limit as string) || 20;
-    const hours = parseInt(req.query.hours as string) || 24;
+    const limit = bounded(req.query.limit, 20, 100);
+    const hours = bounded(req.query.hours, 24, 720);
 
     const records = await getMostProblematicAttendanceRecords(tenantId, limit, hours);
 

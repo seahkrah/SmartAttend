@@ -8,7 +8,7 @@
  */
 
 import { query } from '../db/connection.js';
-import { recordClockDrift, recordAPILatency } from './metricsService.js';
+import { getPlatformHealthStatus, recordClockDrift, recordAPILatency } from './metricsService.js';
 
 export interface SimulationResult {
   scenario: string;
@@ -199,16 +199,11 @@ export async function simulatePartialOutage(
         results.metrics_collected++;
 
         // Check health status was updated to degraded/critical
-        const healthStatus = await query(
-          `SELECT health_status FROM platform_health_status 
-           WHERE tenant_id = $1`,
-          [tenantId]
-        );
+        const health = await getPlatformHealthStatus(tenantId);
 
-        if (healthStatus.rows[0]?.health_status !== 'degraded' && 
-            healthStatus.rows[0]?.health_status !== 'critical') {
+        if (health?.health_status !== 'degraded' && health?.health_status !== 'critical') {
           results.issues_found.push(
-            `Health status not updated to degraded during outage (current: ${healthStatus.rows[0]?.health_status})`
+            `Health status not updated to degraded during outage (current: ${health?.health_status})`
           );
           results.tests_failed++;
         } else {

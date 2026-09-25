@@ -510,6 +510,168 @@ router.post('/admin/school/users', async (req: TenantRequest, res: Response) => 
 })
 
 // ===========================================================================
+// Departments
+// ===========================================================================
+//
+// Departments used to exist only as a side effect: typing a new name on the
+// student or lecturer form created one. There was no way to list them, fix a
+// misspelling, give one a code or a head, or remove one; the menu entry said
+// "Soon". A school's colleges are recorded as free text on students and
+// staff, not as an entity, so this manages departments only.
+
+const DEPT_REFERENCES = ['students', 'faculty', 'courses', 'programmes', 'semesters'] as const
+
+async function departmentInput(ctx: Ctx, b: any, currentId: string | null): Promise<
+  { ok: true; name?: string; code?: string | null; description?: string | null; headId?: string | null }
+  | { ok: false; status: number; error: string }
+> {
+  const out: { name?: string; code?: string | null; description?: string | null; headId?: string | null } = {}
+  if (b.name !== undefined || currentId === null) {
+    const name = String(b.name ?? '').trim()
+    if (name.length < 2 || name.length > 120) return { ok: false, status: 400, error: 'A department needs a name of 2 to 120 characters' }
+    const clash = await query(
+      `SELECT 1 FROM school_departments WHERE tenant_id = $1 AND LOWER(name) = LOWER($2) AND ($3::uuid IS NULL OR id <> $3::uuid)`,
+      [ctx.tenantId, name, currentId])
+    if (clash.rows.length > 0) return { ok: false, status: 409, error: 'This school already has a department with that name' }
+    out.name = name
+  }
+  if (b.code !== undefined) {
+    const code = String(b.code ?? '').trim().toUpperCase() || null
+    if (code && !/^[A-Z0-9-]{1,20}$/.test(code)) return { ok: false, status: 400, error: 'A code is up to 20 letters, digits or dashes' }
+    if (code) {
+      const clash = await query(
+        `SELECT 1 FROM school_departments WHERE tenant_id = $1 AND code = $2 AND ($3::uuid IS NULL OR id <> $3::uuid)`,
+        [ctx.tenantId, code, currentId])
+      if (clash.rows.length > 0) return { ok: false, status: 409, error: 'Another department already uses that code' }
+    }
+    out.code = code
+  }
+  if (b.description !== undefined) {
+    const d = String(b.description ?? '').trim()
+    if (d.length > 2000) return { ok: false, status: 400, error: 'The description is too long' }
+    out.description = d || null
+  }
+  if (b.headUserId !== undefined) {
+    const head = b.headUserId ? String(b.headUserId) : null
+    if (head) {
+      // The head must be one of this school's lecturers: an id from another
+      // school, or of someone who is not staff, reads as unknown.
+      if (!UUID.test(head)) return { ok: false, status: 404, error: 'No such lecturer at this school' }
+      const staff = await query(`SELECT 1 FROM faculty WHERE user_id = $1 AND tenant_id = $2`, [head, ctx.tenantId])
+      if (staff.rows.length === 0) return { ok: false, status: 404, error: 'No such lecturer at this school' }
+    }
+    out.headId = head
+  }
+  return { ok: true, ...out }
+}
+
+router.get('/admin/school/departments', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const r = await query(
+      `SELECT d.id, d.name, d.code, d.description, d.head_id, d.created_at,
+              hu.full_name AS head_name,
+              (SELECT COUNT(*)::int FROM students s WHERE s.department_id = d.id AND s.tenant_id = $1) AS students,
+              (SELECT COUNT(*)::int FROM faculty f WHERE f.department_id = d.id AND f.tenant_id = $1) AS faculty,
+              (SELECT COUNT(*)::int FROM courses c WHERE c.department_id = d.id AND c.tenant_id = $1) AS courses,
+              (SELECT COUNT(*)::int FROM programmes p WHERE p.department_id = d.id AND p.tenant_id = $1) AS programmes
+         FROM school_departments d
+         LEFT JOIN users hu ON hu.id = d.head_id
+        WHERE d.tenant_id = $1
+        ORDER BY LOWER(d.name)`,
+      [ctx.tenantId]
+    )
+    return res.json({ departments: r.rows })
+  } catch (e) {
+    return fail(res, 'load departments', e)
+  }
+})
+
+router.post('/admin/school/departments', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const input = await departmentInput(ctx, req.body ?? {}, null)
+    if (input.ok === false) return res.status(input.status).json({ error: input.error })
+    const r = await query(
+      `INSERT INTO school_departments (name, code, description, head_id, tenant_id, platform_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [input.name, input.code ?? null, input.description ?? null, input.headId ?? null, ctx.tenantId, ctx.platformId]
+    )
+    await logAudit({
+      actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'DEPARTMENT_CREATED', actionScope: 'TENANT',
+      resourceType: 'school_department', resourceId: r.rows[0].id, tenantId: ctx.tenantId,
+      afterState: r.rows[0], ipAddress: getClientIp(req),
+    }).catch((e) => console.error('[SCHOOL_ADMIN] audit failed:', e))
+    return res.status(201).json({ department: r.rows[0] })
+  } catch (e) {
+    return fail(res, 'create department', e)
+  }
+})
+
+router.put('/admin/school/departments/:departmentId', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const { departmentId } = req.params
+    if (badId(res, departmentId, 'Department')) return
+    const before = await query(`SELECT * FROM school_departments WHERE id = $1 AND tenant_id = $2`, [departmentId, ctx.tenantId])
+    if (before.rows.length === 0) return notFound(res, 'Department')
+    const input = await departmentInput(ctx, req.body ?? {}, departmentId)
+    if (input.ok === false) return res.status(input.status).json({ error: input.error })
+    const r = await query(
+      `UPDATE school_departments
+          SET name = COALESCE($3, name),
+              code = CASE WHEN $4 THEN $5 ELSE code END,
+              description = CASE WHEN $6 THEN $7 ELSE description END,
+              head_id = CASE WHEN $8 THEN $9::uuid ELSE head_id END
+        WHERE id = $1 AND tenant_id = $2 RETURNING *`,
+      [departmentId, ctx.tenantId, input.name ?? null,
+       input.code !== undefined, input.code ?? null,
+       input.description !== undefined, input.description ?? null,
+       input.headId !== undefined, input.headId ?? null]
+    )
+    await logAudit({
+      actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'DEPARTMENT_UPDATED', actionScope: 'TENANT',
+      resourceType: 'school_department', resourceId: departmentId, tenantId: ctx.tenantId,
+      beforeState: before.rows[0], afterState: r.rows[0], ipAddress: getClientIp(req),
+    }).catch((e) => console.error('[SCHOOL_ADMIN] audit failed:', e))
+    return res.json({ department: r.rows[0] })
+  } catch (e) {
+    return fail(res, 'update department', e)
+  }
+})
+
+/** Removes a department nothing refers to. One with people or courses in it is refused, with the counts. */
+router.delete('/admin/school/departments/:departmentId', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const { departmentId } = req.params
+    if (badId(res, departmentId, 'Department')) return
+    const before = await query(`SELECT * FROM school_departments WHERE id = $1 AND tenant_id = $2`, [departmentId, ctx.tenantId])
+    if (before.rows.length === 0) return notFound(res, 'Department')
+    const inUse: Record<string, number> = {}
+    for (const table of DEPT_REFERENCES) {
+      const c = await query(`SELECT COUNT(*)::int AS n FROM ${table} WHERE department_id = $1`, [departmentId])
+      if (c.rows[0].n > 0) inUse[table] = c.rows[0].n
+    }
+    if (Object.keys(inUse).length > 0) {
+      return res.status(409).json({
+        error: 'Move everything out of this department before removing it',
+        inUse,
+      })
+    }
+    await query(`DELETE FROM school_departments WHERE id = $1 AND tenant_id = $2`, [departmentId, ctx.tenantId])
+    await logAudit({
+      actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'DEPARTMENT_DELETED', actionScope: 'TENANT',
+      resourceType: 'school_department', resourceId: departmentId, tenantId: ctx.tenantId,
+      beforeState: before.rows[0], ipAddress: getClientIp(req),
+    }).catch((e) => console.error('[SCHOOL_ADMIN] audit failed:', e))
+    return res.json({ deleted: true })
+  } catch (e) {
+    return fail(res, 'remove department', e)
+  }
+})
+
+// ===========================================================================
 // Students
 // ===========================================================================
 

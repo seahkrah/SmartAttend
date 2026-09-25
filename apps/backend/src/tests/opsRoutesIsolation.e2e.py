@@ -117,6 +117,23 @@ check("verification mismatches stay on the caller's tenant",
 co, r = call("GET", "/failure-rates", None, base="/metrics")
 check("metrics require authentication", co in (401, 403), f"({co})")
 
+print("-- metrics: every figure answers, and only to those who run the tenant --")
+# Three of these answered 500 on every call (an enum compared with LIKE, an
+# alias used inside ORDER BY, two views that never existed), and a trigger
+# that failed on every insert meant no latency row was ever stored.
+for ep in ("failure-rates", "api-latency", "api-latency-by-endpoint", "clock-drift",
+           "verification-mismatches", "health-status", "summary", "failure-reasons",
+           "problematic-records", "dashboard", "early-signals"):
+    co, r = call("GET", f"/{ep}", AT, base="/metrics")
+    check(f"{ep} answers", co == 200 and r.get('tenant_id') == A['tenantId'], f"({co} {str(r)[:160]})")
+co, r = call("GET", "/health-status", AT, base="/metrics")
+check("the requests just made were recorded", co == 200 and int(r.get('samples_24h') or 0) > 0, f"({r})")
+check("and health is computed from them", r.get('health_status') in ('healthy', 'degraded', 'critical'), f"({r})")
+co, r = call("GET", "/problematic-records", FA, base="/metrics")
+check("a lecturer cannot read whose attendance keeps failing", co == 403, f"({co} {r})")
+co, r = call("GET", "/summary?hours=99999999", AT, base="/metrics")
+check("an absurd window is capped, not scanned", co == 200 and r.get('hours') == 720, f"({co} {r.get('hours') if isinstance(r, dict) else r})")
+
 print("-- simulations: superadmin only --")
 co, r = call("POST", "/time-drift", AT, base="/simulations")
 check("an administrator may not run a failure simulation", co == 403, f"({co} {r})")

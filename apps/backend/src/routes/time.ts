@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
 import { isSuperadmin } from '../auth/authService.js'
+import { query } from '../db/connection.js'
 import {
   getServerTime,
   getServerTimeISO,
@@ -139,7 +140,7 @@ router.get('/validate', async (req: Request, res: Response) => {
  */
 router.get('/drift/history', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req.user as any)?.id
+    const userId = req.user?.userId
     if (!userId) {
       return res.status(401).json({ error: 'Not authenticated' })
     }
@@ -152,10 +153,11 @@ router.get('/drift/history', authenticateToken, async (req: Request, res: Respon
       count: history.length,
       drift: history.map(record => ({
         id: record.id,
-        timestamp: record.timestamp,
-        driftSeconds: record.drift_seconds,
-        severity: record.severity,
-        attendanceAffected: record.attendance_affected
+        timestamp: record.server_time,
+        driftSeconds: Number(record.drift_seconds),
+        category: record.drift_category,
+        action: record.action_type,
+        accepted: record.was_accepted
       }))
     })
   } catch (error) {
@@ -172,18 +174,19 @@ router.get('/drift/history', authenticateToken, async (req: Request, res: Respon
  */
 router.get('/drift/stats', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-    if (!user?.id) {
+    const user = req.user
+    if (!user?.userId) {
       return res.status(401).json({ error: 'Not authenticated' })
     }
 
-    const isSuperAdmin = await isSuperadmin(user.id)
+    const isSuperAdmin = await isSuperadmin(user.userId)
     if (!isSuperAdmin) {
       return res.status(403).json({ error: 'Superadmin access required' })
     }
 
-    const tenantId = req.query.tenantId as string
-    if (!tenantId) {
+    // A platform-wide view: the operator names the tenant deliberately.
+    const tenantId = String(req.query.tenantId ?? '')
+    if (!/^[0-9a-f-]{36}$/i.test(tenantId)) {
       return res.status(400).json({ error: 'tenantId query parameter required' })
     }
 
@@ -209,12 +212,12 @@ router.get('/drift/stats', authenticateToken, async (req: Request, res: Response
  */
 router.get('/drift/critical', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-    if (!user?.id) {
+    const user = req.user
+    if (!user?.userId) {
       return res.status(401).json({ error: 'Not authenticated' })
     }
 
-    const isSuperAdmin = await isSuperadmin(user.id)
+    const isSuperAdmin = await isSuperadmin(user.userId)
     if (!isSuperAdmin) {
       return res.status(403).json({ error: 'Superadmin access required' })
     }
@@ -227,13 +230,16 @@ router.get('/drift/critical', authenticateToken, async (req: Request, res: Respo
       events: events.map(event => ({
         id: event.id,
         userId: event.user_id,
-        tenantId: event.tenant_id,
-        timestamp: event.timestamp,
-        driftSeconds: event.drift_seconds,
-        severity: event.severity,
-        attendanceAffected: event.attendance_affected,
-        clientTime: event.client_timestamp,
-        serverTime: event.server_timestamp
+        timestamp: event.server_time,
+        driftSeconds: Number(event.drift_seconds),
+        category: event.drift_category,
+        action: event.action_type,
+        accepted: event.was_accepted,
+        clientTime: event.client_time,
+        serverTime: event.server_time,
+        review: event.review_action
+          ? { action: event.review_action, notes: event.review_notes, by: event.reviewed_by, at: event.reviewed_at }
+          : null
       }))
     })
   } catch (error) {
@@ -255,36 +261,48 @@ router.get('/drift/critical', authenticateToken, async (req: Request, res: Respo
  */
 router.post('/drift/investigate', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-    if (!user?.id) {
+    const user = req.user
+    if (!user?.userId) {
       return res.status(401).json({ error: 'Not authenticated' })
     }
 
-    const isSuperAdmin = await isSuperadmin(user.id)
+    const isSuperAdmin = await isSuperadmin(user.userId)
     if (!isSuperAdmin) {
       return res.status(403).json({ error: 'Superadmin access required' })
     }
 
-    const { driftEventId, action, notes } = req.body
+    const { driftEventId, action, notes } = req.body ?? {}
 
-    if (!driftEventId) {
+    if (typeof driftEventId !== 'string' || !/^[0-9a-f-]{36}$/i.test(driftEventId)) {
       return res.status(400).json({ error: 'driftEventId required' })
     }
 
     if (!['reviewed', 'resolved', 'flagged'].includes(action)) {
       return res.status(400).json({ error: 'Invalid action' })
     }
+    if (notes !== undefined && notes !== null && (typeof notes !== 'string' || notes.length > 4000)) {
+      return res.status(400).json({ error: 'notes must be text of at most 4000 characters' })
+    }
 
-    // TODO: Update drift event with investigation status
-    // This would be stored in a separate investigation table or added to clock_drift_log
+    const event = await query(`SELECT id FROM drift_audit_log WHERE id = $1`, [driftEventId])
+    if (event.rows.length === 0) {
+      return res.status(404).json({ error: 'Drift event not found' })
+    }
 
-    res.json({
-      driftEventId,
-      action,
-      investigatedBy: user.id,
-      timestamp: getServerTimeISO(),
-      notes
-    })
+    // Appended, never edited: the event's history of decisions stays whole.
+    const saved = await query(
+      `INSERT INTO drift_reviews (drift_event_id, action, notes, reviewed_by)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, drift_event_id, action, notes, reviewed_by, created_at`,
+      [driftEventId, action, notes?.trim() || null, user.userId]
+    )
+    const history = await query(
+      `SELECT id, action, notes, reviewed_by, created_at FROM drift_reviews
+        WHERE drift_event_id = $1 ORDER BY created_at DESC`,
+      [driftEventId]
+    )
+
+    res.status(201).json({ review: saved.rows[0], history: history.rows })
   } catch (error) {
     console.error('[TIME_API] /drift/investigate error:', error)
     res.status(500).json({ error: 'Investigation failed' })
@@ -299,12 +317,12 @@ router.post('/drift/investigate', authenticateToken, async (req: Request, res: R
  */
 router.get('/status', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const user = req.user as any
-    if (!user?.id) {
+    const user = req.user
+    if (!user?.userId) {
       return res.status(401).json({ error: 'Not authenticated' })
     }
 
-    const isSuperAdmin = await isSuperadmin(user.id)
+    const isSuperAdmin = await isSuperadmin(user.userId)
     if (!isSuperAdmin) {
       return res.status(403).json({ error: 'Superadmin access required' })
     }

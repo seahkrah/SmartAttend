@@ -338,5 +338,28 @@ check("an administrator has no student record of their own", co == 404, f"({co} 
 co, r = call("GET", "/my/transcript", None, base="/gradebook")
 check("and it needs a token", co in (401, 403), f"({co})")
 
+print("-- withholding a published result --")
+# The results listing carried no result id, so nothing could name a result to
+# withhold; and a malformed id reached the database as a cast error.
+co, r = call("GET", f"/courses/{A['courseId']}/results", AT, base="/gradebook")
+pub = next((x for x in r.get('results', []) if x.get('status') == 'published'), None) if co == 200 else None
+check("published results carry their id", pub is not None and pub.get('resultId'), f"({co} {str(r)[:200]})")
+if pub and pub.get('resultId'):
+    co, r = call("POST", f"/results/{pub['resultId']}/withhold", BT, {}, base="/gradebook")
+    check("another school cannot withhold it", co == 404, f"({co} {r})")
+    co, r = call("POST", f"/results/{pub['resultId']}/withhold", FA, {}, base="/gradebook")
+    check("nor can a lecturer", co == 403, f"({co} {r})")
+    co, r = call("GET", f"/students/{pub['studentId']}/transcript", AT, base="/gradebook")
+    before = len(r.get('entries', [])) if co == 200 else -1
+    co, r = call("POST", f"/results/{pub['resultId']}/withhold", AT, {}, base="/gradebook")
+    check("the registrar withholds it", co == 200 and r['result']['status'] == 'withheld', f"({co} {r})")
+    co, r = call("GET", f"/students/{pub['studentId']}/transcript", AT, base="/gradebook")
+    after = len(r.get('entries', [])) if co == 200 else -1
+    check("and it leaves the transcript", before >= 1 and after == before - 1, f"({before} -> {after})")
+    co, r = call("POST", f"/courses/{A['courseId']}/results/publish", AT, {}, base="/gradebook")
+    check("publishing again restores it", co == 200, f"({co} {r})")
+co, r = call("POST", "/results/not-a-uuid/withhold", AT, {}, base="/gradebook")
+check("a malformed id is 404, not a server error", co == 404, f"({co} {r})")
+
 print(f"\n{P} passed, {F} failed")
 sys.exit(1 if F else 0)

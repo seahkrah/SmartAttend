@@ -75,8 +75,8 @@ export async function scenario_CriticalDatabaseOutage(
       [
         'Database Connection Pool Exhaustion',
         'Authentication service experiencing 100% connection pool saturation',
-        'critical',
-        'open',
+        'CRITICAL',
+        'OPEN',
         'database_service',
         platformId,
       ]
@@ -87,15 +87,15 @@ export async function scenario_CriticalDatabaseOutage(
       status: 'passed',
       duration: Date.now() - stepStart,
       action: 'INSERT incident with status=open',
-      payload: { severity: 'critical', status: 'open' },
+      payload: { severity: 'CRITICAL', status: 'OPEN' },
     })
 
     // Step 2: Verify incident created in open state
-    let verifyResult = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
+    let verifyResult = await query(`SELECT status, acknowledged_at, (SELECT COUNT(*) FROM incident_escalations WHERE incident_id = $1) AS escalations FROM incidents WHERE id = $1`, [incidentId])
     assertions.push({
       name: 'Incident starts in open state',
-      passed: verifyResult.rows[0].status === 'open',
-      expected: 'open',
+      passed: verifyResult.rows[0].status === 'OPEN',
+      expected: 'OPEN',
       actual: verifyResult.rows[0].status,
     })
 
@@ -112,11 +112,11 @@ export async function scenario_CriticalDatabaseOutage(
       action: 'Transition open → acknowledged',
     })
 
-    verifyResult = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
+    verifyResult = await query(`SELECT status, acknowledged_at, (SELECT COUNT(*) FROM incident_escalations WHERE incident_id = $1) AS escalations FROM incidents WHERE id = $1`, [incidentId])
     assertions.push({
       name: 'Incident transitions to acknowledged',
-      passed: verifyResult.rows[0].status === 'acknowledged',
-      expected: 'acknowledged',
+      passed: verifyResult.rows[0].acknowledged_at !== null,
+      expected: 'acknowledged_at set',
       actual: verifyResult.rows[0].status,
     })
 
@@ -135,11 +135,11 @@ export async function scenario_CriticalDatabaseOutage(
       action: 'Escalate to management level',
     })
 
-    verifyResult = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
+    verifyResult = await query(`SELECT status, acknowledged_at, (SELECT COUNT(*) FROM incident_escalations WHERE incident_id = $1) AS escalations FROM incidents WHERE id = $1`, [incidentId])
     assertions.push({
       name: 'Incident escalated to executive level',
-      passed: verifyResult.rows[0].status === 'escalated',
-      expected: 'escalated',
+      passed: Number(verifyResult.rows[0].escalations) > 0,
+      expected: 'an escalation record',
       actual: verifyResult.rows[0].status,
     })
 
@@ -153,11 +153,11 @@ export async function scenario_CriticalDatabaseOutage(
       action: 'Transition to investigating state',
     })
 
-    verifyResult = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
+    verifyResult = await query(`SELECT status, acknowledged_at, (SELECT COUNT(*) FROM incident_escalations WHERE incident_id = $1) AS escalations FROM incidents WHERE id = $1`, [incidentId])
     assertions.push({
       name: 'Incident moves to investigating state',
-      passed: verifyResult.rows[0].status === 'investigating',
-      expected: 'investigating',
+      passed: verifyResult.rows[0].status === 'INVESTIGATING',
+      expected: 'INVESTIGATING',
       actual: verifyResult.rows[0].status,
     })
 
@@ -204,11 +204,11 @@ export async function scenario_CriticalDatabaseOutage(
       action: 'Transition to mitigating state',
     })
 
-    verifyResult = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
+    verifyResult = await query(`SELECT status, acknowledged_at, (SELECT COUNT(*) FROM incident_escalations WHERE incident_id = $1) AS escalations FROM incidents WHERE id = $1`, [incidentId])
     assertions.push({
       name: 'Incident in mitigating state',
-      passed: verifyResult.rows[0].status === 'mitigating',
-      expected: 'mitigating',
+      passed: verifyResult.rows[0].status === 'CONTAINED',
+      expected: 'CONTAINED',
       actual: verifyResult.rows[0].status,
     })
 
@@ -233,11 +233,11 @@ export async function scenario_CriticalDatabaseOutage(
       action: 'Transition to resolved with complete summary',
     })
 
-    verifyResult = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
+    verifyResult = await query(`SELECT status, acknowledged_at, (SELECT COUNT(*) FROM incident_escalations WHERE incident_id = $1) AS escalations FROM incidents WHERE id = $1`, [incidentId])
     assertions.push({
       name: 'Incident successfully resolved',
-      passed: verifyResult.rows[0].status === 'resolved',
-      expected: 'resolved',
+      passed: verifyResult.rows[0].status === 'RESOLVED',
+      expected: 'RESOLVED',
       actual: verifyResult.rows[0].status,
     })
 
@@ -254,11 +254,11 @@ export async function scenario_CriticalDatabaseOutage(
       action: 'Transition to closed (terminal state)',
     })
 
-    verifyResult = await query('SELECT status FROM incidents WHERE id = $1', [incidentId])
+    verifyResult = await query(`SELECT status, acknowledged_at, (SELECT COUNT(*) FROM incident_escalations WHERE incident_id = $1) AS escalations FROM incidents WHERE id = $1`, [incidentId])
     assertions.push({
       name: 'Incident formally closed',
-      passed: verifyResult.rows[0].status === 'closed',
-      expected: 'closed',
+      passed: verifyResult.rows[0].status === 'CLOSED',
+      expected: 'CLOSED',
       actual: verifyResult.rows[0].status,
     })
 
@@ -321,8 +321,8 @@ export async function scenario_SecurityBreach(userId: string, platformId: string
       [
         'Unauthorized API Access Detected',
         'Suspicious pattern detected: 500k API requests from unknown IP range',
-        'critical',
-        'open',
+        'CRITICAL',
+        'OPEN',
         'security_detection',
         platformId,
       ]
@@ -418,8 +418,8 @@ export async function scenario_InvalidStateTransitions(
       [
         'Test incident for state transitions',
         'Testing invalid transitions',
-        'low',
-        'open',
+        'LOW',
+        'OPEN',
         'test',
         platformId,
       ]

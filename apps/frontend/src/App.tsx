@@ -11,6 +11,9 @@ import HomeRedirect from './components/routing/HomeRedirect';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { SetPasswordPage } from './pages/SetPasswordPage';
+import TenantIncidentsPage from './pages/TenantIncidentsPage';
+import SchoolAdminDepartmentsPage from './pages/SchoolAdminDepartmentsPage';
+import SchoolAdminResultsPage from './pages/SchoolAdminResultsPage';
 import IncidentDetailPage from './pages/IncidentDetailPage';
 
 // Superadmin Pages
@@ -188,7 +191,10 @@ export default function App() {
                     <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
                     <Route path="/admissions" element={<SchoolAdminAdmissionsPage />} />
                     <Route path="/finance" element={<SchoolAdminFinancePage />} />
+                    <Route path="/departments" element={<SchoolAdminDepartmentsPage />} />
+                    <Route path="/results" element={<SchoolAdminResultsPage />} />
                     <Route path="/notifications" element={<AdminNotificationsPage />} />
+                    <Route path="/incidents" element={<TenantIncidentsPage />} />
                     <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
                     <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                     <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
@@ -220,6 +226,7 @@ export default function App() {
                     <Route path="/reports" element={<CorporateAdminReportsPage />} />
                     <Route path="/approvals" element={<CorporateAdminApprovalsPage />} />
                     <Route path="/notifications" element={<AdminNotificationsPage />} />
+                    <Route path="/incidents" element={<TenantIncidentsPage />} />
                     <Route path="/settings" element={<CorporateAdminSettingsPage />} />
                   </Routes>
                 </AppShell>

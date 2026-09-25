@@ -46,6 +46,11 @@ async function cleanup() {
     await query(`DELETE FROM ${child} WHERE incident_id IN (${fixtureIncidents})`)
   }
   await query(`DELETE FROM incidents WHERE id IN (${fixtureIncidents})`)
+  // Drift reviews are append-only; the fixture removes its own for the length
+  // of its cleanup only.
+  await query(`ALTER TABLE drift_reviews DISABLE TRIGGER USER`)
+  await query(`DELETE FROM drift_reviews WHERE reviewed_by IN (SELECT id FROM users WHERE email LIKE '%@sa2e.test')`)
+  await query(`ALTER TABLE drift_reviews ENABLE TRIGGER USER`)
   await query(`DELETE FROM users WHERE email LIKE '%@sa2e.test'`)
 
   // Tenants the suite provisions, and the entities behind them.

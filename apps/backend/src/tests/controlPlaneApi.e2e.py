@@ -383,5 +383,86 @@ check("a tenant administrator cannot read the platform trail", co == 403, f"({co
 co, r = call("GET", "/export/system-report", AT)
 check("nor export the system report", co == 403, f"({co} {r})")
 
+print("-- a tenant works its own incident through the lifecycle the table allows --")
+# The lifecycle service wrote statuses the incidents table refuses
+# ('acknowledged', 'escalated', 'mitigating', lower case) and compared lower
+# case with the stored upper case, so no incident could move through it; the
+# tenant's open list filtered on 'open' and was always empty.
+co, r = call("POST", "/incidents", SU, {"title": f"Check-ins failing {RUN}", "severity": "HIGH",
+                                        "affectedTenantId": A['tenantId'], "description": "Kiosk errors"})
+inc = (r.get('incident') or {}).get('id') if isinstance(r, dict) else None
+check("(the platform raises an incident for school A)", co == 201 and inc, f"({co} {r})")
+co, r = call("GET", "?status=active", AT, base="/incidents")
+check("school A sees it among its active incidents", co == 200 and any(i['id'] == inc for i in r['data']['incidents']), f"({co} {str(r)[:200]})")
+co, r = call("GET", "?status=active", BT, base="/incidents")
+check("school B does not", co == 200 and all(i['id'] != inc for i in r['data']['incidents']), f"({co})")
+co, r = call("GET", "/open", AT, base="/incidents")
+check("the /open list is no longer always empty", co == 200 and any(i['id'] == inc for i in r['data']['incidents']), f"({co})")
+co, r = call("GET", f"/{inc}", BT, base="/incidents")
+check("school B cannot open it", co == 404, f"({co})")
+co, r = call("GET", "?status=active", FA, base="/incidents")
+check("a lecturer sees no incidents", co == 403, f"({co})")
+co, r = call("POST", f"/{inc}/acknowledge", AT, {"acknowledgementNote": "on it"}, base="/incidents")
+check("the administrator acknowledges it", co == 200, f"({co} {r})")
+co, r = call("POST", f"/{inc}/acknowledge", AT, {}, base="/incidents")
+check("once", co == 400 and 'already' in str(r), f"({co} {r})")
+co, r = call("POST", f"/{inc}/escalate", AT, {"escalationLevel": "level_1", "escalationReason": "spreading"}, base="/incidents")
+check("a high incident cannot be escalated below level 3", co == 400, f"({co} {r})")
+co, r = call("POST", f"/{inc}/escalate", AT, {"escalationLevel": "level_3", "escalationReason": "spreading"}, base="/incidents")
+check("but can at level 3", co == 200, f"({co} {r})")
+co, r = call("POST", f"/{inc}/close", AT, {}, base="/incidents")
+check("an unresolved incident cannot be closed", co == 400, f"({co} {r})")
+co, r = call("POST", f"/{inc}/investigate", AT, {}, base="/incidents")
+check("investigation starts", co == 200, f"({co} {r})")
+co, r = call("POST", f"/{inc}/mitigate", AT, {"mitigationPlan": "kiosks on manual"}, base="/incidents")
+check("it is contained", co == 200, f"({co} {r})")
+co, r = call("GET", f"/{inc}", AT, base="/incidents")
+check("and its status says so", co == 200 and r['data']['status'] == 'CONTAINED' and r['data']['acknowledged_at'], f"({co} {r})")
+co, r = call("POST", f"/{inc}/resolve", AT, {"rootCause": "expired certificate"}, base="/incidents")
+check("a resolution needs remediation and prevention", co == 400, f"({co} {r})")
+co, r = call("POST", f"/{inc}/resolve", AT, {"rootCause": "expired certificate", "remediationSteps": "renewed",
+                                              "preventionMeasures": "expiry alert"}, base="/incidents")
+check("it is resolved", co == 200, f"({co} {r})")
+co, r = call("POST", f"/{inc}/resolve", AT, {"rootCause": "x", "remediationSteps": "x", "preventionMeasures": "x"}, base="/incidents")
+check("not twice", co == 400, f"({co} {r})")
+co, r = call("POST", f"/{inc}/close", AT, {"closureNote": "done"}, base="/incidents")
+check("and closed", co == 200, f"({co} {r})")
+co, r = call("GET", "?status=resolved", AT, base="/incidents")
+check("it now sits among the resolved", co == 200 and any(i['id'] == inc and i['status'] == 'CLOSED' for i in r['data']['incidents']), f"({co})")
+co, r = call("GET", f"/{inc}/timeline", AT, base="/incidents")
+kinds = [e['event_type'] for e in r.get('data', {}).get('timeline', [])] if co == 200 else []
+check("every step is on its timeline", all(k in kinds for k in ('acknowledged', 'escalated', 'investigation_started', 'contained', 'resolved', 'closed')), f"({kinds})")
+co, r = call("GET", "/stats", AT, base="/incidents")
+check("statistics count in the table's vocabulary", co == 200 and isinstance(r['data']['statistics']['resolved_count'], int)
+      and r['data']['statistics']['resolved_count'] >= 1, f"({co} {r})")
+
+print("-- clock drift: reviews are recorded, not just echoed --")
+DB = os.environ.get("DATABASE_URL", "postgresql://jjelo@127.0.0.1:55432/jjelotech_dev")
+def sql(q):
+    return subprocess.run(["psql", DB, "-Atc", q], capture_output=True, text=True).stdout.strip()
+event = sql("INSERT INTO drift_audit_log (client_time, server_time, drift_ms, drift_seconds, drift_direction, "
+            "drift_category, action_taken, action_type, was_accepted) VALUES (now() + interval '10 minutes', now(), "
+            "600000, 600, 'AHEAD', 'CRITICAL', 'BLOCKED', 'ATTENDANCE_MARK', false) RETURNING id").split('\n')[0]
+# Every one of these read req.user.id, which the auth middleware never sets,
+# so they answered 401 to everyone, superadmins included.
+co, r = call("GET", "/drift/critical", SU, base="/time")
+check("a superadmin can list critical drift", co == 200 and any(e['id'] == event for e in r.get('events', [])), f"({co} {str(r)[:200]})")
+co, r = call("GET", "/status", SU, base="/time")
+check("and read the time authority status", co == 200, f"({co} {r})")
+co, r = call("POST", "/drift/investigate", SU, {"driftEventId": event, "action": "flagged", "notes": "phone clock ten minutes fast"}, base="/time")
+check("a review is recorded", co == 201 and r.get('review', {}).get('action') == 'flagged', f"({co} {r})")
+co, r = call("POST", "/drift/investigate", SU, {"driftEventId": event, "action": "resolved", "notes": "device clock fixed"}, base="/time")
+check("and a later one joins the history, the first kept", co == 201 and [h['action'] for h in r.get('history', [])] == ['resolved', 'flagged'], f"({co} {r})")
+co, r = call("GET", "/drift/critical", SU, base="/time")
+ev = next((e for e in r.get('events', []) if e['id'] == event), {})
+check("the event shows its latest review", (ev.get('review') or {}).get('action') == 'resolved', f"({ev})")
+check("a review cannot be rewritten afterwards",
+      'add a new review' in subprocess.run(["psql", DB, "-Atc", f"UPDATE drift_reviews SET action = 'reviewed' WHERE drift_event_id = '{event}'"],
+                                           capture_output=True, text=True).stderr)
+co, r = call("POST", "/drift/investigate", SU, {"driftEventId": "00000000-0000-0000-0000-000000000000", "action": "reviewed"}, base="/time")
+check("an unknown event is 404", co == 404, f"({co} {r})")
+co, r = call("POST", "/drift/investigate", AT, {"driftEventId": event, "action": "reviewed"}, base="/time")
+check("a tenant administrator cannot review drift", co == 403, f"({co} {r})")
+
 print(f"\n{P} passed, {F} failed")
 sys.exit(1 if F else 0)

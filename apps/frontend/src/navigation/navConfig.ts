@@ -130,7 +130,7 @@ const schoolAdminNav: AudienceNav = {
       items: [
         // No page has ever existed for this; the school's departments are
         // modelled in the database but nothing reads them yet.
-        { label: 'Colleges & departments', to: '/admin/school/departments', icon: Landmark, status: 'planned' },
+        { label: 'Departments', to: '/admin/school/departments', icon: Landmark, status: 'ready' },
         { label: 'Programmes', to: '/admin/school/programmes', icon: Layers, status: 'ready' },
         { label: 'Courses', to: '/admin/school/courses', icon: BookOpen, status: 'ready' },
       ],
@@ -157,7 +157,7 @@ const schoolAdminNav: AudienceNav = {
       items: [
         // Grading schemes and publication belong to the registrar; lecturers
         // enter marks from their own gradebook, which exists.
-        { label: 'Results & transcripts', to: '/admin/school/examinations', icon: FileText, status: 'planned' },
+        { label: 'Results & transcripts', to: '/admin/school/results', icon: FileText, status: 'ready' },
       ],
     },
     {
@@ -165,6 +165,7 @@ const schoolAdminNav: AudienceNav = {
       items: [
         { label: 'Approvals', to: '/admin/school/approvals', icon: ClipboardCheck, status: 'ready', countKey: 'approvals' },
         { label: 'Notifications', to: '/admin/school/notifications', icon: Bell, status: 'ready' },
+        { label: 'Incidents', to: '/admin/school/incidents', icon: AlertTriangle, status: 'ready' },
         { label: 'Settings', to: '/admin/school/settings', icon: Settings, status: 'ready' },
       ],
     },
@@ -292,9 +293,7 @@ const corporateAdminNav: AudienceNav = {
       items: [
         { label: 'Approvals', to: '/admin/corporate/approvals', icon: ClipboardCheck, status: 'ready', countKey: 'approvals' },
         { label: 'Notifications', to: '/admin/corporate/notifications', icon: Bell, status: 'ready' },
-        // The backend has an incident lifecycle; no page has ever been wired
-        // to it, so this has never been a working link.
-        { label: 'Incidents', to: '/admin/corporate/incidents', icon: AlertTriangle, status: 'planned' },
+        { label: 'Incidents', to: '/admin/corporate/incidents', icon: AlertTriangle, status: 'ready' },
         { label: 'Settings', to: '/admin/corporate/settings', icon: Settings, status: 'ready' },
       ],
     },

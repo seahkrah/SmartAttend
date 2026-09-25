@@ -520,7 +520,7 @@ router.get('/courses/:courseId/results', teaching, async (req: TenantRequest, re
     const byId = new Map(students.rows.map((s: any) => [s.id, s]))
 
     const stored = await query(
-      `SELECT student_id, status, published_at FROM course_results
+      `SELECT id, student_id, status, published_at FROM course_results
         WHERE course_id = $1 AND tenant_id = $2
           AND ($3::uuid IS NULL OR semester_id = $3::uuid)`,
       [course.id, ctx.tenantId, semesterId]
@@ -533,6 +533,7 @@ router.get('/courses/:courseId/results', teaching, async (req: TenantRequest, re
       results: computed.map((c) => ({
         ...c,
         student: byId.get(c.studentId) ?? null,
+        resultId: storedById.get(c.studentId)?.id ?? null,
         status: storedById.get(c.studentId)?.status ?? 'unsaved',
         publishedAt: storedById.get(c.studentId)?.published_at ?? null,
       })),
@@ -633,6 +634,7 @@ router.post('/courses/:courseId/results/publish', registrar, async (req: TenantR
 router.post('/results/:id/withhold', registrar, async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return notFound(res, 'Result')
     const updated = await query(
       `UPDATE course_results SET status = 'withheld', published_at = NULL
         WHERE id = $1 AND tenant_id = $2 RETURNING *`,

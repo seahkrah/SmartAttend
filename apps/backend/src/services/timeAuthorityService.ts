@@ -583,10 +583,16 @@ export async function getTenantClockDriftStats(tenantId: string): Promise<any> {
 export async function getCriticalDriftEvents(limit: number = 100): Promise<any[]> {
   try {
     const result = await query(
-      `SELECT * FROM drift_audit_log 
-       WHERE drift_category IN ('BLOCKED', 'CRITICAL')
-       ORDER BY created_at DESC 
-       LIMIT $1`,
+      `SELECT d.*, r.action AS review_action, r.notes AS review_notes,
+              r.reviewed_by, r.created_at AS reviewed_at
+         FROM drift_audit_log d
+         LEFT JOIN LATERAL (
+           SELECT action, notes, reviewed_by, created_at FROM drift_reviews
+            WHERE drift_event_id = d.id ORDER BY created_at DESC LIMIT 1
+         ) r ON TRUE
+        WHERE d.drift_category IN ('BLOCKED', 'CRITICAL')
+        ORDER BY d.created_at DESC
+        LIMIT $1`,
       [limit]
     )
     return result.rows

@@ -209,20 +209,20 @@ router.get('/stats', async (req: Request, res: Response) => {
     res.json({
       totalOpen: open.length,
       byStatus: {
-        open: count((i) => i.status === 'open'),
-        acknowledged: count((i) => i.status === 'acknowledged'),
-        investigating: count((i) => i.status === 'investigating'),
-        escalated: count((i) => i.status === 'escalated'),
+        open: count((i) => i.status === 'OPEN'),
+        investigating: count((i) => i.status === 'INVESTIGATING'),
+        contained: count((i) => i.status === 'CONTAINED'),
+        unacknowledged: count((i) => !i.acknowledged_at),
       },
       bySeverity: {
-        critical: count((i) => i.severity === 'critical'),
-        high: count((i) => i.severity === 'high'),
-        medium: count((i) => i.severity === 'medium'),
-        low: count((i) => i.severity === 'low'),
+        critical: count((i) => i.severity === 'CRITICAL'),
+        high: count((i) => i.severity === 'HIGH'),
+        medium: count((i) => i.severity === 'MEDIUM'),
+        low: count((i) => i.severity === 'LOW'),
       },
       // Unacknowledged for more than an hour.
       overdue: count(
-        (i) => i.status === 'open' && Date.now() - new Date(i.created_at).getTime() > HOUR
+        (i) => !i.acknowledged_at && Date.now() - new Date(i.created_at).getTime() > HOUR
       ),
       totals: stats,
     })

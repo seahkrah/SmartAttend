@@ -70,6 +70,8 @@ export interface CourseResult {
   student: { id: string; student_id: string; first_name: string; last_name: string } | null;
   status: 'unsaved' | 'provisional' | 'published' | 'withheld';
   publishedAt: string | null;
+  /** The stored result, once there is one; needed to withhold it. */
+  resultId: string | null;
 }
 
 export interface TranscriptEntry {
@@ -183,6 +185,11 @@ export const gradebookService = {
   }> {
     const { data } = await axiosClient.post(`/gradebook/courses/${courseId}/results/publish`, input ?? {});
     return data;
+  },
+
+  /** Takes a published result back out of the transcript, pending review. */
+  async withhold(resultId: string): Promise<void> {
+    await axiosClient.post(`/gradebook/results/${resultId}/withhold`);
   },
 
   /**

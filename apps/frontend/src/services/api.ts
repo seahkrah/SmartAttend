@@ -67,6 +67,10 @@ class ApiClient {
     return this.client.post<T>(url, data, config);
   }
 
+  async put<T = any>(url: string, data?: any, config?: any) {
+    return this.client.put<T>(url, data, config);
+  }
+
   async patch<T = any>(url: string, data?: any, config?: any) {
     return this.client.patch<T>(url, data, config);
   }

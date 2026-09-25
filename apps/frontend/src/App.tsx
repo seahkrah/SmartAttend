@@ -7,14 +7,14 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SuperadminRegisterPage } from './pages/SuperadminRegisterPage';
 import { SuperadminLoginPage } from './pages/SuperadminLoginPage';
-import { DashboardPage } from './pages/DashboardPage';
+import HomeRedirect from './components/routing/HomeRedirect';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import IncidentDetailPage from './pages/IncidentDetailPage';
 
 // Superadmin Pages
 import SuperadminConsolePage from './pages/SuperadminConsolePage';
 import SuperadminDashboardPage from './pages/SuperadminDashboardPage';
-import SuperadminAnalyticsPage from './pages/SuperadminAnalyticsPage';
+import SuperadminIncidentsPage from './pages/SuperadminIncidentsPage';
 import SuperadminManagementPage from './pages/SuperadminManagementPage';
 import SuperadminAdminsPage from './pages/SuperadminAdminsPage';
 import SuperadminAuditLogsPage from './pages/SuperadminAuditLogsPage';
@@ -23,7 +23,8 @@ import SuperadminSettingsPage from './pages/SuperadminSettingsPage';
 // Phase 9 Page Wrappers (with HIERARCHY tokens + error/loading states)
 import AdminTenantPanelPage from './pages/AdminTenantPanelPage';
 import FacultyAttendanceWorkflowPage from './pages/FacultyAttendanceWorkflowPage';
-import HREmployeeAttendanceDashboard from './pages/HREmployeeAttendanceDashboard';
+import HRTodayPage from './pages/HRTodayPage';
+import { HRAnalyticsPanelPage } from './pages/HRAnalyticsPanelPage';
 
 // Faculty Portal Pages
 import FacultyDashboardPage from './pages/FacultyDashboardPage';
@@ -150,7 +151,7 @@ export default function App() {
                     <Route path="/" element={<SuperadminConsolePage />} />
                     <Route path="/console" element={<SuperadminConsolePage />} />
                     <Route path="/dashboard" element={<SuperadminDashboardPage />} />
-                    <Route path="/analytics" element={<SuperadminAnalyticsPage />} />
+                    <Route path="/incidents" element={<SuperadminIncidentsPage />} />
                     <Route path="/management" element={<SuperadminManagementPage />} />
                     <Route path="/entities" element={<SuperadminManagementPage />} />
                     <Route path="/tenants" element={<SuperadminManagementPage />} />
@@ -276,8 +277,8 @@ export default function App() {
               <RoleRoute requiredRole={['hr', 'hr_director', 'admin', 'manager']}>
                 <AppShell>
                   <Routes>
-                    <Route path="/" element={<HREmployeeAttendanceDashboard />} />
-                    <Route path="/analytics" element={<HREmployeeAttendanceDashboard />} />
+                    <Route path="/" element={<HRTodayPage />} />
+                    <Route path="/analytics" element={<HRAnalyticsPanelPage />} />
                     <Route path="/leave" element={<HRLeavePage />} />
                     <Route path="/face-matching" element={<FaceMatchingAdminPage subjectType="employee" />} />
                     <Route path="/payroll" element={<HRPayrollPage />} />
@@ -326,12 +327,13 @@ export default function App() {
           }
         />
 
-        {/* Default Dashboard Route (legacy) */}
+        {/* Where a signed-in user belongs: their audience's home, or a plain
+            statement that their role has none. */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <HomeRedirect />
             </ProtectedRoute>
           }
         />

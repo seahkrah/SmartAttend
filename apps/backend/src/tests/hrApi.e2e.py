@@ -85,5 +85,24 @@ co,r=call("GET","/export/organization-report?format=XLSX",A['token']); check("XL
 co,r=call("GET","/export/organization-report?format=CSV",A['token']); check("CSV 200", co==200 and 'name,email' in str(r), f"({co})")
 check("export excludes B employees", 'emp1.b@c2e.test' not in str(r))
 
+print("-- today --")
+# The HR landing page used to show six invented employees. It now reads this.
+co,r=call("GET","/today",A['token'])
+check("today 200 for HR", co==200, f"({co} {r})")
+ids={p['employeeId'] for p in r.get('people',[])} if co==200 else set()
+check("today covers exactly the tenant's current staff", ids==A_STAFF, f"({ids ^ A_STAFF})")
+check("organisation scope for HR", co==200 and r.get('scope')=='organisation', f"({r.get('scope')})")
+check("every person has a known status",
+      co==200 and all(p['status'] in ('on_clock','checked_out','absent','expected','off') for p in r['people']), "")
+check("the summary adds up",
+      co==200 and sum(r['summary'][k] for k in ('onClock','checkedOut','absent','expected','off'))==r['summary']['total'], f"({r.get('summary')})")
+co,r=call("GET","/today",B['token'])
+check("B's today holds none of A's staff", co==200 and not ({p['employeeId'] for p in r['people']} & A_STAFF), f"({co})")
+co,r=call("GET","/today",A['managerToken'])
+check("a manager sees only their direct reports", co==200 and r.get('scope')=='direct_reports'
+      and all(p['employeeId']!=A['hrEmpId'] for p in r['people']), f"({co} {r.get('scope')})")
+co,r=call("GET","/today",A['empToken'])
+check("an employee cannot read who is at work", co==403, f"({co})")
+
 print(f"\n{P} passed, {F} failed")
 sys.exit(0 if F==0 else 1)

@@ -83,6 +83,122 @@ function windowDays(req: TenantRequest): number {
 }
 
 // ---------------------------------------------------------------------------
+// GET /api/hr/today
+// ---------------------------------------------------------------------------
+// Who is at work today, from real check-ins and the published roster.
+//
+// Each person is one of: on the clock (an open check-in from the last day),
+// checked out (checked in today and out again), absent (rostered, the shift
+// began more than the grace period ago, and no check-in), expected (rostered,
+// not started yet), or off (neither rostered nor checked in). Late is a flag
+// on top: the first check-in came after the shift start plus the grace
+// period. Revoked check-ins do not count; flagged ones do, and say so.
+//
+// A manager sees their direct reports; HR and administrators see everyone.
+// The day is the server's.
+const LATE_GRACE_MINUTES = 10
+
+router.get('/today', async (req: TenantRequest, res: Response) => {
+  const ctx = req.ctx!
+  try {
+    let managerScope: string | null = null
+    if (ctx.roleName === 'manager') {
+      const me = await query(`SELECT id FROM employees WHERE user_id = $1 AND tenant_id = $2`,
+        [ctx.userId, ctx.tenantId])
+      if (me.rows.length === 0) return res.json({ date: null, summary: {}, people: [] })
+      managerScope = me.rows[0].id
+    }
+
+    const r = await query(
+      `WITH people AS (
+         SELECT e.id, e.employee_id AS code, e.first_name || ' ' || e.last_name AS name,
+                d.name AS department
+           FROM employees e
+           LEFT JOIN corporate_departments d ON d.id = e.department_id AND d.tenant_id = e.tenant_id
+          WHERE e.tenant_id = $1 AND e.is_currently_employed
+            AND ($2::uuid IS NULL OR e.manager_id = $2::uuid)
+       ),
+       shift AS (
+         SELECT DISTINCT ON (employee_id) employee_id, starts_at, ends_at, name AS shift_name
+           FROM roster_shifts
+          WHERE tenant_id = $1 AND work_date = CURRENT_DATE AND status = 'published'
+          ORDER BY employee_id, starts_at
+       ),
+       first_in AS (
+         SELECT DISTINCT ON (employee_id) employee_id, check_in_time, check_out_time, checkin_state,
+                face_verified, check_in_type, site_location
+           FROM corporate_checkins
+          WHERE tenant_id = $1 AND checkin_state <> 'REVOKED'
+            AND check_in_time >= CURRENT_DATE AND check_in_time < CURRENT_DATE + 1
+          ORDER BY employee_id, check_in_time
+       ),
+       open_now AS (
+         SELECT DISTINCT employee_id FROM corporate_checkins
+          WHERE tenant_id = $1 AND checkin_state <> 'REVOKED' AND check_out_time IS NULL
+            AND check_in_time > LOCALTIMESTAMP - INTERVAL '24 hours'
+       )
+       SELECT p.*, s.starts_at, s.ends_at, s.shift_name,
+              f.check_in_time, f.check_out_time, f.checkin_state, f.face_verified,
+              f.check_in_type, f.site_location,
+              (o.employee_id IS NOT NULL) AS on_clock,
+              CURRENT_DATE AS today, LOCALTIMESTAMP AS now
+         FROM people p
+         LEFT JOIN shift s ON s.employee_id = p.id
+         LEFT JOIN first_in f ON f.employee_id = p.id
+         LEFT JOIN open_now o ON o.employee_id = p.id
+        ORDER BY p.name`,
+      [ctx.tenantId, managerScope]
+    )
+
+    const grace = LATE_GRACE_MINUTES * 60_000
+    const people = r.rows.map((x: any) => {
+      const now = new Date(x.now).getTime()
+      const start = x.starts_at ? new Date(x.starts_at).getTime() : null
+      const firstIn = x.check_in_time ? new Date(x.check_in_time).getTime() : null
+      let status: 'on_clock' | 'checked_out' | 'absent' | 'expected' | 'off'
+      if (x.on_clock) status = 'on_clock'
+      else if (firstIn !== null) status = 'checked_out'
+      else if (start !== null) status = now > start + grace ? 'absent' : 'expected'
+      else status = 'off'
+      return {
+        employeeId: x.id,
+        code: x.code,
+        name: x.name,
+        department: x.department,
+        status,
+        late: start !== null && firstIn !== null && firstIn > start + grace,
+        shift: x.starts_at ? { name: x.shift_name, startsAt: x.starts_at, endsAt: x.ends_at } : null,
+        firstCheckIn: x.check_in_time,
+        checkedOutAt: x.check_out_time,
+        state: x.checkin_state,
+        faceMatched: x.face_verified === true,
+        checkInType: x.check_in_type,
+        site: x.site_location,
+      }
+    })
+    const count = (k: string) => people.filter((p: any) => p.status === k).length
+    res.json({
+      date: r.rows[0]?.today ?? null,
+      graceMinutes: LATE_GRACE_MINUTES,
+      scope: managerScope ? 'direct_reports' : 'organisation',
+      summary: {
+        total: people.length,
+        onClock: count('on_clock'),
+        checkedOut: count('checked_out'),
+        absent: count('absent'),
+        expected: count('expected'),
+        off: count('off'),
+        late: people.filter((p: any) => p.late).length,
+        flagged: people.filter((p: any) => p.state === 'FLAGGED').length,
+      },
+      people,
+    })
+  } catch (e) {
+    fail(res, e)
+  }
+})
+
+// ---------------------------------------------------------------------------
 // GET /api/hr/overview
 // ---------------------------------------------------------------------------
 router.get('/overview', async (req: TenantRequest, res: Response) => {

@@ -1266,6 +1266,45 @@ router.get('/incidents', async (req: Request, res: Response) => {
   }
 })
 
+async function incidentWithTimeline(runner: { query: typeof query }, id: string) {
+  const inc = await runner.query(
+    `SELECT i.*, t.name AS affected_tenant_name, d.full_name AS detected_by_name,
+            a.full_name AS acknowledged_by_name, r.full_name AS resolved_by_name,
+            s.full_name AS assigned_to_name
+       FROM incidents i
+       LEFT JOIN tenants t ON t.id = i.affected_tenant_id
+       LEFT JOIN users d ON d.id = i.detected_by_user_id
+       LEFT JOIN users a ON a.id = i.acknowledged_by_user_id
+       LEFT JOIN users r ON r.id = i.resolved_by_user_id
+       LEFT JOIN users s ON s.id = i.assigned_superadmin_id
+      WHERE i.id = $1`,
+    [id]
+  )
+  if (inc.rows.length === 0) return null
+  const timeline = await runner.query(
+    `SELECT e.id, e.event_type, e.old_value, e.new_value, e.description, e.created_at,
+            u.full_name AS performed_by_name
+       FROM incident_timeline_events e
+       LEFT JOIN users u ON u.id = e.performed_by_user_id
+      WHERE e.incident_id = $1
+      ORDER BY e.created_at DESC`,
+    [id]
+  )
+  return { incident: inc.rows[0], timeline: timeline.rows }
+}
+
+router.get('/incidents/:incidentId', async (req: Request, res: Response) => {
+  try {
+    const { incidentId } = req.params
+    if (!UUID.test(incidentId)) return notFound(res, 'Incident')
+    const found = await incidentWithTimeline({ query }, incidentId)
+    if (!found) return notFound(res, 'Incident')
+    return res.json(found)
+  } catch (e) {
+    return fail(res, 'load that incident', e)
+  }
+})
+
 router.post('/incidents', async (req: Request, res: Response) => {
   try {
     const b = req.body ?? {}
@@ -1339,7 +1378,17 @@ router.put('/incidents/:incidentId', async (req: Request, res: Response) => {
       })
     }
 
-    const after = await query(
+    const note = typeof b.notes === 'string' ? b.notes.trim() : ''
+    if (!status && !b.title && b.description === undefined && !b.severity && !b.rootCause
+        && !b.resolutionNotes && !note) {
+      return res.status(400).json({ error: 'Nothing to change' })
+    }
+
+    const client = await getConnection()
+    let after: any
+    try {
+    await client.query('BEGIN')
+    after = await client.query(
       `UPDATE incidents
           SET title = COALESCE($2, title),
               description = COALESCE($3, description),
@@ -1365,12 +1414,47 @@ router.put('/incidents/:incidentId', async (req: Request, res: Response) => {
       ]
     )
 
+    // The timeline is the incident's story; every change and note is in it.
+    if (status && status !== before.rows[0].status) {
+      await client.query(
+        `INSERT INTO incident_timeline_events
+           (incident_id, event_type, old_value, new_value, description, performed_by_user_id)
+         VALUES ($1, 'status_changed', $2, $3, $4, $5)`,
+        [incidentId, JSON.stringify(before.rows[0].status), JSON.stringify(status),
+         `Status changed from ${before.rows[0].status} to ${status}`, actorOf(req)]
+      )
+    }
+    if (b.severity && String(b.severity).toUpperCase() !== before.rows[0].severity) {
+      await client.query(
+        `INSERT INTO incident_timeline_events
+           (incident_id, event_type, old_value, new_value, description, performed_by_user_id)
+         VALUES ($1, 'severity_updated', $2, $3, $4, $5)`,
+        [incidentId, JSON.stringify(before.rows[0].severity), JSON.stringify(String(b.severity).toUpperCase()),
+         `Severity changed from ${before.rows[0].severity} to ${String(b.severity).toUpperCase()}`, actorOf(req)]
+      )
+    }
+    if (note) {
+      await client.query(
+        `INSERT INTO incident_timeline_events
+           (incident_id, event_type, description, performed_by_user_id)
+         VALUES ($1, 'note_added', $2, $3)`,
+        [incidentId, note.slice(0, 4000), actorOf(req)]
+      )
+    }
+    await client.query('COMMIT')
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw e
+    } finally {
+      client.release()
+    }
+
     await audit(req, 'INCIDENT_UPDATE', 'SYSTEM', { result: 'SUCCESS' },
       { type: 'incident', id: incidentId },
       { beforeState: before.rows[0], afterState: after.rows[0] })
     await logAction(req, 'INCIDENT_UPDATE', 'incident', incidentId, { status: b.status })
 
-    return res.json({ incident: after.rows[0] })
+    return res.json(await incidentWithTimeline({ query }, incidentId))
   } catch (e) {
     await audit(req, 'INCIDENT_UPDATE', 'SYSTEM',
       { result: 'FAILURE', error: String((e as Error).message) },

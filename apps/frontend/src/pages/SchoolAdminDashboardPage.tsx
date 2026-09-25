@@ -19,6 +19,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import axios from 'axios'
+import { ErrorState } from '../components/states/PageStates'
 
 interface DashboardStats {
   totalUsers: number
@@ -46,6 +47,7 @@ const SchoolAdminDashboardPage: React.FC = () => {
   })
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDashboardData()
@@ -54,6 +56,7 @@ const SchoolAdminDashboardPage: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const token = localStorage.getItem('accessToken')
       
       // Fetch dashboard stats
@@ -78,14 +81,10 @@ const SchoolAdminDashboardPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
-      // Use mock data for demo
-      setStats({
-        totalUsers: 150,
-        activeUsers: 142,
-        pendingApprovals: 5,
-        todayAttendance: 138,
-        attendanceRate: 92,
-      })
+      // This used to fill the cards with invented figures (150 users, 92%
+      // attendance) when the request failed, so an outage looked like a
+      // healthy school. It now says the figures could not be loaded.
+      setLoadError('The dashboard figures could not be loaded.')
     } finally {
       setLoading(false)
     }
@@ -136,6 +135,14 @@ const SchoolAdminDashboardPage: React.FC = () => {
       <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-white group-hover:translate-x-1 transition-all" />
     </button>
   )
+
+  if (loadError && !loading) {
+    return (
+      <div className="p-6">
+        <ErrorState title="Dashboard unavailable" description={loadError} onRetry={fetchDashboardData} />
+      </div>
+    )
+  }
 
   return (
     <>

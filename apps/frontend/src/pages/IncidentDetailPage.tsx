@@ -1,432 +1,204 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
-import { motion } from 'framer-motion'
-import { useParams, useNavigate } from 'react-router-dom'
+/**
+ * Superadmin — one incident.
+ *
+ * Rewritten against the API that exists. The previous page read an endpoint
+ * the server did not have, displayed fields the incidents table does not hold
+ * (affected entity lists, users impacted), and its status dropdown changed
+ * only the screen: nothing was saved. Now:
+ *
+ *   GET /api/superadmin/incidents/:id   the incident and its timeline
+ *   PUT /api/superadmin/incidents/:id   status, severity, root cause, notes;
+ *                                       every change lands on the timeline
+ */
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, MessageSquarePlus } from 'lucide-react';
+import { axiosClient } from '../utils/axiosClient';
+import { ErrorState, LoadingState, EmptyState } from '../components/states/PageStates';
 
-interface IncidentTimeline {
-  id: string
-  action: string
-  notes: string
-  status?: string
-  created_at: string
-  created_by: string
-}
+const STATUSES = ['OPEN', 'INVESTIGATING', 'CONTAINED', 'RESOLVED', 'CLOSED'] as const;
+const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 
 interface Incident {
-  id: string
-  title: string
-  description: string
-  severity: 'critical' | 'high' | 'medium' | 'low'
-  status: 'open' | 'investigating' | 'resolved' | 'closed'
-  affected_entities: string[]
-  affected_entity_count: number
-  impact_users: number
-  created_at: string
-  created_by: string
-  updated_at: string
-  updated_by: string
-  timeline: IncidentTimeline[]
+  id: string;
+  incident_number: number;
+  title: string;
+  description: string;
+  incident_type: string;
+  severity: (typeof SEVERITIES)[number];
+  status: (typeof STATUSES)[number];
+  affected_tenant_name: string | null;
+  created_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  root_cause: string | null;
+  resolution_notes: string | null;
+  detected_by_name: string | null;
+  acknowledged_by_name: string | null;
+  resolved_by_name: string | null;
+  assigned_to_name: string | null;
+  error_count: number | null;
 }
 
-const getSeverityColor = (severity: string) => {
-  switch (severity) {
-    case 'critical':
-      return { bg: 'bg-red-900/20', border: 'border-red-600', text: 'text-red-300', badge: '🔴' }
-    case 'high':
-      return { bg: 'bg-orange-900/20', border: 'border-orange-600', text: 'text-orange-300', badge: '🟠' }
-    case 'medium':
-      return { bg: 'bg-amber-900/20', border: 'border-amber-600', text: 'text-amber-300', badge: '🟡' }
-    case 'low':
-      return { bg: 'bg-blue-900/20', border: 'border-blue-600', text: 'text-blue-300', badge: '🟢' }
-    default:
-      return { bg: 'bg-slate-900/20', border: 'border-slate-600', text: 'text-slate-300', badge: '⚪' }
-  }
+interface TimelineEntry {
+  id: string;
+  event_type: string;
+  description: string | null;
+  created_at: string;
+  performed_by_name: string | null;
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'open':
-      return { bg: 'bg-red-600/30', text: 'text-red-300', icon: '🔴' }
-    case 'investigating':
-      return { bg: 'bg-amber-600/30', text: 'text-amber-300', icon: '🔍' }
-    case 'resolved':
-      return { bg: 'bg-green-600/30', text: 'text-green-300', icon: '✅' }
-    case 'closed':
-      return { bg: 'bg-blue-600/30', text: 'text-blue-300', icon: '✓' }
-    default:
-      return { bg: 'bg-slate-600/30', text: 'text-slate-300', icon: '⭕' }
-  }
-}
+const SEVERITY_BADGE: Record<string, string> = {
+  CRITICAL: 'badge badge-danger', HIGH: 'badge badge-danger', MEDIUM: 'badge badge-warning', LOW: 'badge badge-neutral',
+};
 
-const IncidentDetailView: React.FC = () => {
-  const { incidentId } = useParams<{ incidentId: string }>()
-  const navigate = useNavigate()
-  const [incident, setIncident] = useState<Incident | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [newNote, setNewNote] = useState('')
-  const [newStatus, setNewStatus] = useState('')
-  const [updating, setUpdating] = useState(false)
-  const [showNoteForm, setShowNoteForm] = useState(false)
+const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
 
-  useEffect(() => {
-    fetchIncidentDetails()
-  }, [incidentId])
+const IncidentDetailPage: React.FC = () => {
+  const { incidentId } = useParams<{ incidentId: string }>();
+  const navigate = useNavigate();
+  const [incident, setIncident] = useState<Incident | null>(null);
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [status, setStatus] = useState<string>('');
+  const [rootCause, setRootCause] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const fetchIncidentDetails = async () => {
+  const apply = (data: { incident: Incident; timeline: TimelineEntry[] }) => {
+    setIncident(data.incident);
+    setTimeline(data.timeline);
+    setStatus(data.incident.status);
+    setRootCause(data.incident.root_cause ?? '');
+  };
+
+  const load = async () => {
+    setLoadError(null);
     try {
-      setLoading(true)
-      const token = localStorage.getItem('accessToken')
-      const response = await axios.get(`/api/superadmin/incidents/${incidentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setIncident(response.data.data)
-      setNewStatus(response.data.data.status)
-      setError('')
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load incident')
-      console.error('Error fetching incident:', err)
-    } finally {
-      setLoading(false)
+      const { data } = await axiosClient.get(`/superadmin/incidents/${incidentId}`);
+      apply(data);
+    } catch (e: any) {
+      if (e?.response?.status === 404) setNotFound(true);
+      else setLoadError(e?.response?.data?.error ?? 'The incident could not be loaded');
     }
-  }
+  };
 
-  const handleStatusChange = async () => {
-    if (newStatus === incident?.status) return
+  useEffect(() => { void load(); }, [incidentId]);
 
+  const save = async (body: Record<string, unknown>) => {
+    setSaving(true);
+    setSaveError(null);
     try {
-      setUpdating(true)
-      const token = localStorage.getItem('accessToken')
-      const response = await axios.put(
-        `/api/superadmin/incidents/${incidentId}`,
-        { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      setIncident(response.data.data)
-      setError('')
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update status')
-      setNewStatus(incident?.status || 'open')
+      const { data } = await axiosClient.put(`/superadmin/incidents/${incidentId}`, body);
+      apply(data);
+      return true;
+    } catch (e: any) {
+      setSaveError(e?.response?.data?.error ?? 'The change was not saved');
+      return false;
     } finally {
-      setUpdating(false)
+      setSaving(false);
     }
+  };
+
+  if (notFound) {
+    return <div className="p-6"><EmptyState title="No such incident" description="It may have been removed, or the link is wrong." /></div>;
   }
+  if (loadError) return <div className="p-6"><ErrorState title="Could not load the incident" description={loadError} onRetry={load} /></div>;
+  if (!incident) return <div className="p-6"><LoadingState label="Loading incident" /></div>;
 
-  const handleAddNote = async () => {
-    if (!newNote.trim()) return
-
-    try {
-      setUpdating(true)
-      const token = localStorage.getItem('accessToken')
-      const response = await axios.put(
-        `/api/superadmin/incidents/${incidentId}`,
-        { notes: newNote },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      setIncident(response.data.data)
-      setNewNote('')
-      setShowNoteForm(false)
-      setError('')
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to add note')
-    } finally {
-      setUpdating(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full"
-        />
-      </div>
-    )
-  }
-
-  if (error && !incident) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-        <div className="text-center">
-          <p className="text-red-500 text-2xl font-bold mb-4">Error</p>
-          <p className="text-slate-300 mb-6">{error}</p>
-          <button
-            onClick={() => navigate('/superadmin')}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!incident) return null
-
-  const severityStyle = getSeverityColor(incident.severity)
+  const resolving = status === 'RESOLVED' && incident.status !== 'RESOLVED';
+  const statusChanged = status !== incident.status;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4 mb-8"
-        >
+    <div className="p-6 space-y-6 max-w-5xl">
+      <button className="btn btn-ghost flex items-center gap-1" onClick={() => navigate('/superadmin/incidents')}>
+        <ArrowLeft className="w-4 h-4" /> Incidents
+      </button>
+
+      <header className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={SEVERITY_BADGE[incident.severity] ?? 'badge badge-neutral'}>{incident.severity}</span>
+          <span className="badge badge-brand">{incident.status}</span>
+          <span className="text-sm text-muted">#{incident.incident_number} · {incident.incident_type}</span>
+        </div>
+        <h1 className="text-2xl font-semibold text-primary">{incident.title}</h1>
+        <p className="text-secondary whitespace-pre-line">{incident.description}</p>
+      </header>
+
+      {saveError && <div role="alert" className="card text-sm text-danger-600">{saveError}</div>}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="card space-y-2 text-sm">
+          <h2 className="font-semibold text-primary">Details</h2>
+          <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1">
+            <dt className="text-muted">Organisation</dt><dd className="text-primary">{incident.affected_tenant_name ?? 'Platform-wide'}</dd>
+            <dt className="text-muted">Detected</dt><dd className="text-primary">{when(incident.created_at)}{incident.detected_by_name ? ` by ${incident.detected_by_name}` : ''}</dd>
+            <dt className="text-muted">Assigned to</dt><dd className="text-primary">{incident.assigned_to_name ?? '—'}</dd>
+            <dt className="text-muted">Acknowledged</dt><dd className="text-primary">{when(incident.acknowledged_at)}{incident.acknowledged_by_name ? ` by ${incident.acknowledged_by_name}` : ''}</dd>
+            <dt className="text-muted">Resolved</dt><dd className="text-primary">{when(incident.resolved_at)}{incident.resolved_by_name ? ` by ${incident.resolved_by_name}` : ''}</dd>
+            {incident.error_count !== null && (<><dt className="text-muted">Errors seen</dt><dd className="text-primary">{incident.error_count}</dd></>)}
+            {incident.root_cause && (<><dt className="text-muted">Root cause</dt><dd className="text-primary whitespace-pre-line">{incident.root_cause}</dd></>)}
+          </dl>
+        </section>
+
+        <section className="card space-y-3 text-sm">
+          <h2 className="font-semibold text-primary">Change status</h2>
+          <label className="block">
+            <span className="text-muted">Status</span>
+            <select className="input-field w-full mt-1" value={status} onChange={(e) => setStatus(e.target.value)} disabled={saving}>
+              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          {resolving && (
+            <label className="block">
+              <span className="text-muted">Root cause (required to resolve)</span>
+              <textarea className="input-field w-full mt-1" rows={3} value={rootCause} onChange={(e) => setRootCause(e.target.value)} />
+            </label>
+          )}
           <button
-            onClick={() => navigate('/superadmin')}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+            className="btn btn-primary"
+            disabled={saving || !statusChanged || (resolving && rootCause.trim().length === 0)}
+            onClick={() => void save({ status, ...(resolving ? { rootCause: rootCause.trim() } : {}) })}
           >
-            ← Back
+            {saving ? 'Saving…' : 'Save status'}
           </button>
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-2xl">{severityStyle.badge}</span>
-              <h1 className="text-4xl font-bold">{incident.title}</h1>
-            </div>
-            <p className="text-slate-400">ID: {incident.id}</p>
-          </div>
-        </motion.div>
-
-        {/* Error Alert */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="p-4 bg-red-900/20 border border-red-600 rounded-lg text-red-300"
-          >
-            {error}
-          </motion.div>
-        )}
-
-        {/* Main Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className={`p-8 rounded-xl border ${severityStyle.border} ${severityStyle.bg} backdrop-blur-sm`}
-        >
-          {/* Severity & Status Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div>
-              <label className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Severity</label>
-              <div className={`mt-2 px-4 py-2 rounded-lg font-semibold ${severityStyle.text} capitalize`}>
-                {severityStyle.badge} {incident.severity}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Status</label>
-              <select
-                value={newStatus}
-                onChange={(e) => {
-                  setNewStatus(e.target.value)
-                  setTimeout(() => {
-                    setNewStatus(e.target.value)
-                    const newVal = e.target.value
-                    setIncident(prev => prev ? { ...prev, status: newVal as any } : null)
-                  }, 300)
-                }}
-                disabled={updating}
-                className="mt-2 w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 capitalize"
-              >
-                <option value="open">🔴 Open</option>
-                <option value="investigating">🔍 Investigating</option>
-                <option value="resolved">✅ Resolved</option>
-                <option value="closed">✓ Closed</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="mb-8">
-            <h3 className="text-lg font-bold mb-3">Description</h3>
-            <p className="text-slate-300 leading-relaxed">{incident.description}</p>
-          </div>
-
-          {/* Meta Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm text-slate-400 mb-1">Created</p>
-              <p className="font-semibold">{new Date(incident.created_at).toLocaleString()}</p>
-              <p className="text-sm text-slate-400">by {incident.created_by}</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-400 mb-1">Last Updated</p>
-              <p className="font-semibold">{new Date(incident.updated_at).toLocaleString()}</p>
-              <p className="text-sm text-slate-400">by {incident.updated_by}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Impact Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
-        >
-          <h3 className="text-lg font-bold">Impact</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-4 rounded-lg bg-slate-700/30">
-              <p className="text-sm text-slate-400">Affected Entities</p>
-              <p className="text-3xl font-bold text-cyan-400">{incident.affected_entity_count}</p>
-            </div>
-            <div className="p-4 rounded-lg bg-slate-700/30">
-              <p className="text-sm text-slate-400">Users Impacted</p>
-              <p className="text-3xl font-bold text-amber-400">{incident.impact_users.toLocaleString()}</p>
-            </div>
-          </div>
-          {incident.affected_entities.length > 0 && (
-            <div>
-              <p className="text-sm text-slate-400 mb-3">Affected IDs:</p>
-              <div className="flex flex-wrap gap-2">
-                {incident.affected_entities.map((entity, idx) => (
-                  <span key={idx} className="px-3 py-1 bg-slate-700 rounded-full text-sm">
-                    {entity}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Timeline */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-6"
-        >
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold">Timeline</h3>
-            {!showNoteForm && (
-              <button
-                onClick={() => setShowNoteForm(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm font-semibold"
-              >
-                + Add Note
-              </button>
-            )}
-          </div>
-
-          {/* Add Note Form */}
-          {showNoteForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="p-4 rounded-lg bg-blue-900/20 border border-blue-600 space-y-3"
-            >
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Add a note to the timeline..."
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                rows={4}
-                disabled={updating}
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleAddNote}
-                  disabled={updating || !newNote.trim()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors font-semibold"
-                >
-                  {updating ? 'Adding...' : 'Add Note'}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowNoteForm(false)
-                    setNewNote('')
-                  }}
-                  disabled={updating}
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-lg transition-colors font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Timeline Items */}
-          <div className="space-y-4">
-            {incident.timeline && incident.timeline.length > 0 ? (
-              incident.timeline.map((entry, idx) => {
-                const actionStyle = entry.status ? getStatusColor(entry.status) : { bg: '', text: '', icon: '📝' }
-                return (
-                  <motion.div
-                    key={entry.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className="flex gap-4"
-                  >
-                    <div className="flex flex-col items-center">
-                      <div className="text-2xl">{actionStyle.icon || '📝'}</div>
-                      {idx < (incident.timeline?.length || 0) - 1 && (
-                        <div className="w-1 h-12 bg-slate-700 mt-2" />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-4">
-                      <div className="p-4 rounded-lg bg-slate-700/30 border border-slate-700">
-                        <div className="flex items-start justify-between mb-2">
-                          <p className="font-semibold capitalize">{entry.action}</p>
-                          <p className="text-xs text-slate-400">
-                            {new Date(entry.created_at).toLocaleTimeString()}
-                          </p>
-                        </div>
-                        {entry.status && (
-                          <p className={`text-sm mb-2 capitalize ${actionStyle.text}`}>
-                            {actionStyle.icon} Status: {entry.status}
-                          </p>
-                        )}
-                        {entry.notes && (
-                          <p className="text-sm text-slate-300">{entry.notes}</p>
-                        )}
-                        <p className="text-xs text-slate-500 mt-2">by {entry.created_by}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )
-              })
-            ) : (
-              <p className="text-slate-400 text-center py-8">No timeline entries yet</p>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="flex gap-3 justify-end"
-        >
-          <button
-            onClick={() => navigate('/superadmin')}
-            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition-colors"
-          >
-            Close
-          </button>
-          {incident.status !== 'closed' && (
-            <button
-              onClick={() => {
-                setNewStatus('closed' as any)
-                handleStatusChange()
-              }}
-              disabled={updating}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg font-semibold transition-colors"
-            >
-              {updating ? 'Updating...' : 'Close Incident'}
-            </button>
-          )}
-        </motion.div>
+        </section>
       </div>
-    </div>
-  )
-}
 
-export default IncidentDetailView
+      <section className="card space-y-3">
+        <h2 className="font-semibold text-primary">Timeline</h2>
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (await save({ notes: note })) setNote('');
+          }}
+        >
+          <textarea className="input-field w-full" rows={2} placeholder="Add a note to the timeline"
+                    value={note} onChange={(e) => setNote(e.target.value)} aria-label="Note" />
+          <div>
+            <button className="btn btn-secondary flex items-center gap-1" disabled={saving || note.trim().length === 0}>
+              <MessageSquarePlus className="w-4 h-4" /> Add note
+            </button>
+          </div>
+        </form>
+        {timeline.length === 0 ? (
+          <p className="text-sm text-muted">Nothing recorded yet.</p>
+        ) : (
+          <ol className="space-y-2 text-sm">
+            {timeline.map((t) => (
+              <li key={t.id} className="border-l-2 border-subtle pl-3">
+                <div className="text-muted">{when(t.created_at)} · {t.event_type.replace(/_/g, ' ')}{t.performed_by_name ? ` · ${t.performed_by_name}` : ''}</div>
+                {t.description && <div className="text-primary whitespace-pre-line">{t.description}</div>}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+};
+
+export default IncidentDetailPage;

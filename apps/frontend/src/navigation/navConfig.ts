@@ -308,7 +308,7 @@ const hrNav: AudienceNav = {
     {
       label: 'Overview',
       items: [
-        { label: 'Attendance overview', to: '/hr', icon: LayoutDashboard, status: 'ready' },
+        { label: 'Today', to: '/hr', icon: LayoutDashboard, status: 'ready' },
         { label: 'HR analytics', to: '/hr/analytics', icon: BarChart3, status: 'ready' },
       ],
     },
@@ -354,7 +354,7 @@ const managerNav: AudienceNav = {
     {
       label: 'Overview',
       items: [
-        { label: 'Attendance overview', to: '/hr', icon: LayoutDashboard, status: 'ready' },
+        { label: 'Today', to: '/hr', icon: LayoutDashboard, status: 'ready' },
       ],
     },
     {
@@ -439,6 +439,7 @@ const superadminNav: AudienceNav = {
     {
       label: 'System',
       items: [
+        { label: 'Incidents', to: '/superadmin/incidents', icon: AlertTriangle, status: 'ready' },
         { label: 'Audit log', to: '/superadmin/audit', icon: FileText, status: 'ready' },
         { label: 'Settings', to: '/superadmin/settings', icon: Settings, status: 'ready' },
       ],

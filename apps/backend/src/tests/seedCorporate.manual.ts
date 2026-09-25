@@ -18,6 +18,12 @@ async function main() {
   const adminRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='admin'`, [cp.id])).rows[0]
   const mgrRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='manager'`, [cp.id])).rows[0]
 
+  // Incidents can name an employer (057); theirs go before the tenant does.
+  await query(`DELETE FROM incident_timeline_events WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%'))`)
+  await query(`DELETE FROM incident_notifications WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%'))`)
+  await query(`DELETE FROM escalation_events WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%'))`)
+  await query(`DELETE FROM error_logs WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%'))`)
+  await query(`DELETE FROM incidents WHERE id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%'))`)
   await query(`DELETE FROM notifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_campaigns WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM stored_files WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)

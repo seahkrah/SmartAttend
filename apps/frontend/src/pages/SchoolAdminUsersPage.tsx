@@ -117,7 +117,7 @@ const SchoolAdminUsersPage: React.FC = () => {
           headers: { Authorization: `Bearer ${token}` },
         })
         setUsers((prev) => prev.filter((u) => u.id !== userId))
-        showToast('success', 'User deleted successfully')
+        showToast('success', 'Removed from the school')
       } else {
         await axios.patch(
           `/api/auth/admin/school/users/${userId}`,
@@ -182,12 +182,12 @@ const SchoolAdminUsersPage: React.FC = () => {
     const titles = {
       suspend: 'Suspend User',
       disable: 'Disable User',
-      delete: 'Delete User',
+      delete: 'Remove from school',
     }
     const messages = {
       suspend: `Are you sure you want to suspend ${userName}? They will not be able to access the system until reactivated.`,
       disable: `Are you sure you want to disable ${userName}? They will be marked as inactive.`,
-      delete: `Are you sure you want to permanently delete ${userName}? This action cannot be undone.`,
+      delete: `Remove ${userName} from this school? They lose access here. Their attendance, grades and invoices are kept, and the account is deactivated if they belong to no other school.`,
     }
     setConfirmDialog({
       open: true,

@@ -1,3 +1,5 @@
+import { logAudit } from '../services/domainAuditService.js'
+import { getClientIp } from '../utils/getClientIp.js'
 import { Router, Response } from 'express'
 import { query, getConnection } from '../db/connection.js'
 import { hashPassword } from '../auth/authService.js'
@@ -299,9 +301,70 @@ router.patch('/admin/school/users/:userId', async (req: TenantRequest, res: Resp
       await query(`UPDATE users SET is_active = $1 WHERE id = $2`, [next.active, userId])
     }
 
+    await logAudit({
+      actorId: ctx.userId, actorRole: ctx.roleName, actionType: `USER_${String(action).toUpperCase()}`,
+      actionScope: 'TENANT', resourceType: 'user', resourceId: userId, tenantId: ctx.tenantId,
+      afterState: { membership: next.assoc }, ipAddress: getClientIp(req),
+    }).catch((e) => console.error('[SCHOOL_ADMIN] audit failed:', e))
+
     return res.json({ message: 'User updated successfully' })
   } catch (e) {
     return fail(res, 'update user', e)
+  }
+})
+
+/**
+ * Removes a person from this school.
+ *
+ * Their membership goes; their records (attendance, grades, invoices) stay,
+ * because the school's history must outlive an account. The account itself is
+ * deactivated only if they belong to no other school. An administrator cannot
+ * remove themselves or another administrator: administrators cannot create
+ * administrators here, and one compromised account must not be able to lock
+ * the others out.
+ */
+router.delete('/admin/school/users/:userId', async (req: TenantRequest, res: Response) => {
+  const client = await getConnection()
+  try {
+    const ctx = ctxOf(req)
+    const { userId } = req.params
+    if (badId(res, userId, 'User')) return
+    if (!(await userInTenant(ctx, userId))) return notFound(res, 'User')
+    if (userId === ctx.userId) {
+      return res.status(400).json({ error: 'You cannot remove your own account' })
+    }
+    const role = await query(
+      `SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`, [userId])
+    if (['admin', 'superadmin'].includes(role.rows[0]?.name)) {
+      return res.status(403).json({ error: 'Administrators are removed by the platform operator, not from here' })
+    }
+
+    await client.query('BEGIN')
+    await client.query(
+      `DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`,
+      [userId, ctx.tenantId]
+    )
+    const elsewhere = await client.query(
+      `SELECT 1 FROM user_tenant_memberships WHERE user_id = $1 AND status = 'active' LIMIT 1`, [userId])
+    let deactivated = false
+    if (elsewhere.rows.length === 0) {
+      await client.query(`UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [userId])
+      deactivated = true
+    }
+    await client.query('COMMIT')
+
+    await logAudit({
+      actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'USER_REMOVED_FROM_TENANT',
+      actionScope: 'TENANT', resourceType: 'user', resourceId: userId, tenantId: ctx.tenantId,
+      afterState: { deactivated }, ipAddress: getClientIp(req),
+    }).catch((e) => console.error('[SCHOOL_ADMIN] audit failed:', e))
+
+    return res.json({ removed: true, accountDeactivated: deactivated })
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    return fail(res, 'remove user', e)
+  } finally {
+    client.release()
   }
 })
 
@@ -317,7 +380,7 @@ router.post('/admin/school/users', async (req: TenantRequest, res: Response) => 
 
     // An administrator may staff their own school; they may not mint another
     // administrator, which would let one compromised account widen itself.
-    const GRANTABLE = ['student', 'faculty', 'staff']
+    const GRANTABLE = ['student', 'faculty', 'it']
     if (!GRANTABLE.includes(role)) {
       return res.status(403).json({
         error: `Role must be one of: ${GRANTABLE.join(', ')}`,

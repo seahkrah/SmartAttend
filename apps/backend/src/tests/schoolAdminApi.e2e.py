@@ -222,6 +222,24 @@ co, r = call("GET", "/admin/school/users", BT)
 b_emails = {u['email'] for u in r.get('users', [])} if co == 200 else set()
 check("user lists do not overlap", not (a_emails & b_emails), f"({a_emails & b_emails})")
 
+print("-- removing someone from the school --")
+# The page's delete button called a route that did not exist.
+co, r = call("GET", "/me", AT, base="/auth")
+me = r.get('user', {}).get('id') if co == 200 else None
+co, r = call("DELETE", f"/admin/school/users/{me}", AT)
+check("an administrator cannot remove themselves", co == 400, f"({co} {r})")
+co, r = call("GET", "/admin/school/users", BT)
+b_user = next((u['id'] for u in r.get('users', []) if u.get('role') != 'admin'), None) if co == 200 else None
+co, r = call("DELETE", f"/admin/school/users/{b_user}", AT)
+check("another school's user is 404", co == 404, f"({co} {r})")
+co, r = call("POST", "/admin/school/users", AT, dict(email=f"leaver.{RUN}@e2e.test", fullName="Leaver", role="faculty"))
+leaver = r.get('userId') if co == 201 else None
+co, r = call("DELETE", f"/admin/school/users/{leaver}", AT)
+check("a lecturer account is removed", co == 200 and r.get('removed') is True, f"({co} {r})")
+check("and, belonging nowhere else, deactivated", r.get('accountDeactivated') is True, f"({r})")
+co, r = call("GET", "/admin/school/users", AT)
+check("and no longer listed", co == 200 and all(u['id'] != leaver for u in r.get('users', [])), f"({co})")
+
 # ---------------------------------------------------------------- enrolments
 print("-- enrolments --")
 co, r = call("GET", "/admin/school/enrollments", AT)

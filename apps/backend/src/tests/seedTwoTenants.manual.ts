@@ -25,7 +25,7 @@ async function main() {
   await query(`DELETE FROM incident_notifications WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%'))`)
   await query(`DELETE FROM escalation_events WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%'))`)
   await query(`DELETE FROM error_logs WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%'))`)
-  await query(`DELETE FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM incidents WHERE affected_tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`DELETE FROM audit_logs WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)

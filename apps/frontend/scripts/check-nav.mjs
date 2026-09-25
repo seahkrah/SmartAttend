@@ -104,7 +104,6 @@ const UNLISTED = new Map([
   ['/superadmin', 'redirects to /superadmin/dashboard'],
   ['/superadmin/console', 'the same redirect as /superadmin'],
   ['/superadmin/incident/:incidentId', 'a detail page, reached from an incident rather than from a menu'],
-  ['/superadmin/analytics', 'the page survived the superadmin API rewrite but its endpoint did not; it can only show an error, so it is not offered'],
   ['/superadmin/entities', 'an alias of /superadmin/management'],
   ['/superadmin/tenants', 'an alias of /superadmin/management'],
 ]);

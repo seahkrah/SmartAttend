@@ -294,6 +294,29 @@ check("move an incident to investigating", co == 200, f"({co} {r})")
 check("picking it up is stamped",
       r.get('incident', {}).get('acknowledged_at') is not None, f"({r})")
 
+# The detail page read an endpoint that did not exist, and its status control
+# saved nothing. The detail and the timeline are now real.
+co, r = call("GET", f"/incidents/{incident}", SU)
+check("an incident's detail is readable", co == 200 and r.get('incident', {}).get('id') == incident, f"({co} {r})")
+check("its timeline records the status change",
+      co == 200 and any(t['event_type'] == 'status_changed' for t in r.get('timeline', [])), f"({r.get('timeline')})")
+co, r = call("PUT", f"/incidents/{incident}", SU, {"notes": f"Looked at the logs, run {RUN}"})
+check("a note goes on the timeline",
+      co == 200 and any(f"run {RUN}" in (t.get('description') or '') for t in r.get('timeline', [])), f"({co} {r})")
+co, r = call("PUT", f"/incidents/{incident}", SU, {})
+check("an update with nothing in it is refused", co == 400, f"({co} {r})")
+co, r = call("GET", "/incidents/00000000-0000-4000-8000-000000000000", SU)
+check("an unknown incident is 404", co == 404, f"({co} {r})")
+co, r = call("GET", f"/incidents/{incident}", AT)
+check("a tenant administrator cannot read the superadmin view", co == 403, f"({co})")
+
+# Incidents named only schools: affected_tenant_id referenced school_entities,
+# so an employer could not be recorded as affected (migration 057).
+co, r = call("POST", "/incidents", SU, {"title": f"Payroll export failing {RUN}", "severity": "HIGH",
+                                        "affectedTenantId": c['A']['tenantId']})
+check("an incident can name an employer", co == 201 and r.get('incident', {}).get('affected_tenant_id') == c['A']['tenantId'],
+      f"({co} {r})")
+
 co, r = call("PUT", f"/incidents/{incident}", SU, {"status": "NOT_A_STATE"})
 check("a status outside the vocabulary is refused", co == 400, f"({co} {r})")
 

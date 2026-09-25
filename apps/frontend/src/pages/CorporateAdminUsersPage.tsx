@@ -54,7 +54,7 @@ const CorporateAdminUsersPage: React.FC = () => {
   const [deptFilter, setDeptFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [showAddModal, setShowAddModal] = useState(false)
-  const [invite, setInvite] = useState<{ employeeId: string; name: string; invitation: InvitationResult | null } | null>(null)
+  const [invite, setInvite] = useState<{ employeeId: string; name: string; invitation: InvitationResult | null; kind?: 'invitation' | 'reset' } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [total, setTotal] = useState(0)
@@ -158,8 +158,10 @@ const CorporateAdminUsersPage: React.FC = () => {
         <InvitationDialog
           personName={invite.name}
           invitation={invite.invitation}
-          issue={async (handover) =>
-            (await apiClient.post(`/corporate/admin/employees/${invite.employeeId}/invitation`, { handover })).data.invitation}
+          kind={invite.kind}
+          issue={async (handover) => invite.kind === 'reset'
+            ? (await apiClient.post(`/corporate/admin/employees/${invite.employeeId}/reset-access`, { handover })).data.reset
+            : (await apiClient.post(`/corporate/admin/employees/${invite.employeeId}/invitation`, { handover })).data.invitation}
           onClose={() => { setInvite(null); fetchEmployees() }}
         />
       )}
@@ -296,6 +298,15 @@ const CorporateAdminUsersPage: React.FC = () => {
                             title="Send a new invitation"
                           >
                             Invite
+                          </button>
+                        )}
+                        {!emp.awaiting_setup && emp.is_currently_employed && (
+                          <button
+                            onClick={() => setInvite({ employeeId: emp.id, name: `${emp.first_name} ${emp.last_name}`, invitation: null, kind: 'reset' })}
+                            className="text-xs text-slate-300 hover:text-white"
+                            title="Reset this person's access"
+                          >
+                            Reset access
                           </button>
                         )}
                         {emp.is_currently_employed && (

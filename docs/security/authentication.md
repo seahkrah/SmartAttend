@@ -122,6 +122,27 @@ whatever role id the client sent, is gone.
 `SUPERADMIN_BOOTSTRAP_TOKEN` (at least 32 characters, compared in constant
 time) in production, and everywhere once a superadmin exists.
 
+## Reset by an administrator
+
+When someone has lost access, or an account may be in the wrong hands, a
+tenant administrator can **reset access**:
+
+- `POST /api/auth/admin/school/users/:userId/reset-access`
+- `POST /api/corporate/admin/employees/:employeeId/reset-access`
+
+The old password stops working at once and every session ends. The person
+then chooses a new password from a single-use link, valid for 24 hours. The
+link is emailed with wording that says the old password has already stopped
+working (`account.access_reset`). With `handover: true` it is returned to
+the administrator instead, to give in person.
+
+The administrator never sets or sees the password. The reset:
+
+- is audited (`USER_ACCESS_RESET`) before the link exists;
+- is refused for administrators and for the caller's own account;
+- does not apply to accounts not yet set up (they get a new invitation
+  instead).
+
 ## Password reset
 
 `POST /api/auth/password/forgot` always answers 202 with the same text. The
@@ -199,18 +220,16 @@ These are stated so nobody assumes otherwise:
   lockout is already global.
 - **Email delivery depends on each tenant configuring a provider.** Until one
   is configured, invitations and resets are recorded, not sent. Administrators
-  are told so and can hand over setup links. Password resets for such a tenant
-  have no delivery path except an administrator issuing a new setup link, and
-  that is possible only for accounts that have never signed in.
+  are told so, and can hand over setup and reset links in person.
 
 ## Tests
 
-- `apps/backend/src/tests/accountSecurity.e2e.py` (90 checks against the
+- `apps/backend/src/tests/accountSecurity.e2e.py` (105 checks against the
   running API): sessions, rotation and replay, logout, device sign-out,
   expiry, password change, reset, lockout, spoofed addresses, deactivation,
-  invitations and handover for school, corporate and superadmin, template
-  lock, outbox redaction, self-registration, superadmin bootstrap, CORS and
-  headers.
+  invitations and handover for school, corporate and superadmin, reset of
+  access by an administrator, template lock, outbox redaction,
+  self-registration, superadmin bootstrap, CORS and headers.
 - `apps/backend/src/auth/authSecurity.test.ts` (unit): password policy,
   production configuration, CORS and proxy settings, the rate limiter's 429,
   token hashing.

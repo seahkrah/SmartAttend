@@ -2,7 +2,7 @@ import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { Router, Response } from 'express'
 import { query, getConnection } from '../db/connection.js'
-import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth/accountTokens.js'
+import { sendInvitation, unusablePasswordHash, resetAccessByAdmin, AccountTokenError } from '../auth/accountTokens.js'
 import { authenticateToken } from '../auth/middleware.js'
 import {
   resolveTenantContext,
@@ -393,6 +393,48 @@ router.post('/admin/school/users/:userId/invitation', async (req: TenantRequest,
     await client.query('ROLLBACK').catch(() => {})
     if (e instanceof AccountTokenError) return res.status(e.status).json({ error: e.message })
     return fail(res, 'send the invitation', e)
+  } finally {
+    client.release()
+  }
+})
+
+/**
+ * Restores access for someone who has lost it, or locks out an account that
+ * may be compromised: their password stops working, every session ends, and
+ * they choose a new password from a single-use link, emailed or (with
+ * `handover`) given to the administrator to pass on. Audited before the link
+ * exists. Not for administrators, nor for the caller's own account.
+ */
+router.post('/admin/school/users/:userId/reset-access', async (req: TenantRequest, res: Response) => {
+  const client = await getConnection()
+  try {
+    const ctx = ctxOf(req)
+    const { userId } = req.params
+    if (badId(res, userId, 'User')) return
+    if (!(await userInTenant(ctx, userId))) return notFound(res, 'User')
+    if (userId === ctx.userId) {
+      return res.status(400).json({ error: 'Change your own password from your settings' })
+    }
+    const role = await query(
+      `SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`, [userId])
+    if (['admin', 'superadmin'].includes(role.rows[0]?.name)) {
+      return res.status(403).json({ error: "An administrator's access is reset by the platform operator" })
+    }
+    const handover = req.body?.handover === true
+
+    await client.query('BEGIN')
+    const result = await resetAccessByAdmin(client, { userId, tenantId: ctx.tenantId, actorId: ctx.userId, handover })
+    await logAudit({
+      actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'USER_ACCESS_RESET',
+      actionScope: 'TENANT', resourceType: 'user', resourceId: userId, tenantId: ctx.tenantId,
+      afterState: { delivery: result.delivery }, ipAddress: getClientIp(req),
+    })
+    await client.query('COMMIT')
+    return res.json({ reset: result })
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    if (e instanceof AccountTokenError) return res.status(e.status).json({ error: e.message })
+    return fail(res, 'reset access', e)
   } finally {
     client.release()
   }

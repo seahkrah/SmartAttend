@@ -172,6 +172,10 @@ co, r, _ = call("POST", f"/corporate/admin/employees/{emp_id}/invitation", {"han
 check("the employer can, for handing over in person", co == 200 and '/activate?token=' in r.get('invitation', {}).get('link', ''), f"({co} {r})")
 co, r, _ = login(f"yaw.{RUN}@c2e.test", "Yboateng123", platform="corporate")
 check("the old predictable password does not work", co == 401, f"({co} {r})")
+co, r, _ = call("POST", f"/corporate/admin/employees/{emp_id}/reset-access", {"handover": True}, CB['adminToken'])
+check("another employer cannot reset that employee's access", co in (403, 404), f"({co} {r})")
+co, r, _ = call("POST", f"/corporate/admin/employees/{emp_id}/reset-access", {"handover": True}, CA['adminToken'])
+check("an employee who has not set up yet is invited, not reset", co == 409, f"({co} {r})")
 
 co, r, _ = call("POST", "/superadmin/tenant-admins", {"tenantId": A['tenantId'], "email": f"head.{RUN}@e2e.test",
                 "fullName": "Deputy Head", "handover": True}, SU)
@@ -309,6 +313,44 @@ sql(f"DELETE FROM auth_failed_logins WHERE email_norm IN ('{email}', 'ghost.{RUN
 co, r, _ = login(email, NEWEST)
 check("once the pause lifts, sign-in works and clears the count", co == 200, f"({co} {r})")
 check("(count cleared)", sql(f"SELECT COUNT(*) FROM auth_failed_logins WHERE email_norm = '{email}'") == '0')
+live = r.get('accessToken')
+
+print("-- an administrator restores someone's access without learning their password --")
+co, r, _ = call("POST", f"/auth/admin/school/users/{user_id}/reset-access", {"handover": True}, B['token'])
+check("another school cannot reset this user's access", co == 404, f"({co} {r})")
+co, r, _ = call("POST", f"/auth/admin/school/users/{admin_a_id}/reset-access", {}, A['token'])
+check("an administrator's own account is not reset from here", co == 400, f"({co} {r})")
+co, r, _ = call("POST", f"/auth/admin/school/users/{user_id}/reset-access", {"handover": True}, A['token'])
+link = (r.get('reset') or {}).get('link', '')
+check("the administrator resets access and gets a link to hand over", co == 200 and '/reset-password?token=' in link, f"({co} {r})")
+check("which is audited", sql(f"SELECT COUNT(*) FROM audit_logs WHERE action_type = 'USER_ACCESS_RESET' AND resource_id = '{user_id}'") == '1')
+co, r, _ = call("GET", "/auth/me", None, live)
+check("the person is signed out at once", co == 401, f"({co} {r})")
+co, r, _ = login(email, NEWEST)
+check("and the old password no longer works", co == 401, f"({co} {r})")
+RESTORED = "tea on the veranda at noon " + RUN
+co, r, _ = call("POST", "/auth/password/reset", {"token": link.split('token=')[1], "password": RESTORED, "confirmPassword": RESTORED})
+check("the person chooses a new password from the link", co == 200, f"({co} {r})")
+co, r, _ = login(email, RESTORED)
+check("and signs in with it", co == 200, f"({co} {r})")
+co, r, _ = call("POST", f"/auth/admin/school/users/{user_id}/reset-access", {}, A['token'])
+check("by email instead, the delivery is reported", co == 200 and r.get('reset', {}).get('delivery') in ('email', 'simulated')
+      and 'link' not in r.get('reset', {}), f"({co} {r})")
+msg_id, _tok, _n = outbox_link('account.access_reset', email)
+check("the email says the old password has stopped working", 'no longer works' in sql(f"SELECT body FROM notification_messages WHERE id = '{msg_id}'"))
+co, r, _ = call("GET", f"/notifications/messages/{msg_id}", None, A['token'])
+check("and its link is withheld from the administrator", co == 200 and r['message'].get('body') is None, f"({co})")
+fresh = f"fresh.{RUN}@e2e.test"
+co, r, _ = call("POST", "/auth/admin/school/users", {"email": fresh, "fullName": "Not Yet", "role": "faculty"}, A['token'])
+co, r, _ = call("POST", f"/auth/admin/school/users/{r.get('userId')}/reset-access", {"handover": True}, A['token'])
+check("an account not yet set up gets an invitation, not a reset", co == 409, f"({co} {r})")
+# The emailed reset disabled the password again; finish it through its link.
+AGAIN = "rain on the tin roof " + RUN
+co, r, _ = call("POST", "/auth/password/reset", {"token": _tok, "password": AGAIN, "confirmPassword": AGAIN})
+check("the emailed link restores access too", co == 200, f"({co} {r})")
+# The deactivation checks below sign in with this password.
+NEWEST = AGAIN
+co, r, _ = login(email, NEWEST)
 live = r.get('accessToken')
 
 print("-- deactivation takes effect on the next request --")

@@ -46,7 +46,8 @@ export async function unusablePasswordHash(): Promise<string> {
   return bcrypt.hash(crypto.randomBytes(32).toString('base64url'), 12)
 }
 
-async function issue(runner: Runner, userId: string, purpose: TokenPurpose, createdBy: string | null) {
+async function issue(runner: Runner, userId: string, purpose: TokenPurpose, createdBy: string | null,
+                     ttlMinutes: number = TTL_MINUTES[purpose]) {
   const token = crypto.randomBytes(32).toString('base64url')
   await runner.query(
     `UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP
@@ -56,7 +57,7 @@ async function issue(runner: Runner, userId: string, purpose: TokenPurpose, crea
   await runner.query(
     `INSERT INTO auth_tokens (user_id, purpose, token_hash, created_by, expires_at)
      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP + ($5 || ' minutes')::interval)`,
-    [userId, purpose, hashToken(token), createdBy, String(TTL_MINUTES[purpose])]
+    [userId, purpose, hashToken(token), createdBy, String(ttlMinutes)]
   )
   return token
 }
@@ -120,26 +121,72 @@ export async function sendInvitation(
     data: { firstName: r.firstName, link, validFor: `${expiresInDays} days` },
     priority: 1,
   })
+  return { ...(await deliveryOf(runner, opts.tenantId, summary)), expiresInDays }
+}
+
+/** What happened to an account email: really sent, only recorded, or not queued at all. */
+async function deliveryOf(
+  runner: Runner,
+  tenantId: string,
+  summary: { queued: unknown[]; skipped: Array<{ reason?: string }> }
+): Promise<{ delivery: InvitationDelivery; reason?: string }> {
   if (summary.queued.length === 0) {
-    return {
-      delivery: 'unavailable',
-      reason: summary.skipped[0]?.reason ?? 'The invitation email could not be queued',
-      expiresInDays,
-    }
+    return { delivery: 'unavailable', reason: summary.skipped[0]?.reason ?? 'The email could not be queued' }
   }
-  const channel = await channelConfig(runner, opts.tenantId, 'email')
+  const channel = await channelConfig(runner, tenantId, 'email')
   if (channel.provider === 'log') {
     return {
       delivery: 'simulated',
-      reason: 'Email is not set up for this organisation, so the invitation was recorded but not sent. '
-        + 'Set up email, or give the person a setup link directly.',
-      expiresInDays,
+      reason: 'Email is not set up for this organisation, so the message was recorded but not sent. '
+        + 'Set up email, or give the person the link directly.',
     }
   }
-  if (!channel.isEnabled) {
-    return { delivery: 'unavailable', reason: 'Email is switched off for this organisation', expiresInDays }
+  if (!channel.isEnabled) return { delivery: 'unavailable', reason: 'Email is switched off for this organisation' }
+  return { delivery: 'email' }
+}
+
+/** How long an administrator's reset link lasts: long enough to hand over in person. */
+const ADMIN_RESET_TTL_MINUTES = 24 * 60
+
+/**
+ * An administrator restores access for someone who has lost it.
+ *
+ * The old password stops working at once and every session ends, so this is
+ * also what to do with an account that may be compromised. The person then
+ * chooses a new password from a single-use link, valid for 24 hours, that is
+ * emailed to them or, with `handover`, given to the administrator to pass on.
+ * The administrator never learns or sets the password. The caller audits it
+ * and must refuse administrators' accounts.
+ */
+export async function resetAccessByAdmin(
+  runner: Runner,
+  opts: { userId: string; tenantId: string; actorId: string; handover?: boolean }
+): Promise<InvitationResult> {
+  const u = await runner.query(`SELECT activated_at FROM users WHERE id = $1`, [opts.userId])
+  if (u.rows.length === 0) throw new AccountTokenError(404, 'No such account')
+  if (!u.rows[0].activated_at) {
+    throw new AccountTokenError(409, 'This person has not set up their account yet; send them a new invitation instead.')
   }
-  return { delivery: 'email', expiresInDays }
+  await runner.query(
+    `UPDATE users SET password_hash = $2, password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1`,
+    [opts.userId, await unusablePasswordHash()]
+  )
+  await revokeUserSessions(opts.userId, 'access_reset_by_admin')
+  const token = await issue(runner, opts.userId, 'password_reset', opts.actorId, ADMIN_RESET_TTL_MINUTES)
+  const link = `${appUrl()}/reset-password?token=${token}`
+  const expiresInDays = 1
+  if (opts.handover) return { delivery: 'handover', link, expiresInDays }
+
+  const r = await recipientOf(runner, opts.userId)
+  const summary = await notify(runner, { tenantId: opts.tenantId, userId: opts.actorId }, {
+    eventKey: 'account.access_reset',
+    channels: ['email'],
+    recipients: [{ userId: r.userId, name: r.name, email: r.email }],
+    data: { firstName: r.firstName, link, validFor: '24 hours' },
+    priority: 1,
+  })
+  return { ...(await deliveryOf(runner, opts.tenantId, summary)), expiresInDays }
 }
 
 /**

@@ -320,6 +320,23 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
     },
   },
 
+  // An administrator reset this person's access: unlike a self-service
+  // reset, the old password has already stopped working.
+  'account.access_reset': {
+    email: {
+      subject: 'Your {{ tenantName }} access has been reset',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + 'An administrator at {{ tenantName }} has reset your access. Your old password no longer works '
+        + 'and you have been signed out everywhere. Choose a new password here:\n\n{{ link }}\n\n'
+        + 'The link works once and expires in {{ validFor }}. If you did not expect this, contact your '
+        + 'administrator.'
+        + SIGN_OFF,
+      required: ['firstName', 'tenantName', 'link', 'validFor'],
+      category: 'account',
+    },
+  },
+
   // A tenant administrator checking that a channel works. Deliberately blunt
   // about what it is, so nobody mistakes it for a real notice.
   'system.test': {
@@ -354,7 +371,7 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
  * Tenants cannot override their templates, and nobody can read their bodies
  * back out of the outbox.
  */
-export const SENSITIVE_EVENTS: ReadonlySet<string> = new Set(['account.invitation', 'account.password_reset'])
+export const SENSITIVE_EVENTS: ReadonlySet<string> = new Set(['account.invitation', 'account.password_reset', 'account.access_reset'])
 
 export function defaultTemplate(eventKey: string, channel: Channel): TemplateDefinition | null {
   return DEFAULT_TEMPLATES[eventKey]?.[channel] ?? null

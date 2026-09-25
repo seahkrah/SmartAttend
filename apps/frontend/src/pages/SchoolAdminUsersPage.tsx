@@ -53,7 +53,7 @@ const SchoolAdminUsersPage: React.FC = () => {
     role: 'faculty',
     phone: ''
   })
-  const [invite, setInvite] = useState<{ userId: string; name: string; invitation: InvitationResult | null } | null>(null)
+  const [invite, setInvite] = useState<{ userId: string; name: string; invitation: InvitationResult | null; kind?: 'invitation' | 'reset' } | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
     title: string
@@ -224,8 +224,10 @@ const SchoolAdminUsersPage: React.FC = () => {
           <InvitationDialog
             personName={invite.name}
             invitation={invite.invitation}
-            issue={async (handover) =>
-              (await apiClient.post(`/auth/admin/school/users/${invite.userId}/invitation`, { handover })).data.invitation}
+            kind={invite.kind}
+            issue={async (handover) => invite.kind === 'reset'
+              ? (await apiClient.post(`/auth/admin/school/users/${invite.userId}/reset-access`, { handover })).data.reset
+              : (await apiClient.post(`/auth/admin/school/users/${invite.userId}/invitation`, { handover })).data.invitation}
             onClose={() => { setInvite(null); fetchUsers() }}
           />
         )}
@@ -427,6 +429,15 @@ const SchoolAdminUsersPage: React.FC = () => {
                             title="Send a new invitation"
                           >
                             Invite
+                          </button>
+                        )}
+                        {!user.awaitingSetup && user.role !== 'admin' && (
+                          <button
+                            onClick={() => setInvite({ userId: user.id, name: user.fullName, invitation: null, kind: 'reset' })}
+                            className="px-2 py-1 bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 rounded transition-colors text-xs font-medium"
+                            title="Reset this person's access"
+                          >
+                            Reset access
                           </button>
                         )}
                         <button

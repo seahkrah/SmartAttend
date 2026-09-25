@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express'
-import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth/accountTokens.js'
+import { sendInvitation, unusablePasswordHash, resetAccessByAdmin, AccountTokenError } from '../auth/accountTokens.js'
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { authenticateToken } from '../auth/middleware.js'
@@ -553,6 +553,51 @@ router.post('/admin/employees/:employeeId/invitation', authenticateToken, async 
     if (err instanceof AccountTokenError) return res.status(err.status).json({ error: err.message })
     console.error('[Corporate Admin Invitation]', err.message)
     return res.status(500).json({ error: 'Failed to send the invitation' })
+  } finally {
+    client.release()
+  }
+})
+
+/** Restores an employee's access; see the school equivalent in schoolAdmin.ts. */
+router.post('/admin/employees/:employeeId/reset-access', authenticateToken, async (req: Request, res: Response) => {
+  const client = await pool.connect()
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
+    const entity = await getCorporateEntity(req)
+    if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
+    const { employeeId } = req.params
+    if (!UUID.test(employeeId)) return res.status(404).json({ error: 'Employee not found' })
+    const emp = await query(
+      `SELECT e.user_id, r.name AS role
+         FROM employees e JOIN users u ON u.id = e.user_id JOIN roles r ON r.id = u.role_id
+        WHERE e.id = $1 AND e.tenant_id = $2`,
+      [employeeId, entity.id]
+    )
+    if (emp.rows.length === 0) return res.status(404).json({ error: 'Employee not found' })
+    if (emp.rows[0].user_id === req.user.userId) {
+      return res.status(400).json({ error: 'Change your own password from your settings' })
+    }
+    if (['admin', 'superadmin'].includes(emp.rows[0].role)) {
+      return res.status(403).json({ error: "An administrator's access is reset by the platform operator" })
+    }
+    const handover = req.body?.handover === true
+
+    await client.query('BEGIN')
+    const result = await resetAccessByAdmin(client, {
+      userId: emp.rows[0].user_id, tenantId: entity.id, actorId: req.user.userId, handover,
+    })
+    await logAudit({
+      actorId: req.user.userId, actorRole: 'admin', actionType: 'USER_ACCESS_RESET',
+      actionScope: 'TENANT', resourceType: 'user', resourceId: emp.rows[0].user_id, tenantId: entity.id,
+      afterState: { delivery: result.delivery }, ipAddress: getClientIp(req),
+    })
+    await client.query('COMMIT')
+    return res.json({ reset: result })
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {})
+    if (err instanceof AccountTokenError) return res.status(err.status).json({ error: err.message })
+    console.error('[Corporate Admin Reset Access]', err.message)
+    return res.status(500).json({ error: 'Failed to reset access' })
   } finally {
     client.release()
   }

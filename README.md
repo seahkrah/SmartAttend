@@ -95,8 +95,6 @@ Run these before pushing; CI runs the same.
 - Tokens are held in `localStorage`, not `httpOnly` cookies.
 - Email and SMS delivery depend on each tenant configuring a provider. Until
   then messages are recorded as *simulated*, never as sent.
-- An administrator cannot yet reset a signed-in user's password for a tenant
-  without email.
 - Not built:
   - guardian/parent portal
   - timetabling

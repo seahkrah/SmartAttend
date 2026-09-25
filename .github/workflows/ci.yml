@@ -152,3 +152,59 @@ jobs:
       - name: API log on failure
         if: failure()
         run: cat /tmp/api.log || true
+
+  images:
+    name: Container images
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jjelo
+          POSTGRES_PASSWORD: jjelo
+          POSTGRES_DB: jjelotech_images
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the API image
+        run: docker build -f apps/backend/Dockerfile -t jjelotech-api:ci .
+
+      - name: Build the web image
+        run: docker build -f apps/frontend/Dockerfile --build-arg VITE_API_BASE_URL=https://api.example.org/api -t jjelotech-web:ci .
+
+      # The image, not the checkout: migrations from an empty database, then a
+      # production-mode server that must report ready.
+      - name: Migrate and start the API image
+        run: |
+          cat > /tmp/api.env <<ENV
+          NODE_ENV=production
+          PORT=5000
+          DATABASE_URL=postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_images
+          DATABASE_SSL=off
+          JWT_SECRET=$(openssl rand -base64 48)
+          PUBLIC_APP_URL=https://app.example.org
+          CORS_ORIGINS=https://app.example.org
+          ENV
+          docker run --rm --network host --env-file /tmp/api.env jjelotech-api:ci node dist/db/migrate.js
+          docker run -d --name api --network host --env-file /tmp/api.env jjelotech-api:ci
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:5000/api/health/ready && exit 0
+            sleep 1
+          done
+          docker logs api; exit 1
+
+      - name: The web image serves the app with its security policy
+        run: |
+          docker run -d --name web -p 8080:8080 -e API_ORIGIN=https://api.example.org jjelotech-web:ci
+          sleep 3
+          curl -sf http://127.0.0.1:8080/ > /dev/null
+          curl -sfI http://127.0.0.1:8080/some/client/route | grep -q "200"
+          curl -sI http://127.0.0.1:8080/ | grep -qi "content-security-policy: .*connect-src 'self' https://api.example.org"

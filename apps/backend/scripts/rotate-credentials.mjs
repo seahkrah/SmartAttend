@@ -25,7 +25,7 @@
 import pg from 'pg'
 import bcryptjs from 'bcryptjs'
 import { randomBytes } from 'crypto'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 
 const { Pool } = pg
 
@@ -79,7 +79,12 @@ async function main() {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    // Same rule as the server (src/db/connection.ts): verified TLS unless
+    // DATABASE_SSL=off. It used to encrypt without checking the certificate,
+    // which a man in the middle defeats.
+    ssl: ((process.env.DATABASE_SSL ?? (process.env.NODE_ENV === 'production' ? 'verify' : 'off')) === 'off')
+      ? false
+      : { rejectUnauthorized: true, ...(process.env.DATABASE_SSL_CA ? { ca: readFileSync(process.env.DATABASE_SSL_CA, 'utf8') } : {}) },
   })
 
   try {

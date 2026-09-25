@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import { runMigrations } from './migrations.js'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
+import { readFileSync } from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -14,9 +15,27 @@ const { Pool } = pg
 
 console.log('[DB] DATABASE_URL:', process.env.DATABASE_URL ? '***configured***' : '***NOT SET***')
 
+/**
+ * TLS to the database. DATABASE_SSL:
+ *   verify  encrypted, and the server's certificate must check out (with
+ *           DATABASE_SSL_CA naming a CA file for a private CA). The default
+ *           in production.
+ *   off     no TLS: only for a database reachable solely on a private
+ *           network, such as the compose stack's. The default elsewhere.
+ * There is deliberately no "encrypt but trust anything" setting.
+ */
+export function databaseSsl(env: NodeJS.ProcessEnv = process.env): false | { rejectUnauthorized: true; ca?: string } {
+  const mode = (env.DATABASE_SSL ?? (env.NODE_ENV === 'production' ? 'verify' : 'off')).toLowerCase()
+  if (mode === 'off') return false
+  if (mode !== 'verify') throw new Error(`DATABASE_SSL must be "verify" or "off", not "${mode}"`)
+  return env.DATABASE_SSL_CA
+    ? { rejectUnauthorized: true, ca: readFileSync(env.DATABASE_SSL_CA, 'utf8') }
+    : { rejectUnauthorized: true }
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+  ssl: databaseSsl(),
 })
 
 pool.on('error', (err) => {

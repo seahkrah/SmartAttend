@@ -88,6 +88,7 @@ Run these before pushing; CI runs the same.
 | Unit tests (includes the real face models on fixtures) | `npm test` |
 | End-to-end API suites against a running API: seeds two schools and two companies, then runs 25 suites | `bash scripts/run-all-e2e.sh` |
 | Web app: types, every menu link routed, every API call matched to a server route, build | `cd apps/frontend && npm run build` |
+| Container images build, migrate an empty database and report ready (CI job `images`) | see `.github/workflows/ci.yml` |
 
 ## Not done yet
 
@@ -105,9 +106,10 @@ Run these before pushing; CI runs the same.
   - expenses
   - country payroll rules (payroll computes from configured components and
     tax bands; it ships no country's statutory rules)
-- The Dockerfiles and `docker-compose.yml` have not been verified against
-  the current code; there is no tested production deployment, backup or
-  restore procedure yet.
+- Deployment is a single-machine Docker Compose stack with scripted, verified
+  backups ([docs/operations/deployment.md](docs/operations/deployment.md)).
+  There is no metrics exporter or alerting, no staging environment and no load
+  test yet, and running several API replicas needs a shared rate-limit store.
 - `docs/archive/` holds earlier phase reports. They are history, not
   documentation, and several describe features that were not real.
 

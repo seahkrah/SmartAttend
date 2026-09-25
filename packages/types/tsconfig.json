@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "commonjs",
+    "module": "node16",
     "lib": ["ES2020"],
     "declaration": true,
     "declarationMap": true,
@@ -13,10 +13,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    // node10 resolution still matches how this package is consumed; the flag
-    // silences the TypeScript 7.0 deprecation error without changing it.
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0"
+    // node16 emits CommonJS here (package.json has no "type": "module") and is
+    // accepted by the locked TypeScript 5.9 and by later versions alike. The
+    // previous "node" + ignoreDeprecations "6.0" only built with a newer
+    // global tsc; the locked 5.9 rejects that flag value.
+    "moduleResolution": "node16"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

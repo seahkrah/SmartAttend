@@ -3,7 +3,8 @@
 import http from 'http'
 import express from 'express'
 import dotenv from 'dotenv'
-import { initializeDatabase } from './db/connection.js'
+import { initializeDatabase, query } from './db/connection.js'
+import { pendingMigrations } from './db/migrationStatus.js'
 import { applyHttpSecurity } from './security/httpSecurity.js'
 import { validateProductionConfig } from './config/validateEnv.js'
 import authRoutes from './routes/auth.js'
@@ -83,11 +84,23 @@ app.use(tenantIdExtractorMiddleware)
 // API latency tracking middleware
 app.use(apiLatencyTrackingMiddleware)
 
-// Debug middleware to log all requests
+// One line per request. In production it is JSON with the outcome and time,
+// and never the query string (reset and activation tokens travel in bodies,
+// but a query string is where a mistake would put one).
 app.use((req, res, next) => {
-  console.log(`[REQUEST] ${req.method} ${req.path}`);
-  next();
-});
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[REQUEST] ${req.method} ${req.path}`)
+    return next()
+  }
+  const started = Date.now()
+  res.on('finish', () => {
+    console.log(JSON.stringify({
+      t: new Date().toISOString(), method: req.method, path: req.path,
+      status: res.statusCode, ms: Date.now() - started,
+    }))
+  })
+  next()
+})
 
 // Routes
 app.use('/api/auth', schoolAdminRoutes)
@@ -154,9 +167,24 @@ app.use('/api/time', timeRoutes)
 // Error handling middleware (MUST be last)
 app.use(errorToIncidentHandler)
 
-// Health check
+// Liveness: the process is up.
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// Readiness: the database answers and its schema is current. A load balancer
+// or orchestrator should send traffic only while this is 200.
+app.get('/api/health/ready', async (_req, res) => {
+  try {
+    await query('SELECT 1')
+    const pending = await pendingMigrations()
+    if (pending.length > 0) {
+      return res.status(503).json({ status: 'migrations_pending', pending })
+    }
+    return res.json({ status: 'ready' })
+  } catch {
+    return res.status(503).json({ status: 'database_unavailable' })
+  }
 })
 
 async function startServer() {

@@ -5,6 +5,7 @@ import { checkPassword, PASSWORD_MIN } from './passwordPolicy.js'
 import { configProblems } from '../config/validateEnv.js'
 import { limiter, allowedOrigins, trustProxySetting } from '../security/httpSecurity.js'
 import { hashToken } from './sessions.js'
+import { databaseSsl } from '../db/connection.js'
 
 describe('password policy', () => {
   it('accepts a long passphrase with no composition rules', () => {
@@ -119,5 +120,18 @@ describe('token hashing', () => {
     expect(h).toMatch(/^[0-9a-f]{64}$/)
     expect(h).not.toContain('abc')
     expect(hashToken('abc')).toBe(h)
+  })
+})
+
+describe('database TLS', () => {
+  it('verifies the certificate by default in production', () => {
+    expect(databaseSsl({ NODE_ENV: 'production' } as any)).toEqual({ rejectUnauthorized: true })
+  })
+  it('is off by default elsewhere, and can be turned off explicitly for a private network', () => {
+    expect(databaseSsl({ NODE_ENV: 'development' } as any)).toBe(false)
+    expect(databaseSsl({ NODE_ENV: 'production', DATABASE_SSL: 'off' } as any)).toBe(false)
+  })
+  it('has no setting that encrypts without checking the certificate', () => {
+    expect(() => databaseSsl({ DATABASE_SSL: 'require' } as any)).toThrow(/verify.*off/)
   })
 })

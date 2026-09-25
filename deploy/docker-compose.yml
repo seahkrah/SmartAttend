@@ -1,0 +1,76 @@
+# A production-like stack on one machine: database, a one-off migration job,
+# the API and the web app.
+#
+#   cp deploy/.env.example deploy/.env      # fill it in
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+#
+# Put a TLS-terminating reverse proxy in front of `api` and `web`; neither
+# serves HTTPS itself. See docs/operations/deployment.md.
+name: jjelotech
+
+services:
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_USER: jjelotech
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: jjelotech
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jjelotech -d jjelotech"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    # Not published: only the API reaches the database.
+
+  migrate:
+    build: { context: .., dockerfile: apps/backend/Dockerfile }
+    image: jjelotech-api:local
+    command: ["node", "dist/db/migrate.js"]
+    environment: &api_env
+      NODE_ENV: production
+      DATABASE_URL: postgresql://jjelotech:${POSTGRES_PASSWORD}@db:5432/jjelotech
+      # The database is reachable only on this stack's private network.
+      DATABASE_SSL: "off"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/.env}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?set PUBLIC_APP_URL in deploy/.env}
+      CORS_ORIGINS: ${PUBLIC_APP_URL}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      BIOMETRIC_TEMPLATE_KEY: ${BIOMETRIC_TEMPLATE_KEY:-}
+      SUPERADMIN_BOOTSTRAP_TOKEN: ${SUPERADMIN_BOOTSTRAP_TOKEN:-}
+      FILE_STORAGE_BACKEND: local
+      FILE_STORAGE_ROOT: /data/files
+      NOTIFICATION_DISPATCH: "on"
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    image: jjelotech-api:local
+    environment: *api_env
+    volumes:
+      - files:/data/files
+    ports:
+      - "${API_PORT:-5000}:5000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  web:
+    image: jjelotech-web:local
+    build:
+      context: ..
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${API_PUBLIC_URL:?set API_PUBLIC_URL in deploy/.env}/api
+    environment:
+      API_ORIGIN: ${API_PUBLIC_URL}
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  files:

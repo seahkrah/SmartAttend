@@ -1,62 +1,21 @@
-# =============================================================================
-# .dockerignore — Prevent unnecessary file copies into container
-# =============================================================================
-
-# Version control
+# Build context is the repository root. Patterns need **/ to apply below it:
+# the previous file's `node_modules/` and `.env` matched only at the root, so
+# apps/*/node_modules and apps/backend/.env (with its secrets) were sent into
+# every build.
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/.e2e-fixtures
+apps/backend/storage
+apps/backend/.file-storage
 .git
-.gitignore
-.gitattributes
-
-# Documentation
-*.md
-*.md
-docs/
-
-# Development tools
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-
-# Dependencies (will be reinstalled)
-node_modules/
-.venv/
-venv/
-__pycache__/
-
-# Build outputs (will be regenerated)
-dist/
-build/
-*.log
-
-# Tests
-coverage/
-.nyc_output/
-.jest-cache/
-test/
-
-# Environment files (never copy secrets)
-.env
-.env.local
-.env.*.local
-
-# Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
-
-# CI/CD
-.github/
-.gitlab-ci.yml
-.circleci/
-
-# Node
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# IDE cache
-.vscode/
-.idea/
-*.swp
+.github
+docs
+**/*.md
+.vscode
+.idea
+**/.DS_Store

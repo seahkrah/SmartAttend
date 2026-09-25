@@ -12,8 +12,7 @@
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "setup-superadmin": "tsx setup-superadmin.ts",
-    "delete-superadmin": "tsx delete-superadmin.ts"
+    "setup-superadmin": "tsx setup-superadmin.ts"
   },
   "dependencies": {
     "@jjelotech/types": "file:../../packages/types",

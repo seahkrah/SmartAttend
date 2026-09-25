@@ -42,5 +42,10 @@ export function checkPassword(password: unknown, context: { email?: string | nul
     problems.push('Do not include your email name in your password')
   }
   if (/^(.)\1+$/.test(password)) problems.push('Do not repeat a single character')
+  // The product's own name is the first thing anyone guessing would try; the
+  // old setup script's default superadmin password was built from it.
+  if (/jjelo|smartattend/.test(lower.replace(/[^a-z]/g, ''))) {
+    problems.push('Do not build your password from the name of this system')
+  }
   return problems
 }

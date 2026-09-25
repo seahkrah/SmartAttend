@@ -157,7 +157,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   // A user belongs to one platform today. The switcher shows both so the
   // product's shape is legible, but only the user's own platform is
-  // selectable — see DESIGN_AUDIT.md on cross-platform access.
+  // selectable — see docs/archive/DESIGN_AUDIT.md on cross-platform access.
   const platform: Platform = nav?.platform ?? (user?.platform as Platform) ?? 'school';
   const available: Platform[] = user?.platform ? [user.platform as Platform] : ['school'];
   const isCorporate = platform === 'corporate';

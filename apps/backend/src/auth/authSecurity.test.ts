@@ -25,6 +25,10 @@ describe('password policy', () => {
   it('refuses one character repeated', () => {
     expect(checkPassword('zzzzzzzzzzzz')).toContain('Do not repeat a single character')
   })
+  it("refuses passwords built from the system's own name", () => {
+    expect(checkPassword('jjelotech123')).toContain('Do not build your password from the name of this system')
+    expect(checkPassword('Smart-Attend-2026!')).toContain('Do not build your password from the name of this system')
+  })
   it('refuses a non-string', () => {
     expect(checkPassword(undefined)).toEqual(['A password is required'])
     expect(checkPassword({ length: 20 })).toEqual(['A password is required'])

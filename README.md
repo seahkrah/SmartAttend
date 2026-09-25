@@ -55,6 +55,18 @@ proves and what it does not.
 
 ## Running it locally
 
+The quick way, from a fresh checkout (it installs everything, writes the config
+with generated secrets, sets up the database, loads demo data and starts the
+app; it starts PostgreSQL in Docker if you have no database):
+
+```bash
+scripts/setup-local.sh                                          # macOS / Linux
+powershell -ExecutionPolicy Bypass -File scripts\setup-local.ps1  # Windows
+```
+
+Afterwards, `scripts/start-local.sh` (or `scripts\start-local.ps1`) starts it
+again. The steps it performs, by hand:
+
 Needs Node 20 and PostgreSQL 16.
 
 ```bash

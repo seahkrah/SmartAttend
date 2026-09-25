@@ -1,6 +1,6 @@
 import { query } from './connection.js'
 import type { 
-  User, Student, Faculty, Employee, SchoolAttendance, CorporateCheckin,
+  User, Student, Faculty, Employee, SchoolAttendance,
   StudentCourse, FacultyCourse, WorkAssignment, StudentFaceEmbedding, EmployeeFaceEmbedding
 } from '../types/database.js'
 
@@ -272,50 +272,6 @@ export async function getActiveAssignments(employeeId: string): Promise<WorkAssi
      WHERE employee_id = $1 AND is_active = true
      ORDER BY assigned_date DESC`,
     [employeeId]
-  )
-  return result.rows
-}
-
-// Corporate Check-ins
-export async function recordCheckIn(
-  employeeId: string,
-  checkInType: 'office' | 'field',
-  checkInLatitude?: number,
-  checkInLongitude?: number,
-  siteLocation?: string,
-  faceVerified: boolean = false,
-  assignmentId?: string
-): Promise<CorporateCheckin> {
-  const result = await query(
-    `INSERT INTO corporate_checkins (employee_id, check_in_type, check_in_time, check_in_latitude, check_in_longitude, site_location, face_verified, assignment_id)
-     VALUES ($1, $2, CURRENT_TIMESTAMP, $3, $4, $5, $6, $7)
-     RETURNING *`,
-    [employeeId, checkInType, checkInLatitude || null, checkInLongitude || null, siteLocation || null, faceVerified, assignmentId || null]
-  )
-  return result.rows[0]
-}
-
-export async function recordCheckOut(
-  checkInId: string,
-  checkOutLatitude?: number,
-  checkOutLongitude?: number
-): Promise<CorporateCheckin> {
-  const result = await query(
-    `UPDATE corporate_checkins
-     SET check_out_time = CURRENT_TIMESTAMP, check_out_latitude = $2, check_out_longitude = $3
-     WHERE id = $1
-     RETURNING *`,
-    [checkInId, checkOutLatitude || null, checkOutLongitude || null]
-  )
-  return result.rows[0]
-}
-
-export async function getEmployeeCheckIns(employeeId: string, days: number = 30): Promise<CorporateCheckin[]> {
-  const result = await query(
-    `SELECT * FROM corporate_checkins
-     WHERE employee_id = $1 AND check_in_time > CURRENT_TIMESTAMP - INTERVAL '1 day' * $2
-     ORDER BY check_in_time DESC`,
-    [employeeId, days]
   )
   return result.rows
 }

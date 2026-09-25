@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { authenticateToken } from '../auth/middleware.js'
 import { query } from '../db/connection.js'
 import * as queries from '../db/queries.js'
-import type { Employee, WorkAssignment, CorporateCheckin } from '../types/database.js'
+import type { Employee, WorkAssignment } from '../types/database.js'
 import type { TenantAwareRequest } from '../types/tenantContext.js'
 import { verifyTenantOwnsResource } from '../auth/tenantEnforcementMiddleware.js'
 import {
@@ -904,107 +904,19 @@ router.patch('/assignments/:assignmentId/end', authenticateToken, async (req: Re
 })
 
 // ===========================
-// CHECK-IN ENDPOINTS
+// CHECK-IN ENDPOINTS — removed
 // ===========================
-
-// RECORD check-in
-router.post('/checkins', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const {
-      employeeId,
-      checkInType,
-      checkInLatitude,
-      checkInLongitude,
-      siteLocation,
-      assignmentId,
-      faceVerified
-    } = req.body
-
-    if (!employeeId || !checkInType) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    if (!['office', 'field'].includes(checkInType)) {
-      return res.status(400).json({ error: 'Invalid check-in type' })
-    }
-
-    const checkin = await queries.recordCheckIn(
-      employeeId,
-      checkInType,
-      checkInLatitude,
-      checkInLongitude,
-      siteLocation,
-      faceVerified || false,
-      assignmentId
-    )
-
-    return res.status(201).json({
-      message: 'Check-in recorded',
-      data: checkin
-    })
-  } catch (error: any) {
-    console.error('Check-in error:', error)
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// RECORD check-out
-router.post('/checkins/:checkinId/checkout', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { checkinId } = req.params
-    const { checkOutLatitude, checkOutLongitude } = req.body
-
-    const checkout = await queries.recordCheckOut(
-      checkinId,
-      checkOutLatitude,
-      checkOutLongitude
-    )
-
-    if (!checkout) {
-      return res.status(404).json({ error: 'Check-in not found' })
-    }
-
-    return res.json({
-      message: 'Check-out recorded',
-      data: checkout
-    })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// GET employee check-ins
-router.get('/employees/:employeeId/checkins', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { employeeId } = req.params
-    const days = parseInt(req.query.days as string) || 30
-
-    const checkins = await queries.getEmployeeCheckIns(employeeId, days)
-    return res.json({ data: checkins })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// GET today's check-ins for department
-router.get('/checkins/department/:departmentId', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { departmentId } = req.params
-    const today = new Date().toISOString().split('T')[0]
-
-    const result = await query(
-      `SELECT e.employee_id, e.first_name, e.last_name, cc.check_in_time, cc.check_out_time, cc.check_in_type, cc.face_verified
-       FROM employees e
-       LEFT JOIN corporate_checkins cc ON e.id = cc.employee_id AND DATE(cc.check_in_time) = $1
-       WHERE e.department_id = $2 AND e.is_currently_employed = true
-       ORDER BY e.first_name, e.last_name`,
-      [today, departmentId]
-    )
-
-    return res.json({ data: result.rows })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
+//
+// Four routes lived here: record a check-in, record a check-out, read an
+// employee's check-ins, and read a department's day. None checked a tenant
+// and none checked who was asking. The first took the employee id from the
+// request body and let the caller assert face verification, so any signed-in
+// identity on either platform could write a "face-verified" check-in against
+// any employee of any tenant; the reads returned another tenant's names and
+// hours to anybody who asked. Nothing in the product called them.
+//
+// Self-service check-in now lives at /api/workforce/my/*, which takes the
+// employee from the signed-in identity, the tenant from context and the time
+// from the server, and never lets the client say a face was verified.
 
 export default router

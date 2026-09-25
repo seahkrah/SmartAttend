@@ -219,7 +219,65 @@ export const TIMESHEET_STATUS_LABEL: Record<TimesheetStatus, string> = {
   exported: 'Sent to payroll',
 };
 
+
+// ---------------------------------------------------------------------------
+// Self-service check-in
+// ---------------------------------------------------------------------------
+
+export type CheckInType = 'office' | 'field';
+export type CheckInState = 'VERIFIED' | 'FLAGGED' | 'REVOKED' | 'MANUAL_OVERRIDE';
+
+export interface CheckIn {
+  id: string;
+  checkInType: CheckInType;
+  checkInTime: string;
+  checkOutTime: string | null;
+  siteLocation: string | null;
+  state: CheckInState;
+  faceVerified: boolean;
+  /** Hours for a closed check-in; null while it is open. */
+  hours: string | null;
+}
+
+export interface MyAttendance {
+  /** Null when the signed-in account has no employee record here. */
+  employee: { id: string; employeeNumber: string; name: string } | null;
+  onTheClock?: CheckIn | null;
+  /** Open check-ins too old to close: they count for nothing until HR acts. */
+  needsAttention?: CheckIn[];
+  history?: CheckIn[];
+  week?: { from: string; to: string; verifiedHours: string; flaggedHours: string };
+}
+
+export const CHECKIN_STATE_LABEL: Record<CheckInState, string> = {
+  VERIFIED: 'Counted',
+  MANUAL_OVERRIDE: 'Corrected by HR',
+  FLAGGED: 'Flagged for review',
+  REVOKED: 'Not counted',
+};
+
 export const workforceService = {
+  // -- self-service check-in -----------------------------------------------
+  /**
+   * The caller's own attendance. No employee id is sent: the API resolves the
+   * employee from the signed-in identity and would ignore one anyway.
+   */
+  async myAttendance(days = 30): Promise<MyAttendance> {
+    const { data } = await axiosClient.get('/workforce/my/attendance', { params: { days } });
+    return data;
+  },
+
+  /** The time is the server's; nothing here sends one. */
+  async checkIn(input: { checkInType?: CheckInType; siteLocation?: string } = {}): Promise<CheckIn> {
+    const { data } = await axiosClient.post('/workforce/my/check-in', input);
+    return data.checkIn;
+  },
+
+  async checkOut(): Promise<CheckIn> {
+    const { data } = await axiosClient.post('/workforce/my/check-out', {});
+    return data.checkIn;
+  },
+
   // -- contracts ---------------------------------------------------------
   async listContracts(status?: ContractStatus): Promise<Contract[]> {
     const { data } = await axiosClient.get('/workforce/contracts', { params: { status } });

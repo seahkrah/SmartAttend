@@ -46,6 +46,7 @@ SUITES=(
   leaveApi
   payrollApi
   workforceApi
+  checkinApi
   admissionsApi
   feesApi
   notificationsApi

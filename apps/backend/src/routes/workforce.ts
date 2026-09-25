@@ -13,7 +13,10 @@ import {
   WorkforceError,
   type WorkforceContext,
   activateContract,
+  attendanceFor,
   buildTimesheet,
+  checkIn,
+  checkOut,
   contractInForce,
   endContract,
   exportTimesheet,
@@ -866,6 +869,82 @@ router.get('/timesheets', schedulers, async (req: TenantRequest, res: Response) 
     return res.json({ timesheets: result.rows })
   } catch (e) {
     return fail(res, 'load timesheets', e)
+  }
+})
+
+// ===========================================================================
+// Self-service check-in
+// ===========================================================================
+
+/**
+ * The caller's own attendance.
+ *
+ * No employee id is accepted, by design: these three routes replace ones that
+ * took it from the request body and so let anybody check anybody in. The
+ * employee is whoever is signed in, and somebody with no employee record in
+ * this tenant is told so rather than shown somebody else's.
+ */
+router.get('/my/attendance', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const employee = await callerEmployee(ctx)
+    if (!employee) return res.json({ employee: null })
+
+    const days = Number(req.query.days ?? 30)
+    const summary = await attendanceFor({ query }, svcCtx(req), employee.id, days)
+    return res.json({
+      employee: {
+        id: employee.id,
+        employeeNumber: employee.employee_id,
+        name: `${employee.first_name} ${employee.last_name}`,
+      },
+      ...summary,
+    })
+  } catch (e) {
+    return fail(res, 'load your attendance', e)
+  }
+})
+
+router.post('/my/check-in', async (req: TenantRequest, res: Response) => {
+  let client
+  try {
+    const ctx = ctxOf(req)
+    const employee = await callerEmployee(ctx)
+    if (!employee) return notFound(res, 'Employee record')
+
+    client = await getConnection()
+    await client.query('BEGIN')
+    const row = await checkIn(client, svcCtx(req), employee.id, {
+      checkInType: req.body?.checkInType,
+      siteLocation: req.body?.siteLocation,
+    })
+    await client.query('COMMIT')
+    return res.status(201).json({ checkIn: row })
+  } catch (e) {
+    if (client) await client.query('ROLLBACK').catch(() => undefined)
+    return fail(res, 'check you in', e)
+  } finally {
+    if (client) client.release()
+  }
+})
+
+router.post('/my/check-out', async (req: TenantRequest, res: Response) => {
+  let client
+  try {
+    const ctx = ctxOf(req)
+    const employee = await callerEmployee(ctx)
+    if (!employee) return notFound(res, 'Employee record')
+
+    client = await getConnection()
+    await client.query('BEGIN')
+    const row = await checkOut(client, svcCtx(req), employee.id)
+    await client.query('COMMIT')
+    return res.json({ checkIn: row })
+  } catch (e) {
+    if (client) await client.query('ROLLBACK').catch(() => undefined)
+    return fail(res, 'check you out', e)
+  } finally {
+    if (client) client.release()
   }
 })
 

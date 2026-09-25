@@ -310,6 +310,12 @@ const hrNav: AudienceNav = {
       ],
     },
     {
+      label: 'Me',
+      items: [
+        { label: 'Check in', to: '/hr/check-in', icon: Clock, status: 'ready' },
+      ],
+    },
+    {
       label: 'Workforce',
       items: [
         { label: 'Roles & contracts', to: '/hr/contracts', icon: FileText, status: 'ready' },
@@ -348,6 +354,12 @@ const managerNav: AudienceNav = {
       ],
     },
     {
+      label: 'Me',
+      items: [
+        { label: 'Check in', to: '/hr/check-in', icon: Clock, status: 'ready' },
+      ],
+    },
+    {
       label: 'My team',
       items: [
         { label: 'Shifts & rosters', to: '/hr/shifts', icon: CalendarDays, status: 'ready' },
@@ -367,18 +379,18 @@ const managerNav: AudienceNav = {
  * a 403 or a 404. They are listed for students and not here, because a menu
  * entry that leads to "No data available" is worse than no entry at all.
  *
- * That leaves employees without a self-service attendance page, which is a
- * real gap: EmployeeSelfServiceAttendancePage exists in the codebase and has
- * never been wired to a route. Routing it needs its own change, since nothing
- * has ever exercised it.
+ * Check-in is the home, because it is what an employee opens the app to do.
+ * It has its own page rather than reusing the students' attendance page,
+ * which is about classes and reads a student record.
  */
 const employeeNav: AudienceNav = {
-  home: '/student/work',
+  home: '/student/check-in',
   platform: 'corporate',
   groups: [
     {
       label: 'My work',
       items: [
+        { label: 'Check in', to: '/student/check-in', icon: Clock, status: 'ready' },
         { label: 'Shifts & timesheets', to: '/student/work', icon: CalendarDays, status: 'ready' },
         { label: 'Leave', to: '/student/leave', icon: CalendarCheck, status: 'ready' },
       ],

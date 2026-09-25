@@ -1,540 +1,339 @@
+import React, { useEffect, useState } from 'react';
+import {
+  AlertTriangle, Clock, LogIn, LogOut, MapPin, ShieldAlert, UserX,
+} from 'lucide-react';
+import { useToastStore } from '../components/Toast';
+import { getErrorMessage } from '../utils/errorHandler';
+import { LoadingOverlay } from '../components/LoadingStates';
+import { EmptyState, ErrorAlert } from '../components/ErrorDisplay';
+import {
+  workforceService,
+  CHECKIN_STATE_LABEL,
+  formatHours,
+  type CheckIn,
+  type CheckInType,
+  type MyAttendance,
+} from '../services/workforceService';
+
 /**
- * Employee/Student Self-Service Attendance
- * 
- * Allow employees/students to:
- * 1. View active sessions they can join
- * 2. Mark attendance with face recognition
- * 3. See their attendance history
- * 4. Get clear feedback on successful marking
+ * An employee checking in and out of work.
+ *
+ * This replaced a page of the same name that was mock data from top to
+ * bottom: hardcoded "Database Systems" sessions, a hardcoded history, and a
+ * mark-attendance button that showed a success screen and added a PRESENT row
+ * whether or not anything was recorded — nothing was ever saved. It was also
+ * a school page in all but name, built around courses and seat capacity. An
+ * employee who used it would have been told they had checked in while their
+ * timesheet stayed at zero.
+ *
+ * Everything here comes from /workforce/my/*, and the three things that
+ * matter are decided by the server, not this page: who is checking in, when,
+ * and whether a face was verified. The weekly figure comes from the same
+ * function timesheets are built from, so it is the number the employee's
+ * timesheet will show.
  */
 
-import React, { useEffect, useState } from 'react';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../components/Toast';
-import { HIERARCHY } from '../utils/visualHierarchy';
-import FaceCaptureComponent from '../components/FaceCaptureComponent';
-import { type FaceCapture } from '../services/faceEncodingService';
-import { verifyFaceWithBackend } from '../services/faceVerificationAPI';
+const STATE_STYLE: Record<string, string> = {
+  VERIFIED: 'bg-success-600/20 text-success-300',
+  MANUAL_OVERRIDE: 'bg-brand-500/20 text-brand-300',
+  FLAGGED: 'bg-amber-500/20 text-amber-300',
+  REVOKED: 'bg-rose-600/20 text-rose-300',
+};
 
-interface ActiveSession {
-  id: string;
-  courseName: string;
-  courseDepartment: string;
-  startTime: string;
-  endTime: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'CLOSED';
-  attendanceMethod: 'FACE_RECOGNITION' | 'QR_CODE' | 'BOTH';
-  attendeeCount: number;
-  totalCapacity: number;
+function timeOf(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-interface AttendanceRecord {
-  id: string;
-  courseName: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: 'PRESENT' | 'ABSENT' | 'LATE';
-  verificationMethod: 'FACE_RECOGNITION' | 'QR_CODE' | null;
-  confidence?: number;
-  markedAt?: string;
+function dayOf(iso: string): string {
+  return new Date(iso).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-type PanelMode = 'available-sessions' | 'mark-attendance' | 'history' | 'success';
+/** "3 h 12 min" since a moment, for the on-the-clock card. */
+function elapsedSince(iso: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
+}
 
-export const EmployeeSelfServiceAttendance: React.FC = () => {
-  const user = useAuthStore((state) => state.user);
-  const addToast = useToastStore((state) => state.addToast);
+const EmployeeSelfServiceAttendancePage: React.FC = () => {
+  const [data, setData] = useState<MyAttendance | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [checkInType, setCheckInType] = useState<CheckInType>('office');
+  const [site, setSite] = useState('');
+  const [now, setNow] = useState(() => Date.now());
 
-  // State
-  const [mode, setMode] = useState<PanelMode>('available-sessions');
-  const [sessions, setSessions] = useState<ActiveSession[]>([]);
-  const [history, setHistory] = useState<AttendanceRecord[]>([]);
-  const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastMarkedSession, setLastMarkedSession] = useState<ActiveSession | null>(null);
-  const [faceConfidence, setFaceConfidence] = useState<number>(0);
-  const [showFaceCapture, setShowFaceCapture] = useState(false);
-  const [isFaceProcessing, setIsFaceProcessing] = useState(false);
+  const { addToast } = useToastStore();
 
-  // Load available sessions on mount
+  useEffect(() => { void load(); }, []);
+
+  // The elapsed time on the card moves while the page is open. Nothing is
+  // computed from it — the recorded hours are the server's.
   useEffect(() => {
-    setIsLoading(true);
-    // In real app: fetch from API
-    setTimeout(() => {
-      const mockSessions: ActiveSession[] = [
-        {
-          id: 'sess001',
-          courseName: 'Database Systems',
-          courseDepartment: 'Computer Science',
-          startTime: new Date().toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          endTime: new Date(Date.now() + 60 * 60 * 1000).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          status: 'IN_PROGRESS',
-          attendanceMethod: 'FACE_RECOGNITION',
-          attendeeCount: 24,
-          totalCapacity: 35,
-        },
-        {
-          id: 'sess002',
-          courseName: 'Web Development',
-          courseDepartment: 'Computer Science',
-          startTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          endTime: new Date(Date.now() + 3 * 60 * 60 * 1000).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          status: 'OPEN',
-          attendanceMethod: 'BOTH',
-          attendeeCount: 0,
-          totalCapacity: 30,
-        },
-      ];
-
-      setSessions(mockSessions);
-
-      // Load attendance history
-      const mockHistory: AttendanceRecord[] = [
-        {
-          id: 'att001',
-          courseName: 'Database Systems',
-          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          startTime: '09:00',
-          endTime: '10:30',
-          status: 'PRESENT',
-          verificationMethod: 'FACE_RECOGNITION',
-          confidence: 92,
-          markedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'att002',
-          courseName: 'Web Development',
-          date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          startTime: '14:00',
-          endTime: '15:30',
-          status: 'PRESENT',
-          verificationMethod: 'FACE_RECOGNITION',
-          confidence: 88,
-          markedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'att003',
-          courseName: 'Database Systems',
-          date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          startTime: '09:00',
-          endTime: '10:30',
-          status: 'ABSENT',
-          verificationMethod: null,
-        },
-      ];
-
-      setHistory(mockHistory);
-      setIsLoading(false);
-    }, 800);
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
   }, []);
 
-  // Handle captured face for attendance
-  const handleFaceCapture = async (face: FaceCapture) => {
-    if (!selectedSession) return;
-
+  const load = async () => {
     try {
-      setIsFaceProcessing(true);
-
-      // Send to backend for verification
-      // Generate a pseudo-sessionId for now (in real app, would be from activeSession)
-      const pseudoSessionId = `session-${selectedSession.id}`;
-      const result = await verifyFaceWithBackend({
-        sessionId: pseudoSessionId,
-        studentId: user?.id || 'unknown',
-        embedding: face.embedding,
-        imageMetadata: face.imageMetadata,
-      });
-
-      // Add to history
-      const newRecord: AttendanceRecord = {
-        id: `att${Date.now()}`,
-        courseName: selectedSession.courseName,
-        date: new Date().toISOString().split('T')[0],
-        startTime: selectedSession.startTime,
-        endTime: selectedSession.endTime,
-        status: 'PRESENT',
-        verificationMethod: 'FACE_RECOGNITION',
-        confidence: result.confidence,
-        markedAt: new Date().toISOString(),
-      };
-
-      setHistory((prev) => [newRecord, ...prev]);
-      setLastMarkedSession(selectedSession);
-      setFaceConfidence(result.confidence);
-      setShowFaceCapture(false);
-      setMode('success');
-
-      addToast({
-        type: result.verified ? 'success' : 'warning',
-        title: result.verified ? '✅ Attendance Marked' : '⚠️ Low Confidence',
-        message: `${result.confidence}% confidence`,
-      });
-    } catch (err: any) {
-      addToast({
-        type: 'error',
-        title: 'Verification Failed',
-        message: 'Face verification could not be completed',
-      });
+      setLoading(true);
+      setError(null);
+      setData(await workforceService.myAttendance(30));
+    } catch (e) {
+      setError(getErrorMessage(e));
     } finally {
-      setIsFaceProcessing(false);
+      setLoading(false);
     }
   };
 
-  // Start face capture
-  const handleMarkWithFace = async () => {
-    if (!selectedSession) return;
-    setShowFaceCapture(true);
+  const doCheckIn = async () => {
+    try {
+      setBusy(true);
+      const row = await workforceService.checkIn({
+        checkInType,
+        siteLocation: site.trim() || undefined,
+      });
+      addToast({ type: 'success', title: `Checked in at ${timeOf(row.checkInTime)}` });
+      setSite('');
+      await load();
+    } catch (e) {
+      addToast({ type: 'error', title: 'Could not check you in', message: getErrorMessage(e) });
+      await load();
+    } finally {
+      setBusy(false);
+    }
   };
 
-  // ============ RENDER: AVAILABLE SESSIONS ============
-  const renderAvailableSessions = () => {
+  const doCheckOut = async () => {
+    try {
+      setBusy(true);
+      const row = await workforceService.checkOut();
+      addToast({
+        type: 'success',
+        title: `Checked out at ${timeOf(row.checkOutTime)}`,
+        message: row.hours ? `${formatHours(row.hours)} hours recorded.` : undefined,
+      });
+      await load();
+    } catch (e) {
+      addToast({ type: 'error', title: 'Could not check you out', message: getErrorMessage(e) });
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) return <LoadingOverlay message="Loading your attendance…" />;
+
+  const card = 'rounded-xl border border-slate-800 bg-slate-900/60';
+  const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600';
+
+  if (!error && data && !data.employee) {
     return (
-      <div className="space-y-4">
-        <div className="grid gap-4">
-          {sessions.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <p className="text-lg">📭 No active sessions</p>
-              <p className="text-sm mt-1">Check back later or contact your instructor</p>
-            </div>
-          ) : (
-            sessions.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => {
-                  setSelectedSession(session);
-                  setMode('mark-attendance');
-                }}
-                className="p-6 bg-slate-800 border border-slate-700 rounded-lg hover:border-blue-500 hover:bg-slate-700/50 transition-all text-left"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white">{session.courseName}</h3>
-                    <p className="text-sm text-slate-400 mt-1">{session.courseDepartment}</p>
-                  </div>
-                  <div>
-                    {session.status === 'IN_PROGRESS' && (
-                      <span className="inline-block px-3 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded">
-                        🔴 In Progress
-                      </span>
-                    )}
-                    {session.status === 'OPEN' && (
-                      <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded">
-                        🟢 Opening Soon
-                      </span>
-                    )}
-                    {session.status === 'CLOSED' && (
-                      <span className="inline-block px-3 py-1 bg-slate-600 text-slate-400 text-xs font-medium rounded">
-                        ⏹️ Closed
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-2 md:grid-cols-3 text-sm text-slate-400 mb-4">
-                  <div>⏱️ {session.startTime} - {session.endTime}</div>
-                  <div>👥 {session.attendeeCount}/{session.totalCapacity} marked</div>
-                  <div>
-                    🔐{' '}
-                    {session.attendanceMethod === 'FACE_RECOGNITION' && 'Face Recognition'}
-                    {session.attendanceMethod === 'QR_CODE' && 'QR Code'}
-                    {session.attendanceMethod === 'BOTH' && 'Face or QR Code'}
-                  </div>
-                </div>
-
-                <div className="w-full bg-slate-700 rounded-full h-2">
-                  <div
-                    className="h-full bg-blue-500 rounded-full"
-                    style={{
-                      width: `${(session.attendeeCount / session.totalCapacity) * 100}%`,
-                    }}
-                  />
-                </div>
-              </button>
-            ))
-          )}
+      <div className="p-6">
+        <div className={`${card} p-6`}>
+          <EmptyState
+            icon={<UserX className="h-8 w-8" />}
+            title="No employee record"
+            message="This account is not linked to an employee here, so there is nothing to check in to. Ask HR if that is wrong."
+          />
         </div>
       </div>
     );
-  };
+  }
 
-  // ============ RENDER: MARK ATTENDANCE ============
-  const renderMarkAttendance = () => {
-    if (!selectedSession) return null;
+  const open: CheckIn | null = data?.onTheClock ?? null;
+  const stale = data?.needsAttention ?? [];
+  const history = data?.history ?? [];
+  const week = data?.week;
 
-    return (
-      <div className="space-y-6">
-        {/* Session Info */}
-        <div className="bg-blue-900/30 border border-blue-500 p-6 rounded-lg">
-          <h2 className="text-xl font-semibold text-white mb-2">{selectedSession.courseName}</h2>
-          <p className="text-slate-400 mb-4">{selectedSession.courseDepartment}</p>
-          <div className="grid gap-2 text-sm text-slate-300">
-            <div>⏱️ {selectedSession.startTime} - {selectedSession.endTime}</div>
-            <div>👥 {selectedSession.attendeeCount} students already marked</div>
-          </div>
-        </div>
-
-        {/* Verification Methods */}
-        <div>
-          <h3 className={HIERARCHY.SECONDARY.className + ' mb-3'}>
-            How would you like to mark attendance?
-          </h3>
-
-          {showFaceCapture ? (
-            <FaceCaptureComponent
-              onCapture={handleFaceCapture}
-              onCancel={() => setShowFaceCapture(false)}
-              isLoading={isFaceProcessing}
-            />
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {(selectedSession.attendanceMethod === 'FACE_RECOGNITION' ||
-                selectedSession.attendanceMethod === 'BOTH') && (
-                <button
-                  onClick={handleMarkWithFace}
-                  className="p-6 bg-slate-800 border-2 border-blue-600 rounded-lg hover:bg-blue-900/20 transition-all text-left"
-                >
-                  <div className="text-3xl mb-3">🔐</div>
-                  <h4 className="font-semibold text-white mb-1">Face Recognition</h4>
-                  <p className="text-sm text-slate-400">
-                    Biometric verification. Quick and secure.
-                  </p>
-                  <div className="mt-4 text-xs text-blue-400 font-medium">→ Start</div>
-                </button>
-              )}
-
-              {(selectedSession.attendanceMethod === 'QR_CODE' ||
-                selectedSession.attendanceMethod === 'BOTH') && (
-                <button
-                  onClick={() => addToast({ type: 'info', title: 'QR Code', message: 'Scan QR code with phone camera' })}
-                  className="p-6 bg-slate-800 border-2 border-slate-600 rounded-lg hover:border-slate-500 transition-all text-left"
-                >
-                  <div className="text-3xl mb-3">📱</div>
-                  <h4 className="font-semibold text-white mb-1">Scan QR Code</h4>
-                  <p className="text-sm text-slate-400">
-                    Quick QR scan. Ask your instructor for the code.
-                  </p>
-                  <div className="mt-4 text-xs text-slate-400 font-medium">→ Setup</div>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Instructions */}
-        <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-          <h4 className="text-sm font-semibold text-white mb-2">📋 Instructions</h4>
-          <ul className="text-xs text-slate-400 space-y-1">
-            <li>• Make sure you're in a well-lit area</li>
-            <li>• Face the camera directly</li>
-            <li>• Keep your face fully visible in frame</li>
-            <li>• The system will verify your identity</li>
-          </ul>
-        </div>
-
-        {/* Back Button */}
-        <button
-          onClick={() => setMode('available-sessions')}
-          className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-all"
-        >
-          ← Back to Sessions
-        </button>
-      </div>
-    );
-  };
-
-  // ============ RENDER: SUCCESS ============
-  const renderSuccess = () => {
-    return (
-      <div className="text-center py-12">
-        <div className="text-6xl mb-6 animate-bounce">✅</div>
-        <h2 className="text-2xl font-bold text-white mb-2">
-          Attendance Marked Successfully!
-        </h2>
-        <p className="text-slate-400 mb-6">
-          {lastMarkedSession?.courseName || ''}
-        </p>
-
-        {faceConfidence > 0 && (
-          <div className="bg-blue-900/30 p-6 rounded-lg border border-blue-500 mb-6">
-            <div className="text-sm text-slate-400 mb-2">Face Verification Confidence</div>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 bg-slate-700 rounded-full h-3">
-                <div
-                  className="h-full bg-gradient-to-r from-green-500 to-blue-500 rounded-full"
-                  style={{ width: `${faceConfidence}%` }}
-                />
-              </div>
-              <div className="text-2xl font-bold text-blue-400">{faceConfidence.toFixed(0)}%</div>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-2 mb-8">
-          <div className="text-green-400 text-sm">
-            ✅ Identity verified
-          </div>
-          <div className="text-green-400 text-sm">
-            ✅ Attendance recorded
-          </div>
-          <div className="text-green-400 text-sm">
-            ✅ Session locked immutably
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              setMode('available-sessions');
-              setSelectedSession(null);
-              setFaceConfidence(0);
-            }}
-            className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-all text-white"
-          >
-            ← Mark Another Session
-          </button>
-          <button
-            onClick={() => setMode('history')}
-            className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-medium transition-all"
-          >
-            📋 View History
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // ============ RENDER: HISTORY ============
-  const renderHistory = () => {
-    return (
-      <div className="space-y-4">
-        <h3 className={HIERARCHY.SECONDARY.className + ' mb-4'}>
-          Your Attendance History
-        </h3>
-
-        {history.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <p>No attendance records yet</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {history.map((record) => (
-              <div
-                key={record.id}
-                className="p-4 bg-slate-800 border border-slate-700 rounded-lg"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h4 className="font-semibold text-slate-200">{record.courseName}</h4>
-                    <p className="text-xs text-slate-500">{record.date}</p>
-                  </div>
-                  <div>
-                    {record.status === 'PRESENT' && (
-                      <span className="inline-block px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
-                        ✅ Present
-                      </span>
-                    )}
-                    {record.status === 'ABSENT' && (
-                      <span className="inline-block px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded">
-                        ❌ Absent
-                      </span>
-                    )}
-                    {record.status === 'LATE' && (
-                      <span className="inline-block px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded">
-                        ⏰ Late
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="text-xs text-slate-500 space-y-1">
-                  <div>⏱️ {record.startTime} - {record.endTime}</div>
-                  {record.verificationMethod && (
-                    <div>
-                      🔐 {record.verificationMethod}
-                      {record.confidence && ` (${record.confidence}% confidence)`}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button
-          onClick={() => setMode('available-sessions')}
-          className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-all mt-6"
-        >
-          ← Back to Sessions
-        </button>
-      </div>
-    );
-  };
-
-  // ============ MAIN RENDER ============
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className={HIERARCHY.PRIMARY.className}>📍 Mark Your Attendance</h1>
-          <p className={HIERARCHY.SECONDARY.className}>
-            {user?.fullName || 'Student'} • {user?.role}
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-100">Check in</h1>
+        <p className="mt-1 text-sm text-slate-400">
+          Start and end your working day. These are the hours your timesheet is built from.
+        </p>
+      </div>
+
+      {error && <ErrorAlert title="Could not load your attendance" message={error} onDismiss={() => setError(null)} />}
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className={`${card} p-6 lg:col-span-2`}>
+          {open ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-medium text-success-300">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-success-400" />
+                  On the clock
+                </div>
+                <div className="mt-2 text-3xl font-semibold text-slate-100">
+                  {elapsedSince(open.checkInTime, now)}
+                </div>
+                <div className="mt-1 text-sm text-slate-400">
+                  since {timeOf(open.checkInTime)}
+                  {' · '}{open.checkInType === 'field' ? 'in the field' : 'at the office'}
+                  {open.siteLocation && ` · ${open.siteLocation}`}
+                </div>
+              </div>
+              <button
+                onClick={() => void doCheckOut()}
+                disabled={busy}
+                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-3 text-base font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                <LogOut className="h-5 w-5" /> Check out
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-400">
+                <span className="h-2 w-2 rounded-full bg-slate-600" />
+                Not checked in
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-slate-500">Where</label>
+                  <div className="flex gap-2">
+                    {(['office', 'field'] as CheckInType[]).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setCheckInType(t)}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${
+                          checkInType === t
+                            ? 'border-brand-500 bg-brand-600/20 text-brand-200'
+                            : 'border-slate-700 text-slate-400 hover:bg-slate-800'
+                        }`}
+                      >
+                        {t === 'office' ? 'Office' : 'Field'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-slate-500">
+                    Site (optional)
+                  </label>
+                  <input className={field} placeholder="e.g. Depot 4" value={site} maxLength={255}
+                    onChange={(e) => setSite(e.target.value)} />
+                </div>
+              </div>
+              <button
+                onClick={() => void doCheckIn()}
+                disabled={busy}
+                className="inline-flex items-center gap-2 rounded-xl bg-success-600 px-6 py-3 text-base font-semibold text-white hover:bg-success-500 disabled:opacity-50"
+              >
+                <LogIn className="h-5 w-5" /> Check in now
+              </button>
+            </div>
+          )}
+          <p className="mt-5 flex items-start gap-2 text-xs text-slate-500">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            The time is taken from the server, not this device. Check-ins made here are not
+            face-verified.
           </p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-8 border-b border-slate-700">
-          <button
-            onClick={() => setMode('available-sessions')}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              mode === 'available-sessions'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            Available Classes
-          </button>
-          <button
-            onClick={() => setMode('history')}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              mode === 'history'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            History
-          </button>
+        <div className={`${card} p-6`}>
+          <div className="text-xs uppercase tracking-wider text-slate-500">This week</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-100">
+            {formatHours(week?.verifiedHours ?? '0')} h
+          </div>
+          <div className="mt-1 text-sm text-slate-400">
+            counted since {week?.from ?? '—'}
+          </div>
+          {week && Number(week.flaggedHours) > 0 && (
+            <div className="mt-3 text-xs text-amber-300">
+              {formatHours(week.flaggedHours)} h more are flagged for review and not counted yet.
+            </div>
+          )}
+          <div className="mt-3 text-xs text-slate-500">
+            Only completed check-ins count — a shift still in progress is added when you check out.
+          </div>
         </div>
+      </div>
 
-        {/* Content */}
-        {isLoading ? (
-          <div className="text-center py-12 text-slate-400">
-            <p>Loading sessions...</p>
+      {stale.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+            <AlertTriangle className="h-4 w-4" />
+            {stale.length} check-in{stale.length === 1 ? ' was' : 's were'} never checked out
+          </div>
+          <p className="mt-1 text-sm text-amber-200/80">
+            A check-in left open for more than a day is not closed automatically, because that
+            would record a shift of days. It counts for nothing until HR corrects it.
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-amber-200/80">
+            {stale.map((c) => (
+              <li key={c.id}>{dayOf(c.checkInTime)} from {timeOf(c.checkInTime)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className={card}>
+        <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+          The last 30 days
+        </div>
+        {history.length === 0 ? (
+          <div className="p-6">
+            <EmptyState
+              icon={<Clock className="h-8 w-8" />}
+              title="Nothing yet"
+              message="Your check-ins appear here as you make them."
+            />
           </div>
         ) : (
-          <>
-            {mode === 'available-sessions' && renderAvailableSessions()}
-            {mode === 'mark-attendance' && renderMarkAttendance()}
-            {mode === 'history' && renderHistory()}
-            {mode === 'success' && renderSuccess()}
-          </>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
+                <tr className="border-b border-slate-800">
+                  <th className="px-5 py-3">Day</th>
+                  <th className="px-5 py-3">In</th>
+                  <th className="px-5 py-3">Out</th>
+                  <th className="px-5 py-3 text-right">Hours</th>
+                  <th className="px-5 py-3">Where</th>
+                  <th className="px-5 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {history.map((c) => (
+                  <tr key={c.id} className="text-slate-300">
+                    <td className="px-5 py-2.5">{dayOf(c.checkInTime)}</td>
+                    <td className="px-5 py-2.5">{timeOf(c.checkInTime)}</td>
+                    <td className="px-5 py-2.5">
+                      {c.checkOutTime ? timeOf(c.checkOutTime) : (
+                        <span className="text-slate-500">open</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-2.5 text-right text-slate-100">
+                      {c.hours === null ? '—' : formatHours(c.hours)}
+                    </td>
+                    <td className="px-5 py-2.5 text-xs text-slate-500">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {c.checkInType === 'field' ? 'Field' : 'Office'}
+                        {c.siteLocation && ` · ${c.siteLocation}`}
+                      </span>
+                    </td>
+                    <td className="px-5 py-2.5">
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${STATE_STYLE[c.state] ?? ''}`}>
+                        {CHECKIN_STATE_LABEL[c.state] ?? c.state}
+                      </span>
+                      {c.faceVerified && (
+                        <span className="ml-2 text-xs text-slate-500">face verified</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
   );
 };
 
-export default EmployeeSelfServiceAttendance;
+export default EmployeeSelfServiceAttendancePage;

@@ -23,11 +23,16 @@ def check(n, ok, d=""):
 print("-- platform isolation --")
 co,r=call("GET","/overview",SCHOOL['token']); check("school identity refused from EMS", co==403, f"({co} {r})")
 
+A_STAFF = set(A['employees']) | {A['hrEmpId'], A['managerEmpId']}
+
 print("\n-- overview / metrics --")
 co,r=call("GET","/overview",A['token']); check("overview 200", co==200, f"({co} {r})")
 if co==200:
-    # Three staff plus the HR manager, who is an employee of the company too.
-    check("headcount is tenant-scoped", r.get('total_members')==4, f"({r})")
+    # Everybody the fixture employs in A: the staff, the HR manager and the
+    # line manager, who are employees of the company too. Derived from the
+    # fixture rather than written down, so adding a person to it is not a
+    # reason for this to fail — only counting somebody from B is.
+    check("headcount is tenant-scoped", r.get('total_members')==len(A_STAFF), f"({r})")
     check("bands computed", r.get('chronic_absentees',0)>=1, f"({r})")
 co,r=call("GET","/departments/metrics",A['token']); check("dept metrics 200", co==200, f"({co} {r})")
 names=[d['name'] for d in r] if co==200 and isinstance(r,list) else []
@@ -35,8 +40,10 @@ check("only own departments", names==['Operations A'], f"({names})")
 
 print("\n-- members --")
 co,r=call("GET","/members",A['token']); check("members 200", co==200, f"({co} {r})")
-mails=sorted(m['email'] for m in (r.get('data') or [])) if co==200 else []
-check("only own employees", all(e.endswith('.a@c2e.test') for e in mails) and len(mails)==4, f"({mails})")
+ids={m['id'] for m in (r.get('data') or [])} if co==200 else set()
+# The exact set, not a suffix and a count: a list containing one of B's people
+# and missing one of A's would pass the old check.
+check("only own employees", ids==A_STAFF, f"({sorted(ids)} vs {sorted(A_STAFF)})")
 co,r=call("GET",f"/members/{B['employees'][0]}",A['token']); check("cannot read B employee", co==404, f"({co})")
 co,r=call("GET",f"/members/{A['employees'][0]}",A['token']); check("can read own employee", co==200, f"({co})")
 
@@ -44,7 +51,7 @@ print("\n-- patterns / compliance --")
 co,r=call("GET","/patterns",A['token']); check("patterns 200", co==200 and isinstance(r,list), f"({co} {r})")
 if co==200: check("detects an absentee", any(p['pattern']!='NONE' for p in r), f"({r})")
 co,r=call("GET","/compliance/summary",A['token']); check("compliance 200", co==200, f"({co} {r})")
-if co==200: check("compliance scoped", r.get('headcount')==4, f"({r})")
+if co==200: check("compliance scoped", r.get('headcount')==len(A_STAFF), f"({r})")
 
 print("\n-- campaigns --")
 co,r=call("POST","/campaigns",A['token'],{"name":"Nudge","criteria":"BAD","message_template":"hello there"})

@@ -10,6 +10,13 @@ async function main() {
   // Payroll needs two distinct people: one who calculates and one who signs
   // off. A single role that can do both makes the approval step decorative.
   const dirRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='hr_director'`, [cp.id])).rows[0]
+  // The tenant administrator and a line manager. The corporate admin routes
+  // resolve their company from corporate_entities.admin_user_id, which nothing
+  // here used to set, so those pages refused every account in this fixture.
+  // Managers have their own permissions — rosters, timesheets, leave — and
+  // until now had no account to exercise them with.
+  const adminRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='admin'`, [cp.id])).rows[0]
+  const mgrRole = (await query(`SELECT id FROM roles WHERE platform_id=$1 AND name='manager'`, [cp.id])).rows[0]
 
   await query(`DELETE FROM notifications WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM notification_campaigns WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
@@ -76,6 +83,21 @@ async function main() {
     await query(`INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status) VALUES ($1,$2,'active')`,
       [dir.id, ent.id])
 
+    const admin = (await query(
+      `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
+       VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+      [cp.id, `admin.${tag.toLowerCase()}@c2e.test`, `Admin ${tag}`, adminRole.id, hash])).rows[0]
+    await query(`INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status) VALUES ($1,$2,'active')`,
+      [admin.id, ent.id])
+    await query(`UPDATE corporate_entities SET admin_user_id = $1 WHERE id = $2`, [admin.id, ent.id])
+
+    const mgr = (await query(
+      `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
+       VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+      [cp.id, `mgr.${tag.toLowerCase()}@c2e.test`, `Manager ${tag}`, mgrRole.id, hash])).rows[0]
+    await query(`INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status) VALUES ($1,$2,'active')`,
+      [mgr.id, ent.id])
+
     const dept = (await query(
       `INSERT INTO corporate_departments (name, code, platform_id, tenant_id) VALUES ($1,$2,$3,$4) RETURNING id`,
       [`Operations ${tag}`, `OPS${tag}`, cp.id, ent.id])).rows[0]
@@ -88,6 +110,12 @@ async function main() {
                               department_id, date_of_joining, is_currently_employed, tenant_id)
        VALUES ($1,$2,$3,$4,$5,'000',$6,'2024-01-01',true,$7) RETURNING id`,
       [hr.id, `E-${tag}HR`, 'HR', tag, `hr.${tag.toLowerCase()}@c2e.test`, dept.id, ent.id])).rows[0]
+
+    const mgrEmp = (await query(
+      `INSERT INTO employees (user_id, employee_id, first_name, last_name, email, phone,
+                              department_id, date_of_joining, is_currently_employed, tenant_id)
+       VALUES ($1,$2,$3,$4,$5,'000',$6,'2024-01-01',true,$7) RETURNING id`,
+      [mgr.id, `E-${tag}MG`, 'Manager', tag, `mgr.${tag.toLowerCase()}@c2e.test`, dept.id, ent.id])).rows[0]
 
     const empIds: string[] = []
     let firstEmpUserId: string | null = null
@@ -205,6 +233,9 @@ async function main() {
       hrEmpId: hrEmp.id,
       token: generateAccessToken(hr.id, cp.id, hrRole.id),
       dirToken: generateAccessToken(dir.id, cp.id, dirRole.id),
+      adminToken: generateAccessToken(admin.id, cp.id, adminRole.id),
+      managerToken: generateAccessToken(mgr.id, cp.id, mgrRole.id),
+      managerEmpId: mgrEmp.id,
       empToken: generateAccessToken(firstEmpUserId!, cp.id, empRole.id),
       empId: empIds[0],
     }

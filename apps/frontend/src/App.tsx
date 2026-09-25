@@ -63,6 +63,7 @@ import HRContractsPage from './pages/HRContractsPage';
 import HRRosterPage from './pages/HRRosterPage';
 import HRTimesheetsPage from './pages/HRTimesheetsPage';
 import EmployeeWorkPage from './pages/EmployeeWorkPage';
+import EmployeeSelfServiceAttendancePage from './pages/EmployeeSelfServiceAttendancePage';
 import EmployeePayslipsPage from './pages/EmployeePayslipsPage';
 import SchoolAdminRoomsPage from './pages/SchoolAdminRoomsPage';
 import SchoolAdminSchedulesPage from './pages/SchoolAdminSchedulesPage';
@@ -283,6 +284,10 @@ export default function App() {
                     <Route path="/contracts" element={
                       <HRContractsPage canEnd={isDirector} />} />
                     <Route path="/shifts" element={<HRRosterPage />} />
+                    {/* HR staff and managers are employees too and check in like
+                        anybody; the page resolves the employee from the signed-in
+                        identity and says so plainly when there is none. */}
+                    <Route path="/check-in" element={<EmployeeSelfServiceAttendancePage />} />
                     <Route path="/timesheets" element={
                       <HRTimesheetsPage canExport={isDirector} />} />
                   </Routes>
@@ -309,6 +314,7 @@ export default function App() {
                     <Route path="/leave" element={<EmployeeLeavePage />} />
                     <Route path="/payslips" element={<EmployeePayslipsPage />} />
                     <Route path="/work" element={<EmployeeWorkPage />} />
+                    <Route path="/check-in" element={<EmployeeSelfServiceAttendancePage />} />
                     <Route path="/settings" element={<StudentSettingsPage />} />
                   </Routes>
                 </AppShell>

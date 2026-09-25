@@ -991,3 +991,238 @@ export async function exportTimesheet(
     amount: fromMinor(amountMinor),
   }
 }
+
+// ---------------------------------------------------------------------------
+// Self-service check-in
+// ---------------------------------------------------------------------------
+
+/**
+ * How long an open check-in stays open.
+ *
+ * Somebody who checks in and forgets to check out leaves a row with no end.
+ * Closing it days later would record a shift of days, so after this long it
+ * stops counting as "on the clock": the employee can check in again, the old
+ * row is reported as needing HR's attention, and — having no check-out — it
+ * contributes nothing to a timesheet, which is what the timesheet engine
+ * already does with any open row.
+ */
+export const OPEN_CHECKIN_HOURS = 24
+
+const CHECKIN_TYPES = ['office', 'field'] as const
+export type CheckInType = typeof CHECKIN_TYPES[number]
+
+export interface CheckInRow {
+  id: string
+  checkInType: string
+  checkInTime: string
+  checkOutTime: string | null
+  siteLocation: string | null
+  state: string
+  faceVerified: boolean
+  /** Hours for a closed check-in; null while it is open. */
+  hours: string | null
+}
+
+function toCheckInRow(r: any): CheckInRow {
+  return {
+    id: r.id,
+    checkInType: r.check_in_type,
+    checkInTime: r.check_in_time,
+    checkOutTime: r.check_out_time,
+    siteLocation: r.site_location,
+    state: r.checkin_state,
+    faceVerified: r.face_verified === true,
+    hours: r.hours === null || r.hours === undefined ? null : String(r.hours),
+  }
+}
+
+const CHECKIN_COLUMNS = `
+  id, check_in_type, check_in_time, check_out_time, site_location,
+  checkin_state, face_verified,
+  CASE WHEN check_out_time IS NULL THEN NULL
+       ELSE ROUND((GREATEST(EXTRACT(EPOCH FROM (check_out_time - check_in_time)), 0)
+                   / 3600.0)::numeric, 2)
+  END AS hours`
+
+/**
+ * The employee's open check-in, if they are on the clock.
+ *
+ * LOCALTIMESTAMP rather than CURRENT_TIMESTAMP because check_in_time is a
+ * timestamp without time zone; comparing it with a zoned value would convert
+ * one of them and the 24-hour window would move with the session's zone.
+ */
+async function openCheckIn(runner: Runner, tenantId: string, employeeId: string, lock = false) {
+  const r = await runner.query(
+    `SELECT ${CHECKIN_COLUMNS}
+       FROM corporate_checkins
+      WHERE tenant_id = $1 AND employee_id = $2
+        AND check_out_time IS NULL
+        AND check_in_time > LOCALTIMESTAMP - make_interval(hours => $3)
+      ORDER BY check_in_time DESC
+      LIMIT 1${lock ? ' FOR UPDATE' : ''}`,
+    [tenantId, employeeId, OPEN_CHECKIN_HOURS]
+  )
+  return r.rows[0] ?? null
+}
+
+/**
+ * Locks the employee row for the length of the caller's transaction.
+ *
+ * Two check-ins submitted at once — a double tap, two tabs — would each find
+ * nobody on the clock and each insert one. Serialising on the employee makes
+ * the second one see the first. The lock is also the ownership check: the row
+ * is selected inside the caller's tenant and only if they are still employed.
+ */
+async function lockEmployee(client: PoolClient, tenantId: string, employeeId: string) {
+  const r = await client.query(
+    `SELECT id FROM employees
+      WHERE id = $1 AND tenant_id = $2 AND is_currently_employed = TRUE
+      FOR UPDATE`,
+    [employeeId, tenantId]
+  )
+  if (r.rowCount === 0) throw new WorkforceError('Employee record not found', 404)
+}
+
+/**
+ * Checks the employee in, now.
+ *
+ * Three things are deliberately not taken from the request, whatever it says:
+ * who is checking in (the signed-in identity), when (the server's clock), and
+ * whether a face was verified (it was not — this is a web check-in, and the
+ * face-verification service is a lecturer's tool for a class, not something
+ * an employee can call). The removed route took all three from the client.
+ */
+export async function checkIn(
+  client: PoolClient,
+  ctx: WorkforceContext,
+  employeeId: string,
+  input: { checkInType?: unknown; siteLocation?: unknown }
+): Promise<CheckInRow> {
+  const type = input.checkInType === undefined || input.checkInType === null || input.checkInType === ''
+    ? 'office'
+    : String(input.checkInType)
+  if (!(CHECKIN_TYPES as readonly string[]).includes(type)) {
+    throw new WorkforceError('checkInType must be office or field')
+  }
+  const site = input.siteLocation === undefined || input.siteLocation === null
+    ? null
+    : String(input.siteLocation).trim().slice(0, 255) || null
+
+  await lockEmployee(client, ctx.tenantId, employeeId)
+
+  const open = await openCheckIn(client, ctx.tenantId, employeeId)
+  if (open) {
+    throw new WorkforceError('You are already checked in; check out first', 409)
+  }
+
+  const created = await client.query(
+    `INSERT INTO corporate_checkins
+       (tenant_id, employee_id, check_in_type, check_in_time, site_location, face_verified)
+     VALUES ($1, $2, $3, LOCALTIMESTAMP, $4, FALSE)
+     RETURNING ${CHECKIN_COLUMNS}`,
+    [ctx.tenantId, employeeId, type, site]
+  )
+  return toCheckInRow(created.rows[0])
+}
+
+/** Checks the employee out of their open check-in, now. */
+export async function checkOut(
+  client: PoolClient,
+  ctx: WorkforceContext,
+  employeeId: string
+): Promise<CheckInRow> {
+  await lockEmployee(client, ctx.tenantId, employeeId)
+
+  const open = await openCheckIn(client, ctx.tenantId, employeeId, true)
+  if (!open) {
+    throw new WorkforceError(
+      `You are not checked in. A check-in left open for more than ${OPEN_CHECKIN_HOURS} hours `
+        + 'is not closed automatically; ask HR to correct it',
+      409
+    )
+  }
+
+  const closed = await client.query(
+    `UPDATE corporate_checkins
+        SET check_out_time = LOCALTIMESTAMP
+      WHERE id = $1 AND tenant_id = $2 AND employee_id = $3 AND check_out_time IS NULL
+      RETURNING ${CHECKIN_COLUMNS}`,
+    [open.id, ctx.tenantId, employeeId]
+  )
+  return toCheckInRow(closed.rows[0])
+}
+
+export interface AttendanceSummary {
+  onTheClock: CheckInRow | null
+  /** Open check-ins older than the window: counted nowhere, awaiting HR. */
+  needsAttention: CheckInRow[]
+  history: CheckInRow[]
+  week: { from: string; to: string; verifiedHours: string; flaggedHours: string }
+}
+
+/**
+ * The employee's own attendance: whether they are on the clock, what needs
+ * HR's attention, their recent history, and this week's hours.
+ *
+ * The weekly figure comes from workedHours — the function timesheets are
+ * built from — so the number an employee sees here is the number their
+ * timesheet will say, rather than a second calculation that can disagree.
+ */
+export async function attendanceFor(
+  runner: Runner,
+  ctx: WorkforceContext,
+  employeeId: string,
+  days: number
+): Promise<AttendanceSummary> {
+  const window = Math.min(Math.max(Math.trunc(days) || 30, 1), 90)
+
+  const history = await runner.query(
+    `SELECT ${CHECKIN_COLUMNS}
+       FROM corporate_checkins
+      WHERE tenant_id = $1 AND employee_id = $2
+        AND check_in_time > LOCALTIMESTAMP - make_interval(days => $3)
+      ORDER BY check_in_time DESC
+      LIMIT 200`,
+    [ctx.tenantId, employeeId, window]
+  )
+  const rows = history.rows.map(toCheckInRow)
+
+  const open = await openCheckIn(runner, ctx.tenantId, employeeId)
+  const stale = await runner.query(
+    `SELECT ${CHECKIN_COLUMNS}
+       FROM corporate_checkins
+      WHERE tenant_id = $1 AND employee_id = $2
+        AND check_out_time IS NULL
+        AND check_in_time <= LOCALTIMESTAMP - make_interval(hours => $3)
+        AND check_in_time > LOCALTIMESTAMP - make_interval(days => $4)
+      ORDER BY check_in_time DESC`,
+    [ctx.tenantId, employeeId, OPEN_CHECKIN_HOURS, window]
+  )
+
+  // Monday to today, in the database's own calendar so it agrees with the
+  // ::date grouping inside workedHours.
+  const bounds = await runner.query(
+    `SELECT to_char(date_trunc('week', LOCALTIMESTAMP)::date, 'YYYY-MM-DD') AS monday,
+            to_char(LOCALTIMESTAMP::date, 'YYYY-MM-DD') AS today`
+  )
+  const { monday, today } = bounds.rows[0]
+  const week = await workedHours(runner, ctx.tenantId, employeeId, monday, today)
+  let verified = 0
+  let flagged = 0
+  for (const d of week.values()) {
+    verified += d.worked
+    flagged += d.flagged
+  }
+
+  return {
+    onTheClock: open ? toCheckInRow(open) : null,
+    needsAttention: stale.rows.map(toCheckInRow),
+    history: rows,
+    week: {
+      from: monday,
+      to: today,
+      verifiedHours: fromCentihours(verified),
+      flaggedHours: fromCentihours(flagged),
+    },
+  }
+}

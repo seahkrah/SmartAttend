@@ -49,12 +49,14 @@ export function apiLatencyTrackingMiddleware(
     const responseTimeMs = endTime - startTime;
 
     // res.send runs after the route handler, so the server-resolved context
-    // is available here. Anything unresolved is recorded as 'system' rather
-    // than taking the caller's word for it.
-    const tenantId = (_req as TenantRequest).ctx?.tenantId || 'system';
+    // is available here. A request with no resolved tenant is not recorded:
+    // the metrics are per tenant, and the caller's word is not taken for it.
+    // (It used to be recorded against the literal 'system', which is not a
+    // tenant id, so every such write failed the foreign key.)
+    const tenantId = (_req as TenantRequest).ctx?.tenantId;
 
     // Skip metrics recording for health check endpoints
-    if (!_req.path.includes('/health')) {
+    if (tenantId && !_req.path.includes('/health')) {
       // Record metrics asynchronously (fire and forget)
       recordAPILatency({
         endpoint: _req.path,

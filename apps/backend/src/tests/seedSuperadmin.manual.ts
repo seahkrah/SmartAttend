@@ -36,11 +36,14 @@ async function cleanup() {
     `DELETE FROM session_invalidation_log
       WHERE invalidated_by_superadmin_id IN (SELECT id FROM users WHERE email LIKE '%@sa2e.test')`
   )
-  await query(
-    `DELETE FROM incidents
+  // The incident's own history does not cascade, so it goes first.
+  const fixtureIncidents = `SELECT id FROM incidents
       WHERE detected_by_user_id IN (SELECT id FROM users WHERE email LIKE '%@sa2e.test')
          OR resolved_by_user_id IN (SELECT id FROM users WHERE email LIKE '%@sa2e.test')`
-  )
+  for (const child of ['incident_timeline_events', 'incident_notifications', 'escalation_events', 'error_logs']) {
+    await query(`DELETE FROM ${child} WHERE incident_id IN (${fixtureIncidents})`)
+  }
+  await query(`DELETE FROM incidents WHERE id IN (${fixtureIncidents})`)
   await query(`DELETE FROM users WHERE email LIKE '%@sa2e.test'`)
 
   // Tenants the suite provisions, and the entities behind them.
@@ -97,7 +100,21 @@ async function main() {
     [platformId, roleId, hashed]
   )
 
+  // An open incident affecting school A, for the suites that check who may
+  // act on an incident and what gets recorded when they do. Incidents are
+  // raised by the system, not through the API, so the fixture raises it.
+  const schoolA = await query(`SELECT id FROM school_entities WHERE code = 'E2E-A'`)
+  const incident = schoolA.rows.length === 0 ? null : await query(
+    `INSERT INTO incidents (title, description, incident_type, severity, status,
+                            assigned_superadmin_id, affected_tenant_id, detected_by_user_id)
+     VALUES ('E2E incident', 'Raised by the superadmin fixture', 'fixture', 'LOW', 'OPEN',
+             $1, $2, $1)
+     RETURNING id`,
+    [user.rows[0].id, schoolA.rows[0].id]
+  )
+
   console.log(JSON.stringify({
+    schoolAIncidentId: incident?.rows[0]?.id ?? null,
     superadminId: user.rows[0].id,
     token: generateAccessToken(user.rows[0].id, platformId, roleId),
     lockedUserId: locked.rows[0].id,

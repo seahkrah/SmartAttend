@@ -52,6 +52,9 @@ SUITES=(
   notificationsApi
   controlPlaneApi
   filesApi
+  # Last: it creates employee and student records that earlier suites'
+  # exact headcounts do not expect. The next run's fixtures remove them.
+  crossTenantAudit
 )
 
 fail=0

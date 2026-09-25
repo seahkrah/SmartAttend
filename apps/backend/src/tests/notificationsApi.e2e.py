@@ -411,10 +411,10 @@ if STOK:
           co == 200 and not any('100.00' in (n.get('body') or '')
                                 for n in r.get('notifications', [])), f"({co} {r})")
 
-    # Swept until it comes back empty, not once. The outbox is global and a
-    # sweep claims a bounded batch oldest-first, so on a database where other
-    # suites have already queued a batch's worth, one sweep never reaches a
-    # message queued a moment ago. That is the dispatcher working as designed;
+    # Swept until it comes back empty, not once. A sweep claims a bounded
+    # batch of this tenant's outbox oldest-first, so where earlier suites have
+    # already queued a batch's worth for this school, one sweep never reaches
+    # a message queued a moment ago. That is the dispatcher working as designed;
     # assuming a single sweep drains everything is what put this assertion on
     # a knife edge.
     co = 0

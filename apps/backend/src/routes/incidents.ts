@@ -207,11 +207,18 @@ router.patch(
 
     // Resolved and scoped by the :incidentId param middleware above.
     const incident = (req as any).incident
+    const actor = contextOf(req).userId
+    // Who acknowledged and who resolved are the signed-in caller, never ids
+    // from the body. Taking them from the body let a caller record anyone,
+    // including a user of another tenant, as having handled the incident.
+    // Acknowledgement is stamped once, by the first person to act on it.
+    const resolving =
+      String(req.body.status ?? '').toUpperCase() === 'RESOLVED' || req.body.resolvedByUserId !== undefined
     const updates = {
       status: req.body.status,
       severity: req.body.severity,
-      acknowledgedByUserId: req.body.acknowledgedByUserId || contextOf(req).userId,
-      resolvedByUserId: req.body.resolvedByUserId,
+      acknowledgedByUserId: incident.acknowledged_by_user_id ? undefined : actor,
+      resolvedByUserId: resolving ? actor : undefined,
       rootCause: req.body.rootCause,
       remediationSteps: req.body.remediationSteps,
       preventionMeasures: req.body.preventionMeasures,

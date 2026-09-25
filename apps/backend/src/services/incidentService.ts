@@ -308,7 +308,10 @@ export async function updateIncident(
     if (input.resolvedByUserId !== undefined) {
       updates.push(`resolved_by_user_id = $${paramIndex++}`)
       updates.push(`resolved_at = CURRENT_TIMESTAMP`)
-      updates.push(`status = 'resolved'`)
+      // The status vocabulary is upper case; 'resolved' failed the check
+      // constraint, so this path could never succeed. An explicit status in
+      // the same update would assign the column twice, so it is left to that.
+      if (input.status === undefined) updates.push(`status = 'RESOLVED'`)
       values.push(input.resolvedByUserId)
     }
     if (input.rootCause !== undefined) {

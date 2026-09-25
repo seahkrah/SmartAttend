@@ -96,8 +96,9 @@ const CorporateAdminUsersPage: React.FC = () => {
 
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.firstName || !form.lastName || !form.email) {
-      setError('First name, last name, and email are required.')
+    // An employee record needs a phone number; the server refuses one without.
+    if (!form.firstName || !form.lastName || !form.email || !form.phone.trim()) {
+      setError('First name, last name, email and phone are required.')
       return
     }
     try {
@@ -107,7 +108,7 @@ const CorporateAdminUsersPage: React.FC = () => {
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
-        phone: form.phone || undefined,
+        phone: form.phone.trim(),
         departmentId: form.departmentId || undefined,
         designation: form.designation || undefined,
         employmentType: form.employmentType || 'full_time',
@@ -336,9 +337,9 @@ const CorporateAdminUsersPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">Phone</label>
+                  <label className="block text-sm text-slate-400 mb-1">Phone *</label>
                   <input
-                    type="text" value={form.phone}
+                    type="tel" required value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />

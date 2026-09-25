@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express'
 import multer from 'multer'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { query } from '../db/connection.js'
@@ -20,6 +20,8 @@ import {
   mayRead,
   openForDownload,
   purgeDeleted,
+  isOwnerType,
+  subjectInTenant,
   quotaFor,
   recordAccess,
   softDelete,
@@ -171,12 +173,17 @@ router.post('/', upload.single('file'), async (req: TenantRequest, res: Response
     const file = (req as any).file as
       { path: string; originalname: string; mimetype?: string; size: number } | undefined
 
+    // A refusal after multer has written the upload to staging must remove
+    // it, or every rejected request leaves its bytes on disk.
+    const discardStaged = () => rm(file!.path, { force: true }).catch(() => undefined)
+
     if (!file) {
       return res.status(400).json({ error: 'Send a file in a field named "file"' })
     }
 
     const category = (req.body ?? {}).category
     if (!isCategory(category)) {
+      await discardStaged()
       return res.status(400).json({
         error: 'A valid category is required',
         categories: [
@@ -188,8 +195,27 @@ router.post('/', upload.single('file'), async (req: TenantRequest, res: Response
     }
 
     const ownerId = (req.body ?? {}).ownerId
+    const ownerType = (req.body ?? {}).ownerType || null
     if (ownerId && !UUID.test(String(ownerId))) {
+      await discardStaged()
       return res.status(400).json({ error: 'ownerId must be an identifier' })
+    }
+    if (ownerType && !isOwnerType(ownerType)) {
+      await discardStaged()
+      return res.status(400).json({
+        error: 'Unknown ownerType',
+        ownerTypes: ['student', 'employee', 'application', 'leave_request', 'user'],
+      })
+    }
+    if (ownerId && !ownerType) {
+      await discardStaged()
+      return res.status(400).json({ error: 'ownerId needs an ownerType' })
+    }
+    // The subject is resolved inside the caller's tenant. Another tenant's id
+    // reads as absent, the same as one that does not exist.
+    if (ownerId && !(await subjectInTenant(ownerType, String(ownerId), ctx.tenantId))) {
+      await discardStaged()
+      return res.status(404).json({ error: 'No such record in this tenant to attach the file to' })
     }
 
     const result = await store(
@@ -202,7 +228,7 @@ router.post('/', upload.single('file'), async (req: TenantRequest, res: Response
       },
       {
         category: category as FileCategory,
-        ownerType: (req.body ?? {}).ownerType || null,
+        ownerType,
         ownerId: ownerId || null,
       }
     )
@@ -418,7 +444,7 @@ router.delete('/:fileId', async (req: TenantRequest, res: Response) => {
 router.post('/purge', staff, async (req: TenantRequest, res: Response) => {
   try {
     const days = Number((req.body ?? {}).olderThanDays)
-    const purged = await purgeDeleted(Number.isFinite(days) && days >= 0 ? days : 30)
+    const purged = await purgeDeleted(ctxOf(req).tenantId, Number.isFinite(days) && days >= 0 ? days : 30)
     return res.json({ purged })
   } catch (e) {
     return fail(res, 'purge deleted files', e)

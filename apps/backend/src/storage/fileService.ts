@@ -374,6 +374,40 @@ export async function mayRead(
   return { allowed: false, reason: 'This file is not yours to read' }
 }
 
+/**
+ * The tables a file may hang off, and the column that holds each one's
+ * tenant. A file names its subject by type and id; both are the uploader's
+ * claim, so the pair is resolved inside the uploader's tenant before it is
+ * stored. Unchecked, a file in one tenant could name another tenant's
+ * student or employee as its subject.
+ */
+const OWNER_TABLES: Record<string, { table: string; idColumn: string }> = {
+  student: { table: 'students', idColumn: 'id' },
+  employee: { table: 'employees', idColumn: 'id' },
+  application: { table: 'applications', idColumn: 'id' },
+  leave_request: { table: 'leave_requests', idColumn: 'id' },
+  user: { table: 'user_tenant_memberships', idColumn: 'user_id' },
+}
+
+export function isOwnerType(value: unknown): value is keyof typeof OWNER_TABLES {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(OWNER_TABLES, value)
+}
+
+/** Whether the named subject exists in this tenant. */
+export async function subjectInTenant(
+  ownerType: string,
+  ownerId: string,
+  tenantId: string
+): Promise<boolean> {
+  const target = OWNER_TABLES[ownerType]
+  if (!target) return false
+  const r = await query(
+    `SELECT 1 FROM ${target.table} WHERE ${target.idColumn} = $1 AND tenant_id = $2 LIMIT 1`,
+    [ownerId, tenantId]
+  )
+  return (r.rowCount ?? 0) > 0
+}
+
 /** Whether the reader is the subject of the thing a file hangs off. */
 async function ownsSubject(
   runner: Runner,
@@ -468,20 +502,27 @@ export async function softDelete(
 }
 
 /**
- * Removes the bytes of files deleted longer ago than the grace period.
+ * Removes the bytes of one tenant's files deleted longer ago than the grace
+ * period.
  *
  * The row stays, so a reference still resolves to something that explains
  * what happened, and openForDownload reports the bytes as gone rather than
  * returning nothing.
+ *
+ * The tenant is required. This used to sweep every tenant's deleted files,
+ * and it was reachable by any tenant's staff with a grace period of their
+ * choosing, so one employer could destroy the bytes another had deleted a
+ * minute earlier and still meant to recover.
  */
-export async function purgeDeleted(olderThanDays = 30): Promise<number> {
+export async function purgeDeleted(tenantId: string, olderThanDays = 30): Promise<number> {
   const due = await query(
     `SELECT id, backend, storage_key FROM stored_files
-      WHERE deleted_at IS NOT NULL
-        AND deleted_at < CURRENT_TIMESTAMP - ($1 || ' days')::interval
+      WHERE tenant_id = $1
+        AND deleted_at IS NOT NULL
+        AND deleted_at < CURRENT_TIMESTAMP - ($2 || ' days')::interval
         AND storage_key <> ''
       LIMIT 500`,
-    [String(olderThanDays)]
+    [tenantId, String(olderThanDays)]
   )
 
   const purged: string[] = []
@@ -496,17 +537,14 @@ export async function purgeDeleted(olderThanDays = 30): Promise<number> {
   if (purged.length === 0) return 0
 
   // The keys are blanked so a later sweep does not try again. The guard
-  // trigger refuses a change to storage_key, so it is suspended once around
-  // the whole batch rather than per row.
-  await query(`ALTER TABLE stored_files DISABLE TRIGGER trg_stored_files_guard`)
-  try {
-    await query(
-      `UPDATE stored_files SET storage_key = '' WHERE id = ANY($1::uuid[])`,
-      [purged]
-    )
-  } finally {
-    await query(`ALTER TABLE stored_files ENABLE TRIGGER trg_stored_files_guard`)
-  }
+  // trigger permits exactly this change and no other: a deleted file's key
+  // may be emptied. It used to be disabled for the whole table around the
+  // batch, which left every other connection's writes unguarded meanwhile.
+  await query(
+    `UPDATE stored_files SET storage_key = ''
+      WHERE id = ANY($1::uuid[]) AND tenant_id = $2 AND deleted_at IS NOT NULL`,
+    [purged, tenantId]
+  )
   return purged.length
 }
 

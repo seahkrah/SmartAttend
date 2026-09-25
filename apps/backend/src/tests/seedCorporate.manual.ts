@@ -58,6 +58,12 @@ async function main() {
   await query(`DELETE FROM employees WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM corporate_departments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM corporate_user_associations WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@c2e.test')`)
+  // Reading the audit trail is itself recorded, and actor_id is RESTRICT
+  // (037), so a corporate identity that ever read it would otherwise block
+  // its own teardown. Same exception, same pattern as the school fixture.
+  await query(`ALTER TABLE audit_access_log DISABLE TRIGGER USER`)
+  await query(`DELETE FROM audit_access_log WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@c2e.test')`)
+  await query(`ALTER TABLE audit_access_log ENABLE TRIGGER USER`)
   await query(`DELETE FROM users WHERE email LIKE '%@c2e.test'`)
   await query(`DELETE FROM corporate_entities WHERE code LIKE 'C2E-%'`)
   await query(`DELETE FROM tenants WHERE code LIKE 'C2E-%'`)

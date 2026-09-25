@@ -533,11 +533,16 @@ export function backoffSeconds(attempt: number): number {
  * rows 'sending' in the same statement means a worker that dies mid-send
  * leaves them visibly stuck rather than silently re-sent.
  */
-export async function claimDue(client: PoolClient, limit = 25): Promise<any[]> {
+export async function claimDue(
+  client: PoolClient,
+  limit = 25,
+  tenantId: string | null = null
+): Promise<any[]> {
   const claimed = await client.query(
     `WITH due AS (
        SELECT id FROM notification_messages
         WHERE status = 'pending' AND next_attempt_at <= CURRENT_TIMESTAMP
+          AND ($2::uuid IS NULL OR tenant_id = $2::uuid)
         ORDER BY priority, next_attempt_at
         LIMIT $1
         FOR UPDATE SKIP LOCKED
@@ -547,7 +552,7 @@ export async function claimDue(client: PoolClient, limit = 25): Promise<any[]> {
        FROM due
       WHERE m.id = due.id
       RETURNING m.*`,
-    [limit]
+    [limit, tenantId]
   )
   return claimed.rows
 }
@@ -560,7 +565,10 @@ export async function claimDue(client: PoolClient, limit = 25): Promise<any[]> {
  * the queue from leaking messages; the grace period is long enough that a
  * slow-but-living send is not duplicated.
  */
-export async function requeueStalled(olderThanMinutes = 15): Promise<number> {
+export async function requeueStalled(
+  olderThanMinutes = 15,
+  tenantId: string | null = null
+): Promise<number> {
   const r = await query(
     `UPDATE notification_messages
         SET status = 'pending',
@@ -569,8 +577,9 @@ export async function requeueStalled(olderThanMinutes = 15): Promise<number> {
       WHERE status = 'sending'
         AND updated_at < CURRENT_TIMESTAMP - ($1 || ' minutes')::interval
         AND attempts < max_attempts
+        AND ($2::uuid IS NULL OR tenant_id = $2::uuid)
       RETURNING id`,
-    [String(olderThanMinutes)]
+    [String(olderThanMinutes), tenantId]
   )
   return r.rowCount ?? 0
 }
@@ -731,14 +740,22 @@ export interface SweepResult {
 }
 
 /** One pass of the dispatcher. Safe to run concurrently with itself. */
-export async function runOnce(limit = 25): Promise<SweepResult> {
-  const requeued = await requeueStalled()
+/**
+ * One pass of the dispatcher.
+ *
+ * With a tenant, only that tenant's queue is touched. The background worker
+ * sweeps everything; a tenant administrator pressing "send now" must not, or
+ * they would be sending other tenants' mail on their own schedule and reading
+ * back how much of it there was.
+ */
+export async function runOnce(limit = 25, tenantId: string | null = null): Promise<SweepResult> {
+  const requeued = await requeueStalled(15, tenantId)
 
   const client = await pool.connect()
   let rows: any[]
   try {
     await client.query('BEGIN')
-    rows = await claimDue(client, limit)
+    rows = await claimDue(client, limit, tenantId)
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined)

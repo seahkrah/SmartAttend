@@ -375,7 +375,7 @@ router.post('/channels/:channel/test', admin, async (req: TenantRequest, res: Re
 
     // Sent immediately rather than left for the dispatcher: the point of a
     // test is to find out now whether the channel works.
-    const swept = await runOnce(10)
+    const swept = await runOnce(10, ctx.tenantId)
 
     const delivered = summary.queued.length > 0
       ? (await query(
@@ -681,9 +681,10 @@ router.post('/messages/:messageId/cancel', admin, async (req: TenantRequest, res
 })
 
 /** Runs the dispatcher now, rather than waiting for the next sweep. */
-router.post('/dispatch', admin, async (_req: TenantRequest, res: Response) => {
+router.post('/dispatch', admin, async (req: TenantRequest, res: Response) => {
   try {
-    return res.json({ swept: await runOnce(50) })
+    // This tenant's queue only; the background worker is what sweeps all.
+    return res.json({ swept: await runOnce(50, ctxOf(req).tenantId) })
   } catch (e) {
     return fail(res, 'run the dispatcher', e)
   }

@@ -19,6 +19,13 @@ async function main() {
   // than weakening either guarantee. This runs only against a throwaway
   // verification database.
   await query(`ALTER TABLE audit_logs DISABLE TRIGGER USER`)
+  // Incidents name the school they affected and the people who handled them,
+  // so they go before either.
+  await query(`DELETE FROM incident_timeline_events WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%'))`)
+  await query(`DELETE FROM incident_notifications WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%'))`)
+  await query(`DELETE FROM escalation_events WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%'))`)
+  await query(`DELETE FROM error_logs WHERE incident_id IN (SELECT id FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%'))`)
+  await query(`DELETE FROM incidents WHERE affected_tenant_id IN (SELECT id FROM school_entities WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`DELETE FROM audit_logs WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)

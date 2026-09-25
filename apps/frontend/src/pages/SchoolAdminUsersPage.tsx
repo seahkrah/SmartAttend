@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import {
   Users,
   Search,
@@ -218,7 +217,7 @@ const SchoolAdminUsersPage: React.FC = () => {
   }
 
   return (
-    <TenantAdminLayout currentPage="users" platform="school">
+    <>
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((toast) => (
@@ -608,7 +607,7 @@ const SchoolAdminUsersPage: React.FC = () => {
           </div>
         </div>
       )}
-    </TenantAdminLayout>
+    </>
   )
 }
 

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Trash2, BookOpen, GraduationCap, X } from 'lucide-react';
-import { TenantAdminLayout } from '../components/TenantAdminLayout';
 import { useToastStore } from '../components/Toast';
 import { useConfirmDialog } from '../components/useConfirmDialog';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -184,14 +183,14 @@ const SchoolAdminProgrammesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <TenantAdminLayout currentPage="programmes" platform="school">
+      <>
         <LoadingOverlay message="Loading programmes…" />
-      </TenantAdminLayout>
+      </>
     );
   }
 
   return (
-    <TenantAdminLayout currentPage="programmes" platform="school">
+    <>
       <ConfirmDialog />
 
       <div className="flex items-start justify-between gap-4 mb-6">
@@ -480,7 +479,7 @@ const SchoolAdminProgrammesPage: React.FC = () => {
           </form>
         </div>
       )}
-    </TenantAdminLayout>
+    </>
   );
 };
 

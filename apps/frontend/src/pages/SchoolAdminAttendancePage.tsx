@@ -6,7 +6,6 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import TenantAdminLayout from '../components/TenantAdminLayout';
 import { axiosClient } from '../utils/axiosClient';
 import { useToastStore } from '../components/Toast';
 
@@ -55,7 +54,7 @@ const SchoolAdminAttendancePage: React.FC = () => {
   };
 
   return (
-    <TenantAdminLayout currentPage="attendance" platform="school">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -181,7 +180,7 @@ const SchoolAdminAttendancePage: React.FC = () => {
           </div>
         )}
       </div>
-    </TenantAdminLayout>
+    </>
   );
 };
 

@@ -649,7 +649,35 @@ router.post('/results/:id/withhold', registrar, async (req: TenantRequest, res: 
 // Transcripts
 // ===========================================================================
 
+/**
+ * The caller's own transcript.
+ *
+ * A student holds a user id, not a student id, so asking them to supply one
+ * means asking them to look it up — and the page that tried sent the user id
+ * instead, which reads as a student who does not exist. Resolving the record
+ * from the authenticated identity is the same thing every other "my own"
+ * route in this codebase does.
+ */
+router.get('/my/transcript', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const mine = await query(
+      `SELECT id FROM students WHERE user_id = $1 AND tenant_id = $2 LIMIT 1`,
+      [ctx.userId, ctx.tenantId]
+    )
+    if (mine.rowCount === 0) return notFound(res, 'Student record')
+    req.params.studentId = mine.rows[0].id
+    return transcriptHandler(req, res)
+  } catch (e) {
+    return fail(res, 'load your transcript', e)
+  }
+})
+
 router.get('/students/:studentId/transcript', async (req: TenantRequest, res: Response) => {
+  return transcriptHandler(req, res)
+})
+
+async function transcriptHandler(req: TenantRequest, res: Response) {
   try {
     const ctx = ctxOf(req)
     const student = await owned('students', ctx, req.params.studentId)
@@ -706,6 +734,6 @@ router.get('/students/:studentId/transcript', async (req: TenantRequest, res: Re
   } catch (e) {
     return fail(res, 'load transcript', e)
   }
-})
+}
 
 export default router

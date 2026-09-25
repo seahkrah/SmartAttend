@@ -6,7 +6,6 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import FacultyLayout from '../components/FacultyLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 import {
@@ -93,17 +92,17 @@ const FacultyCoursesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <FacultyLayout currentPage="courses">
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
           <span className="ml-3 text-slate-400">Loading courses...</span>
         </div>
-      </FacultyLayout>
+      </>
     )
   }
 
   return (
-    <FacultyLayout currentPage="courses">
+    <>
       <div className="space-y-4">
         {courses.length === 0 ? (
           <div className="text-center py-20">
@@ -215,7 +214,7 @@ const FacultyCoursesPage: React.FC = () => {
           })
         )}
       </div>
-    </FacultyLayout>
+    </>
   )
 }
 

@@ -12,7 +12,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useToastStore } from '../components/Toast';
 import { axiosClient } from '../utils/axiosClient';
-import FacultyLayout from '../components/FacultyLayout';
 import {
   getCameraStream,
   stopCameraStream,
@@ -421,7 +420,7 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
   // ════════════════════════════════════
   if (!selectedSchedule) {
     return (
-      <FacultyLayout currentPage="attendance">
+      <>
       <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold text-white mb-2">Take Attendance</h1>
           <p className="text-slate-400 mb-8">Select a class schedule to begin marking attendance.</p>
@@ -493,7 +492,7 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
             </div>
           )}
         </div>
-      </FacultyLayout>
+      </>
     );
   }
 
@@ -501,7 +500,7 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
   // RENDER: ATTENDANCE MARKING VIEW
   // ════════════════════════════════════
   return (
-    <FacultyLayout currentPage="attendance">
+    <>
       <div className="max-w-6xl mx-auto">
         {/* ── Header ── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -951,7 +950,7 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
           );
         })()}
       </div>
-    </FacultyLayout>
+    </>
   );
 };
 

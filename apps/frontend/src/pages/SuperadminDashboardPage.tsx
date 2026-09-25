@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { TrendingUp, AlertTriangle } from 'lucide-react'
 import { ResponsiveContainer, BarChart, PieChart as PieChartRechart, Bar, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { apiClient } from '../services/api'
-import SuperadminLayout from '../components/SuperadminLayout'
 
 
 interface DashboardStats {
@@ -81,16 +80,16 @@ const SuperadminDashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="dashboard">
+      <>
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading dashboard...</div>
         </div>
-      </SuperadminLayout>
+      </>
     )
   }
 
   return (
-    <SuperadminLayout currentPage="dashboard">
+    <>
       <div className="space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -194,7 +193,7 @@ const SuperadminDashboardPage: React.FC = () => {
 
         {/* Critical Alerts */}
       </div>
-    </SuperadminLayout>
+    </>
   )
 }
 

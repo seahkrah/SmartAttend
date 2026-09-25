@@ -185,6 +185,19 @@ export const gradebookService = {
     return data;
   },
 
+  /**
+   * The caller's own transcript.
+   *
+   * Separate from `transcript` because a student knows their user id and not
+   * their student id, and the two are different rows.
+   */
+  async myTranscript(academicYearId?: string): Promise<Transcript> {
+    const { data } = await axiosClient.get('/gradebook/my/transcript', {
+      params: { academicYearId },
+    });
+    return data;
+  },
+
   async transcript(studentId: string, academicYearId?: string): Promise<Transcript> {
     const { data } = await axiosClient.get(`/gradebook/students/${studentId}/transcript`, {
       params: academicYearId ? { academicYearId } : undefined,

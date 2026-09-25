@@ -10,7 +10,6 @@
  */
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import FacultyLayout from '../components/FacultyLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 import {
@@ -182,17 +181,17 @@ const FacultyReportsPage: React.FC = () => {
 
   if (loadingFilters) {
     return (
-      <FacultyLayout currentPage="reports">
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
           <span className="ml-3 text-slate-400">Loading...</span>
         </div>
-      </FacultyLayout>
+      </>
     )
   }
 
   return (
-    <FacultyLayout currentPage="reports">
+    <>
       <div className="space-y-6">
         {/* ── Filter panel ── */}
         <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
@@ -433,7 +432,7 @@ const FacultyReportsPage: React.FC = () => {
           </div>
         )}
       </div>
-    </FacultyLayout>
+    </>
   )
 }
 

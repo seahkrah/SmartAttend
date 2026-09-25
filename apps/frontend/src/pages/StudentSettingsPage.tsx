@@ -7,7 +7,6 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { StudentLayout } from '../components/StudentLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 import { useAuthStore } from '../store/authStore'
@@ -125,7 +124,7 @@ export const StudentSettingsPage: React.FC = () => {
   }
 
   return (
-    <StudentLayout currentPage="settings">
+    <>
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-white">Settings</h1>
@@ -354,7 +353,7 @@ export const StudentSettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </StudentLayout>
+    </>
   )
 }
 

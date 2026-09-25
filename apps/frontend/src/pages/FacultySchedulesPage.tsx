@@ -6,7 +6,6 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import FacultyLayout from '../components/FacultyLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 import { useNavigate } from 'react-router-dom'
@@ -113,18 +112,18 @@ const FacultySchedulesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <FacultyLayout currentPage="schedules">
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
           <span className="ml-3 text-slate-400">Loading schedules...</span>
         </div>
-      </FacultyLayout>
+      </>
     )
   }
 
   if (schedules.length === 0) {
     return (
-      <FacultyLayout currentPage="schedules">
+      <>
         <div className="text-center py-20">
           <CalendarDays className="w-12 h-12 mx-auto mb-3 text-slate-600" />
           <p className="text-slate-400 text-lg">No schedules assigned</p>
@@ -132,12 +131,12 @@ const FacultySchedulesPage: React.FC = () => {
             Contact your administrator to assign class schedules.
           </p>
         </div>
-      </FacultyLayout>
+      </>
     )
   }
 
   return (
-    <FacultyLayout currentPage="schedules">
+    <>
       <div className="space-y-6">
         {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -303,7 +302,7 @@ const FacultySchedulesPage: React.FC = () => {
           </div>
         )}
       </div>
-    </FacultyLayout>
+    </>
   )
 }
 

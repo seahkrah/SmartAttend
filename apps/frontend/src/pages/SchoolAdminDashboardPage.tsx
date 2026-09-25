@@ -7,7 +7,6 @@
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import {
   Users,
   GraduationCap,
@@ -139,7 +138,7 @@ const SchoolAdminDashboardPage: React.FC = () => {
   )
 
   return (
-    <TenantAdminLayout currentPage="dashboard" platform="school">
+    <>
       <div className="space-y-8">
         {/* Welcome Header */}
         <div className="flex items-center justify-between">
@@ -288,7 +287,7 @@ const SchoolAdminDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </TenantAdminLayout>
+    </>
   )
 }
 

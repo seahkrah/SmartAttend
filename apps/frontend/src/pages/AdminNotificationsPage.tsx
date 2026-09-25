@@ -3,7 +3,6 @@ import {
   Bell, Send, AlertTriangle, CheckCircle2, Ban, RefreshCw, Play,
   FileText, Radio, ShieldOff, X, Undo2, Info,
 } from 'lucide-react';
-import { TenantAdminLayout } from '../components/TenantAdminLayout';
 import { useToastStore } from '../components/Toast';
 import { useConfirmDialog } from '../components/useConfirmDialog';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -15,7 +14,6 @@ import {
   type TemplateEvent, type TemplateChannel, type Suppression,
   type NotificationsOverview, type DeliveryAttempt, type ProviderName,
 } from '../services/notificationsService';
-import { useAuthStore } from '../store/authStore';
 
 /**
  * Notification delivery — the administrator's console.
@@ -87,10 +85,6 @@ const AdminNotificationsPage: React.FC = () => {
 
   const { addToast } = useToastStore();
   const { showConfirmDialog, ConfirmDialog } = useConfirmDialog();
-  // Both SMS and EMS send notifications, so the shell follows the signed-in
-  // platform rather than assuming a school.
-  const platform = useAuthStore((s) => s.user?.platform) === 'corporate' ? 'corporate' : 'school';
-
   const [channelForm, setChannelForm] = useState({
     provider: 'log' as ProviderName,
     isEnabled: true,
@@ -404,14 +398,14 @@ const AdminNotificationsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <TenantAdminLayout currentPage="notifications" platform={platform}>
+      <>
         <LoadingOverlay message="Loading notifications…" />
-      </TenantAdminLayout>
+      </>
     );
   }
 
   return (
-    <TenantAdminLayout currentPage="notifications" platform={platform}>
+    <>
       <ConfirmDialog />
 
       <div className="mb-6 flex items-start justify-between gap-4">
@@ -1005,7 +999,7 @@ const AdminNotificationsPage: React.FC = () => {
           </form>
         </Modal>
       )}
-    </TenantAdminLayout>
+    </>
   );
 };
 

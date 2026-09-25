@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { FileText, Search } from 'lucide-react'
 import { apiClient } from '../services/api'
-import SuperadminLayout from '../components/SuperadminLayout'
 
 interface AuditLog {
   id: string
@@ -65,16 +64,16 @@ const SuperadminAuditLogsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="audit">
+      <>
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading audit logs...</div>
         </div>
-      </SuperadminLayout>
+      </>
     )
   }
 
   return (
-    <SuperadminLayout currentPage="audit">
+    <>
       <div className="space-y-6">
         {/* Search Bar */}
         <div className="relative">
@@ -174,7 +173,7 @@ const SuperadminAuditLogsPage: React.FC = () => {
           </div>
         )}
       </div>
-    </SuperadminLayout>
+    </>
   )
 }
 

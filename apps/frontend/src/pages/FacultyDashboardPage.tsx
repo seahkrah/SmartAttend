@@ -10,7 +10,6 @@
 
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import FacultyLayout from '../components/FacultyLayout'
 import { axiosClient } from '../utils/axiosClient'
 import {
   Users,
@@ -71,20 +70,20 @@ const FacultyDashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <FacultyLayout currentPage="dashboard">
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           <span className="ml-3 text-slate-400">Loading dashboard...</span>
         </div>
-      </FacultyLayout>
+      </>
     )
   }
 
   if (!data) {
     return (
-      <FacultyLayout currentPage="dashboard">
+      <>
         <div className="text-center py-20 text-slate-400">Failed to load dashboard data.</div>
-      </FacultyLayout>
+      </>
     )
   }
 
@@ -96,7 +95,7 @@ const FacultyDashboardPage: React.FC = () => {
   ]
 
   return (
-    <FacultyLayout currentPage="dashboard">
+    <>
       <div className="space-y-8">
         {/* ── Stat cards ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -221,7 +220,7 @@ const FacultyDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </FacultyLayout>
+    </>
   )
 }
 

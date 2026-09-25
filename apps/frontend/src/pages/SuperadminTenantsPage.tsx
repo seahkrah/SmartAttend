@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Edit2, Trash2, Lock, Unlock, Plus, X } from 'lucide-react'
 import { apiClient } from '../services/api'
-import SuperadminLayout from '../components/SuperadminLayout'
 
 interface Tenant {
   id: string
@@ -131,16 +130,16 @@ const SuperadminTenantsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="management">
+      <>
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading tenants...</div>
         </div>
-      </SuperadminLayout>
+      </>
     )
   }
 
   return (
-    <SuperadminLayout currentPage="management">
+    <>
       <div className="space-y-6">
         {/* Add Tenant Button */}
         <button
@@ -275,7 +274,7 @@ const SuperadminTenantsPage: React.FC = () => {
           )}
         </div>
       </div>
-    </SuperadminLayout>
+    </>
   )
 }
 

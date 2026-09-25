@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build": "tsc && node scripts/check-nav.mjs && vite build",
+    "preview": "vite preview",
+    "check-nav": "node scripts/check-nav.mjs"
   },
   "dependencies": {
     "@jjelotech/types": "file:../../packages/types",

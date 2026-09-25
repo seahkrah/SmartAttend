@@ -8,7 +8,6 @@
  */
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import FacultyLayout from '../components/FacultyLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 import {
@@ -176,29 +175,29 @@ const FacultyEnrollmentPage: React.FC = () => {
 
   if (loadingSchedules) {
     return (
-      <FacultyLayout currentPage="enrollment">
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
           <span className="ml-3 text-slate-400">Loading schedules...</span>
         </div>
-      </FacultyLayout>
+      </>
     )
   }
 
   if (schedules.length === 0) {
     return (
-      <FacultyLayout currentPage="enrollment">
+      <>
         <div className="text-center py-20">
           <AlertCircle className="w-12 h-12 mx-auto mb-3 text-slate-600" />
           <p className="text-slate-400 text-lg">No schedules assigned</p>
           <p className="text-slate-500 text-sm mt-1">Contact your admin to assign class schedules first.</p>
         </div>
-      </FacultyLayout>
+      </>
     )
   }
 
   return (
-    <FacultyLayout currentPage="enrollment">
+    <>
       <div className="space-y-6">
         {/* Schedule selector */}
         <div className="flex flex-wrap gap-2">
@@ -346,7 +345,7 @@ const FacultyEnrollmentPage: React.FC = () => {
           </div>
         )}
       </div>
-    </FacultyLayout>
+    </>
   )
 }
 

@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import {
   ClipboardCheck, Loader2, CheckCircle2,
   XCircle, Clock, LogOut, Users, ChevronLeft, ChevronRight,
@@ -101,7 +100,7 @@ const CorporateAdminAttendancePage: React.FC = () => {
   }
 
   return (
-    <TenantAdminLayout currentPage="attendance" platform="corporate">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -267,7 +266,7 @@ const CorporateAdminAttendancePage: React.FC = () => {
           </div>
         )}
       </div>
-    </TenantAdminLayout>
+    </>
   )
 }
 

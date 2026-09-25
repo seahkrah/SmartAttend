@@ -5,7 +5,6 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import {
   Save, Building2, Mail, Phone, MapPin,
   Briefcase, Loader2, CheckCircle2, AlertCircle,
@@ -134,16 +133,16 @@ const CorporateAdminSettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <TenantAdminLayout currentPage="settings" platform="corporate">
+      <>
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
         </div>
-      </TenantAdminLayout>
+      </>
     )
   }
 
   return (
-    <TenantAdminLayout currentPage="settings" platform="corporate">
+    <>
       <div className="space-y-6 max-w-3xl">
         {/* Header */}
         <div>
@@ -330,7 +329,7 @@ const CorporateAdminSettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </TenantAdminLayout>
+    </>
   )
 }
 

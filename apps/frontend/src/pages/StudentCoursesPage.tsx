@@ -5,7 +5,6 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { StudentLayout } from '../components/StudentLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 
@@ -59,7 +58,7 @@ export const StudentCoursesPage: React.FC = () => {
   }
 
   return (
-    <StudentLayout currentPage="courses">
+    <>
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-white mb-2">My Courses</h1>
         <p className="text-slate-400 mb-8">
@@ -133,7 +132,7 @@ export const StudentCoursesPage: React.FC = () => {
           </div>
         )}
       </div>
-    </StudentLayout>
+    </>
   )
 }
 

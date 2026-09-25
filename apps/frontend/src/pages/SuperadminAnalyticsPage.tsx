@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { AlertCircle, Users, Building2, Shield } from 'lucide-react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
-import SuperadminLayout from '../components/SuperadminLayout'
 import axios from 'axios'
 
 interface AnalyticsData {
@@ -80,26 +79,26 @@ const SuperadminAnalyticsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="analytics">
+      <>
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading analytics...</div>
         </div>
-      </SuperadminLayout>
+      </>
     )
   }
 
   if (error) {
     return (
-      <SuperadminLayout currentPage="analytics">
+      <>
         <div className="flex items-center justify-center h-full">
           <div className="text-red-400">Error: {error}</div>
         </div>
-      </SuperadminLayout>
+      </>
     )
   }
 
   return (
-    <SuperadminLayout currentPage="analytics">
+    <>
       <div className="space-y-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -254,7 +253,7 @@ const SuperadminAnalyticsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </SuperadminLayout>
+    </>
   )
 }
 

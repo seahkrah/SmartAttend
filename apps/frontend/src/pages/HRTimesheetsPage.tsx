@@ -104,7 +104,12 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
       const [list, m, comps] = await Promise.all([
         workforceService.listTimesheets(),
         hrService.listMembers(1, 200).catch(() => ({ members: [], page: 1, pageSize: 200, total: 0 })),
-        payrollService.listComponents().catch(() => [] as SalaryComponent[]),
+        // Only fetched by somebody who can actually spend the money. Payroll
+        // components are HR's, so asking for them as a manager is a request
+        // that can only ever be refused.
+        canExport
+          ? payrollService.listComponents().catch(() => [] as SalaryComponent[])
+          : Promise.resolve([] as SalaryComponent[]),
       ]);
       setSheets(list);
       setMembers(m.members.filter((x: MemberAttendanceSummary) => x.role === 'EMPLOYEE'));

@@ -321,5 +321,22 @@ check("B's lecturer cannot read A's transcript", co == 404, f"({co} {r})")
 co, r = call("GET", f"/students/{GHOST}/transcript", AT, base="/gradebook")
 check("an unknown student is 404", co == 404, f"({co} {r})")
 
+# A student holds a user id, not a student id. The page that asked for their
+# own transcript sent the user id and got a 404 every time, so it had never
+# once loaded; this is the route that resolves the record instead.
+ST = A.get('studentToken')
+co, r = call("GET", "/my/transcript", ST, base="/gradebook")
+check("a student reads their own transcript without knowing its id", co == 200, f"({co} {r})")
+if co == 200:
+    check("and it is theirs",
+          r.get('student', {}).get('id') == A['students'][0], f"({r.get('student')})")
+    check("with the published result on it", len(r.get('entries', [])) >= 1, f"({r})")
+
+co, r = call("GET", "/my/transcript", AT, base="/gradebook")
+check("an administrator has no student record of their own", co == 404, f"({co} {r})")
+
+co, r = call("GET", "/my/transcript", None, base="/gradebook")
+check("and it needs a token", co in (401, 403), f"({co})")
+
 print(f"\n{P} passed, {F} failed")
 sys.exit(1 if F else 0)

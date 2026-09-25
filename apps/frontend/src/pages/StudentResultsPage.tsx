@@ -5,7 +5,6 @@ import { getErrorMessage } from '../utils/errorHandler';
 import { LoadingOverlay } from '../components/LoadingStates';
 import { EmptyState, ErrorAlert } from '../components/ErrorDisplay';
 import { useAuthStore } from '../store/authStore';
-import attendanceService from '../services/attendanceService';
 import { gradebookService, type Transcript } from '../services/gradebookService';
 
 /**
@@ -30,11 +29,12 @@ const StudentResultsPage: React.FC = () => {
   useEffect(() => {
     void (async () => {
       try {
-        // The transcript is keyed on the student record, not the user, so the
-        // profile is resolved first.
-        const profile = await attendanceService.getProfile();
-        const data = await gradebookService.transcript(profile.id);
-        setTranscript(data);
+        // The transcript is keyed on the student record, not the user. This
+        // used to read an id off /attendance/profile, which returns the USER
+        // id — so every request asked for a student that does not exist and
+        // the page had never once loaded. The API resolves the record from
+        // the signed-in identity instead.
+        setTranscript(await gradebookService.myTranscript());
       } catch (e) {
         const message = getErrorMessage(e);
         setError(message);

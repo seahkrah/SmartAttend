@@ -81,6 +81,7 @@ import CorporateAdminReportsPage from './pages/CorporateAdminReportsPage';
 
 // Components
 import { RoleRoute, ProtectedRoute } from './components/routing/RoleRoute';
+import { AppShell } from './components/shell/AppShell';
 import { ToastContainer } from './components/Toast';
 
 // Store
@@ -142,19 +143,21 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RoleRoute requiredRole="superadmin">
-                <Routes>
-                  <Route path="/" element={<SuperadminConsolePage />} />
-                  <Route path="/console" element={<SuperadminConsolePage />} />
-                  <Route path="/dashboard" element={<SuperadminDashboardPage />} />
-                  <Route path="/analytics" element={<SuperadminAnalyticsPage />} />
-                  <Route path="/management" element={<SuperadminManagementPage />} />
-                  <Route path="/entities" element={<SuperadminManagementPage />} />
-                  <Route path="/tenants" element={<SuperadminManagementPage />} />
-                  <Route path="/admins" element={<SuperadminAdminsPage />} />
-                  <Route path="/audit" element={<SuperadminAuditLogsPage />} />
-                  <Route path="/settings" element={<SuperadminSettingsPage />} />
-                  <Route path="/incident/:incidentId" element={<IncidentDetailPage />} />
-                </Routes>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<SuperadminConsolePage />} />
+                    <Route path="/console" element={<SuperadminConsolePage />} />
+                    <Route path="/dashboard" element={<SuperadminDashboardPage />} />
+                    <Route path="/analytics" element={<SuperadminAnalyticsPage />} />
+                    <Route path="/management" element={<SuperadminManagementPage />} />
+                    <Route path="/entities" element={<SuperadminManagementPage />} />
+                    <Route path="/tenants" element={<SuperadminManagementPage />} />
+                    <Route path="/admins" element={<SuperadminAdminsPage />} />
+                    <Route path="/audit" element={<SuperadminAuditLogsPage />} />
+                    <Route path="/settings" element={<SuperadminSettingsPage />} />
+                    <Route path="/incident/:incidentId" element={<IncidentDetailPage />} />
+                  </Routes>
+                </AppShell>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -166,25 +169,27 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RoleRoute requiredRole="admin">
-                <Routes>
-                  <Route path="/" element={<Navigate to="/admin/school/dashboard" replace />} />
-                  <Route path="/dashboard" element={<SchoolAdminDashboardPage />} />
-                  <Route path="/users" element={<SchoolAdminUsersPage />} />
-                  <Route path="/students" element={<SchoolAdminStudentsPage />} />
-                  <Route path="/faculty" element={<SchoolAdminFacultyPage />} />
-                  <Route path="/courses" element={<SchoolAdminCoursesPage />} />
-                  <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
-                  <Route path="/admissions" element={<SchoolAdminAdmissionsPage />} />
-                  <Route path="/finance" element={<SchoolAdminFinancePage />} />
-                  <Route path="/notifications" element={<AdminNotificationsPage />} />
-                  <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
-                  <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
-                  <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
-                  <Route path="/attendance" element={<SchoolAdminAttendancePage />} />
-                  <Route path="/reports" element={<SchoolAdminReportsPage />} />
-                  <Route path="/approvals" element={<SchoolAdminApprovalsPage />} />
-                  <Route path="/settings" element={<SchoolAdminSettingsPage />} />
-                </Routes>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/admin/school/dashboard" replace />} />
+                    <Route path="/dashboard" element={<SchoolAdminDashboardPage />} />
+                    <Route path="/users" element={<SchoolAdminUsersPage />} />
+                    <Route path="/students" element={<SchoolAdminStudentsPage />} />
+                    <Route path="/faculty" element={<SchoolAdminFacultyPage />} />
+                    <Route path="/courses" element={<SchoolAdminCoursesPage />} />
+                    <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
+                    <Route path="/admissions" element={<SchoolAdminAdmissionsPage />} />
+                    <Route path="/finance" element={<SchoolAdminFinancePage />} />
+                    <Route path="/notifications" element={<AdminNotificationsPage />} />
+                    <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
+                    <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
+                    <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
+                    <Route path="/attendance" element={<SchoolAdminAttendancePage />} />
+                    <Route path="/reports" element={<SchoolAdminReportsPage />} />
+                    <Route path="/approvals" element={<SchoolAdminApprovalsPage />} />
+                    <Route path="/settings" element={<SchoolAdminSettingsPage />} />
+                  </Routes>
+                </AppShell>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -196,17 +201,19 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RoleRoute requiredRole="admin">
-                <Routes>
-                  <Route path="/" element={<Navigate to="/admin/corporate/dashboard" replace />} />
-                  <Route path="/dashboard" element={<CorporateAdminDashboardPage />} />
-                  <Route path="/employees" element={<CorporateAdminUsersPage />} />
-                  <Route path="/departments" element={<CorporateAdminDepartmentsPage />} />
-                  <Route path="/attendance" element={<CorporateAdminAttendancePage />} />
-                  <Route path="/reports" element={<CorporateAdminReportsPage />} />
-                  <Route path="/approvals" element={<CorporateAdminApprovalsPage />} />
-                  <Route path="/notifications" element={<AdminNotificationsPage />} />
-                  <Route path="/settings" element={<CorporateAdminSettingsPage />} />
-                </Routes>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/admin/corporate/dashboard" replace />} />
+                    <Route path="/dashboard" element={<CorporateAdminDashboardPage />} />
+                    <Route path="/employees" element={<CorporateAdminUsersPage />} />
+                    <Route path="/departments" element={<CorporateAdminDepartmentsPage />} />
+                    <Route path="/attendance" element={<CorporateAdminAttendancePage />} />
+                    <Route path="/reports" element={<CorporateAdminReportsPage />} />
+                    <Route path="/approvals" element={<CorporateAdminApprovalsPage />} />
+                    <Route path="/notifications" element={<AdminNotificationsPage />} />
+                    <Route path="/settings" element={<CorporateAdminSettingsPage />} />
+                  </Routes>
+                </AppShell>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -218,11 +225,13 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RoleRoute requiredRole="admin">
-                <Routes>
-                  <Route path="/" element={<AdminTenantPanelPage />} />
-                  <Route path="/dashboard" element={<AdminTenantPanelPage />} />
-                  <Route path="/tenants" element={<AdminTenantPanelPage />} />
-                </Routes>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<AdminTenantPanelPage />} />
+                    <Route path="/dashboard" element={<AdminTenantPanelPage />} />
+                    <Route path="/tenants" element={<AdminTenantPanelPage />} />
+                  </Routes>
+                </AppShell>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -234,17 +243,19 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RoleRoute requiredRole="faculty">
-                <Routes>
-                  <Route path="/" element={<FacultyDashboardPage />} />
-                  <Route path="/students" element={<FacultyStudentsPage />} />
-                  <Route path="/courses" element={<FacultyCoursesPage />} />
-                  <Route path="/enrollment" element={<FacultyEnrollmentPage />} />
-                  <Route path="/attendance" element={<FacultyAttendanceWorkflowPage />} />
-                  <Route path="/schedules" element={<FacultySchedulesPage />} />
-                  <Route path="/gradebook" element={<FacultyGradebookPage />} />
-                  <Route path="/reports" element={<FacultyReportsPage />} />
-                  <Route path="/settings" element={<FacultySettingsPage />} />
-                </Routes>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<FacultyDashboardPage />} />
+                    <Route path="/students" element={<FacultyStudentsPage />} />
+                    <Route path="/courses" element={<FacultyCoursesPage />} />
+                    <Route path="/enrollment" element={<FacultyEnrollmentPage />} />
+                    <Route path="/attendance" element={<FacultyAttendanceWorkflowPage />} />
+                    <Route path="/schedules" element={<FacultySchedulesPage />} />
+                    <Route path="/gradebook" element={<FacultyGradebookPage />} />
+                    <Route path="/reports" element={<FacultyReportsPage />} />
+                    <Route path="/settings" element={<FacultySettingsPage />} />
+                  </Routes>
+                </AppShell>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -255,21 +266,27 @@ export default function App() {
           path="/hr/*"
           element={
             <ProtectedRoute>
-              <RoleRoute requiredRole={['hr', 'hr_director', 'admin']}>
-                <Routes>
-                  <Route path="/" element={<HREmployeeAttendanceDashboard />} />
-                  <Route path="/analytics" element={<HREmployeeAttendanceDashboard />} />
-                  <Route path="/leave" element={<HRLeavePage />} />
-                  <Route path="/payroll" element={<HRPayrollPage />} />
-                  {/* Ending a contract and sending hours to payroll both need a
-                      director; the pages withhold those controls rather than
-                      offering them and having the API refuse. */}
-                  <Route path="/contracts" element={
-                    <HRContractsPage canEnd={isDirector} />} />
-                  <Route path="/shifts" element={<HRRosterPage />} />
-                  <Route path="/timesheets" element={
-                    <HRTimesheetsPage canExport={isDirector} />} />
-                </Routes>
+              {/* Managers are admitted for rosters, timesheets and leave
+                  decisions, which the API already permits them; their
+                  navigation offers nothing else, and the API refuses the rest
+                  regardless. Before this they had no reachable page at all. */}
+              <RoleRoute requiredRole={['hr', 'hr_director', 'admin', 'manager']}>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<HREmployeeAttendanceDashboard />} />
+                    <Route path="/analytics" element={<HREmployeeAttendanceDashboard />} />
+                    <Route path="/leave" element={<HRLeavePage />} />
+                    <Route path="/payroll" element={<HRPayrollPage />} />
+                    {/* Ending a contract and sending hours to payroll both need a
+                        director; the pages withhold those controls rather than
+                        offering them and having the API refuse. */}
+                    <Route path="/contracts" element={
+                      <HRContractsPage canEnd={isDirector} />} />
+                    <Route path="/shifts" element={<HRRosterPage />} />
+                    <Route path="/timesheets" element={
+                      <HRTimesheetsPage canExport={isDirector} />} />
+                  </Routes>
+                </AppShell>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -281,18 +298,20 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RoleRoute requiredRole={['student', 'employee']}>
-                <Routes>
-                  <Route path="/" element={<StudentDashboardPage />} />
-                  <Route path="/courses" element={<StudentCoursesPage />} />
-                  <Route path="/attendance" element={<StudentAttendancePage />} />
-                  <Route path="/schedule" element={<StudentSchedulePage />} />
-                  <Route path="/results" element={<StudentResultsPage />} />
-                  <Route path="/fees" element={<StudentFeesPage />} />
-                  <Route path="/leave" element={<EmployeeLeavePage />} />
-                  <Route path="/payslips" element={<EmployeePayslipsPage />} />
-                  <Route path="/work" element={<EmployeeWorkPage />} />
-                  <Route path="/settings" element={<StudentSettingsPage />} />
-                </Routes>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<StudentDashboardPage />} />
+                    <Route path="/courses" element={<StudentCoursesPage />} />
+                    <Route path="/attendance" element={<StudentAttendancePage />} />
+                    <Route path="/schedule" element={<StudentSchedulePage />} />
+                    <Route path="/results" element={<StudentResultsPage />} />
+                    <Route path="/fees" element={<StudentFeesPage />} />
+                    <Route path="/leave" element={<EmployeeLeavePage />} />
+                    <Route path="/payslips" element={<EmployeePayslipsPage />} />
+                    <Route path="/work" element={<EmployeeWorkPage />} />
+                    <Route path="/settings" element={<StudentSettingsPage />} />
+                  </Routes>
+                </AppShell>
               </RoleRoute>
             </ProtectedRoute>
           }

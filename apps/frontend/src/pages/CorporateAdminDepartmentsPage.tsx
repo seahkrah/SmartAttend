@@ -5,7 +5,6 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import {
   FolderTree, Plus, Pencil, Trash2, X, Loader2, Users,
   Building2, UserCircle,
@@ -135,7 +134,7 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
   const totalEmployees = departments.reduce((sum, d) => sum + d.employee_count, 0)
 
   return (
-    <TenantAdminLayout currentPage="departments" platform="corporate">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -272,7 +271,7 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </TenantAdminLayout>
+    </>
   )
 }
 

@@ -6,7 +6,6 @@
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { StudentLayout } from '../components/StudentLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 
@@ -78,7 +77,7 @@ export const StudentDashboardPage: React.FC = () => {
   const att = data?.attendance_summary
 
   return (
-    <StudentLayout currentPage="dashboard">
+    <>
       <div className="max-w-6xl mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -238,7 +237,7 @@ export const StudentDashboardPage: React.FC = () => {
           </>
         )}
       </div>
-    </StudentLayout>
+    </>
   )
 }
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToastStore } from '../components/Toast';
-import { TenantAdminLayout } from '../components/TenantAdminLayout';
 import { getErrorMessage, showSuccess } from '../utils/errorHandler';
 
 interface Faculty {
@@ -243,7 +242,7 @@ const SchoolAdminFacultyPage: React.FC = () => {
   );
 
   return (
-    <TenantAdminLayout currentPage="faculty" platform="school">
+    <>
       <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
@@ -547,7 +546,7 @@ const SchoolAdminFacultyPage: React.FC = () => {
         </div>
       )}
       </div>
-    </TenantAdminLayout>
+    </>
   );
 };
 

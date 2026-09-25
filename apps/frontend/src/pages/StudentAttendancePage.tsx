@@ -5,7 +5,6 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { StudentLayout } from '../components/StudentLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 
@@ -98,7 +97,7 @@ export const StudentAttendancePage: React.FC = () => {
   }, [courseFilter, statusFilter, dateFrom, dateTo, addToast])
 
   return (
-    <StudentLayout currentPage="attendance">
+    <>
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-white mb-2">My Attendance</h1>
         <p className="text-slate-400 mb-6">View your attendance records across all courses.</p>
@@ -245,7 +244,7 @@ export const StudentAttendancePage: React.FC = () => {
           </div>
         )}
       </div>
-    </StudentLayout>
+    </>
   )
 }
 

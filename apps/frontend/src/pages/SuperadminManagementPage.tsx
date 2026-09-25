@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Trash2, Plus, X, Users, Mail, CheckCircle, AlertCircle, Building2, Edit3, PauseCircle, Ban, Play, Shield, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { apiClient } from '../services/api'
-import SuperadminLayout from '../components/SuperadminLayout'
 
 interface Entity {
   id: string
@@ -220,7 +219,10 @@ const SuperadminManagementPage: React.FC = () => {
   const loadUsers = async () => {
     try {
       const response = await apiClient.get('/superadmin/users')
-      setAllUsers(response.data || [])
+      // The endpoint answers { users: [...] }. Taking the body itself put an
+      // object where an array belonged, and the first .filter over it threw
+      // during render — which took the whole page down, shell included.
+      setAllUsers(Array.isArray(response.data?.users) ? response.data.users : [])
     } catch (error: any) {
       console.error('Error loading users:', error)
       setAllUsers([])
@@ -628,16 +630,16 @@ const SuperadminManagementPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="management">
+      <>
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading data...</div>
         </div>
-      </SuperadminLayout>
+      </>
     )
   }
 
   return (
-    <SuperadminLayout currentPage="management">
+    <>
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
@@ -1026,7 +1028,7 @@ const SuperadminManagementPage: React.FC = () => {
           </div>
         )}
       </div>
-    </SuperadminLayout>
+    </>
   )
 }
 

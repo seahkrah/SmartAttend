@@ -3,25 +3,41 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, LogOut, Menu, Search } from 'lucide-react';
 import { JjeloTechMark } from '../BrandLogo';
 import { useAuthStore } from '../../store/authStore';
-import { navForPlatform, visibleGroups, type NavItem, type Platform } from '../../navigation/navConfig';
+import { activeItem, navFor, type NavItem, type Platform } from '../../navigation/navConfig';
 
 /**
  * The shared application shell — screens 1a and 3b.
  *
- * One shell serves both platforms. The School/Employees switcher sits at the
- * top of the sidebar and the navigation below it is grouped under headings.
- * This replaces SchoolAdminLayout, TenantAdminLayout, FacultyLayout,
- * StudentLayout and SuperadminLayout, which are separate and flat.
+ * One shell serves the whole product. The School/Employees switcher sits at
+ * the top of the sidebar and the navigation below it is grouped under
+ * headings.
+ *
+ * This replaced TenantAdminLayout, FacultyLayout, StudentLayout and
+ * SuperadminLayout, four flat sidebars that each carried their own copy of
+ * the route table. The copies had drifted from the router and from each
+ * other: the HR pages were in none of them and were reachable only by typing
+ * a URL, and two entries pointed at routes that had never existed.
  *
  * The EMS side marks its active item in orange, the school side in blue,
  * matching the mockups.
+ *
+ * Which navigation appears is decided by audience — see navConfig. The shell
+ * itself knows nothing about roles beyond passing them through, so adding a
+ * page is a change to one file rather than to a sidebar and a route table that
+ * can disagree with each other.
  */
 
 interface AppShellProps {
   children: React.ReactNode;
   /** Small line above the page title, e.g. "SEMESTER I · 2026/27 · WEEK 6". */
   eyebrow?: string;
-  title: string;
+  /**
+   * The header's heading. Optional: most pages render their own, and a shell
+   * that repeated it would put two headings on every screen. Passed by the
+   * dev preview and available to any page that would rather the shell owned
+   * its title.
+   */
+  title?: string;
   /** Buttons for the top-right of the header. */
   actions?: React.ReactNode;
   /** Live counts keyed by NavItem.countKey. */
@@ -131,14 +147,22 @@ export const AppShell: React.FC<AppShellProps> = ({
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
+  // The navigation belongs to the audience, not to the platform: an HR
+  // manager and a corporate administrator are both on the corporate platform
+  // and reach different pages.
+  const nav = navFor(user?.role, user?.platform as Platform | undefined);
+  const groups = nav?.groups ?? [];
+  const home = nav?.home ?? '/dashboard';
+  const showSwitcher = nav?.showPlatformSwitcher !== false;
+
   // A user belongs to one platform today. The switcher shows both so the
   // product's shape is legible, but only the user's own platform is
   // selectable — see DESIGN_AUDIT.md on cross-platform access.
-  const platform: Platform = user?.platform ?? 'school';
-  const available: Platform[] = user?.platform ? [user.platform] : ['school'];
+  const platform: Platform = nav?.platform ?? (user?.platform as Platform) ?? 'school';
+  const available: Platform[] = user?.platform ? [user.platform as Platform] : ['school'];
   const isCorporate = platform === 'corporate';
 
-  const groups = visibleGroups(navForPlatform(platform), user?.role);
+  const current = activeItem(groups, location.pathname);
 
   const handleLogout = async () => {
     await logout();
@@ -148,34 +172,36 @@ export const AppShell: React.FC<AppShellProps> = ({
   const sidebar = (
     <nav className="flex flex-col h-full" aria-label="Main">
       <div className="px-4 py-4 border-b border-subtle">
-        <Link to="/dashboard" className="flex items-center gap-2.5 mb-4">
+        <Link to={home} className="flex items-center gap-2.5 mb-4">
           <JjeloTechMark className="w-9 h-9 flex-shrink-0" idSuffix="shell-sidebar" />
           <span className="min-w-0">
             <span className="block font-bold text-primary leading-tight">JjeloTech</span>
             <span className="block text-xs text-muted truncate">
-              {isCorporate ? 'Employee management' : 'School management'}
+              {nav?.subtitle ?? (isCorporate ? 'Employee management' : 'School management')}
             </span>
           </span>
         </Link>
-        <PlatformSwitcher
-          active={platform}
-          available={available}
-          onSwitch={() => {
-            /* Single-platform accounts only; see above. */
-          }}
-        />
+        {showSwitcher && (
+          <PlatformSwitcher
+            active={platform}
+            available={available}
+            onSwitch={() => {
+              /* Single-platform accounts only; see above. */
+            }}
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 pb-4">
-        {groups.map(group => (
+        {groups.map((group) => (
           <div key={group.label}>
             <div className="nav-group-label">{group.label}</div>
             <div className="space-y-0.5">
-              {group.items.map(item => (
+              {group.items.map((item) => (
                 <NavLink
                   key={item.label}
                   item={item}
-                  active={location.pathname === item.to}
+                  active={current?.to === item.to}
                   accent={isCorporate}
                   count={item.countKey ? counts[item.countKey] : undefined}
                 />
@@ -240,7 +266,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 {eyebrow && (
                   <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{eyebrow}</p>
                 )}
-                <h1 className="text-xl font-bold text-primary truncate">{title}</h1>
+                {title && <h1 className="text-xl font-bold text-primary truncate">{title}</h1>}
               </div>
 
               {onSearch && (
@@ -263,7 +289,9 @@ export const AppShell: React.FC<AppShellProps> = ({
             </div>
           </header>
 
-          <main className="p-5">{children}</main>
+          {/* No padding here: every page in this app already carries its own, and
+              a second gutter would indent the whole product by two. */}
+          <main>{children}</main>
         </div>
       </div>
     </div>

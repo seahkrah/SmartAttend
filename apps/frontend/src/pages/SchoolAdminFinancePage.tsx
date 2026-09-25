@@ -3,7 +3,6 @@ import {
   Plus, Search, X, Receipt, Wallet, AlertTriangle, Undo2, Send,
   Ban, ListPlus, Trash2, TrendingUp,
 } from 'lucide-react';
-import { TenantAdminLayout } from '../components/TenantAdminLayout';
 import { useToastStore } from '../components/Toast';
 import { useConfirmDialog } from '../components/useConfirmDialog';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -398,14 +397,14 @@ const SchoolAdminFinancePage: React.FC = () => {
 
   if (loading) {
     return (
-      <TenantAdminLayout currentPage="finance" platform="school">
+      <>
         <LoadingOverlay message="Loading fees…" />
-      </TenantAdminLayout>
+      </>
     );
   }
 
   return (
-    <TenantAdminLayout currentPage="finance" platform="school">
+    <>
       <ConfirmDialog />
 
       <div className="flex items-start justify-between gap-4 mb-6">
@@ -1075,7 +1074,7 @@ const SchoolAdminFinancePage: React.FC = () => {
           </form>
         </Modal>
       )}
-    </TenantAdminLayout>
+    </>
   );
 };
 

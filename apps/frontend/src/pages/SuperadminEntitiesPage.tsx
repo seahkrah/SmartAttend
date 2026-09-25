@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Mail, CheckCircle, AlertCircle } from 'lucide-react'
 import { apiClient } from '../services/api'
-import SuperadminLayout from '../components/SuperadminLayout'
 
 
 interface Entity {
@@ -83,16 +82,16 @@ const SuperadminEntitiesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SuperadminLayout currentPage="management">
+      <>
         <div className="flex items-center justify-center h-full">
           <div className="text-slate-400">Loading entities...</div>
         </div>
-      </SuperadminLayout>
+      </>
     )
   }
 
   return (
-    <SuperadminLayout currentPage="management">
+    <>
       <div className="space-y-8">
         {/* Schools Section */}
         <div>
@@ -154,7 +153,7 @@ const SuperadminEntitiesPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </SuperadminLayout>
+    </>
   )
 }
 

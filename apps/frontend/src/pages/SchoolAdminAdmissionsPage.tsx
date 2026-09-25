@@ -3,7 +3,6 @@ import {
   Plus, Search, X, ClipboardCheck, UserPlus, CalendarRange,
   CheckCircle2, Clock, FileText, History, GraduationCap,
 } from 'lucide-react';
-import { TenantAdminLayout } from '../components/TenantAdminLayout';
 import { useToastStore } from '../components/Toast';
 import { useConfirmDialog } from '../components/useConfirmDialog';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -449,14 +448,14 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <TenantAdminLayout currentPage="admissions" platform="school">
+      <>
         <LoadingOverlay message="Loading admissions…" />
-      </TenantAdminLayout>
+      </>
     );
   }
 
   return (
-    <TenantAdminLayout currentPage="admissions" platform="school">
+    <>
       <ConfirmDialog />
 
       <div className="flex items-start justify-between gap-4 mb-6">
@@ -1239,7 +1238,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
           </div>
         </Modal>
       )}
-    </TenantAdminLayout>
+    </>
   );
 };
 

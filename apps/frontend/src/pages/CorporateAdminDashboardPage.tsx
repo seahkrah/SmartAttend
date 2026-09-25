@@ -7,7 +7,6 @@
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import {
   Users,
   Building2,
@@ -109,16 +108,16 @@ export const CorporateAdminDashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <TenantAdminLayout currentPage="dashboard" platform="corporate">
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
         </div>
-      </TenantAdminLayout>
+      </>
     )
   }
 
   return (
-    <TenantAdminLayout currentPage="dashboard" platform="corporate">
+    <>
       <div className="space-y-8">
         {/* Welcome Header */}
         <div className="flex items-center justify-between">
@@ -282,7 +281,7 @@ export const CorporateAdminDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </TenantAdminLayout>
+    </>
   )
 }
 

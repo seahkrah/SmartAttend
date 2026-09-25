@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useToastStore } from '../components/Toast';
-import { TenantAdminLayout } from '../components/TenantAdminLayout';
 import { getErrorMessage } from '../utils/errorHandler';
 
 interface AttendanceRecord {
@@ -85,7 +84,7 @@ const SchoolAdminReportsPage: React.FC = () => {
   };
 
   return (
-    <TenantAdminLayout currentPage="reports" platform="school">
+    <>
       <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Attendance Reports & Analytics</h1>
@@ -191,7 +190,7 @@ const SchoolAdminReportsPage: React.FC = () => {
         </div>
       )}
       </div>
-    </TenantAdminLayout>
+    </>
   );
 };
 

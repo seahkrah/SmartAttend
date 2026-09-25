@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { Bell, Shield, Database, Save } from 'lucide-react'
-import SuperadminLayout from '../components/SuperadminLayout'
 
 const SuperadminSettingsPage: React.FC = () => {
   const [settings, setSettings] = useState({
@@ -72,7 +71,7 @@ const SuperadminSettingsPage: React.FC = () => {
   )
 
   return (
-    <SuperadminLayout currentPage="settings">
+    <>
       <div className="space-y-8 max-w-3xl">
         {/* Security Settings */}
         <div>
@@ -209,7 +208,7 @@ const SuperadminSettingsPage: React.FC = () => {
           )}
         </div>
       </div>
-    </SuperadminLayout>
+    </>
   )
 }
 

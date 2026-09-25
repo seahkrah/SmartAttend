@@ -6,14 +6,13 @@
  */
 
 import React from 'react'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import { AdminApprovalDashboard } from '../components/AdminApprovalDashboard'
 
 const CorporateAdminApprovalsPage: React.FC = () => {
   return (
-    <TenantAdminLayout currentPage="approvals" platform="corporate">
+    <>
       <AdminApprovalDashboard />
-    </TenantAdminLayout>
+    </>
   )
 }
 

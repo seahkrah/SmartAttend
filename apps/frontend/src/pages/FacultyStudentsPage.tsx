@@ -6,7 +6,6 @@
  */
 
 import React, { useEffect, useState, useMemo } from 'react'
-import FacultyLayout from '../components/FacultyLayout'
 import { axiosClient } from '../utils/axiosClient'
 import { Search, Users, Filter, ChevronDown } from 'lucide-react'
 
@@ -76,7 +75,7 @@ const FacultyStudentsPage: React.FC = () => {
   )
 
   return (
-    <FacultyLayout currentPage="students">
+    <>
       <div className="space-y-6">
         {/* Header + stats */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -191,7 +190,7 @@ const FacultyStudentsPage: React.FC = () => {
           </div>
         )}
       </div>
-    </FacultyLayout>
+    </>
   )
 }
 

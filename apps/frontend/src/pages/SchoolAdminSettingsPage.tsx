@@ -5,7 +5,6 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { TenantAdminLayout } from '../components/TenantAdminLayout'
 import { LoadingOverlay } from '../components/LoadingStates'
 import axios from 'axios'
 import NotificationPreferences from '../components/NotificationPreferences'
@@ -145,14 +144,14 @@ const SchoolAdminSettingsPage: React.FC = () => {
   // showed default values as though they were the school's saved settings.
   if (loading) {
     return (
-      <TenantAdminLayout currentPage="settings" platform="school">
+      <>
         <LoadingOverlay message="Loading settings…" />
-      </TenantAdminLayout>
+      </>
     )
   }
 
   return (
-    <TenantAdminLayout currentPage="settings" platform="school">
+    <>
       <div className="flex gap-6">
         {/* Settings Navigation */}
         <div className="w-64 shrink-0">
@@ -411,7 +410,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </TenantAdminLayout>
+    </>
   )
 }
 

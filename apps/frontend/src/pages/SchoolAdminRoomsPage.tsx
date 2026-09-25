@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToastStore } from '../components/Toast';
-import { TenantAdminLayout } from '../components/TenantAdminLayout';
 import { getErrorMessage } from '../utils/errorHandler';
 import { useConfirmDialog } from '../components/useConfirmDialog';
 
@@ -93,7 +92,7 @@ const SchoolAdminRoomsPage: React.FC = () => {
   };
 
   return (
-    <TenantAdminLayout currentPage="rooms" platform="school">
+    <>
       <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
@@ -191,7 +190,7 @@ const SchoolAdminRoomsPage: React.FC = () => {
       )}
     </div>
     <ConfirmDialog />
-    </TenantAdminLayout>
+    </>
   );
 };
 

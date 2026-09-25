@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express'
-import bcrypt from 'bcryptjs'
+import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth/accountTokens.js'
+import { logAudit } from '../services/domainAuditService.js'
+import { getClientIp } from '../utils/getClientIp.js'
 import { authenticateToken } from '../auth/middleware.js'
 import pool, { query } from '../db/connection.js'
 import {
@@ -321,6 +323,7 @@ router.get('/admin/employees', authenticateToken, async (req: Request, res: Resp
 
     let sql = `
       SELECT e.*, u.email AS user_email, u.is_active AS user_active,
+             (u.activated_at IS NULL) AS awaiting_setup,
              cd.name AS department_name
       FROM employees e
       JOIN users u ON e.user_id = u.id
@@ -395,9 +398,10 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
     }
     const roleId = employeeRole.rows[0].id
 
-    // Default password: first letter of first name (uppercase) + last name (lowercase) + "123"
-    const defaultPassword = firstName.charAt(0).toUpperCase() + lastName.toLowerCase() + '123'
-    const passwordHash = await bcrypt.hash(defaultPassword, 10)
+    // The account starts with a password nobody knows; the employee chooses
+    // their own from the invitation. (It used to be first initial + surname +
+    // "123", which anyone who knew a colleague's name could guess.)
+    const passwordHash = await unusablePasswordHash()
     const fullName = `${firstName} ${lastName}`
 
     // Auto-generate employee ID: ENT-CODE-NNN
@@ -412,13 +416,14 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
     // any part fails, none of it is kept.
     const client = await pool.connect()
     let empResult
+    let invitation
     try {
       await client.query('BEGIN')
 
       // Create user
       const userResult = await client.query(
         `INSERT INTO users (platform_id, email, full_name, phone, role_id, password_hash, must_reset_password)
-         VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id`,
+         VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id`,
         [platformId, email, fullName, phone || null, roleId, passwordHash]
       )
       const newUserId = userResult.rows[0].id
@@ -450,6 +455,7 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
           tenantId,
         ]
       )
+      invitation = await sendInvitation(client, { userId: newUserId, tenantId, invitedBy: req.user.userId })
 
       await client.query('COMMIT')
     } catch (e) {
@@ -460,9 +466,9 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
     }
 
     return res.status(201).json({
-      message: 'Employee created successfully',
+      message: 'Employee created and invited to set their password.',
       data: empResult.rows[0],
-      defaultPassword,
+      invitation,
     })
   } catch (err: any) {
     console.error('[Corporate Admin Create Employee]', err.message)
@@ -498,6 +504,57 @@ router.patch('/admin/employees/:employeeId/terminate', authenticateToken, async 
   } catch (err: any) {
     console.error('[Corporate Admin Terminate]', err.message)
     return res.status(500).json({ error: err.message })
+  }
+})
+
+/**
+ * Sends an employee a fresh invitation, cancelling any earlier one. With
+ * `handover: true` the setup link is returned rather than emailed, for an
+ * employer without working email; that is audited. Only for accounts nobody
+ * has signed in to yet.
+ */
+router.post('/admin/employees/:employeeId/invitation', authenticateToken, async (req: Request, res: Response) => {
+  const client = await pool.connect()
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
+    const entity = await getCorporateEntity(req)
+    if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
+
+    const { employeeId } = req.params
+    if (!UUID.test(employeeId)) return res.status(404).json({ error: 'Employee not found' })
+    const emp = await query(
+      `SELECT e.user_id, r.name AS role
+         FROM employees e JOIN users u ON u.id = e.user_id JOIN roles r ON r.id = u.role_id
+        WHERE e.id = $1 AND e.tenant_id = $2`,
+      [employeeId, entity.id]
+    )
+    if (emp.rows.length === 0) return res.status(404).json({ error: 'Employee not found' })
+    if (['admin', 'superadmin'].includes(emp.rows[0].role)) {
+      return res.status(403).json({ error: 'Administrators are invited by the platform operator, not from here' })
+    }
+    const handover = req.body?.handover === true
+
+    await client.query('BEGIN')
+    const invitation = await sendInvitation(client, {
+      userId: emp.rows[0].user_id, tenantId: entity.id, invitedBy: req.user.userId, handover,
+    })
+    // Recorded before the link can be used: no record, no link.
+    await logAudit({
+      actorId: req.user.userId, actorRole: 'admin',
+      actionType: handover ? 'USER_SETUP_LINK_ISSUED' : 'USER_INVITATION_SENT',
+      actionScope: 'TENANT', resourceType: 'user', resourceId: emp.rows[0].user_id, tenantId: entity.id,
+      afterState: { delivery: invitation.delivery }, ipAddress: getClientIp(req),
+    })
+    await client.query('COMMIT')
+
+    return res.json({ invitation })
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {})
+    if (err instanceof AccountTokenError) return res.status(err.status).json({ error: err.message })
+    console.error('[Corporate Admin Invitation]', err.message)
+    return res.status(500).json({ error: 'Failed to send the invitation' })
+  } finally {
+    client.release()
   }
 })
 

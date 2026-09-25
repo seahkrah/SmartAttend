@@ -1,41 +1,58 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, X, Mail, Building2, Trash2 } from 'lucide-react'
 import { apiClient } from '../services/api'
+import { InvitationDialog, type InvitationResult } from '../components/accounts/InvitationDialog'
 
-
+/**
+ * Tenant administrators, as the platform operator sees them.
+ *
+ * This page used to read a list shape the API has never returned, list
+ * tenants from fields that do not exist, and post `tenant_id` where the API
+ * reads `tenantId`, so it showed nothing and could create no one. It also
+ * asked the operator to choose the administrator's password; administrators
+ * now choose their own from an invitation.
+ */
 interface TenantAdmin {
   id: string
   email: string
-  fullName: string
-  tenant_id: string
-  tenant_name: string
+  full_name: string
+  tenant_id: string | null
+  tenant_name: string | null
+  platform_kind: string | null
+  is_active: boolean
+  last_login: string | null
+  awaiting_setup: boolean
   created_at: string
 }
 
+interface Entity {
+  id: string
+  name: string
+  kind: 'school' | 'corporate'
+  is_active: boolean
+}
+
+const EMPTY = { email: '', fullName: '', tenantId: '' }
+
 const SuperadminAdminsPage: React.FC = () => {
   const [admins, setAdmins] = useState<TenantAdmin[]>([])
+  const [tenants, setTenants] = useState<Entity[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    fullName: '',
-    tenant_id: '',
-  })
+  const [formData, setFormData] = useState(EMPTY)
   const [loading, setLoading] = useState(true)
-  const [tenants, setTenants] = useState<any[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  useEffect(() => {
-    loadAdmins()
-    loadTenants()
-  }, [])
+  const [saving, setSaving] = useState(false)
+  const [invite, setInvite] = useState<{ id: string; name: string; invitation: InvitationResult | null } | null>(null)
 
   const loadAdmins = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const response = await apiClient.get('/superadmin/tenant-admins')
-      setAdmins(response.data || [])
-    } catch (error) {
-      console.error('Error loading admins:', error)
+      setAdmins(response.data?.admins ?? [])
+    } catch (error: any) {
+      setLoadError(error?.response?.data?.error ?? 'Could not load administrators')
     } finally {
       setLoading(false)
     }
@@ -44,212 +61,152 @@ const SuperadminAdminsPage: React.FC = () => {
   const loadTenants = async () => {
     try {
       const response = await apiClient.get('/superadmin/entities')
-      const allTenants = [
-        ...(response.data?.schools || []),
-        ...(response.data?.corporates || []),
-      ]
-      setTenants(allTenants)
-    } catch (error) {
-      console.error('Error loading tenants:', error)
+      setTenants(response.data?.entities ?? [])
+    } catch {
+      setTenants([])
     }
   }
+
+  useEffect(() => {
+    loadAdmins()
+    loadTenants()
+  }, [])
 
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
-    
-    // Validate tenant selection
-    if (!formData.tenant_id.trim()) {
-      setFormError('Please select a tenant before creating an admin. A tenant admin must be assigned to manage a specific tenant.')
+    if (!formData.tenantId) {
+      setFormError('Choose the tenant this administrator will manage.')
       return
     }
-
-    if (formData.password.length < 8) {
-      setFormError('Password must be at least 8 characters.')
-      return
-    }
-    
     try {
-      await apiClient.post('/superadmin/tenant-admins', formData)
-      setFormData({ email: '', password: '', fullName: '', tenant_id: '' })
+      setSaving(true)
+      const res = await apiClient.post('/superadmin/tenant-admins', formData)
+      setInvite({ id: res.data.admin.id, name: formData.fullName, invitation: res.data.invitation ?? null })
+      setFormData(EMPTY)
       setShowForm(false)
-      setFormError(null)
       await loadAdmins()
     } catch (error: any) {
-      const msg = error.response?.data?.error || 'Failed to create admin'
-      setFormError(msg)
+      setFormError(error.response?.data?.error || 'Failed to create the administrator')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleDeleteAdmin = async (adminId: string) => {
+  const handleDeleteAdmin = async (admin: TenantAdmin) => {
+    if (!confirm(`Remove ${admin.full_name} as an administrator of ${admin.tenant_name ?? 'their tenant'}?`)) return
     try {
-      await apiClient.delete(`/superadmin/tenant-admins/${adminId}`)
+      await apiClient.delete(`/superadmin/tenant-admins/${admin.id}`)
       await loadAdmins()
     } catch (error: any) {
-      console.error('Error deleting admin:', error)
+      alert(error?.response?.data?.error ?? 'Could not remove that administrator')
     }
   }
 
   if (loading) {
-    return (
-      <>
-        <div className="flex items-center justify-center h-full">
-          <div className="text-slate-400">Loading admins...</div>
-        </div>
-      </>
-    )
+    return <div className="flex items-center justify-center h-full text-slate-400">Loading administrators…</div>
   }
 
   return (
     <>
+      {invite && (
+        <InvitationDialog
+          personName={invite.name}
+          invitation={invite.invitation}
+          issue={async (handover) =>
+            (await apiClient.post(`/superadmin/tenant-admins/${invite.id}/invitation`, { handover })).data.invitation}
+          onClose={() => { setInvite(null); loadAdmins() }}
+        />
+      )}
       <div className="space-y-6">
-        {/* Add Admin Button */}
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg transition-all shadow-lg"
         >
           {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-          {showForm ? 'Cancel' : 'Create Tenant Admin'}
+          {showForm ? 'Cancel' : 'Appoint Tenant Admin'}
         </button>
 
-        {/* Add Admin Form */}
+        {loadError && (
+          <div role="alert" className="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm">{loadError}</div>
+        )}
+
         {showForm && (
-          <form
-            onSubmit={handleAddAdmin}
-            className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
-          >
-              {formError && (
-                <div className="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-400 text-sm flex items-start gap-2">
-                  <span className="text-red-400 shrink-0 mt-0.5">⚠️</span>
-                  <span>{formError}</span>
-                </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Full Name</label>
-                  <input
-                    type="text"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-orange-500 outline-none"
-                    placeholder="Enter full name"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-orange-500 outline-none"
-                    placeholder="Enter email"
-                    required
-                  />
-                </div>
-              </div>
+          <form onSubmit={handleAddAdmin} className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4">
+            {formError && (
+              <div role="alert" className="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm">{formError}</div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="block">
+                <span className="block text-sm font-medium text-slate-300 mb-2">Full name</span>
+                <input type="text" value={formData.fullName} required
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-orange-500 outline-none" />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-slate-300 mb-2">Email</span>
+                <input type="email" value={formData.email} required
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-orange-500 outline-none" />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-slate-300 mb-2">Tenant</span>
+                <select value={formData.tenantId} required
+                  onChange={(e) => setFormData({ ...formData, tenantId: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-orange-500 outline-none">
+                  <option value="">Choose a tenant…</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.kind === 'school' ? 'School' : 'Company'})</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="text-xs text-slate-400">
+              The administrator is invited to choose their own password. If the tenant has no email set up yet,
+              you can hand them a one-time setup link instead.
+            </p>
+            <button type="submit" disabled={saving}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-lg font-medium">
+              {saving ? 'Appointing…' : 'Appoint administrator'}
+            </button>
+          </form>
+        )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-orange-500 outline-none"
-                    placeholder="Enter password"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    <span className="text-orange-500">*</span> Assign to Tenant
-                  </label>
-                  <select
-                    value={formData.tenant_id}
-                    onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
-                    className={`w-full px-4 py-2 bg-slate-900 border rounded-lg text-white focus:outline-none transition-colors ${
-                      formData.tenant_id 
-                        ? 'border-orange-500 focus:border-orange-400' 
-                        : 'border-slate-700 focus:border-slate-600'
-                    }`}
-                    required
-                  >
-                    <option value="">Select a tenant...</option>
-                    {tenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-slate-400 mt-2">
-                    ⓘ A tenant admin manages a specific tenant. Selection is mandatory.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors font-medium"
-                >
-                  Create Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 px-4 py-2 border border-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-
-        {/* Admins Grid */}
         {admins.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {admins.map((admin) => (
-              <div
-                key={admin.id}
-                className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors group"
-              >
+              <div key={`${admin.id}-${admin.tenant_id}`} className="p-6 rounded-xl bg-slate-800/50 border border-slate-700">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h4 className="font-bold text-white text-lg">{admin.fullName}</h4>
-                    <p className="text-sm text-slate-400 mt-1">Admin</p>
+                    <h4 className="font-bold text-white text-lg">{admin.full_name}</h4>
+                    <p className="text-sm text-slate-400 mt-1">
+                      {admin.awaiting_setup ? 'Invited — awaiting setup' : admin.is_active ? 'Administrator' : 'Deactivated'}
+                    </p>
                   </div>
-                  <button
-                    onClick={() => handleDeleteAdmin(admin.id)}
-                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                  >
+                  <button onClick={() => handleDeleteAdmin(admin)} aria-label={`Remove ${admin.full_name}`}
+                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="w-4 h-4 text-slate-500" />
-                    <p className="text-slate-300 break-all">{admin.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Building2 className="w-4 h-4 text-slate-500" />
-                    <p className="text-slate-300">{admin.tenant_name}</p>
-                  </div>
+                <div className="space-y-2 mb-4 text-sm">
+                  <p className="flex items-center gap-2 text-slate-300 break-all"><Mail className="w-4 h-4 text-slate-500" />{admin.email}</p>
+                  <p className="flex items-center gap-2 text-slate-300"><Building2 className="w-4 h-4 text-slate-500" />{admin.tenant_name ?? 'No tenant'}</p>
                 </div>
-
-                <div className="pt-4 border-t border-slate-700">
+                <div className="pt-4 border-t border-slate-700 flex items-center justify-between">
                   <p className="text-xs text-slate-500">
-                    Created {new Date(admin.created_at).toLocaleDateString()}
+                    {admin.last_login ? `Last signed in ${new Date(admin.last_login).toLocaleDateString()}` : `Appointed ${new Date(admin.created_at).toLocaleDateString()}`}
                   </p>
+                  {admin.awaiting_setup && (
+                    <button onClick={() => setInvite({ id: admin.id, name: admin.full_name, invitation: null })}
+                      className="text-xs text-sky-300 hover:text-sky-200">Invite again</button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="p-12 text-center rounded-xl bg-slate-800/30 border border-dashed border-slate-700">
-            <p className="text-slate-400 text-lg">No tenant admins yet</p>
-            <p className="text-slate-500 text-sm mt-2">Create one to manage tenant operations</p>
+            <p className="text-slate-400 text-lg">No tenant administrators yet</p>
           </div>
         )}
       </div>

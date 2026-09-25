@@ -2,7 +2,7 @@ import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { Router, Response } from 'express'
 import { query, getConnection } from '../db/connection.js'
-import { hashPassword } from '../auth/authService.js'
+import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth/accountTokens.js'
 import { authenticateToken } from '../auth/middleware.js'
 import {
   resolveTenantContext,
@@ -242,7 +242,7 @@ router.get('/admin/school/users', async (req: TenantRequest, res: Response) => {
     const ctx = ctxOf(req)
     const result = await query(
       `SELECT u.id, u.email, u.full_name, u.phone, u.is_active, u.created_at, u.last_login,
-              r.name AS role, sua.status AS association_status
+              u.activated_at, r.name AS role, sua.status AS association_status
          FROM school_user_associations sua
          JOIN users u ON u.id = sua.user_id
          JOIN roles r ON r.id = u.role_id
@@ -262,6 +262,8 @@ router.get('/admin/school/users', async (req: TenantRequest, res: Response) => {
         status: row.association_status,
         createdAt: row.created_at,
         lastLogin: row.last_login,
+        // Invited but has not yet chosen a password.
+        awaitingSetup: row.activated_at === null,
       })),
     })
   } catch (e) {
@@ -277,6 +279,45 @@ router.patch('/admin/school/users/:userId', async (req: TenantRequest, res: Resp
 
     if (badId(res, userId, 'User')) return
     if (!(await userInTenant(ctx, userId))) return notFound(res, 'User')
+
+    // Name and phone. The page's Edit button sent these with no action, which
+    // this route refused, so no one's details could be corrected.
+    if (action === undefined && (req.body.fullName !== undefined || req.body.phone !== undefined)) {
+      const role = await query(
+        `SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`, [userId])
+      if (userId !== ctx.userId && ['admin', 'superadmin'].includes(role.rows[0]?.name)) {
+        return res.status(403).json({ error: 'Another administrator\'s details are changed by the platform operator' })
+      }
+      // The account is shared by every tenant it belongs to; one tenant may
+      // not rewrite what another sees.
+      const elsewhere = await query(
+        `SELECT 1 FROM user_tenant_memberships WHERE user_id = $1 AND tenant_id <> $2 LIMIT 1`,
+        [userId, ctx.tenantId]
+      )
+      if (elsewhere.rows.length > 0) {
+        return res.status(409).json({ error: 'This person also belongs to another organisation; they can change their own details' })
+      }
+      const fullName = req.body.fullName === undefined ? undefined : String(req.body.fullName).trim()
+      if (fullName !== undefined && (fullName.length < 2 || fullName.length > 100)) {
+        return res.status(400).json({ error: 'Full name must be between 2 and 100 characters' })
+      }
+      const phone = req.body.phone === undefined ? undefined : (String(req.body.phone).trim() || null)
+      if (phone && phone.length > 30) return res.status(400).json({ error: 'Phone number is too long' })
+      const before = await query(`SELECT full_name, phone FROM users WHERE id = $1`, [userId])
+      await query(
+        `UPDATE users SET full_name = COALESCE($2, full_name),
+                          phone = CASE WHEN $4 THEN $3 ELSE phone END,
+                          updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1`,
+        [userId, fullName ?? null, phone ?? null, phone !== undefined]
+      )
+      await logAudit({
+        actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'USER_DETAILS_UPDATED',
+        actionScope: 'TENANT', resourceType: 'user', resourceId: userId, tenantId: ctx.tenantId,
+        beforeState: before.rows[0], afterState: { full_name: fullName, phone }, ipAddress: getClientIp(req),
+      }).catch((e) => console.error('[SCHOOL_ADMIN] audit failed:', e))
+      return res.json({ message: 'User updated successfully' })
+    }
 
     // An administrator must not be able to lock themselves out, nor to
     // suspend the account they are currently acting as.
@@ -310,6 +351,50 @@ router.patch('/admin/school/users/:userId', async (req: TenantRequest, res: Resp
     return res.json({ message: 'User updated successfully' })
   } catch (e) {
     return fail(res, 'update user', e)
+  }
+})
+
+/**
+ * Sends a person a fresh invitation, cancelling any earlier one. With
+ * `handover: true` the link is returned instead of emailed, for a school with
+ * no working email; that is audited. Only for accounts nobody has signed in
+ * to, and never for an administrator's account.
+ */
+router.post('/admin/school/users/:userId/invitation', async (req: TenantRequest, res: Response) => {
+  const client = await getConnection()
+  try {
+    const ctx = ctxOf(req)
+    const { userId } = req.params
+    if (badId(res, userId, 'User')) return
+    if (!(await userInTenant(ctx, userId))) return notFound(res, 'User')
+    const role = await query(
+      `SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`, [userId])
+    if (['admin', 'superadmin'].includes(role.rows[0]?.name)) {
+      return res.status(403).json({ error: 'Administrators are invited by the platform operator, not from here' })
+    }
+    const handover = req.body?.handover === true
+
+    await client.query('BEGIN')
+    const invitation = await sendInvitation(client, {
+      userId, tenantId: ctx.tenantId, invitedBy: ctx.userId, handover,
+    })
+    // Recorded before the link can be used: if the record cannot be written,
+    // the link is not issued.
+    await logAudit({
+      actorId: ctx.userId, actorRole: ctx.roleName,
+      actionType: handover ? 'USER_SETUP_LINK_ISSUED' : 'USER_INVITATION_SENT',
+      actionScope: 'TENANT', resourceType: 'user', resourceId: userId, tenantId: ctx.tenantId,
+      afterState: { delivery: invitation.delivery }, ipAddress: getClientIp(req),
+    })
+    await client.query('COMMIT')
+
+    return res.json({ invitation })
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    if (e instanceof AccountTokenError) return res.status(e.status).json({ error: e.message })
+    return fail(res, 'send the invitation', e)
+  } finally {
+    client.release()
   }
 })
 
@@ -372,7 +457,7 @@ router.post('/admin/school/users', async (req: TenantRequest, res: Response) => 
   const client = await getConnection()
   try {
     const ctx = ctxOf(req)
-    const { email, fullName, phone, role, password } = req.body
+    const { email, fullName, phone, role } = req.body
 
     if (!email || !fullName || !role) {
       return res.status(400).json({ error: 'email, fullName and role are required' })
@@ -392,15 +477,13 @@ router.post('/admin/school/users', async (req: TenantRequest, res: Response) => 
 
     await client.query('BEGIN')
 
-    // A temporary password, flagged for reset, rather than a shared default.
-    const temporary = password || `Tmp-${Math.random().toString(36).slice(2, 10)}A1!`
-    const hashed = await hashPassword(temporary)
-
+    // Nobody chooses another person's password: the account starts with one
+    // nobody knows, and the person sets their own from the invitation.
     const user = await client.query(
       `INSERT INTO users (email, full_name, phone, platform_id, role_id, is_active,
                           password_hash, must_reset_password)
-       VALUES ($1, $2, $3, $4, $5, TRUE, $6, TRUE) RETURNING id`,
-      [email, fullName, phone || null, ctx.platformId, roleId, hashed]
+       VALUES ($1, $2, $3, $4, $5, TRUE, $6, FALSE) RETURNING id`,
+      [email, fullName, phone || null, ctx.platformId, roleId, await unusablePasswordHash()]
     )
 
     await client.query(
@@ -408,12 +491,15 @@ router.post('/admin/school/users', async (req: TenantRequest, res: Response) => 
        VALUES ($1, $2, 'active')`,
       [user.rows[0].id, ctx.tenantId]
     )
+    const invitation = await sendInvitation(client, {
+      userId: user.rows[0].id, tenantId: ctx.tenantId, invitedBy: ctx.userId,
+    })
 
     await client.query('COMMIT')
     return res.status(201).json({
-      message: 'User created. They must change their password on first login.',
+      message: 'User created and invited to set their password.',
       userId: user.rows[0].id,
-      temporaryPassword: password ? undefined : temporary,
+      invitation,
     })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
@@ -470,8 +556,7 @@ router.post('/admin/school/students', async (req: TenantRequest, res: Response) 
 
     const departmentId = await departmentIdByName(ctx, department, client as any)
 
-    const temporary = `Tmp-${Math.random().toString(36).slice(2, 10)}A1!`
-    const hashed = await hashPassword(temporary)
+    const hashed = await unusablePasswordHash()
     const fullName = middleName
       ? `${firstName} ${middleName} ${lastName}`
       : `${firstName} ${lastName}`
@@ -479,7 +564,7 @@ router.post('/admin/school/students', async (req: TenantRequest, res: Response) 
     const user = await client.query(
       `INSERT INTO users (email, full_name, phone, platform_id, role_id, is_active,
                           password_hash, must_reset_password)
-       VALUES ($1, $2, $3, $4, $5, TRUE, $6, TRUE) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, TRUE, $6, FALSE) RETURNING id`,
       [email, fullName, phone || null, ctx.platformId, roleId, hashed]
     )
 
@@ -504,12 +589,16 @@ router.post('/admin/school/students', async (req: TenantRequest, res: Response) 
        VALUES ($1, $2, 'active')`,
       [user.rows[0].id, ctx.tenantId]
     )
+    const invitation = await sendInvitation(client, {
+      userId: user.rows[0].id, tenantId: ctx.tenantId, invitedBy: ctx.userId,
+    })
 
     await client.query('COMMIT')
     return res.status(201).json({
-      message: 'Student created. They must change their password on first login.',
+      message: 'Student created and invited to set their password.',
       studentId: student.rows[0].id,
-      temporaryPassword: temporary,
+      userId: user.rows[0].id,
+      invitation,
     })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
@@ -695,8 +784,7 @@ router.post('/admin/school/faculty', async (req: TenantRequest, res: Response) =
     await client.query('BEGIN')
 
     const departmentId = await departmentIdByName(ctx, department, client as any)
-    const temporary = `Tmp-${Math.random().toString(36).slice(2, 10)}A1!`
-    const hashed = await hashPassword(temporary)
+    const hashed = await unusablePasswordHash()
     const fullName = middleName
       ? `${firstName} ${middleName} ${lastName}`
       : `${firstName} ${lastName}`
@@ -704,7 +792,7 @@ router.post('/admin/school/faculty', async (req: TenantRequest, res: Response) =
     const user = await client.query(
       `INSERT INTO users (email, full_name, phone, platform_id, role_id, is_active,
                           password_hash, must_reset_password)
-       VALUES ($1, $2, $3, $4, $5, TRUE, $6, TRUE) RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, TRUE, $6, FALSE) RETURNING id`,
       [email, fullName, phone || null, ctx.platformId, roleId, hashed]
     )
 
@@ -724,12 +812,16 @@ router.post('/admin/school/faculty', async (req: TenantRequest, res: Response) =
        VALUES ($1, $2, 'active')`,
       [ctx.tenantId, user.rows[0].id]
     )
+    const invitation = await sendInvitation(client, {
+      userId: user.rows[0].id, tenantId: ctx.tenantId, invitedBy: ctx.userId,
+    })
 
     await client.query('COMMIT')
     return res.status(201).json({
-      message: 'Faculty member created. They must change their password on first login.',
+      message: 'Faculty member created and invited to set their password.',
       facultyId: faculty.rows[0].id,
-      temporaryPassword: temporary,
+      userId: user.rows[0].id,
+      invitation,
     })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})

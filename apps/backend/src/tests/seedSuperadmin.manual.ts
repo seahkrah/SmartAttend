@@ -7,7 +7,9 @@
  * database would be acting as a real person with real history.
  */
 import { query } from '../db/connection.js'
-import { generateAccessToken } from '../auth/authService.js'
+import { issueTokens } from '../auth/authService.js'
+const generateAccessToken = async (id: string, platform_id: string, role_id: string) =>
+  (await issueTokens({ id, platform_id, role_id }, { userAgent: 'e2e fixture' })).accessToken
 import { hashPassword } from '../auth/authService.js'
 
 async function cleanup() {
@@ -116,7 +118,7 @@ async function main() {
   console.log(JSON.stringify({
     schoolAIncidentId: incident?.rows[0]?.id ?? null,
     superadminId: user.rows[0].id,
-    token: generateAccessToken(user.rows[0].id, platformId, roleId),
+    token: await generateAccessToken(user.rows[0].id, platformId, roleId),
     lockedUserId: locked.rows[0].id,
     platformId,
   }))

@@ -67,6 +67,19 @@ function shift(visibility: AuditVisibility, startAt: number): string {
  * @returns - ID of created audit log entry
  * @throws - If database operation fails
  */
+/**
+ * The audit trail records the actor's class of authority, not the platform
+ * role name: the table only admits superadmin, tenant_admin or user, and a
+ * TENANT-scoped entry must come from a superadmin or tenant administrator.
+ * Callers passed role names ('admin'), so every such entry was refused by
+ * the constraint and, because callers log and carry on, silently lost.
+ */
+export function auditActorClass(role: string | null | undefined): 'superadmin' | 'tenant_admin' | 'user' {
+  if (role === 'superadmin') return 'superadmin'
+  if (role === 'tenant_admin' || role === 'admin') return 'tenant_admin'
+  return 'user'
+}
+
 export async function logAudit(entry: AuditLogEntry): Promise<string> {
   try {
     const result = await query(
@@ -84,7 +97,7 @@ export async function logAudit(entry: AuditLogEntry): Promise<string> {
        RETURNING id`,
       [
         entry.actorId,
-        entry.actorRole || null,
+        entry.actorRole ? auditActorClass(entry.actorRole) : null,
         entry.actionType,
         entry.actionScope,
         entry.resourceType || null,

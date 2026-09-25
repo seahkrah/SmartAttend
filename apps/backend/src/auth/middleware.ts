@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { verifyAccessToken } from './authService.js'
 import { query } from '../db/connection.js'
+import { sessionIsLive } from './sessions.js'
 
 // Extend Express Request to include auth info
 declare global {
@@ -10,6 +11,7 @@ declare global {
         userId: string
         platformId: string
         roleId: string
+        sessionId?: string
         role?: string        // Resolved role name
         platformType?: string // Resolved platform type
       }
@@ -17,8 +19,18 @@ declare global {
   }
 }
 
-// Middleware to verify JWT token
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+/**
+ * Verifies the access token and that the session it names is still live.
+ *
+ * A signature alone is not enough: it stays valid for fifteen minutes after
+ * a logout, a password change or a deactivation. The session lookup is what
+ * makes those take effect on the next request.
+ */
+export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  // Several routers apply this per route after a router-level gate already
+  // has; the session need only be checked once per request.
+  if (req.user?.sessionId) return next()
+
   const authHeader = req.headers['authorization']
   const token = authHeader && authHeader.split(' ')[1] // Bearer TOKEN
 
@@ -26,13 +38,29 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'Access token required' })
   }
 
+  let decoded: any
   try {
-    const decoded = verifyAccessToken(token)
-    req.user = decoded
-    next()
-  } catch (error: any) {
+    decoded = verifyAccessToken(token)
+  } catch {
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
+  if (!decoded?.sid || !decoded?.userId) {
+    return res.status(401).json({ error: 'Invalid or expired token' })
+  }
+  try {
+    if (!(await sessionIsLive(decoded.sid, decoded.userId))) {
+      return res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'SESSION_ENDED' })
+    }
+  } catch (error) {
+    return res.status(500).json({ error: 'Authentication check failed' })
+  }
+  req.user = {
+    userId: decoded.userId,
+    platformId: decoded.platformId,
+    roleId: decoded.roleId,
+    sessionId: decoded.sid,
+  }
+  next()
 }
 
 // Middleware to verify platform access

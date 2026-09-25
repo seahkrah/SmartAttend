@@ -3,7 +3,7 @@ import { LogIn, Lock, Mail } from 'lucide-react';
 import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuthStore } from '../store/authStore';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
@@ -167,15 +167,10 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center text-slate-300 hover:text-slate-200 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 mr-2 rounded border-slate-600 bg-slate-900" />
-                Remember me
-              </label>
-              <a href="#" className="text-primary-400 hover:text-primary-300 font-medium">
+            <div className="flex justify-end text-sm">
+              <Link to={`/forgot-password?platform=${platform}`} className="text-primary-400 hover:text-primary-300 font-medium">
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
             {/* Submit Button */}

@@ -100,8 +100,7 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
       body:
         'Dear {{ firstName }},\n\n'
         + 'You are now enrolled on {{ programmeName }}. Your student number is {{ studentNumber }}.\n\n'
-        + 'You can sign in with this email address. You will be asked to set a password the '
-        + 'first time you do.' + SIGN_OFF,
+        + 'A separate email will invite you to choose a password for your student account.' + SIGN_OFF,
       required: ['firstName', 'programmeName', 'studentNumber', 'tenantName'],
       category: 'admissions',
     },
@@ -288,14 +287,35 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
   },
 
   // ------------------------------------------------------------------- account
-  'account.created': {
+  // These carry a single-use link that sets the account's password. Their
+  // wording is fixed in code (tenants cannot override it) and their bodies
+  // are withheld from the outbox views (SENSITIVE_EVENTS below).
+  'account.invitation': {
     email: {
-      subject: 'Your {{ tenantName }} account',
+      subject: 'Set up your {{ tenantName }} account',
       body:
         'Dear {{ firstName }},\n\n'
-        + 'An account has been created for you at {{ tenantName }}. Sign in with this email '
-        + 'address; you will be asked to set a password the first time.' + SIGN_OFF,
-      required: ['firstName', 'tenantName'],
+        + 'An account has been created for you at {{ tenantName }}. To start using it, choose a '
+        + 'password here:\n\n{{ link }}\n\n'
+        + 'The link works once and expires in {{ validFor }}. If it has expired, ask your '
+        + 'administrator to send a new invitation.\n\n'
+        + 'If you were not expecting this, you can ignore it; nothing happens until the link is used.'
+        + SIGN_OFF,
+      required: ['firstName', 'tenantName', 'link', 'validFor'],
+      category: 'account',
+    },
+  },
+  'account.password_reset': {
+    email: {
+      subject: 'Reset your {{ tenantName }} password',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + 'Someone asked to reset the password for your {{ tenantName }} account. If it was you, '
+        + 'choose a new password here:\n\n{{ link }}\n\n'
+        + 'The link works once and expires in {{ validFor }}. Using it signs you out everywhere.\n\n'
+        + 'If it was not you, ignore this email; your password has not changed.'
+        + SIGN_OFF,
+      required: ['firstName', 'tenantName', 'link', 'validFor'],
       category: 'account',
     },
   },
@@ -328,6 +348,13 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
     },
   },
 }
+
+/**
+ * Events whose messages carry a credential (a link that sets a password).
+ * Tenants cannot override their templates, and nobody can read their bodies
+ * back out of the outbox.
+ */
+export const SENSITIVE_EVENTS: ReadonlySet<string> = new Set(['account.invitation', 'account.password_reset'])
 
 export function defaultTemplate(eventKey: string, channel: Channel): TemplateDefinition | null {
   return DEFAULT_TEMPLATES[eventKey]?.[channel] ?? null

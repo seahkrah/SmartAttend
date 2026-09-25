@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { SessionsPanel } from '../components/accounts/SessionsPanel'
 import { Bell, Shield, Database, Save } from 'lucide-react'
 
 const SuperadminSettingsPage: React.FC = () => {
@@ -206,6 +207,7 @@ const SuperadminSettingsPage: React.FC = () => {
               <span>✓ Settings saved successfully</span>
             </div>
           )}
+          <SessionsPanel />
         </div>
       </div>
     </>

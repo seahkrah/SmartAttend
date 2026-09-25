@@ -15,7 +15,6 @@ interface AuthState {
   error: string | null;
   login: (email: string, password: string, platform: 'school' | 'corporate') => Promise<void>;
   superadminLogin: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string, platform: 'school' | 'corporate', phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   setToken: (token: string) => void;
@@ -111,47 +110,6 @@ export const useAuthStore = create<AuthState>((set) => {
         useToastStore.getState().addToast({
           type: 'error',
           title: 'Superadmin Login Failed',
-          message: errorMessage,
-          duration: undefined,
-        });
-        throw error;
-      }
-    },
-
-    register: async (email: string, password: string, fullName: string, platform: 'school' | 'corporate', phone?: string) => {
-      set({ isLoading: true, error: null });
-      try {
-        const response = await apiClient.register({
-          platform,
-          email,
-          password,
-          confirmPassword: password,
-          fullName,
-          phone,
-        });
-        set({
-          token: response.accessToken,
-          user: {
-            id: response.user.id,
-            email: response.user.email,
-            fullName: response.user.fullName,
-            role: response.user.role || 'user',
-            platform: response.user.platform,
-          },
-          isLoading: false,
-        });
-        useToastStore.getState().addToast({
-          type: 'success',
-          title: 'Registration successful',
-          message: 'Your account has been created. Welcome!',
-          duration: 4000,
-        });
-      } catch (error: any) {
-        const errorMessage = getUserFriendlyError(error);
-        set({ error: errorMessage, isLoading: false });
-        useToastStore.getState().addToast({
-          type: 'error',
-          title: 'Registration Failed',
           message: errorMessage,
           duration: undefined,
         });

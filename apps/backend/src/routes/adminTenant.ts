@@ -1,5 +1,5 @@
 import { Router, Response } from 'express'
-import bcrypt from 'bcryptjs'
+import { sendInvitation, unusablePasswordHash } from '../auth/accountTokens.js'
 import { query } from '../db/connection.js'
 import { authenticateToken } from '../auth/middleware.js'
 import {
@@ -223,7 +223,7 @@ router.get('/users', async (req: TenantRequest, res: Response) => {
 
 router.post('/users', async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
-  const { email, name, role, password } = req.body ?? {}
+  const { email, name, role } = req.body ?? {}
 
   if (!email || typeof email !== 'string' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return res.status(400).json({ error: 'Validation failed', message: 'A valid email is required' })
@@ -263,16 +263,13 @@ router.post('/users', async (req: TenantRequest, res: Response) => {
       return res.status(409).json({ error: 'Conflict', message: 'A user with that email already exists on this platform' })
     }
 
-    // A generated password is returned once and must be changed at first sign-in.
-    const initialPassword =
-      typeof password === 'string' && password.length >= 8
-        ? password
-        : (await import('crypto')).randomBytes(12).toString('base64url')
-    const hash = await bcrypt.hash(initialPassword, 10)
+    // The person chooses their own password from an invitation; nobody else
+    // ever knows it.
+    const hash = await unusablePasswordHash()
 
     const created = await client.query(
       `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, must_reset_password)
-       VALUES ($1, $2, $3, $4, $5, TRUE, TRUE)
+       VALUES ($1, $2, $3, $4, $5, TRUE, FALSE)
        RETURNING id, email, full_name, created_at`,
       [ctx.platformId, email.toLowerCase(), name.trim(), roleRow.rows[0].id, hash]
     )
@@ -284,6 +281,9 @@ router.post('/users', async (req: TenantRequest, res: Response) => {
       `INSERT INTO ${m.table} (user_id, ${m.fk}, status) VALUES ($1, $2, 'active')`,
       [user.id, ctx.tenantId]
     )
+    const invitation = await sendInvitation(client, {
+      userId: user.id, tenantId: ctx.tenantId!, invitedBy: ctx.userId,
+    })
 
     await client.query('COMMIT')
 
@@ -294,10 +294,7 @@ router.post('/users', async (req: TenantRequest, res: Response) => {
       role: DB_TO_ROLE[dbRole] ?? dbRole.toUpperCase(),
       status: 'ACTIVE',
       created_at: user.created_at,
-      // Present only when the server generated it.
-      ...(typeof password === 'string' && password.length >= 8
-        ? {}
-        : { temporary_password: initialPassword }),
+      invitation,
     })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
@@ -449,6 +446,7 @@ router.post('/users/bulk-import', async (req: TenantRequest, res: Response) => {
   }
 
   const errors: Array<{ row: number; error: string }> = []
+  const invitations: Record<string, number> = {}
   let imported = 0
 
   const client = await (await import('../db/connection.js')).default.connect()
@@ -469,30 +467,31 @@ router.post('/users/bulk-import', async (req: TenantRequest, res: Response) => {
       const roleRow = await client.query(`SELECT id FROM roles WHERE platform_id = $1 AND name = $2`, [ctx.platformId, dbRole])
       if (roleRow.rows.length === 0) { errors.push({ row: i + 1, error: 'Role not available on this platform' }); continue }
 
-      const existing = await client.query(`SELECT id FROM users WHERE platform_id = $1 AND email = $2`, [ctx.platformId, email])
-      let userId: string
-      if (existing.rows.length > 0) {
-        userId = existing.rows[0].id
-      } else {
-        const hash = await bcrypt.hash((await import('crypto')).randomBytes(12).toString('base64url'), 10)
-        const created = await client.query(
-          `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, must_reset_password)
-           VALUES ($1,$2,$3,$4,$5,TRUE,TRUE) RETURNING id`,
-          [ctx.platformId, email, name, roleRow.rows[0].id, hash]
-        )
-        userId = created.rows[0].id
-      }
+      // An address that already has an account is refused, not attached:
+      // attaching it made an administrator able to pull another tenant's user
+      // into their own tenant just by knowing the address, and then suspend
+      // or deactivate that account.
+      const existing = await client.query(`SELECT id FROM users WHERE platform_id = $1 AND LOWER(email) = $2`, [ctx.platformId, email])
+      if (existing.rows.length > 0) { errors.push({ row: i + 1, error: 'An account already exists on that email address' }); continue }
+
+      const created = await client.query(
+        `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, must_reset_password)
+         VALUES ($1,$2,$3,$4,$5,TRUE,FALSE) RETURNING id`,
+        [ctx.platformId, email, name, roleRow.rows[0].id, await unusablePasswordHash()]
+      )
+      const userId: string = created.rows[0].id
 
       await client.query(
-        `INSERT INTO ${m.table} (user_id, ${m.fk}, status) VALUES ($1,$2,'active')
-         ON CONFLICT DO NOTHING`,
+        `INSERT INTO ${m.table} (user_id, ${m.fk}, status) VALUES ($1,$2,'active')`,
         [userId, ctx.tenantId]
       )
+      const invitation = await sendInvitation(client, { userId, tenantId: ctx.tenantId!, invitedBy: ctx.userId })
+      invitations[invitation.delivery] = (invitations[invitation.delivery] ?? 0) + 1
       imported++
     }
 
     await client.query('COMMIT')
-    res.status(errors.length > 0 ? 207 : 201).json({ imported, failed: errors.length, errors })
+    res.status(errors.length > 0 ? 207 : 201).json({ imported, failed: errors.length, errors, invitations })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
     fail(res, e)

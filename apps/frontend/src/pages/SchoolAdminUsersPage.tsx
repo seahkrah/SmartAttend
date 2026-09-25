@@ -16,6 +16,8 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import axios from 'axios'
+import { apiClient } from '../services/api'
+import { InvitationDialog, type InvitationResult } from '../components/accounts/InvitationDialog'
 
 interface User {
   id: string
@@ -27,6 +29,7 @@ interface User {
   status: 'active' | 'suspended' | 'disabled'
   createdAt: string
   lastLogin?: string
+  awaitingSetup?: boolean
 }
 
 interface Toast {
@@ -47,10 +50,10 @@ const SchoolAdminUsersPage: React.FC = () => {
   const [newUserData, setNewUserData] = useState({
     email: '',
     fullName: '',
-    password: '',
     role: 'faculty',
     phone: ''
   })
+  const [invite, setInvite] = useState<{ userId: string; name: string; invitation: InvitationResult | null } | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
     title: string
@@ -145,13 +148,10 @@ const SchoolAdminUsersPage: React.FC = () => {
 
   const handleAddUser = async () => {
     try {
-      const token = localStorage.getItem('accessToken')
-      await axios.post('/api/auth/admin/school/users', newUserData, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      showToast('success', 'User created successfully')
+      const res = await apiClient.post('/auth/admin/school/users', newUserData)
       setShowAddUserModal(false)
-      setNewUserData({ email: '', fullName: '', password: '', role: 'faculty', phone: '' })
+      setInvite({ userId: res.data.userId, name: newUserData.fullName, invitation: res.data.invitation ?? null })
+      setNewUserData({ email: '', fullName: '', role: 'faculty', phone: '' })
       fetchUsers()
     } catch (error: any) {
       console.error('Failed to create user:', error)
@@ -220,6 +220,15 @@ const SchoolAdminUsersPage: React.FC = () => {
     <>
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
+        {invite && (
+          <InvitationDialog
+            personName={invite.name}
+            invitation={invite.invitation}
+            issue={async (handover) =>
+              (await apiClient.post(`/auth/admin/school/users/${invite.userId}/invitation`, { handover })).data.invitation}
+            onClose={() => { setInvite(null); fetchUsers() }}
+          />
+        )}
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -400,12 +409,26 @@ const SchoolAdminUsersPage: React.FC = () => {
                       >
                         {user.status}
                       </span>
+                      {user.awaitingSetup && (
+                        <span className="ml-2 px-2 py-0.5 rounded-full text-xs border border-sky-500/40 bg-sky-500/10 text-sky-300">
+                          Awaiting setup
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-slate-400 text-sm">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {user.awaitingSetup && user.role !== 'admin' && (
+                          <button
+                            onClick={() => setInvite({ userId: user.id, name: user.fullName, invitation: null })}
+                            className="px-2 py-1 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 rounded transition-colors text-xs font-medium"
+                            title="Send a new invitation"
+                          >
+                            Invite
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingUser(user)}
                           className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors text-xs font-medium"
@@ -474,18 +497,9 @@ const SchoolAdminUsersPage: React.FC = () => {
                   placeholder="john@school.edu"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={newUserData.password}
-                  onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  placeholder="••••••••"
-                />
-              </div>
+              <p className="text-xs text-slate-400">
+                They will be invited to choose their own password. Nobody else, including you, ever knows it.
+              </p>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Phone
@@ -517,7 +531,7 @@ const SchoolAdminUsersPage: React.FC = () => {
               <button
                 onClick={() => {
                   setShowAddUserModal(false)
-                  setNewUserData({ email: '', fullName: '', password: '', role: 'faculty', phone: '' })
+                  setNewUserData({ email: '', fullName: '', role: 'faculty', phone: '' })
                 }}
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
               >

@@ -1,13 +1,12 @@
-﻿import express, { Request, Response } from 'express'
+import express, { Request, Response } from 'express'
 import { query, getConnection } from '../db/connection.js'
 import {
-  registerUser,
   loginUser,
   getUserWithRole,
   getUserByEmail,
   generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
+  issueTokens,
+  LoginError,
   verifyPassword,
   registerUserWithRole,
   getPendingApprovalsForAdmin,
@@ -32,6 +31,11 @@ import {
 } from '../auth/tenantContextMiddleware.js'
 import { ErrorMessages, getUserFriendlyError, logError } from '../utils/errorMessages.js'
 import { getClientIp } from '../utils/getClientIp.js'
+import { rotateSession, revokeSession, revokeUserSessions, SessionError } from '../auth/sessions.js'
+import { checkPassword } from '../auth/passwordPolicy.js'
+import { requestPasswordReset, redeemToken, AccountTokenError } from '../auth/accountTokens.js'
+import { loginLimiter, refreshLimiter, accountLimiter } from '../security/httpSecurity.js'
+import crypto from 'crypto'
 
 const router = express.Router()
 
@@ -52,7 +56,7 @@ interface RoleBasedRegisterRequest extends Request {
   }
 }
 
-router.post('/register-with-role', async (req: RoleBasedRegisterRequest, res: Response) => {
+router.post('/register-with-role', accountLimiter, async (req: RoleBasedRegisterRequest, res: Response) => {
   try {
     const { platform, email, fullName, password, confirmPassword, phone, role, entityId } = req.body
 
@@ -65,8 +69,9 @@ router.post('/register-with-role', async (req: RoleBasedRegisterRequest, res: Re
       return res.status(400).json({ error: ErrorMessages.VALIDATION_PASSWORD_MISMATCH })
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    const problems = checkPassword(password, { email, name: fullName })
+    if (problems.length > 0) {
+      return res.status(400).json({ error: 'Choose a stronger password', problems })
     }
 
     // Validate role for platform
@@ -239,93 +244,9 @@ router.post(
   }
 })
 
-// ===========================
-// REGISTRATION ENDPOINT (LEGACY - BACKWARD COMPATIBLE)
-// ===========================
-
-interface RegisterRequest extends Request {
-  body: {
-    platform: 'school' | 'corporate'
-    email: string
-    fullName: string
-    password: string
-    confirmPassword: string
-    phone?: string
-    role?: string
-  }
-}
-
-router.post('/register', async (req: RegisterRequest, res: Response) => {
-  try {
-    const { platform, email, fullName, password, confirmPassword, phone, role } = req.body
-
-    // Validation
-    if (!platform || !email || !fullName || !password || !confirmPassword) {
-      return res.status(400).json({ error: ErrorMessages.VALIDATION_MISSING_FIELDS })
-    }
-
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: ErrorMessages.VALIDATION_PASSWORD_MISMATCH })
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' })
-    }
-
-    // Get platform ID
-    const platformResult = await query(
-      `SELECT id FROM platforms WHERE name = $1`,
-      [platform]
-    )
-
-    if (platformResult.rows.length === 0) {
-      return res.status(400).json({ error: ErrorMessages.SYSTEM_CONFIGURATION_ERROR })
-    }
-
-    const platformId = platformResult.rows[0].id
-
-    // Get default role if not specified
-    let roleId = role
-    if (!roleId) {
-      // Default roles: 'student' for school, 'employee' for corporate
-      const defaultRole = platform === 'school' ? 'student' : 'employee'
-      const roleResult = await query(
-        `SELECT id FROM roles WHERE platform_id = $1 AND name = $2`,
-        [platformId, defaultRole]
-      )
-
-      if (roleResult.rows.length === 0) {
-        return res.status(500).json({ error: ErrorMessages.SYSTEM_CONFIGURATION_ERROR })
-      }
-
-      roleId = roleResult.rows[0].id
-    }
-
-    // Check if email already exists
-    const existingUser = await getUserByEmail(email, platformId)
-    if (existingUser) {
-      return res.status(409).json({ error: ErrorMessages.USER_ALREADY_EXISTS })
-    }
-
-    // Create user
-    const user = await registerUser(platformId, email, fullName, password, roleId || '', phone)
-
-    return res.status(201).json({
-      message: 'User registered successfully',
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        platform,
-        createdAt: user.created_at
-      }
-    })
-  } catch (error: any) {
-    logError('Registration', error)
-    const friendlyError = getUserFriendlyError(error, ErrorMessages.USER_CREATE_FAILED)
-    return res.status(500).json({ error: friendlyError.error })
-  }
-})
+// The legacy POST /register created an active account with whatever role id
+// the client sent and no tenant. Nothing called it; it is gone. Self-service
+// sign-up is /register-with-role, which always waits for an administrator.
 
 // ===========================
 // LOGIN ENDPOINT
@@ -339,12 +260,41 @@ interface LoginRequest extends Request {
   }
 }
 
-router.post('/login', async (req: LoginRequest, res: Response) => {
+function sessionMeta(req: Request) {
+  return { ip: getClientIp(req), userAgent: String(req.headers['user-agent'] ?? '') }
+}
+
+/** The answer to a refused sign-in. Only `invalid` and `locked` precede a correct password. */
+function loginRefusal(res: Response, error: unknown) {
+  if (error instanceof LoginError) {
+    switch (error.code) {
+      case 'locked':
+        res.setHeader('Retry-After', String(error.extra.retryAfter ?? 900))
+        return res.status(429).json({ error: error.message, code: 'LOGIN_LOCKED', retryAfter: error.extra.retryAfter })
+      case 'platform_mismatch': {
+        const correctPlatform = String(error.extra.correctPlatform ?? 'other')
+        return res.status(401).json({
+          error: `Your account is registered under the ${correctPlatform} platform. Please select "${correctPlatform}" and try again.`,
+          code: 'PLATFORM_MISMATCH',
+          correctPlatform: correctPlatform.toLowerCase(),
+        })
+      }
+      case 'invalid':
+        return res.status(401).json({ error: ErrorMessages.AUTH_INVALID_CREDENTIALS })
+      default:
+        return res.status(403).json({ error: error.message, code: error.code.toUpperCase() })
+    }
+  }
+  logError('Login', error)
+  return res.status(500).json({ error: 'Sign-in failed. Please try again.' })
+}
+
+router.post('/login', loginLimiter, async (req: LoginRequest, res: Response) => {
   try {
     const { platform, email, password } = req.body
 
     // Validation
-    if (!platform || !email || !password) {
+    if (!platform || !email || !password || typeof email !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: ErrorMessages.VALIDATION_MISSING_FIELDS })
     }
 
@@ -360,8 +310,7 @@ router.post('/login', async (req: LoginRequest, res: Response) => {
 
     const platformId = platformResult.rows[0].id
 
-    // Login user
-    const { user, accessToken, refreshToken } = await loginUser(email, password, platformId)
+    const { user, accessToken, refreshToken } = await loginUser(email, password, platformId, sessionMeta(req))
 
     // Get role name and permissions
     const roleResult = await query(
@@ -378,7 +327,7 @@ router.post('/login', async (req: LoginRequest, res: Response) => {
         email: user.email,
         fullName: user.full_name,
         phone: user.phone,
-        platform,
+        platform: (user as any).platform_name ?? platform,
         role: roleInfo.name,
         permissions: roleInfo.permissions || [],
         profileImage: user.profile_image_url,
@@ -388,20 +337,7 @@ router.post('/login', async (req: LoginRequest, res: Response) => {
       refreshToken
     })
   } catch (error: any) {
-    logError('Login', error)
-    
-    // Handle platform mismatch - tell the user which platform to use
-    if (error.code === 'PLATFORM_MISMATCH' || (error.message && error.message.startsWith('PLATFORM_MISMATCH:'))) {
-      const correctPlatform = error.correctPlatform || error.message.split(':')[1] || 'other'
-      return res.status(401).json({
-        error: `Your account is registered under the ${correctPlatform} platform. Please select "${correctPlatform}" and try again.`,
-        code: 'PLATFORM_MISMATCH',
-        correctPlatform: correctPlatform.toLowerCase()
-      })
-    }
-    
-    // Don't expose whether email exists or password is wrong
-    return res.status(401).json({ error: ErrorMessages.AUTH_INVALID_CREDENTIALS })
+    return loginRefusal(res, error)
   }
 })
 
@@ -424,13 +360,8 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
       return res.status(400).json({ error: 'New passwords do not match' })
     }
     
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' })
-    }
-    
-    // Get user
     const userResult = await query(
-      `SELECT password_hash FROM users WHERE id = $1`,
+      `SELECT password_hash, email, full_name FROM users WHERE id = $1`,
       [req.user.userId]
     )
     
@@ -439,26 +370,144 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
     }
     
     const user = userResult.rows[0]
+
+    const problems = checkPassword(newPassword, { email: user.email, name: user.full_name })
+    if (problems.length > 0) {
+      return res.status(400).json({ error: 'Choose a stronger password', problems })
+    }
     
     // Verify current password
     const isValidPassword = await verifyPassword(currentPassword, user.password_hash)
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Current password is incorrect' })
     }
+    if (await verifyPassword(newPassword, user.password_hash)) {
+      return res.status(400).json({ error: 'The new password must differ from the current one' })
+    }
     
-    // Hash new password
     const newPasswordHash = await hashPassword(newPassword)
-    
-    // Update password and clear must_reset_password flag
     await query(
-      `UPDATE users SET password_hash = $1, must_reset_password = false, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      `UPDATE users SET password_hash = $1, must_reset_password = false,
+              password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2`,
       [newPasswordHash, req.user.userId]
     )
+    // Whoever knew the old password may be signed in elsewhere. This device
+    // stays signed in; every other session ends.
+    const ended = await revokeUserSessions(req.user.userId, 'password_changed', req.user.sessionId)
     
-    return res.json({ message: 'Password changed successfully' })
+    return res.json({ message: 'Password changed successfully', otherSessionsEnded: ended })
   } catch (error: any) {
     logError('Change password', error)
     return res.status(500).json({ error: 'Failed to change password' })
+  }
+})
+
+// ===========================
+// PASSWORD RESET AND ACCOUNT ACTIVATION
+// ===========================
+
+/**
+ * Starts a password reset. Always answers 202 with the same words, whether
+ * or not the address has an account, so this cannot be used to discover who
+ * has one.
+ */
+router.post('/password/forgot', accountLimiter, async (req: Request, res: Response) => {
+  const { email, platform } = req.body ?? {}
+  if (typeof email !== 'string' || !email.includes('@') || email.length > 255 ||
+      !['school', 'corporate'].includes(platform)) {
+    return res.status(400).json({ error: 'Enter your email address and choose your platform' })
+  }
+  // The work happens after the answer is sent, so neither the answer nor how
+  // long it takes depends on whether the account exists. Errors are logged,
+  // not reported, for the same reason.
+  query(`SELECT id FROM platforms WHERE name = $1`, [platform])
+    .then((p) => (p.rows.length > 0 ? requestPasswordReset(email, p.rows[0].id) : undefined))
+    .catch((error) => logError('Password reset request', error))
+  return res.status(202).json({
+    message: 'If an account uses that address, we have sent it a link to reset the password. The link works for 30 minutes.',
+  })
+})
+
+function tokenRefusal(res: Response, error: unknown) {
+  if (error instanceof AccountTokenError) {
+    return res.status(error.status).json({ error: error.message, problems: error.problems })
+  }
+  logError('Account token', error)
+  return res.status(500).json({ error: 'Something went wrong. Please try again.' })
+}
+
+router.post('/password/reset', accountLimiter, async (req: Request, res: Response) => {
+  const { token, password, confirmPassword } = req.body ?? {}
+  if (typeof password !== 'string' || password !== confirmPassword) {
+    return res.status(400).json({ error: 'The passwords do not match' })
+  }
+  try {
+    await redeemToken('password_reset', token, password)
+    return res.json({ message: 'Your password has been changed. Sign in with the new one.' })
+  } catch (error) {
+    return tokenRefusal(res, error)
+  }
+})
+
+router.post('/activate', accountLimiter, async (req: Request, res: Response) => {
+  const { token, password, confirmPassword } = req.body ?? {}
+  if (typeof password !== 'string' || password !== confirmPassword) {
+    return res.status(400).json({ error: 'The passwords do not match' })
+  }
+  try {
+    await redeemToken('account_activation', token, password)
+    return res.json({ message: 'Your account is ready. Sign in with the password you chose.' })
+  } catch (error) {
+    return tokenRefusal(res, error)
+  }
+})
+
+// ===========================
+// SESSIONS
+// ===========================
+
+/** The caller's own signed-in devices. */
+router.get('/sessions', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const r = await query(
+      `SELECT id, created_at, last_used_at, expires_at, created_ip, user_agent
+         FROM auth_sessions
+        WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+        ORDER BY last_used_at DESC`,
+      [req.user!.userId]
+    )
+    return res.json({
+      sessions: r.rows.map((s: any) => ({
+        id: s.id,
+        createdAt: s.created_at,
+        lastUsedAt: s.last_used_at,
+        expiresAt: s.expires_at,
+        ip: s.created_ip,
+        userAgent: s.user_agent,
+        current: s.id === req.user!.sessionId,
+      })),
+    })
+  } catch (error) {
+    logError('List sessions', error)
+    return res.status(500).json({ error: 'Failed to load sessions' })
+  }
+})
+
+/** Signs out one of the caller's own devices. Another user's session reads as missing. */
+router.delete('/sessions/:sessionId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const r = await query(
+      `UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, revoked_reason = 'signed_out_by_user'
+        WHERE id::text = $1 AND user_id = $2 AND revoked_at IS NULL
+        RETURNING id`,
+      [req.params.sessionId, req.user!.userId]
+    )
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Session not found' })
+    return res.json({ message: 'Signed out of that device' })
+  } catch (error) {
+    logError('Revoke session', error)
+    return res.status(500).json({ error: 'Failed to sign out that device' })
   }
 })
 
@@ -480,7 +529,7 @@ interface SuperadminRegisterRequest extends Request {
 // SECURITY: Superadmin registration is gated â€” only works if:
 // 1. No superadmin exists yet (bootstrap mode), OR
 // 2. Request includes a valid SUPERADMIN_BOOTSTRAP_TOKEN from env
-router.post('/register-superadmin', async (req: SuperadminRegisterRequest, res: Response) => {
+router.post('/register-superadmin', accountLimiter, async (req: SuperadminRegisterRequest, res: Response) => {
   try {
     const { email, fullName, password, confirmPassword } = req.body
 
@@ -493,8 +542,9 @@ router.post('/register-superadmin', async (req: SuperadminRegisterRequest, res: 
       return res.status(400).json({ error: 'Passwords do not match' })
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    const problems = checkPassword(password, { email, name: fullName })
+    if (problems.length > 0) {
+      return res.status(400).json({ error: 'Choose a stronger password', problems })
     }
 
     // SECURITY GATE: Check if any superadmin already exists
@@ -505,12 +555,20 @@ router.post('/register-superadmin', async (req: SuperadminRegisterRequest, res: 
     )
     const superadminCount = parseInt(anySuperadminResult.rows[0].cnt, 10)
 
-    if (superadminCount > 0) {
-      // A superadmin already exists â€” require bootstrap token
+    // In production the bootstrap token is always required: otherwise whoever
+    // reaches a fresh deployment first becomes its superadmin. Elsewhere the
+    // first superadmin may be created without it.
+    if (superadminCount > 0 || process.env.NODE_ENV === 'production') {
       const bootstrapToken = process.env.SUPERADMIN_BOOTSTRAP_TOKEN
-      const providedToken = req.headers['x-bootstrap-token'] as string
+      const providedToken = req.headers['x-bootstrap-token']
 
-      if (!bootstrapToken || !providedToken || providedToken !== bootstrapToken) {
+      const matches = typeof bootstrapToken === 'string' && bootstrapToken.length >= 32 &&
+        typeof providedToken === 'string' &&
+        crypto.timingSafeEqual(
+          crypto.createHash('sha256').update(providedToken).digest(),
+          crypto.createHash('sha256').update(bootstrapToken).digest()
+        )
+      if (!matches) {
         return res.status(403).json({ error: 'Superadmin registration is disabled. Contact the existing superadmin.' })
       }
     }
@@ -598,70 +656,48 @@ interface SuperadminLoginRequest extends Request {
   }
 }
 
-router.post('/login-superadmin', async (req: SuperadminLoginRequest, res: Response) => {
+router.post('/login-superadmin', loginLimiter, async (req: SuperadminLoginRequest, res: Response) => {
   try {
     const { email, password } = req.body
 
-    // Validation
-    if (!email || !password) {
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    // Get system platform
-    const platformResult = await query(
-      `SELECT id FROM platforms WHERE name = 'system'`
-    )
-
+    const platformResult = await query(`SELECT id FROM platforms WHERE name = 'system'`)
     if (platformResult.rows.length === 0) {
       return res.status(500).json({ error: 'System platform not configured' })
     }
 
-    const systemPlatformId = platformResult.rows[0].id
-
-    // Find superadmin user
-    const userResult = await query(
-      `SELECT u.*, r.name as role_name, r.permissions FROM users u
-       JOIN roles r ON u.role_id = r.id
-       WHERE u.email = $1 AND u.platform_id = $2 AND r.name = 'superadmin' AND u.is_active = true`,
-      [email, systemPlatformId]
-    )
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password' })
+    // Same checks, throttling and lockout as every other sign-in. Only a
+    // platform superadmin gets through: anyone else's correct password on
+    // this page reads as a wrong one.
+    const { user, accessToken, refreshToken } =
+      await loginUser(email, password, platformResult.rows[0].id, sessionMeta(req)).catch((e) => {
+        if (e instanceof LoginError && e.code === 'platform_mismatch') {
+          throw new LoginError('invalid', 'Invalid email or password')
+        }
+        throw e
+      })
+    const u: any = user
+    if (u.role_name !== 'superadmin' || u.platform_name !== 'system') {
+      return res.status(401).json({ error: ErrorMessages.AUTH_INVALID_CREDENTIALS })
     }
-
-    const user = userResult.rows[0]
-
-    // Verify password
-    const isValidPassword = await verifyPassword(password, user.password_hash)
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid email or password' })
-    }
-
-    // Generate tokens
-    const accessToken = generateAccessToken(user.id, user.platform_id, user.role_id)
-    const refreshToken = generateRefreshToken(user.id)
-
-    // Update last_login
-    await query(
-      `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`,
-      [user.id]
-    )
 
     return res.json({
       message: 'Superadmin login successful',
       user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role_name,
-        permissions: user.permissions || []
+        id: u.id,
+        email: u.email,
+        fullName: u.full_name,
+        role: u.role_name,
+        permissions: u.permissions || []
       },
       accessToken,
       refreshToken
     })
   } catch (error: any) {
-    return res.status(500).json({ error: 'Login failed' })
+    return loginRefusal(res, error)
   }
 })
 
@@ -675,41 +711,45 @@ interface RefreshRequest extends Request {
   }
 }
 
-router.post('/refresh', async (req: RefreshRequest, res: Response) => {
+/**
+ * Exchanges a refresh token for a new access token and a new refresh token.
+ * The old refresh token stops working. A browser with two tabs refreshing at
+ * once gets 409 on the slower one and should retry with the token the faster
+ * one stored.
+ */
+router.post('/refresh', refreshLimiter, async (req: RefreshRequest, res: Response) => {
   try {
-    const { refreshToken } = req.body
+    const { refreshToken } = req.body ?? {}
 
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token required' })
     }
 
-    // Verify refresh token
-    const decoded = verifyRefreshToken(refreshToken)
-    const userId = decoded.userId
-
-    // Get user and their role info
+    const rotated = await rotateSession(refreshToken)
     const userResult = await query(
-      `SELECT u.*, r.id as role_id FROM users u
-       LEFT JOIN roles r ON u.role_id = r.id
-       WHERE u.id = $1`,
-      [userId]
+      `SELECT id, platform_id, role_id FROM users WHERE id = $1 AND is_active = TRUE`,
+      [rotated.userId]
     )
-
     if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: 'User not found' })
+      await revokeSession(rotated.sessionId, 'account_inactive')
+      return res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'SESSION_ENDED' })
     }
-
     const user = userResult.rows[0]
-
-    // Generate new access token
-    const accessToken = generateAccessToken(user.id, user.platform_id, user.role_id)
 
     return res.json({
       message: 'Token refreshed successfully',
-      accessToken
+      accessToken: generateAccessToken(user.id, user.platform_id, user.role_id, rotated.sessionId),
+      refreshToken: rotated.refreshToken,
     })
   } catch (error: any) {
-    return res.status(403).json({ error: 'Invalid refresh token' })
+    if (error instanceof SessionError && error.code === 'race') {
+      return res.status(409).json({ error: error.message, code: 'REFRESH_RACE' })
+    }
+    if (error instanceof SessionError) {
+      return res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'SESSION_ENDED' })
+    }
+    logError('Refresh', error)
+    return res.status(500).json({ error: 'Failed to refresh the session' })
   }
 })
 
@@ -806,13 +846,29 @@ router.put('/me', authenticateToken, async (req: Request, res: Response) => {
 })
 
 // ===========================
-// LOGOUT ENDPOINT (optional - for client-side cleanup)
+// LOGOUT
 // ===========================
 
-router.post('/logout', authenticateToken, (req: Request, res: Response) => {
-  // JWT is stateless, so logout is mainly client-side (delete tokens)
-  // However, you could implement token blacklisting if needed
-  return res.json({ message: 'Logout successful' })
+/** Ends this session on the server; its access and refresh tokens stop working at once. */
+router.post('/logout', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    await revokeSession(req.user!.sessionId!, 'logout')
+    return res.json({ message: 'Logout successful' })
+  } catch (error) {
+    logError('Logout', error)
+    return res.status(500).json({ error: 'Logout failed' })
+  }
+})
+
+/** Ends every session of the caller's, this one included. */
+router.post('/logout-all', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const ended = await revokeUserSessions(req.user!.userId, 'logout_all')
+    return res.json({ message: 'Signed out everywhere', sessionsEnded: ended })
+  } catch (error) {
+    logError('Logout all', error)
+    return res.status(500).json({ error: 'Logout failed' })
+  }
 })
 
 // ===========================

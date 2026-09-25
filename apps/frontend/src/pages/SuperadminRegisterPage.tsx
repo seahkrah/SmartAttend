@@ -26,8 +26,8 @@ export const SuperadminRegisterPage: React.FC = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 10) {
+      setError('Password must be at least 10 characters');
       return;
     }
 

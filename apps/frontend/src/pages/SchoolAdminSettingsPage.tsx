@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { SessionsPanel } from '../components/accounts/SessionsPanel'
 import { LoadingOverlay } from '../components/LoadingStates'
 import axios from 'axios'
 import NotificationPreferences from '../components/NotificationPreferences'
@@ -408,6 +409,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
           <div className="p-6">
             <NotificationPreferences />
           </div>
+          <SessionsPanel />
         </div>
       </div>
     </>

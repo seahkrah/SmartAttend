@@ -1,6 +1,8 @@
 /** Mints a superadmin access token for manual probing of the control plane. */
 import { query } from '../db/connection.js'
-import { generateAccessToken } from '../auth/authService.js'
+import { issueTokens } from '../auth/authService.js'
+const generateAccessToken = async (id: string, platform_id: string, role_id: string) =>
+  (await issueTokens({ id, platform_id, role_id }, { userAgent: 'e2e fixture' })).accessToken
 
 const r = await query(
   `SELECT u.id, u.platform_id, u.role_id FROM users u
@@ -12,5 +14,5 @@ if (r.rows.length === 0) {
   process.exit(1)
 }
 const u = r.rows[0]
-console.log(generateAccessToken(u.id, u.platform_id, u.role_id))
+console.log(await generateAccessToken(u.id, u.platform_id, u.role_id))
 process.exit(0)

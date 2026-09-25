@@ -177,8 +177,9 @@ co, r = call("POST", "/admin/school/students", AT,
                   email=f"iso.late.a.{RUN}@e2e.test", department="Engineering"))
 check("create student 201", co == 201, f"({co} {r})")
 made_student = r.get('studentId') if co == 201 else None
-check("temporary password returned, not a shared default",
-      isinstance(r, dict) and r.get('temporaryPassword', '') not in ('', 'Password'), f"({r})")
+check("no password is returned; the student is invited to choose one",
+      isinstance(r, dict) and 'temporaryPassword' not in r
+      and r.get('invitation', {}).get('delivery') in ('email', 'simulated'), f"({r})")
 
 # Student numbers are unique per school, so B may reuse A's.
 co, r = call("POST", "/admin/school/students", BT,
@@ -239,6 +240,15 @@ check("a lecturer account is removed", co == 200 and r.get('removed') is True, f
 check("and, belonging nowhere else, deactivated", r.get('accountDeactivated') is True, f"({r})")
 co, r = call("GET", "/admin/school/users", AT)
 check("and no longer listed", co == 200 and all(u['id'] != leaver for u in r.get('users', [])), f"({co})")
+# The audit write used to be refused by the table's constraint (it was given
+# the role name 'admin') and the failure was only logged, so nothing recorded
+# who removed whom.
+time.sleep(0.5)
+audited = subprocess.run(
+    ["psql", os.environ.get("DATABASE_URL", "postgresql://jjelo@127.0.0.1:55432/jjelotech_dev"), "-Atc",
+     f"SELECT COUNT(*) FROM audit_logs WHERE action_type = 'USER_REMOVED_FROM_TENANT' AND resource_id = '{leaver}'"],
+    capture_output=True, text=True).stdout.strip()
+check("the removal is in the audit trail", audited == '1', f"({audited})")
 
 # ---------------------------------------------------------------- enrolments
 print("-- enrolments --")

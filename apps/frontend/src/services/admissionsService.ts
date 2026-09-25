@@ -1,3 +1,4 @@
+import type { InvitationResult } from '../components/accounts/InvitationDialog';
 import { axiosClient } from '../utils/axiosClient';
 
 /**
@@ -180,8 +181,8 @@ export interface AdmissionsOverview {
 export interface EnrolmentResult {
   application: Application;
   student: { id: string; userId: string; studentId: string };
-  /** Shown once, at enrolment. The account must reset it on first login. */
-  temporaryPassword: string;
+  /** How the new student will get into their account; nobody else learns the password. */
+  invitation: InvitationResult;
 }
 
 export const admissionsService = {

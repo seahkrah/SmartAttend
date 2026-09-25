@@ -1,6 +1,8 @@
 /** Seeds two school tenants with an admin each, and prints their JWTs. */
 import { query } from '../db/connection.js'
-import { generateAccessToken } from '../auth/authService.js'
+import { issueTokens } from '../auth/authService.js'
+const generateAccessToken = async (id: string, platform_id: string, role_id: string) =>
+  (await issueTokens({ id, platform_id, role_id }, { userAgent: 'e2e fixture' })).accessToken
 import bcrypt from 'bcryptjs'
 
 async function main() {
@@ -189,7 +191,7 @@ async function main() {
         `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
          VALUES ($1,$2,$3,(SELECT id FROM roles WHERE platform_id=$1 AND name='student'),$4,true) RETURNING id`,
         [sp.id, `stu${i}.${tag.toLowerCase()}@e2e.test`, `Stu${i} ${tag}`, hash])).rows[0]
-      if (i === 1) studentToken = generateAccessToken(su.id, sp.id, studentRole.id)
+      if (i === 1) studentToken = await generateAccessToken(su.id, sp.id, studentRole.id)
       await query(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1,$2,'active')`,
         [su.id, ent.id])
       const st = (await query(
@@ -205,8 +207,8 @@ async function main() {
       tenantId: ent.id, deptId: dept.id, semId: sem.id, courseId: course.id, facultyId: fac.id,
       scheduleId: sched.id, students: studentIds,
       studentToken,
-      token: generateAccessToken(admin.id, sp.id, adminRole.id),
-      facToken: generateAccessToken(fuser.id, sp.id, facRole.id),
+      token: await generateAccessToken(admin.id, sp.id, adminRole.id),
+      facToken: await generateAccessToken(fuser.id, sp.id, facRole.id),
     }
   }
   console.log(JSON.stringify(out))

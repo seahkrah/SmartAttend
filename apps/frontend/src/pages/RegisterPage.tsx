@@ -21,13 +21,13 @@ export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
 
   const schoolRoles = [
-    { value: 'student', label: 'Student', requiresApproval: false },
+    { value: 'student', label: 'Student', requiresApproval: true },
     { value: 'faculty', label: 'Faculty', requiresApproval: true },
     { value: 'it', label: 'IT Administrator', requiresApproval: true }
   ];
 
   const corporateRoles = [
-    { value: 'employee', label: 'Employee', requiresApproval: false },
+    { value: 'employee', label: 'Employee', requiresApproval: true },
     { value: 'it', label: 'IT Administrator', requiresApproval: true },
     { value: 'hr', label: 'HR Administrator', requiresApproval: true }
   ];
@@ -49,8 +49,8 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 10) {
+      setError('Password must be at least 10 characters');
       return;
     }
 
@@ -92,7 +92,8 @@ export const RegisterPage: React.FC = () => {
         }, 2000);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      const data = err.response?.data;
+      setError([data?.error || 'Registration failed. Please try again.', ...(data?.problems ?? [])].join(' '));
     } finally {
       setLoading(false);
     }

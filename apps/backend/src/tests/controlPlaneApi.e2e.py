@@ -129,7 +129,9 @@ co, r = call("POST", "/tenant-admins", SU,
              {"tenantId": school, "email": f"head.{RUN}@sa2e.test", "fullName": "Head Teacher"})
 check("appoint an administrator", co == 201, f"({co} {r})")
 admin_one = r.get('admin', {}).get('id') if co == 201 else None
-check("a one-time password is issued", bool(r.get('temporaryPassword')), f"({co})")
+check("no password is issued; the administrator is invited",
+      'temporaryPassword' not in r and r.get('invitation', {}).get('delivery') in ('email', 'simulated'),
+      f"({co} {r})")
 
 co, r = call("POST", "/tenant-admins", SU,
              {"tenantId": school, "email": f"head.{RUN}@sa2e.test", "fullName": "Again"})

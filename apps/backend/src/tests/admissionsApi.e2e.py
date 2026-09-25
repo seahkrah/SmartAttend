@@ -315,8 +315,9 @@ check("enrol the accepted applicant", co == 201, f"({co} {r})")
 enrolled = r if co == 201 else {}
 student_id = enrolled.get('student', {}).get('id')
 check("enrolment produces a student", bool(student_id), f"({co} {r})")
-check("enrolment issues a one-time password",
-      bool(enrolled.get('temporaryPassword')), f"({co})")
+check("enrolment invites the student instead of issuing a password",
+      'temporaryPassword' not in enrolled
+      and enrolled.get('invitation', {}).get('delivery') in ('email', 'simulated'), f"({co} {r})")
 check("the application is now enrolled",
       enrolled.get('application', {}).get('status') == 'enrolled', f"({co} {r})")
 check("the application points at the student it produced",

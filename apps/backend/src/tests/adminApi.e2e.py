@@ -48,7 +48,10 @@ print("\n-- user creation + validation --")
 c,r=call("POST","/users",A['token'],{"email":"bad","name":"X","role":"STUDENT"}); check("rejects bad email", c==400, f"({c})")
 c,r=call("POST","/users",A['token'],{"email":"esc@e2e.test","name":"Esc","role":"ADMIN"}); check("refuses admin escalation", c==403, f"({c})")
 c,r=call("POST","/users",A['token'],{"email":"new.a@e2e.test","name":"New A","role":"STUDENT"}); check("creates user", c in (201,409), f"({c} {r})")
-check("returns temporary password", c==409 or (isinstance(r,dict) and 'temporary_password' in r), f"({list(r) if isinstance(r,dict) else r})")
+check("invites the person rather than returning a password",
+      c==409 or (isinstance(r,dict) and 'temporary_password' not in r and 'password' not in r
+                 and r.get('invitation', {}).get('delivery') in ('email', 'simulated')),
+      f"({list(r) if isinstance(r,dict) else r})")
 newid = r.get('id') if isinstance(r,dict) and c==201 else None
 c,r=call("POST","/users",A['token'],{"email":"new.a@e2e.test","name":"Dup","role":"STUDENT"}); check("duplicate email 409", c==409, f"({c})")
 c,r=call("GET","/users",B['token'])

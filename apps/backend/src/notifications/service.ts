@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg'
 import pool, { query } from '../db/connection.js'
 import {
-  DEFAULT_TEMPLATES, categoryFor, defaultChannelsFor, defaultTemplate,
+  DEFAULT_TEMPLATES, SENSITIVE_EVENTS, categoryFor, defaultChannelsFor, defaultTemplate,
   type TemplateDefinition,
 } from './templates.js'
 import { render, tidy, variablesIn } from './render.js'
@@ -181,6 +181,9 @@ export async function resolveTemplate(
   channel: Channel,
   locale = 'en'
 ): Promise<ResolvedTemplate | null> {
+  const fixed = SENSITIVE_EVENTS.has(eventKey) ? defaultTemplate(eventKey, channel) : undefined
+  if (fixed !== undefined) return fixed ? { ...fixed, source: 'default' } : null
+
   const own = await runner.query(
     `SELECT subject, body FROM notification_templates
       WHERE tenant_id = $1 AND event_key = $2 AND channel = $3 AND locale = $4

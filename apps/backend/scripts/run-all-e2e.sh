@@ -53,8 +53,9 @@ SUITES=(
   controlPlaneApi
   filesApi
   faceMatchingApi
-  # Last: it creates employee and student records that earlier suites'
+  # These last two create employee and student records that earlier suites'
   # exact headcounts do not expect. The next run's fixtures remove them.
+  accountSecurity
   crossTenantAudit
 )
 

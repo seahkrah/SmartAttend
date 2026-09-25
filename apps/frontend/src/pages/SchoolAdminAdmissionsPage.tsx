@@ -4,6 +4,8 @@ import {
   CheckCircle2, Clock, FileText, History, GraduationCap,
 } from 'lucide-react';
 import { useToastStore } from '../components/Toast';
+import { apiClient } from '../services/api';
+import { InvitationDialog, type InvitationResult } from '../components/accounts/InvitationDialog';
 import { useConfirmDialog } from '../components/useConfirmDialog';
 import { getErrorMessage } from '../utils/errorHandler';
 import { LoadingOverlay } from '../components/LoadingStates';
@@ -87,6 +89,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'' | ApplicationStatus>('');
 
   const [detail, setDetail] = useState<ApplicationDetail | null>(null);
+  const [invite, setInvite] = useState<{ userId: string; name: string; invitation: InvitationResult | null } | null>(null);
   const [events, setEvents] = useState<ApplicationEvent[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [funnel, setFunnel] = useState<IntakeFunnel | null>(null);
@@ -363,13 +366,11 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
       await openApplication(detail.application.id);
       await loadApplications();
       void refreshCounts();
-      // The password is shown once and never retrievable afterwards, so it
-      // needs to stay on screen until the registrar dismisses it.
-      addToast({
-        type: 'success',
-        title: `Enrolled as ${result.student.studentId}`,
-        message: `One-time password: ${result.temporaryPassword} — the student must change it on first login.`,
-        duration: null,
+      addToast({ type: 'success', title: `Enrolled as ${result.student.studentId}` });
+      setInvite({
+        userId: result.student.userId,
+        name: `${detail.application.first_name ?? ''} ${detail.application.last_name ?? ''}`.trim() || result.student.studentId,
+        invitation: result.invitation,
       });
     } catch (error) {
       addToast({ type: 'error', title: 'Could not enrol', message: getErrorMessage(error) });
@@ -456,6 +457,15 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
 
   return (
     <>
+      {invite && (
+        <InvitationDialog
+          personName={invite.name}
+          invitation={invite.invitation}
+          issue={async (handover) =>
+            (await apiClient.post(`/auth/admin/school/users/${invite.userId}/invitation`, { handover })).data.invitation}
+          onClose={() => setInvite(null)}
+        />
+      )}
       <ConfirmDialog />
 
       <div className="flex items-start justify-between gap-4 mb-6">

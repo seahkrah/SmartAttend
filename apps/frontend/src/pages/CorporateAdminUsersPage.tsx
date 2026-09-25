@@ -10,6 +10,8 @@ import {
   X, Loader2,
 } from 'lucide-react'
 import axios from 'axios'
+import { apiClient } from '../services/api'
+import { InvitationDialog, type InvitationResult } from '../components/accounts/InvitationDialog'
 
 interface Employee {
   id: string
@@ -25,6 +27,7 @@ interface Employee {
   department_id: string | null
   user_id: string | null
   user_email: string | null
+  awaiting_setup?: boolean
 }
 
 interface Department {
@@ -51,6 +54,7 @@ const CorporateAdminUsersPage: React.FC = () => {
   const [deptFilter, setDeptFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [invite, setInvite] = useState<{ employeeId: string; name: string; invitation: InvitationResult | null } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [total, setTotal] = useState(0)
@@ -104,7 +108,7 @@ const CorporateAdminUsersPage: React.FC = () => {
     try {
       setSaving(true)
       setError('')
-      const res = await axios.post('/api/corporate/admin/employees', {
+      const res = await apiClient.post('/corporate/admin/employees', {
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
@@ -113,13 +117,10 @@ const CorporateAdminUsersPage: React.FC = () => {
         designation: form.designation || undefined,
         employmentType: form.employmentType || 'full_time',
         dateOfJoining: form.dateOfJoining || undefined,
-      }, { headers })
-      const password = res.data.defaultPassword
+      })
       setShowAddModal(false)
+      setInvite({ employeeId: res.data.data.id, name: `${form.firstName} ${form.lastName}`, invitation: res.data.invitation ?? null })
       setForm({ firstName: '', lastName: '', email: '', phone: '', designation: '', departmentId: '', dateOfJoining: '', employmentType: 'full_time' })
-      if (password) {
-        alert(`Employee created! Default password: ${password}\nThey will be prompted to change it on first login.`)
-      }
       fetchEmployees()
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to add employee')
@@ -153,6 +154,15 @@ const CorporateAdminUsersPage: React.FC = () => {
 
   return (
     <>
+      {invite && (
+        <InvitationDialog
+          personName={invite.name}
+          invitation={invite.invitation}
+          issue={async (handover) =>
+            (await apiClient.post(`/corporate/admin/employees/${invite.employeeId}/invitation`, { handover })).data.invitation}
+          onClose={() => { setInvite(null); fetchEmployees() }}
+        />
+      )}
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -267,13 +277,27 @@ const CorporateAdminUsersPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">
                         <StatusBadge status={emp.is_currently_employed ? 'active' : 'terminated'} />
+                        {emp.awaiting_setup && emp.is_currently_employed && (
+                          <span className="ml-2 px-2 py-0.5 rounded-full text-xs border border-sky-500/40 bg-sky-500/10 text-sky-300">
+                            Awaiting setup
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <span className="text-sm text-slate-400">
                           {emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString() : '—'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right space-x-3">
+                        {emp.awaiting_setup && emp.is_currently_employed && (
+                          <button
+                            onClick={() => setInvite({ employeeId: emp.id, name: `${emp.first_name} ${emp.last_name}`, invitation: null })}
+                            className="text-xs text-sky-300 hover:text-sky-200"
+                            title="Send a new invitation"
+                          >
+                            Invite
+                          </button>
+                        )}
                         {emp.is_currently_employed && (
                           <button
                             onClick={() => handleTerminate(emp.id)}

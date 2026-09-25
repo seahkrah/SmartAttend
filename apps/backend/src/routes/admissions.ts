@@ -742,7 +742,7 @@ router.post('/applications/:applicationId/enrol', async (req: TenantRequest, res
         userId: result.userId,
         studentId: result.studentNumber,
       },
-      temporaryPassword: result.temporaryPassword,
+      invitation: result.invitation,
     })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined)

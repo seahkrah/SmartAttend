@@ -4,6 +4,8 @@
  * Organization profile management, admin info
  */
 
+import { apiClient } from '../services/api';
+import { SessionsPanel } from '../components/accounts/SessionsPanel'
 import React, { useState, useEffect } from 'react'
 import {
   Save, Building2, Mail, Phone, MapPin,
@@ -97,8 +99,8 @@ const CorporateAdminSettingsPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     setSuccess(false);
-    if (!newPassword || newPassword.length < 8) {
-      setError('New password must be at least 8 characters.');
+    if (!currentPassword || !newPassword) {
+      setError('Enter your current password and a new one.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -107,23 +109,17 @@ const CorporateAdminSettingsPage: React.FC = () => {
     }
     setLoadingPassword(true);
     try {
-      // Replace with your actual API call
-      const res = await fetch('/api/corporate-admin/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to reset password.');
-      } else {
-        setSuccess(true);
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      }
-    } catch (err) {
-      setError('Network error.');
+      // This called /api/corporate-admin/reset-password, which never existed,
+      // without any credentials, so no corporate administrator could change
+      // their password here.
+      await apiClient.post('/auth/change-password', { currentPassword, newPassword, confirmPassword });
+      setSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      const data = err?.response?.data;
+      setError([data?.error ?? 'Failed to change password.', ...(data?.problems ?? [])].join(' '));
     } finally {
       setLoadingPassword(false);
     }
@@ -327,6 +323,7 @@ const CorporateAdminSettingsPage: React.FC = () => {
           <div className="p-6">
             <NotificationPreferences />
           </div>
+          <SessionsPanel />
         </div>
       </div>
     </>

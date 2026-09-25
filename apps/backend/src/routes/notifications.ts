@@ -17,7 +17,7 @@ import {
   runOnce,
   suppress,
 } from '../notifications/service.js'
-import { DEFAULT_TEMPLATES, knownEventKeys } from '../notifications/templates.js'
+import { DEFAULT_TEMPLATES, SENSITIVE_EVENTS, knownEventKeys } from '../notifications/templates.js'
 import { render, variablesIn } from '../notifications/render.js'
 import type { Channel } from '../notifications/types.js'
 
@@ -425,6 +425,8 @@ router.get('/templates', admin, async (req: TenantRequest, res: Response) => {
           body: override?.body ?? def.body,
           templateId: override?.id ?? null,
           isActive: override ? override.is_active : true,
+          // Carries a password link; the wording is fixed.
+          locked: SENSITIVE_EVENTS.has(eventKey),
         }
       }),
     }))
@@ -456,6 +458,11 @@ router.put('/templates', admin, async (req: TenantRequest, res: Response) => {
       return res.status(400).json({
         error: `'${b.eventKey}' is not an event this system raises`,
         knownEvents: knownEventKeys(),
+      })
+    }
+    if (SENSITIVE_EVENTS.has(b.eventKey)) {
+      return res.status(403).json({
+        error: 'This message carries a password link, so its wording cannot be changed',
       })
     }
 
@@ -606,6 +613,16 @@ router.get('/messages/:messageId', admin, async (req: TenantRequest, res: Respon
       [messageId, ctx.tenantId]
     )
     if (message.rowCount === 0) return notFound(res, 'Message')
+    const msg = message.rows[0]
+    // An invitation or reset carries a link that sets the recipient's
+    // password. Showing it to an administrator would let them take over the
+    // account, so the body never leaves the outbox.
+    if (SENSITIVE_EVENTS.has(msg.event_key)) {
+      msg.body = null
+      msg.body_withheld = true
+      if (msg.payload !== undefined) msg.payload = null
+      if (msg.data !== undefined) msg.data = null
+    }
 
     const attempts = await query(
       `SELECT * FROM notification_deliveries
@@ -613,7 +630,7 @@ router.get('/messages/:messageId', admin, async (req: TenantRequest, res: Respon
       [messageId, ctx.tenantId]
     )
 
-    return res.json({ message: message.rows[0], attempts: attempts.rows })
+    return res.json({ message: msg, attempts: attempts.rows })
   } catch (e) {
     return fail(res, 'load that message', e)
   }

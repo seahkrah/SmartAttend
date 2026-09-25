@@ -10,6 +10,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { recoverSession, endSession, isSessionlessAuthCall } from './sessionRefresh';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -53,7 +54,15 @@ axiosClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
+  // Load-bearing. With any asynchronous request interceptor, axios 1.13
+  // chains the response interceptors as `.catch(handler).then(() => previous
+  // result)`, discarding what an error handler returns. The retry after a
+  // token refresh then resolved to the request's config instead of its
+  // response, so every call that needed a refresh came back with no data.
+  // Marked synchronous (it is), axios uses its other path, where a
+  // recovering error handler's result is the call's result.
+  { synchronous: true }
 );
 
 /**
@@ -70,40 +79,19 @@ axiosClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // Handle 401 Unauthorized — try token refresh once
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    // A 401 means the access token expired or the session ended. Try to
+    // renew it once; if that fails the session is over.
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry
+        && !isSessionlessAuthCall(originalRequest.url)) {
       originalRequest._retry = true;
-
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
-        try {
-          const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-          const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
-
-          // Store new tokens
-          localStorage.setItem('accessToken', accessToken);
-          if (newRefreshToken) {
-            localStorage.setItem('refreshToken', newRefreshToken);
-          }
-
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return axiosClient(originalRequest);
-        } catch (refreshError) {
-          // Refresh failed — clear auth and redirect to login
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return Promise.reject(refreshError);
-        }
-      } else {
-        // No refresh token — clear auth and redirect
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+      const failedWith = String(originalRequest.headers?.Authorization ?? '').replace(/^Bearer /, '') || null;
+      const accessToken = await recoverSession(API_BASE_URL, failedWith);
+      if (accessToken) {
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return axiosClient(originalRequest);
       }
+      endSession();
+      return Promise.reject(error);
     }
 
     // Handle 403 Forbidden (role/permission denied)

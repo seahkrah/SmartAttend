@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { SessionsPanel } from '../components/accounts/SessionsPanel'
 import { axiosClient } from '../utils/axiosClient'
 import { useToastStore } from '../components/Toast'
 import { useAuthStore } from '../store/authStore'
@@ -92,8 +93,8 @@ export const StudentSettingsPage: React.FC = () => {
       addToast({ type: 'error', title: 'Error', message: 'All password fields are required' })
       return
     }
-    if (newPassword.length < 8) {
-      addToast({ type: 'error', title: 'Error', message: 'New password must be at least 8 characters' })
+    if (newPassword.length < 10) {
+      addToast({ type: 'error', title: 'Error', message: 'New password must be at least 10 characters' })
       return
     }
     if (newPassword !== confirmPassword) {
@@ -117,7 +118,8 @@ export const StudentSettingsPage: React.FC = () => {
       setNewPassword('')
       setConfirmPassword('')
     } catch (err: any) {
-      addToast({ type: 'error', title: 'Error', message: err.response?.data?.error || 'Failed to change password' })
+      const data = err.response?.data
+      addToast({ type: 'error', title: 'Error', message: [data?.error || 'Failed to change password', ...(data?.problems ?? [])].join(' ') })
     } finally {
       setPasswordSaving(false)
     }
@@ -263,7 +265,7 @@ export const StudentSettingsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               🔒 Change Password
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Update your login password. Must be at least 8 characters.</p>
+            <p className="text-xs text-slate-400 mt-1">Update your login password. Must be at least 10 characters. Other devices will be signed out.</p>
           </div>
 
           <form onSubmit={handlePasswordChange} className="p-6 space-y-5">
@@ -294,7 +296,7 @@ export const StudentSettingsPage: React.FC = () => {
                   type={showNewPw ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password (min 8 characters)"
+                  placeholder="Enter new password (min 10 characters)"
                   className="w-full bg-slate-900 border border-slate-600 text-white rounded-lg px-3 py-2 pr-10 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                 />
                 <button
@@ -305,8 +307,8 @@ export const StudentSettingsPage: React.FC = () => {
                   {showNewPw ? 'Hide' : 'Show'}
                 </button>
               </div>
-              {newPassword && newPassword.length < 8 && (
-                <p className="text-xs text-amber-400 mt-1">Must be at least 8 characters</p>
+              {newPassword && newPassword.length < 10 && (
+                <p className="text-xs text-amber-400 mt-1">Must be at least 10 characters</p>
               )}
             </div>
 
@@ -351,6 +353,7 @@ export const StudentSettingsPage: React.FC = () => {
           <div className="p-6">
             <NotificationPreferences />
           </div>
+          <SessionsPanel />
         </div>
       </div>
     </>

@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg'
 import { query } from '../db/connection.js'
-import { hashPassword } from '../auth/authService.js'
+import { sendInvitation, unusablePasswordHash, type InvitationResult } from '../auth/accountTokens.js'
 
 /**
  * SMS — admissions.
@@ -376,7 +376,7 @@ export interface EnrolResult {
   studentId: string
   userId: string
   studentNumber: string
-  temporaryPassword: string
+  invitation: InvitationResult
 }
 
 /**
@@ -472,8 +472,8 @@ export async function enrolApplicant(
     throw new AdmissionsError(`Student number ${studentNumber} is already in use`, 409)
   }
 
-  const temporaryPassword = `Adm-${randomSuffix(10)}1!`
-  const hashed = await hashPassword(temporaryPassword)
+  // The student chooses their own password from the invitation sent below.
+  const hashed = await unusablePasswordHash()
   const fullName = applicant.middle_name
     ? `${applicant.first_name} ${applicant.middle_name} ${applicant.last_name}`
     : `${applicant.first_name} ${applicant.last_name}`
@@ -481,7 +481,7 @@ export async function enrolApplicant(
   const user = await client.query(
     `INSERT INTO users (email, full_name, phone, platform_id, role_id, is_active,
                         password_hash, must_reset_password)
-     VALUES ($1, $2, $3, $4, $5, TRUE, $6, TRUE) RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5, TRUE, $6, FALSE) RETURNING id`,
     [applicant.email, fullName, applicant.phone ?? null, ctx.platformId, role.rows[0].id, hashed]
   )
   const userId = user.rows[0].id as string
@@ -544,12 +544,14 @@ export async function enrolApplicant(
     input.note ?? `Enrolled as ${studentNumber}`
   )
 
+  const invitation = await sendInvitation(client, { userId, tenantId: ctx.tenantId, invitedBy: ctx.userId })
+
   return {
     application: updated.rows[0] as ApplicationRow,
     studentId: newStudentId,
     userId,
     studentNumber,
-    temporaryPassword,
+    invitation,
   }
 }
 

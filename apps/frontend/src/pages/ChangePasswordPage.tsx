@@ -5,7 +5,8 @@ import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../components/Toast';
-import { frontendConfig } from '../config/environment';
+import { apiClient } from '../services/api';
+import { FormProblems, PasswordRules } from '../components/auth/AuthShell';
 
 export const ChangePasswordPage: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -14,20 +15,18 @@ export const ChangePasswordPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { user, setUser, token } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
+
+  const [problems, setProblems] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setProblems([]);
 
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       setError('Please fill in all fields.');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters.');
       return;
     }
 
@@ -36,27 +35,11 @@ export const ChangePasswordPage: React.FC = () => {
       return;
     }
 
-    if (newPassword === currentPassword) {
-      setError('New password must be different from current password.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${frontendConfig.apiBaseUrl}/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to change password');
-      }
+      // The server applies the password policy and says what is wrong.
+      const res = await apiClient.post('/auth/change-password', { currentPassword, newPassword, confirmPassword });
+      const ended = Number(res.data?.otherSessionsEnded ?? 0);
 
       // Clear the mustResetPassword flag in the store
       if (user) {
@@ -66,7 +49,9 @@ export const ChangePasswordPage: React.FC = () => {
       addToast({
         type: 'success',
         title: 'Password Changed',
-        message: 'Your password has been updated successfully.',
+        message: ended > 0
+          ? `Your password has been updated and ${ended} other signed-in ${ended === 1 ? 'device was' : 'devices were'} signed out.`
+          : 'Your password has been updated.',
         duration: 4000,
       });
 
@@ -90,7 +75,9 @@ export const ChangePasswordPage: React.FC = () => {
         }
       }, 0);
     } catch (err: any) {
-      setError(err.message || 'Failed to change password');
+      const data = err?.response?.data;
+      setError(data?.error ?? 'Failed to change password');
+      setProblems(Array.isArray(data?.problems) ? data.problems : []);
     } finally {
       setIsSubmitting(false);
     }
@@ -106,17 +93,17 @@ export const ChangePasswordPage: React.FC = () => {
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="w-6 h-6 text-amber-400" />
-            <h2 className="text-xl font-bold text-white">Password Reset Required</h2>
+            <h2 className="text-xl font-bold text-white">
+              {user?.mustResetPassword ? 'Choose a new password' : 'Change password'}
+            </h2>
           </div>
           <p className="text-sm text-slate-300 mb-6">
-            Your account was created with a default password. Please set a new password to continue.
+            {user?.mustResetPassword
+              ? 'Your administrator has asked you to choose a new password before continuing.'
+              : 'Other devices signed in to your account will be signed out.'}
           </p>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg text-red-200 text-sm">
-              {error}
-            </div>
-          )}
+          <div className="mb-4"><FormProblems error={error} problems={problems} /></div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -130,9 +117,6 @@ export const ChangePasswordPage: React.FC = () => {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Enter current password"
               />
-              <p className="text-xs text-slate-400 mt-1">
-                Your default password was provided by your administrator.
-              </p>
             </div>
 
             <div>
@@ -144,7 +128,7 @@ export const ChangePasswordPage: React.FC = () => {
                 name="newPassword"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password (min. 6 characters)"
+                placeholder="At least 10 characters"
               />
             </div>
 
@@ -160,6 +144,8 @@ export const ChangePasswordPage: React.FC = () => {
                 placeholder="Re-enter new password"
               />
             </div>
+
+            <PasswordRules />
 
             <button
               type="submit"

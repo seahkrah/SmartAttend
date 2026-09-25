@@ -1,6 +1,8 @@
 /** Seeds two corporate tenants with HR directors, employees and check-ins. */
 import { query } from '../db/connection.js'
-import { generateAccessToken } from '../auth/authService.js'
+import { issueTokens } from '../auth/authService.js'
+const generateAccessToken = async (id: string, platform_id: string, role_id: string) =>
+  (await issueTokens({ id, platform_id, role_id }, { userAgent: 'e2e fixture' })).accessToken
 import bcrypt from 'bcryptjs'
 
 async function main() {
@@ -82,6 +84,13 @@ async function main() {
   await query(`ALTER TABLE audit_access_log DISABLE TRIGGER USER`)
   await query(`DELETE FROM audit_access_log WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@c2e.test')`)
   await query(`ALTER TABLE audit_access_log ENABLE TRIGGER USER`)
+  // Invitations and setup links an administrator issues are audited, and the
+  // trail is immutable; the fixture suspends that only for its own rows, as
+  // seedTwoTenants does.
+  await query(`ALTER TABLE audit_logs DISABLE TRIGGER USER`)
+  await query(`DELETE FROM audit_logs WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@c2e.test')
+                  OR user_id IN (SELECT id FROM users WHERE email LIKE '%@c2e.test')`)
+  await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)
   await query(`DELETE FROM users WHERE email LIKE '%@c2e.test'`)
   await query(`DELETE FROM corporate_entities WHERE code LIKE 'C2E-%'`)
   await query(`DELETE FROM tenant_settings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
@@ -258,12 +267,12 @@ async function main() {
       timesheetEmpId: tsEmp,
       timesheetWeeks: weeks,
       hrEmpId: hrEmp.id,
-      token: generateAccessToken(hr.id, cp.id, hrRole.id),
-      dirToken: generateAccessToken(dir.id, cp.id, dirRole.id),
-      adminToken: generateAccessToken(admin.id, cp.id, adminRole.id),
-      managerToken: generateAccessToken(mgr.id, cp.id, mgrRole.id),
+      token: await generateAccessToken(hr.id, cp.id, hrRole.id),
+      dirToken: await generateAccessToken(dir.id, cp.id, dirRole.id),
+      adminToken: await generateAccessToken(admin.id, cp.id, adminRole.id),
+      managerToken: await generateAccessToken(mgr.id, cp.id, mgrRole.id),
       managerEmpId: mgrEmp.id,
-      empToken: generateAccessToken(firstEmpUserId!, cp.id, empRole.id),
+      empToken: await generateAccessToken(firstEmpUserId!, cp.id, empRole.id),
       empId: empIds[0],
     }
   }

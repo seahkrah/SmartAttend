@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express'
-import bcrypt from 'bcryptjs'
+import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth/accountTokens.js'
 import { query, getConnection } from '../db/connection.js'
 import { authenticateToken } from '../auth/middleware.js'
 import { auditContextMiddleware } from '../auth/auditContextMiddleware.js'
@@ -699,7 +699,7 @@ router.get('/tenant-admins', async (_req: Request, res: Response) => {
   try {
     const r = await query(
       `SELECT u.id, u.full_name, u.email, u.phone, u.is_active, u.created_at,
-              u.must_reset_password, u.last_login,
+              u.must_reset_password, u.last_login, (u.activated_at IS NULL) AS awaiting_setup,
               m.tenant_id, m.tenant_name, m.platform_kind
          FROM users u
          JOIN roles ro ON ro.id = u.role_id
@@ -777,17 +777,18 @@ router.post('/tenant-admins', async (req: Request, res: Response) => {
       return res.status(409).json({ error: 'An account already exists on that email address' })
     }
 
-    // Issued once, here, and never stored in readable form. The account is
-    // flagged to force a change on first sign-in.
-    const temporary = `Adm-${Math.random().toString(36).slice(2, 10)}A1!`
-    const hashed = await bcrypt.hash(temporary, 12)
+    // The administrator chooses their own password from an invitation. A new
+    // tenant rarely has email set up yet, so the operator may ask for the
+    // one-time setup link instead (`handover`), to pass on directly.
+    const hashed = await unusablePasswordHash()
+    const handover = b.handover === true
 
     await client.query('BEGIN')
 
     const user = await client.query(
       `INSERT INTO users (email, full_name, phone, platform_id, role_id, is_active,
                           password_hash, must_reset_password)
-       VALUES ($1,$2,$3,$4,$5,TRUE,$6,TRUE) RETURNING id, email, full_name`,
+       VALUES ($1,$2,$3,$4,$5,TRUE,$6,FALSE) RETURNING id, email, full_name`,
       [b.email, b.fullName, b.phone || null, platformId, role.rows[0].id, hashed]
     )
     const userId = user.rows[0].id
@@ -808,24 +809,63 @@ router.post('/tenant-admins', async (req: Request, res: Response) => {
       `UPDATE ${entity} SET admin_user_id = COALESCE(admin_user_id, $2) WHERE id = $1`,
       [b.tenantId, userId]
     )
+    const invitation = await sendInvitation(client, {
+      userId, tenantId: b.tenantId, invitedBy: req.user!.userId, handover,
+    })
 
     await client.query('COMMIT')
 
     await audit(req, 'TENANT_ADMIN_CREATE', 'USER', { result: 'SUCCESS' },
-      { type: 'user', id: userId }, { afterState: user.rows[0] }, b.justification)
+      { type: 'user', id: userId }, { afterState: { ...user.rows[0], invitation: invitation.delivery } },
+      b.justification)
     await logAction(req, 'TENANT_ADMIN_CREATE', 'user', userId,
-      { tenantId: b.tenantId, email: b.email })
+      { tenantId: b.tenantId, email: b.email, invitation: invitation.delivery })
 
-    return res.status(201).json({
-      admin: user.rows[0],
-      temporaryPassword: temporary,
-      note: 'Shown once. The account must set a new password at first sign-in.',
-    })
+    return res.status(201).json({ admin: user.rows[0], invitation })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => undefined)
     await audit(req, 'TENANT_ADMIN_CREATE', 'USER',
       { result: 'FAILURE', error: String((e as Error).message) })
     return fail(res, 'create that administrator', e)
+  } finally {
+    client.release()
+  }
+})
+
+/**
+ * A fresh invitation for a tenant administrator who has not signed in yet,
+ * cancelling any earlier one; `handover: true` returns the setup link rather
+ * than emailing it.
+ */
+router.post('/tenant-admins/:adminId/invitation', async (req: Request, res: Response) => {
+  const client = await getConnection()
+  try {
+    const { adminId } = req.params
+    if (!UUID.test(adminId)) return notFound(res, 'Administrator')
+    const admin = await query(
+      `SELECT u.id, m.tenant_id
+         FROM users u JOIN roles r ON r.id = u.role_id
+         JOIN user_tenant_memberships m ON m.user_id = u.id AND m.status = 'active'
+        WHERE u.id = $1 AND r.name = 'admin'
+        LIMIT 1`,
+      [adminId]
+    )
+    if (admin.rowCount === 0) return notFound(res, 'Administrator')
+    const handover = req.body?.handover === true
+
+    await client.query('BEGIN')
+    const invitation = await sendInvitation(client, {
+      userId: adminId, tenantId: admin.rows[0].tenant_id, invitedBy: req.user!.userId, handover,
+    })
+    await client.query('COMMIT')
+
+    await audit(req, handover ? 'TENANT_ADMIN_SETUP_LINK' : 'TENANT_ADMIN_INVITE', 'USER',
+      { result: 'SUCCESS' }, { type: 'user', id: adminId }, { afterState: { delivery: invitation.delivery } })
+    return res.json({ invitation })
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    if (e instanceof AccountTokenError) return res.status(e.status).json({ error: e.message })
+    return fail(res, 'send the invitation', e)
   } finally {
     client.release()
   }

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { apiClient } from '../services/api';
+import { InvitationDialog, type InvitationResult } from '../components/accounts/InvitationDialog';
 import { useToastStore } from '../components/Toast';
 import { getErrorMessage, showSuccess } from '../utils/errorHandler';
 
@@ -27,6 +29,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [invite, setInvite] = useState<{ userId: string; name: string; invitation: InvitationResult | null } | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
@@ -110,11 +113,8 @@ const SchoolAdminStudentsPage: React.FC = () => {
     }
     
     try {
-      const token = localStorage.getItem('accessToken');
-      await axios.post('/api/auth/admin/school/students', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      showSuccess('Student created successfully');
+      const res = await apiClient.post('/auth/admin/school/students', formData);
+      setInvite({ userId: res.data.userId, name: `${formData.firstName} ${formData.lastName}`, invitation: res.data.invitation ?? null });
       setShowAddModal(false);
       resetForm();
       fetchStudents();
@@ -280,6 +280,15 @@ const SchoolAdminStudentsPage: React.FC = () => {
 
   return (
     <>
+      {invite && (
+        <InvitationDialog
+          personName={invite.name}
+          invitation={invite.invitation}
+          issue={async (handover) =>
+            (await apiClient.post(`/auth/admin/school/users/${invite.userId}/invitation`, { handover })).data.invitation}
+          onClose={() => setInvite(null)}
+        />
+      )}
       <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>

@@ -80,7 +80,6 @@ jobs:
     env:
       DATABASE_URL: postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_ci
       JWT_SECRET: ci-only-not-a-real-secret
-      REFRESH_TOKEN_SECRET: ci-only-not-a-real-secret
       # A throwaway key: CI templates are of synthetic test faces and are discarded.
       BIOMETRIC_TEMPLATE_KEY: 3c1e0b7a9f5d2e8c4a6b1d0f7e9c2a5b8d3f6e1c0a9b7d5e2f4c6a8b0d1e3f5a
       PORT: '5000'
@@ -88,6 +87,11 @@ jobs:
       # that writes files does not leave them in the working tree.
       FILE_STORAGE_ROOT: /tmp/ci-file-storage
       FILE_STORAGE_BACKEND: local
+      # Every suite calls from one address; the account endpoints' production
+      # limit (30 per 15 minutes) would throttle the suites themselves. The
+      # limiter's behaviour is covered by a unit test.
+      RATE_LIMIT_ACCOUNT_PER_15MIN: '1000'
+      RATE_LIMIT_LOGIN_PER_MINUTE: '1000'
 
     steps:
       - uses: actions/checkout@v4

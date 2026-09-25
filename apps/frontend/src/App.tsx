@@ -9,6 +9,8 @@ import { SuperadminRegisterPage } from './pages/SuperadminRegisterPage';
 import { SuperadminLoginPage } from './pages/SuperadminLoginPage';
 import HomeRedirect from './components/routing/HomeRedirect';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { SetPasswordPage } from './pages/SetPasswordPage';
 import IncidentDetailPage from './pages/IncidentDetailPage';
 
 // Superadmin Pages
@@ -122,6 +124,9 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/register-superadmin" element={<SuperadminRegisterPage />} />
         <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<SetPasswordPage mode="reset" />} />
+        <Route path="/activate" element={<SetPasswordPage mode="activate" />} />
 
         {/* Unauthorized */}
         <Route

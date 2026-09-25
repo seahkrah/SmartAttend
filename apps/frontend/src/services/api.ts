@@ -1,8 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { frontendConfig } from '../config/environment';
+import { recoverSession, clearStoredSession, isSessionlessAuthCall } from '../utils/sessionRefresh';
 import {
   AuthResponse,
-  RegisterRequest,
   User,
 } from '@jjelotech/types';
 
@@ -10,11 +10,8 @@ const API_BASE_URL = frontendConfig.apiBaseUrl;
 
 class ApiClient {
   private client: AxiosInstance;
-  private token: string | null = null;
 
   constructor() {
-    this.token = localStorage.getItem('accessToken');
-    
     this.client = axios.create({
       baseURL: API_BASE_URL,
       headers: {
@@ -22,43 +19,31 @@ class ApiClient {
       },
     });
 
-    // Add token to requests
+    // The token is read at each request, not cached: another client or tab
+    // may have renewed it since.
+    // `synchronous: true` is load-bearing: see utils/axiosClient.ts.
     this.client.interceptors.request.use((config) => {
-      if (this.token) {
-        config.headers.Authorization = `Bearer ${this.token}`;
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
-    });
+    }, undefined, { synchronous: true });
 
-    // Handle token refresh on 401
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as any;
-        if (error.response?.status === 401 && !originalRequest?._retry) {
-          const refreshToken = localStorage.getItem('refreshToken');
-          if (refreshToken) {
-            originalRequest._retry = true;
-            try {
-              const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-                refreshToken,
-              });
-              const newAccessToken = response.data.accessToken;
-              this.setToken(newAccessToken);
-              localStorage.setItem('accessToken', newAccessToken);
-              
-              // Retry original request with new token
-              if (originalRequest) {
-                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-                return this.client(originalRequest);
-              }
-            } catch (refreshError) {
-              // Refresh failed, clear tokens
-              this.clearToken();
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('refreshToken');
-            }
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry
+            && !isSessionlessAuthCall(originalRequest.url)) {
+          originalRequest._retry = true;
+          const failedWith = String(originalRequest.headers?.Authorization ?? '').replace(/^Bearer /, '') || null;
+          const accessToken = await recoverSession(API_BASE_URL, failedWith);
+          if (accessToken) {
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            return this.client(originalRequest);
           }
+          clearStoredSession();
         }
         return Promise.reject(error);
       }
@@ -66,11 +51,11 @@ class ApiClient {
   }
 
   setToken(token: string) {
-    this.token = token;
+    localStorage.setItem('accessToken', token);
   }
 
   clearToken() {
-    this.token = null;
+    clearStoredSession();
   }
 
   // Generic HTTP methods (use these instead of raw axios to get refresh interceptor)
@@ -98,20 +83,6 @@ class ApiClient {
       email,
       password,
     });
-    
-    if (response.data.accessToken) {
-      this.setToken(response.data.accessToken);
-      localStorage.setItem('accessToken', response.data.accessToken);
-      if (response.data.refreshToken) {
-        localStorage.setItem('refreshToken', response.data.refreshToken);
-      }
-    }
-    
-    return response.data;
-  }
-
-  async register(data: RegisterRequest): Promise<AuthResponse> {
-    const response = await this.client.post<AuthResponse>('/auth/register', data);
     
     if (response.data.accessToken) {
       this.setToken(response.data.accessToken);

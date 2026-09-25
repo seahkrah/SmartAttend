@@ -8,6 +8,13 @@ import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 const { Pool } = pkg;
 
+// These accounts share a published password. They must never exist in a
+// real deployment.
+if (process.env.NODE_ENV === 'production') {
+  console.error('Refusing to create test users with a shared password in production.');
+  process.exit(1);
+}
+
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL is not set. Export it (or source your .env) before running this script.');
   process.exit(1);

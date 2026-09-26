@@ -89,7 +89,7 @@ export const ChangePasswordPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <JjeloTechLogo className="mx-auto mb-4" size="lg" />
+          <JjeloTechLogo className="justify-center mb-4 text-white" size="lg" />
         </div>
 
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10">

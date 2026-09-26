@@ -51,7 +51,7 @@ export const ForgotPasswordPage: React.FC = () => {
                 onClick={() => setPlatform(p)}
                 className={`py-2 rounded-lg border text-sm font-medium ${platform === p
                   ? 'border-primary-500 bg-primary-500/20 text-white' : 'border-slate-700 text-slate-400'}`}>
-                {p === 'school' ? 'School' : 'Corporate'}
+                {p === 'school' ? 'School' : 'Employer'}
               </button>
             ))}
           </div>

@@ -6,7 +6,7 @@ export const AuthShell: React.FC<{ subtitle?: string; children: React.ReactNode 
   <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center px-4">
     <div className="relative z-10 w-full max-w-md">
       <div className="text-center mb-8">
-        <JjeloTechLogo size="lg" showText={true} />
+        <JjeloTechLogo size="lg" className="justify-center text-white" />
         {subtitle && <p className="text-slate-400 mt-4">{subtitle}</p>}
       </div>
       <div className="card mb-6">{children}</div>

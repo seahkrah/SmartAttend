@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, LogOut, Menu, Search } from 'lucide-react';
-import { JjeloTechMark } from '../BrandLogo';
+import { JjeloTechMark, JjeloTechWordmark, BRAND_NAME } from '../BrandLogo';
 import { useAuthStore } from '../../store/authStore';
 import { activeItem, navFor, type NavItem, type Platform } from '../../navigation/navConfig';
 
@@ -62,7 +62,7 @@ const PlatformSwitcher: React.FC<{
 }> = ({ active, available, onSwitch }) => (
   <div className="flex gap-1 p-1 bg-sunken rounded-lg" role="tablist" aria-label="Platform">
     {(['school', 'corporate'] as Platform[]).map(p => {
-      const label = p === 'school' ? 'School' : 'Employees';
+      const label = p === 'school' ? 'School' : 'Employer';
       const isActive = active === p;
       const permitted = available.includes(p);
       return (
@@ -164,6 +164,12 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   const current = activeItem(groups, location.pathname);
 
+  // Each page names itself in the browser tab, so a dozen open tabs are not
+  // a dozen identical titles.
+  React.useEffect(() => {
+    document.title = current ? `${current.label} · ${BRAND_NAME}` : BRAND_NAME;
+  }, [current?.label]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -173,10 +179,10 @@ export const AppShell: React.FC<AppShellProps> = ({
     <nav className="flex flex-col h-full" aria-label="Main">
       <div className="px-4 py-4 border-b border-subtle">
         <Link to={home} className="flex items-center gap-2.5 mb-4">
-          <JjeloTechMark className="w-9 h-9 flex-shrink-0" idSuffix="shell-sidebar" />
+          <JjeloTechMark className="w-10 h-10 flex-shrink-0" title={BRAND_NAME} />
           <span className="min-w-0">
-            <span className="block font-bold text-primary leading-tight">JjeloTech</span>
-            <span className="block text-xs text-muted truncate">
+            <JjeloTechWordmark size="sm" className="text-primary" />
+            <span className="block text-xs text-muted truncate mt-1">
               {nav?.subtitle ?? (isCorporate ? 'Employee management' : 'School management')}
             </span>
           </span>

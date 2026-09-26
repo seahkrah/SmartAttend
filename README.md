@@ -1,7 +1,12 @@
-# JjeloTech
+<p align="center"><img src="apps/frontend/public/logos/favicon.svg" alt="" width="96" /></p>
 
-Multi-tenant attendance and administration for schools (SMS) and employers
-(EMS): a React front end, an Express/TypeScript API and PostgreSQL 16.
+# JJELOTECH SYSTEMS
+
+*Engineering the Dawn of Enterprise Systems.*
+
+A School Management System (SMS) and an Employee Management System (EMS) on
+one multi-tenant platform: a React front end, an Express/TypeScript API and
+PostgreSQL 16.
 
 Every school and every company is a **tenant**. Tenant isolation is enforced
 in two places:

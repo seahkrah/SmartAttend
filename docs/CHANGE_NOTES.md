@@ -5,6 +5,87 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Phase 4: Rebrand to JJELOTECH SYSTEMS (2026-09-26)
+
+### Brand source
+
+The final artwork was supplied during this phase in `logo/`: the "JjeloTech" sun
+and chevron logo with the tagline *Engineering the Dawn of Enterprise Systems*,
+as a 1254-pixel PNG and as a vector trace (`logo/favicon.svg`). The vector is the
+master. `apps/frontend/scripts/brand-assets.mjs` derives every asset from it, so
+changing the artwork means replacing one file and running one command.
+
+| Asset | How it's made |
+|---|---|
+| In-app mark (`BrandLogo.tsx` via `brandMarkPaths.ts`) | The sun and chevron paths only, on a transparent ground, drawn inline. It scales cleanly and works on light and dark themes. |
+| `favicon.svg` | The mark on a dark rounded tile, so the thin rays survive a 16-pixel tab on any browser theme |
+| `favicon-32.png`, `apple-touch-icon.png` | Rasterised from `favicon.svg` in the browser |
+| `jjelotech-logo.svg`, `jjelotech-logo-wordmark.svg` | The full lockup, with and without the tagline, transparent. The trace cuts letter holes with black shapes, so those are applied as an SVG **mask**: the holes are truly transparent rather than black blobs or filled in. |
+
+### What changed
+
+- **Name:** "JJELOTECH SYSTEMS" as the product name, in the browser title, meta
+  description, Open Graph tags, app name and README. Every signed-in page now
+  names itself in its tab ("Guardians · JJELOTECH SYSTEMS"); every tab used to
+  read the same.
+- **Wordmark:** "JJELOTECH / SYSTEMS", set as type so it takes the theme's colours,
+  beside the new mark, in the sidebar and on every sign-in page. The sign-in pages
+  also show the tagline.
+- **Positioning:** "Attendance Made Smart", "Attendance Platform" and "your
+  attendance hub" are replaced. The product is two platforms (SMS and EMS), not an
+  attendance app.
+- **Landing page rewritten:**
+  - It lists only what is built: the SMS and EMS modules, plus the shared
+    foundations.
+  - Removed: developer statistics ("31+ API endpoints", "24 database tables",
+    "100% TypeScript"), the unbacked "thousands of organizations" claim, a "View
+    Demo" button that did nothing, and six footer links to `#`.
+  - The "Powered by SmartCode" credit is kept. SmartCode is the development vendor,
+    and removing a vendor credit is a business decision, not a rebrand one.
+- **Old assets:** the SmartAttend-era favicon and logos are removed from `public/`
+  (still in Git history). The SmartCode vendor logos stay. The `logo/` artwork
+  folder at the repository root isn't touched.
+
+### UI/UX pass
+
+- **Consistent platform naming:** sign-in said "School / Corporate", the app
+  switcher said "School / Employees", and the product says SMS/EMS. All now read
+  **School (SMS) / Employer (EMS)**: sign-in, registration, forgot password,
+  platform-mismatch messages and the switcher.
+- **Scrollbars:** thin scrollbars in the theme's colours everywhere. The platform
+  default (a wide light-grey bar with arrow buttons) sat on every dark sidebar.
+- **Logo centring:** the sign-in, registration, superadmin and change-password
+  screens centred the logo with `text-center`, which doesn't centre a flex row.
+  They're now properly centred.
+- **Phone width (375 px):**
+  - None of the 21 school-admin pages, the landing page or sign-in scroll sideways.
+  - The landing header wrapped "Sign in" and "Request access" onto two lines each.
+    At phone width the header now shows "Sign in" only, and "Request access" moves
+    to a link under the hero.
+  - The SMS/EMS hints on sign-in now line up in both options.
+- **Kept deliberately:** the brand palette. The existing accent (`#f7941d`) and brand
+  blue already match the new logo's orange (`#FE9401`) and blues, so recolouring
+  every component wasn't justified.
+- **White-label emails:** account and notification emails are written in each
+  school's or employer's own name, not the platform's. That's deliberate: the
+  people receiving them know their school, not us.
+
+### Verification
+
+- Frontend build: TypeScript, nav gate (87 entries vs 88 routes, 0 problems),
+  API-contract gate (390 calls vs 501 routes, 0 problems), production build.
+- In the browser: landing, sign-in, the sidebar and not-found checked at desktop
+  and phone width. Favicon and lockup rendered and inspected.
+- A post-rebrand crawl of the school-admin workspace: 21 pages plus a bad address,
+  0 issues.
+- A sweep for old brand strings in the frontend and user-facing backend text: none
+  left. The password policy still refuses passwords built from "smartattend" or
+  "jjelo", on purpose.
+- Dead code noted, not changed: `src/components/Navigation.tsx` isn't imported
+  anywhere.
+
+---
+
 ## Phase 3: Stability and security pass (2026-09-26)
 
 ### How it was checked

@@ -1,26 +1,36 @@
-# JjeloTech brand assets
+# JJELOTECH SYSTEMS brand assets
 
-## The in-app logo is SVG, not a file here
+Every brand asset the app uses comes from one master file: **`logo/favicon.svg`**
+at the repository root, a vector trace of the logo (sun, chevron, "JjeloTech"
+wordmark and the tagline *Engineering the Dawn of Enterprise Systems*).
 
-`src/components/BrandLogo.tsx` draws the mark as inline SVG — it scales
-cleanly, uses the Tailwind palette (`primary-500` → `secondary-500`), and needs
-no raster asset. `JjeloTechMark`, `JjeloTechLogo` and `JjeloTechIcon` are the
-three exports; every screen uses one of them.
+To change the artwork, replace that file and run, in `apps/frontend`:
 
-To switch back to raster artwork, replace the `<svg>` in `JjeloTechMark` with an
-`<img src="/logos/your-file.png" />`. Nothing else needs changing.
+```bash
+node scripts/brand-assets.mjs
+```
+
+The PNG icons are rasterised from `favicon.svg` and need re-exporting at the same
+sizes whenever the mark changes.
 
 ## Files in this folder
 
 | File | Used by | Notes |
 |------|---------|-------|
-| `favicon.png` | `index.html` — favicon and apple-touch-icon | The one raster asset still wired up |
-| `platform-logo.png`, `alt-platform-logo.png` | — | Unreferenced |
-| `brand-logo.png`, `alt-brand-logo.png` | — | SmartCode (development vendor) logo, unreferenced |
+| `favicon.svg` | `index.html`: browser tab icon | The mark on a dark rounded tile. Generated. |
+| `favicon-32.png` | `index.html`: fallback icon | 32×32, rasterised from `favicon.svg` |
+| `apple-touch-icon.png` | `index.html`: iOS home screen and link previews | 180×180, rasterised from `favicon.svg` |
+| `jjelotech-logo-wordmark.svg` | Landing page hero | Mark and wordmark, transparent, for dark backgrounds. Generated. |
+| `jjelotech-logo.svg` | README and documents | As above, with the tagline. Generated. |
+| `brand-logo.png`, `alt-brand-logo.png` | — | SmartCode (development vendor) logos, credited in the landing page footer. Unreferenced. |
 
-Only `apps/frontend/public/` is served by Vite. The `logo/` folder at the
-repository root is an artwork stash — changes there have no effect on the app.
+In the app itself the mark is drawn inline by `src/components/BrandLogo.tsx` from
+`src/components/brandMarkPaths.ts` (also generated), so it needs no image request
+and reads on light and dark surfaces alike.
 
-A file placed directly in `public/` is served from the root, so
-`public/platform-logo.png` would be `/platform-logo.png`, not
-`/logos/platform-logo.png`. Brand assets belong in this folder.
+The SmartAttend-era assets that used to live here (`favicon.png`,
+`platform-logo.png`, `alt-platform-logo.png`, `../favicon 1.svg`) were removed in
+the rebrand. They're still in Git history.
+
+Only `apps/frontend/public/` is served. The `logo/` folder at the repository root
+is the artwork source and isn't served.

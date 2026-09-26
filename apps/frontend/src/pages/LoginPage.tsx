@@ -76,8 +76,8 @@ export const LoginPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <JjeloTechLogo size="lg" showText={true} />
-          <p className="text-slate-400 mt-4">Welcome back to your attendance hub</p>
+          <JjeloTechLogo size="lg" tagline className="justify-center text-white" />
+          <p className="text-slate-400 mt-4">Sign in to your school or organisation</p>
         </div>
 
         {/* Form Card */}
@@ -86,7 +86,7 @@ export const LoginPage: React.FC = () => {
             {/* Platform Selection */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Platform Type
+                Sign in to
               </label>
               <div className="flex gap-3">
                 <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'school' ? '#5d7fff' : undefined }}>
@@ -97,7 +97,7 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">School</span>
+                  <span className="text-slate-300">School <span className="block text-slate-500 text-xs">SMS</span></span>
                 </label>
                 <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'corporate' ? '#5d7fff' : undefined }}>
                   <input
@@ -107,7 +107,7 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">Corporate</span>
+                  <span className="text-slate-300">Employer <span className="block text-slate-500 text-xs">EMS</span></span>
                 </label>
               </div>
             </div>
@@ -153,7 +153,7 @@ export const LoginPage: React.FC = () => {
                   ⚠️ Wrong platform selected
                 </p>
                 <p className="text-amber-200/80 text-sm mb-3">
-                  Your account is registered under the <strong className="text-amber-100">{platformMismatch === 'school' ? 'School' : 'Corporate'}</strong> platform. Please switch to continue.
+                  Your account is registered under the <strong className="text-amber-100">{platformMismatch === 'school' ? 'School' : 'Employer'}</strong> platform. Please switch to continue.
                 </p>
                 <button
                   type="button"
@@ -164,7 +164,7 @@ export const LoginPage: React.FC = () => {
                   }}
                   className="w-full py-2 px-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-200 text-sm font-medium transition-colors"
                 >
-                  Switch to {platformMismatch === 'school' ? 'School' : 'Corporate'} and retry
+                  Switch to {platformMismatch === 'school' ? 'School' : 'Employer'} and retry
                 </button>
               </div>
             )}

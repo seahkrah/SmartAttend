@@ -64,8 +64,8 @@ export const SuperadminLoginPage: React.FC = () => {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <JjeloTechLogo size="lg" showText={true} />
-          <p className="text-slate-400 mt-4">Superadmin Portal</p>
+          <JjeloTechLogo size="lg" className="justify-center text-white" />
+          <p className="text-slate-400 mt-4">Platform operations</p>
         </div>
 
         {/* Form Card */}

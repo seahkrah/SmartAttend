@@ -142,9 +142,9 @@ export const RegisterPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <JjeloTechLogo size="lg" showText={true} />
+          <JjeloTechLogo size="lg" className="justify-center text-white" />
           <h2 className="text-2xl font-bold text-white mt-4 mb-2">Create Account</h2>
-          <p className="text-slate-400">Join JjeloTech with your role</p>
+          <p className="text-slate-400">Request access to your school or organisation</p>
         </div>
 
         {/* Form Card */}
@@ -185,7 +185,7 @@ export const RegisterPage: React.FC = () => {
                       : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600'
                   }`}
                 >
-                  Corporate
+                  Employer
                 </button>
               </div>
             </div>

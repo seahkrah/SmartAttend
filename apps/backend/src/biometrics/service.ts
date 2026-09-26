@@ -22,7 +22,7 @@ import crypto from 'crypto'
 import type { PoolClient } from 'pg'
 import pool, { query } from '../db/connection.js'
 import type { ResolvedTenantContext } from '../auth/tenantContextMiddleware.js'
-import { analyzeFrame, IMAGE_LIMITS, ImageRejected, type FaceObservation } from './engine.js'
+import { analyzeFrame, IMAGE_LIMITS, ImageRejected, EngineUnavailable, type FaceObservation } from './engine.js'
 import { randomSequence, sequenceMatches, type Pose, POSES } from './pose.js'
 import {
   MODEL_ID, THRESHOLDS, clampThreshold, distance, identify as identifyAmong, mean, spread,
@@ -468,6 +468,13 @@ async function analyzeCapture(frames: Buffer[], steps: Pose[]): Promise<Capture 
       analysis = await analyzeFrame(frames[i])
     } catch (e) {
       if (e instanceof ImageRejected) return { reason: `image_${e.code}`, message: `Image ${i + 1}: ${e.message}` }
+      // The server cannot run the engine at all: say so plainly, and let the
+      // operator find the cause in the log rather than in a stack trace.
+      if (e instanceof EngineUnavailable) {
+        console.error('[BIOMETRICS]', e.message)
+        throw new BiometricError(503, 'engine_unavailable',
+          'Face matching is temporarily unavailable on this server. Please try again later or use another method.')
+      }
       throw e
     }
     if (analysis.faces.length === 0) {

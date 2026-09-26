@@ -5,6 +5,7 @@ import express from 'express'
 import dotenv from 'dotenv'
 import { initializeDatabase, query } from './db/connection.js'
 import { pendingMigrations } from './db/migrationStatus.js'
+import { warmUp, engineInfo } from './biometrics/engine.js'
 import { applyHttpSecurity } from './security/httpSecurity.js'
 import { validateProductionConfig } from './config/validateEnv.js'
 import authRoutes from './routes/auth.js'
@@ -186,7 +187,16 @@ app.get('/api/health/ready', async (_req, res) => {
     if (pending.length > 0) {
       return res.status(503).json({ status: 'migrations_pending', pending })
     }
-    return res.json({ status: 'ready' })
+    // Face matching is optional, so a face engine that cannot start degrades
+    // the service rather than taking it out of rotation; it is reported here
+    // so the fault is visible without waiting for someone to try a check-in.
+    const face = engineInfo()
+    return res.json({
+      status: 'ready',
+      components: {
+        faceEngine: { state: face.state, backend: face.backend, error: face.error },
+      },
+    })
   } catch {
     return res.status(503).json({ status: 'database_unavailable' })
   }
@@ -218,6 +228,21 @@ async function startServer() {
       // NOTIFICATION_DISPATCH is 'on', so a test run or a migration script
       // attached to a shared database does not start sending real mail as a
       // side effect of importing this file.
+      // Load the face networks now rather than on the first face check, so a
+      // missing native library is reported at start-up, and the first person
+      // to check in is not the one who waits for the models to load.
+      if (process.env.FACE_ENGINE_WARMUP !== 'off') {
+        warmUp()
+          .then(() => {
+            const e = engineInfo()
+            console.log(`[FACE] engine ready: backend=${e.backend}, TensorFlow ${e.nativeVersion ?? 'unknown'}`)
+            if (e.backend !== 'tensorflow') {
+              console.warn('[FACE] WARNING: not on the native TensorFlow backend; face checks will be very slow')
+            }
+          })
+          .catch((e) => console.error('[FACE] engine unavailable; face matching will answer 503:', e.message))
+      }
+
       if (startDispatcher()) {
         console.log('[SERVER] Notification dispatcher running')
       } else {

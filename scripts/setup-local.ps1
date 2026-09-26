@@ -101,7 +101,21 @@ Step 'Installing the shared types'
 Install $Types
 Run $Types 'npm run build'
 Step 'Installing the API (this includes the face-matching engine and takes a while)'
-Install $Backend
+# A plain `npm ci` fails on Windows: there is no prebuilt TensorFlow binding
+# for Windows, and the node-gyp bundled with npm cannot always find the
+# installed Visual Studio (see apps\backend\scripts\tfjs-native.mjs). So the
+# packages are installed without their install scripts, those scripts are run
+# for everything except the TensorFlow binding, and the binding is built by
+# tfjs-native.mjs, which also proves it loads. Face matching is optional: if
+# the binding cannot be built, setup carries on and says so.
+Run $Backend 'npm ci --no-audit --no-fund --ignore-scripts'
+Push-Location $Backend
+try {
+  $withScripts = npm query ":attr(scripts, [preinstall]), :attr(scripts, [install]), :attr(scripts, [postinstall])" | ConvertFrom-Json
+} finally { Pop-Location }
+$rebuild = $withScripts | Where-Object { $_.location -and $_.name -ne '@tensorflow/tfjs-node' } | ForEach-Object { $_.name } | Sort-Object -Unique
+if ($rebuild) { Run $Backend ('npm rebuild ' + ($rebuild -join ' ')) }
+Run $Backend 'node scripts\tfjs-native.mjs'
 Step 'Installing the web app'
 Install $Frontend
 

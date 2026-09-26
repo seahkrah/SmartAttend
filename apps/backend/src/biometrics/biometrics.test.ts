@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { classifyPose, randomSequence, sequenceMatches, yawRatio, POSES } from './pose.js'
 import { THRESHOLDS, clampThreshold, distance, identify, mean, spread } from './matching.js'
 import { openTemplate, sealTemplate, templateContext, templateKeyConfigured } from './templateCrypto.js'
-import { analyzeFrame, checkImage, imageHeader, ImageRejected, type FaceObservation } from './engine.js'
+import { analyzeFrame, checkImage, engineInfo, imageHeader, ImageRejected, type FaceObservation } from './engine.js'
 
 const FIX = path.join(__dirname, '..', 'tests', 'fixtures', 'faces')
 const img = (name: string) => fs.readFileSync(path.join(FIX, name))
@@ -156,6 +156,17 @@ describe('the engine on real images', () => {
   beforeAll(async () => {
     for (const n of names) faces[n] = (await analyzeFrame(img(`${n}.jpg`))).faces
   }, 120_000)
+
+  // The pure-JavaScript CPU backend gives the same answers two orders of
+  // magnitude slower, so a silent fallback to it would pass every other test
+  // here and fail in production under load.
+  it('runs on the native TensorFlow backend, which face-api shares', () => {
+    const info = engineInfo()
+    expect(info.state).toBe('ready')
+    expect(info.backend).toBe('tensorflow')
+    expect(info.sharedInstance).toBe(true)
+    expect(info.nativeVersion).toMatch(/^\d+\.\d+/)
+  })
 
   it('finds exactly one face where there is one, none or two where there are', () => {
     for (const n of names.filter((x) => x.startsWith('synthetic') || x.startsWith('other'))) {

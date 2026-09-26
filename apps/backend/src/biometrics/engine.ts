@@ -85,7 +85,21 @@ export interface FrameAnalysis {
 // Model loading, once, on first use.
 // ---------------------------------------------------------------------------
 
+/**
+ * The engine could not be started on this server: the native TensorFlow
+ * library failed to load, or the model files are missing. This is a fault in
+ * the deployment, not in the caller's request, so it is reported as such
+ * (503) rather than surfacing as an anonymous 500 on the first face check.
+ */
+export class EngineUnavailable extends Error {
+  constructor(readonly cause: unknown) {
+    super(`The face-matching engine could not start: ${(cause as Error)?.message ?? cause}`)
+  }
+}
+
 let loading: Promise<{ tf: any; faceapi: any }> | null = null
+let loaded: { tf: any; faceapi: any } | null = null
+let lastError: string | null = null
 
 function load(): Promise<{ tf: any; faceapi: any }> {
   if (!loading) {
@@ -96,10 +110,13 @@ function load(): Promise<{ tf: any; faceapi: any }> {
       await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelDir)
       await faceapi.nets.faceLandmark68Net.loadFromDisk(modelDir)
       await faceapi.nets.faceRecognitionNet.loadFromDisk(modelDir)
-      return { tf, faceapi }
+      loaded = { tf, faceapi }
+      lastError = null
+      return loaded
     })().catch((e) => {
       loading = null
-      throw e
+      lastError = (e as Error)?.message ?? String(e)
+      throw new EngineUnavailable(e)
     })
   }
   return loading
@@ -108,6 +125,45 @@ function load(): Promise<{ tf: any; faceapi: any }> {
 /** Loads the networks ahead of the first request, so it is not slow. */
 export async function warmUp(): Promise<void> {
   await load()
+}
+
+export interface EngineInfo {
+  state: 'not_loaded' | 'ready' | 'failed'
+  /** 'tensorflow' is the native library; anything else is a slow fallback. */
+  backend: string | null
+  tfjsVersion: string | null
+  /** The version of the TensorFlow C library the native binding loaded. */
+  nativeVersion: string | null
+  /** face-api runs its networks on the server's own TensorFlow engine. */
+  sharedInstance: boolean
+  error: string | null
+}
+
+/** What the engine is running on, for health checks and the verify script. */
+export function engineInfo(): EngineInfo {
+  if (!loaded) {
+    return {
+      state: lastError ? 'failed' : 'not_loaded',
+      backend: null, tfjsVersion: null, nativeVersion: null, sharedInstance: false, error: lastError,
+    }
+  }
+  const { tf, faceapi } = loaded
+  let nativeVersion: string | null = null
+  try {
+    nativeVersion = tf.backend()?.binding?.TF_Version ?? null
+  } catch {
+    nativeVersion = null
+  }
+  return {
+    state: 'ready',
+    backend: tf.getBackend(),
+    tfjsVersion: tf.version?.['tfjs-core'] ?? null,
+    nativeVersion,
+    // face-api exposes its own namespace object; what matters is that its
+    // kernels run on the same engine (and so the same native backend).
+    sharedInstance: faceapi.tf?.engine?.() === tf.engine(),
+    error: null,
+  }
 }
 
 // ---------------------------------------------------------------------------

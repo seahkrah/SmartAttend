@@ -5,6 +5,54 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Phase 2: TensorFlow verification (2026-09-26)
+
+**Goal:** prove that TensorFlow isn't just installed but is loaded natively and
+drives correct results in the feature it exists for (face matching), and fix any
+version, configuration or silent-failure problems.
+
+### Where TensorFlow is used
+
+Only in `apps/backend/src/biometrics/engine.ts`. `@tensorflow/tfjs-node` 4.22.0 runs
+three networks shipped with `@vladmandic/face-api` 1.7.15: the SSD MobileNet face
+detector, the 68-point landmark model and the dlib ResNet-34 face-recognition model
+(128-number descriptors). They serve face enrolment, verification, identification in
+class, and the head-turn liveness check.
+
+### What I found
+
+| Finding | Severity | Resolution |
+|---|---|---|
+| No prebuilt Windows binding exists for tfjs-node 4.22.0 (every napi and version combination probed returns 404), so Windows always compiles it. npm 10's bundled node-gyp 11.2 doesn't recognise Visual Studio 2026, and npm forces its own node-gyp onto install scripts. `setup-local.ps1` therefore failed at `npm ci` on Windows. | Blocker (Windows setup) | `apps/backend/scripts/tfjs-native.mjs` runs the package's own installer directly, with node-gyp 12.4 (cached outside the project), inside the Visual Studio environment found through `vswhere`. `setup-local.ps1` installs with `--ignore-scripts`, re-runs every other package's install scripts, then calls it. |
+| After a successful build, tfjs-node copies `tensorflow.dll` into `lib/napi-v10` (Node 22's N-API version) but builds the binding into `lib/napi-v8`, so it fails to load with "The specified module could not be found". | Blocker (Windows) | The script stages the DLL beside every built binding. A `postinstall` hook does the same after any plain `npm install`. It's written to be a no-op where the script isn't present (the Docker build installs before copying `scripts/`) and on Linux and macOS. |
+| **Silent failure:** the engine loaded lazily and `warmUp()` was never called. A server whose native library couldn't load started cleanly, looked healthy, and answered the first face check with an anonymous 500. | High | The engine is warmed up at start-up (turn off with `FACE_ENGINE_WARMUP=off`) and logs `[FACE] engine ready: backend=…` or the exact failure. `/api/health/ready` reports `components.faceEngine` (state, backend, error). A load failure becomes `EngineUnavailable`, answered as **503 `engine_unavailable`** with a plain message. A failed load is retried on the next request, so a repaired install heals without a restart. |
+| A silent fallback to the pure-JavaScript CPU backend would give correct but much slower answers, and every existing test would still pass. | Medium | `engineInfo()` exposes the backend. The start-up log warns if it isn't `tensorflow`. A unit test and the verify script both fail on anything else. |
+| Versions | — | One `@tensorflow/tfjs-core` (4.22.0, deduplicated). face-api 1.7.15 is built against `^4.22.0`. face-api runs its kernels on the server's own engine (checked by engine identity). Native TensorFlow C library 2.9.1. CPU only; the build has no GPU support and needs none (about 300 ms per frame). No mismatch. |
+
+### Decisions and why
+
+- **Warn, don't fail, when the binding can't be built** (use `--strict` to fail).
+  Face matching is optional (README). A school without a C++ toolchain should still
+  get a working system, and now it's told clearly why face checks are off.
+- **Readiness stays 200 when only the face engine is down.** Taking the whole API out
+  of a load balancer because an optional feature is degraded would be worse than the
+  fault. The degradation is reported in the body instead.
+- **No change to the Dockerfile or CI.** Linux uses the prebuilt binding, and CI is
+  out of scope under the brief.
+
+### Verification
+
+| What | How | Result |
+|---|---|---|
+| Real inference | `npm run verify-face-engine` (new): real networks on the committed fixtures | Native `tensorflow` backend, C library 2.9.1. 1 / 0 / 2 faces found where expected. Same person 0.22 and 0.42, different people 0.84 (threshold 0.5). Head-turn directions correct. Median 297–366 ms per frame. |
+| Windows setup from scratch | `scripts\setup-local.ps1 -NoStart -NoDemo`: fresh `npm ci` of every package on Windows 11, Node 22.20, VS 2026 | Previously failed at the API install. Now builds the binding, stages the DLL, verifies it loads, and completes. |
+| Failure mode | Removed the staged DLL, started the API | Start-up log and `/health/ready` name the fault. All face operations answer `503 engine_unavailable`. Consent records still work. |
+| Repair and self-healing | `npm run tfjs-native` with the API still running | DLL restaged. `faceMatchingApi` 65/65 with no restart. Readiness shows `ready` on `tensorflow`. |
+| Unit tests | `vitest` on sources | 96/96, including the new native-backend assertion |
+| Regression | Full `run-all-e2e.sh` | See the phase report |
+
+---
+
 ## Phase 1: Guardians and the parent portal (2026-09-26)
 
 **Goal:** close the largest gap between the SMS and comparable products. The school

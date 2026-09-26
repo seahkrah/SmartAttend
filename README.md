@@ -68,7 +68,15 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-local.ps1  # Windows
 ```
 
 Afterwards, `scripts/start-local.sh` (or `scripts\start-local.ps1`) starts it
-again. The steps it performs, by hand:
+again.
+
+Face matching runs on native TensorFlow. Linux and macOS download it prebuilt.
+On Windows it's compiled during setup, which needs Visual Studio 2019 or later
+with the "Desktop development with C++" workload, plus Python 3. Without them,
+setup still completes and everything except face matching works; face checks
+answer 503 until you install the tools and run `npm run tfjs-native` in
+`apps/backend`. To check the engine on any machine, run
+`npm run verify-face-engine`. The steps it performs, by hand:
 
 Needs Node 20 and PostgreSQL 16.
 

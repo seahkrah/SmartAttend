@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import { verifyAccessToken } from './authService.js'
 import { query } from '../db/connection.js'
 import { sessionIsLive } from './sessions.js'
+import { allowedDuringSetup } from './mfa.js'
 
 // Extend Express Request to include auth info
 declare global {
@@ -53,6 +54,14 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     }
   } catch (error) {
     return res.status(500).json({ error: 'Authentication check failed' })
+  }
+  // A role that must use two-factor sign-in, signed in without it, may only
+  // set it up (the token says so: generateAccessToken).
+  if (decoded.mfa === 'setup' && !allowedDuringSetup(req.originalUrl.split('?')[0])) {
+    return res.status(403).json({
+      error: 'Your role requires two-factor sign-in. Set it up under Account security to continue.',
+      code: 'MFA_SETUP_REQUIRED',
+    })
   }
   req.user = {
     userId: decoded.userId,

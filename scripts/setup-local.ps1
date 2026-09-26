@@ -79,6 +79,7 @@ if (-not (Test-Path $envFile)) {
     'PUBLIC_APP_URL=http://localhost:5173'
     "BIOMETRIC_TEMPLATE_KEY=$(Secret 32)"
     'BIOMETRIC_TEMPLATE_KEY_VERSION=1'
+    "MFA_ENCRYPTION_KEY=$(Secret 32)"
   ) | Set-Content -Encoding ascii $envFile
   Write-Host 'Created apps\backend\.env with freshly generated secrets'
 } else {
@@ -86,6 +87,7 @@ if (-not (Test-Path $envFile)) {
   if (-not ($content -match '^DATABASE_URL=')) { Add-Content $envFile "DATABASE_URL=$dbUrl" }
   if (-not ($content -match '^JWT_SECRET=.+')) { Add-Content $envFile "JWT_SECRET=$(Secret 48)" }
   if (-not ($content -match '^BIOMETRIC_TEMPLATE_KEY=.+')) { Add-Content $envFile "BIOMETRIC_TEMPLATE_KEY=$(Secret 32)" }
+  if (-not ($content -match '^MFA_ENCRYPTION_KEY=.+')) { Add-Content $envFile "MFA_ENCRYPTION_KEY=$(Secret 32)" }
   Write-Host 'Kept the existing apps\backend\.env'
 }
 $feEnv = Join-Path $Frontend '.env'

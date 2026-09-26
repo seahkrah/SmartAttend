@@ -5,6 +5,8 @@ import { authenticateToken } from '../auth/middleware.js'
 import { auditContextMiddleware } from '../auth/auditContextMiddleware.js'
 import { extractAuditContext, logAuditEntry, getAuditLogs } from '../services/auditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
+import { clearMfa } from '../auth/mfaService.js'
+import { revokeUserSessions } from '../auth/sessions.js'
 
 /**
  * The control plane.
@@ -700,6 +702,7 @@ router.get('/tenant-admins', async (_req: Request, res: Response) => {
     const r = await query(
       `SELECT u.id, u.full_name, u.email, u.phone, u.is_active, u.created_at,
               u.must_reset_password, u.last_login, (u.activated_at IS NULL) AS awaiting_setup,
+              EXISTS (SELECT 1 FROM user_mfa f WHERE f.user_id = u.id AND f.enabled_at IS NOT NULL) AS mfa_enabled,
               m.tenant_id, m.tenant_name, m.platform_kind
          FROM users u
          JOIN roles ro ON ro.id = u.role_id
@@ -1088,6 +1091,36 @@ router.get('/locked-users', async (_req: Request, res: Response) => {
     })
   } catch (e) {
     return fail(res, 'load deactivated accounts', e)
+  }
+})
+
+/**
+ * Removes two-factor sign-in from an account whose owner has lost their phone
+ * and their recovery codes: typically a school or company administrator, whose
+ * own colleagues cannot reset them. Every session ends; they sign in with
+ * their password and set it up again. A superadmin cannot do this to
+ * themselves: another superadmin must.
+ */
+router.delete('/users/:userId/mfa', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+    if (!UUID.test(userId)) return notFound(res, 'User')
+    if (userId === req.user!.userId) {
+      return res.status(403).json({ error: 'Another superadmin must reset your two-factor sign-in.' })
+    }
+    const u = await query(`SELECT id, email, full_name FROM users WHERE id = $1`, [userId])
+    if (u.rowCount === 0) return notFound(res, 'User')
+    if (!(await clearMfa(null, userId))) {
+      return res.status(409).json({ error: 'That account does not use two-factor sign-in.' })
+    }
+    await revokeUserSessions(userId, 'mfa_reset_by_superadmin')
+    await audit(req, 'USER_MFA_RESET', 'USER', { result: 'SUCCESS' },
+      { type: 'user', id: userId }, { beforeState: { mfa: true }, afterState: { mfa: false } }, req.body?.justification)
+    await logAction(req, 'USER_MFA_RESET', 'user', userId, { email: u.rows[0].email })
+    return res.json({ reset: true })
+  } catch (e) {
+    await audit(req, 'USER_MFA_RESET', 'USER', { result: 'FAILURE', error: String((e as Error).message) })
+    return fail(res, 'reset two-factor sign-in', e)
   }
 })
 

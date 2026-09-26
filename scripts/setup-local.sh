@@ -84,12 +84,14 @@ JWT_SECRET=$(secret 48)
 PUBLIC_APP_URL=http://localhost:5173
 BIOMETRIC_TEMPLATE_KEY=$(secret 32)
 BIOMETRIC_TEMPLATE_KEY_VERSION=1
+MFA_ENCRYPTION_KEY=$(secret 32)
 EOF
   echo "Created apps/backend/.env with freshly generated secrets"
 else
   if ! grep -qE '^DATABASE_URL=' "$BACKEND/.env"; then echo "DATABASE_URL=$DB_URL" >> "$BACKEND/.env"; fi
   grep -qE '^JWT_SECRET=.+' "$BACKEND/.env" || echo "JWT_SECRET=$(secret 48)" >> "$BACKEND/.env"
   grep -qE '^BIOMETRIC_TEMPLATE_KEY=.+' "$BACKEND/.env" || echo "BIOMETRIC_TEMPLATE_KEY=$(secret 32)" >> "$BACKEND/.env"
+  grep -qE '^MFA_ENCRYPTION_KEY=.+' "$BACKEND/.env" || echo "MFA_ENCRYPTION_KEY=$(secret 32)" >> "$BACKEND/.env"
   echo "Kept the existing apps/backend/.env"
 fi
 if [ ! -f "$FRONTEND/.env" ]; then

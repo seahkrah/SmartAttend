@@ -97,6 +97,7 @@ const SchoolAdminAttendancePage = lazy(() => import('./pages/SchoolAdminAttendan
 const SchoolAdminReportsPage = lazy(() => import('./pages/SchoolAdminReportsPage'));
 const SchoolAdminGuardiansPage = lazy(() => import('./pages/SchoolAdminGuardiansPage'));
 const GuardianHomePage = lazy(() => import('./pages/GuardianHomePage'));
+const AccountSecurityPage = lazy(() => import('./pages/AccountSecurityPage'));
 const GuardianChildPage = lazy(() => import('./pages/GuardianChildPage'));
 const CorporateAdminDashboardPage = lazy(() => import('./pages/CorporateAdminDashboardPage'));
 const CorporateAdminUsersPage = lazy(() => import('./pages/CorporateAdminUsersPage'));
@@ -377,6 +378,20 @@ export default function App() {
                   </Routes>
                 </AppShell>
               </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Every signed-in person's own account: two-factor sign-in and the
+            way to the password change. Reached from the account area of the
+            sidebar, and forced for a role that must use two-factor. */}
+        <Route
+          path="/account/security"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <AccountSecurityPage />
+              </AppShell>
             </ProtectedRoute>
           }
         />

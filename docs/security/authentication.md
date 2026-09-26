@@ -55,6 +55,7 @@ implementation (`auth/authService.ts` → `loginUser`).
   account, so it cannot be used to discover accounts. Failures are stored in
   the database (`auth_failed_logins`), so the lockout holds across processes
   and restarts. A successful sign-in clears the count.
+  - With two-factor on, the count is cleared only when the code is right.
   - Trade-off: someone who knows an address can keep it locked by guessing
     wrongly. The pause is short and the owner can still reset their password.
 - Only after a correct password are these reported: wrong platform
@@ -62,6 +63,50 @@ implementation (`auth/authService.ts` → `loginUser`).
   tenant, tenant suspended.
 - The superadmin sign-in page accepts only platform superadmins. Anyone
   else's correct password reads as a wrong one there.
+
+## Two-factor sign-in
+
+Anyone can add an authenticator app to their account under **Account security**
+(`/account/security`, the shield beside "Sign out"). It uses time-based codes
+(TOTP, RFC 6238: HMAC-SHA1, 30-second steps, 6 digits), which every
+authenticator app supports: Google and Microsoft Authenticator, 1Password,
+Bitwarden and others. The algorithm is in `auth/mfa.ts`, written against Node's
+`crypto`, and checked against the RFC's test vectors (`auth/mfa.test.ts`).
+
+- **Setup.** `POST /api/auth/mfa/setup` returns a new secret and its QR code
+  URI. It is not active until `POST /api/auth/mfa/enable` receives a correct code.
+  That call returns 10 single-use recovery codes, shown once, and ends the
+  account's other sessions, which were signed in by password alone.
+- **Signing in.** With two-factor on, a correct password returns
+  `{ mfaRequired: true, mfaToken }` instead of a session.
+  `POST /api/auth/mfa/verify` with the token and a code (or `recoveryCode`)
+  completes it. The challenge lasts 5 minutes, allows 5 tries, and works once.
+  Wrong codes count towards the same 15-minute lockout as wrong passwords, so a
+  stolen password buys only a handful of guesses.
+- **Replay.** One step either side of the current one is accepted, to allow for
+  phone clock drift. The step of each accepted code is stored, and that step or
+  any earlier one is never accepted again.
+- **At rest.** Secrets are sealed with AES-256-GCM under `MFA_ENCRYPTION_KEY`
+  (32 bytes, base64), bound to the account, so a sealed secret copied onto
+  another account does not open. If the key is unset, a key is derived from
+  `JWT_SECRET`, and production logs a warning: rotating `JWT_SECRET` would then
+  make every enrolled authenticator unreadable. Recovery codes and challenge
+  tokens are stored only as SHA-256 hashes.
+- **Turning it off, or making new recovery codes,** needs the password and a
+  current code (or a recovery code).
+- **Required roles.** `MFA_REQUIRED_ROLES` (comma-separated) lists roles that
+  must use it. The default is `superadmin,admin` in production and nobody
+  elsewhere. Such a person who has not set it up still signs in with a password,
+  but their access token carries `mfa: "setup"`. Every API call except `/me`,
+  `/logout`, `/sessions`, `/change-password` and `/mfa/*` then answers
+  `403 MFA_SETUP_REQUIRED`, and the web app takes them to the setup page. They
+  cannot turn it off.
+- **Lost phone.** Recovery codes first. Failing that:
+  - A tenant administrator's **reset access** (below) also removes two-factor.
+  - For an administrator, a superadmin uses **Reset two-factor** on the
+    administrators page (`DELETE /api/superadmin/users/:userId/mfa`). This is
+    audited as `USER_MFA_RESET` with a justification, and ends their sessions.
+  - A superadmin cannot reset their own; another superadmin must.
 
 ## Passwords
 
@@ -207,9 +252,9 @@ are short-lived and single use.
 
 These are stated so nobody assumes otherwise:
 
-- **No second factor.** There is no TOTP or WebAuthn for administrators or
-  superadmins yet. The earlier "MFA" middleware accepted any code and was
-  removed.
+- **No security keys or passkeys (WebAuthn).** Two-factor is authenticator-app
+  codes only. The earlier "MFA" middleware, which accepted any code, was removed;
+  migration 006's `mfa_challenges` table belongs to it and is unused.
 - **Tokens live in `localStorage`.** A script injected into the web app could
   read them. Moving the refresh token to an `httpOnly`, `SameSite=Strict`
   cookie (with CSRF protection on `/refresh`) would remove that exposure. It
@@ -230,6 +275,11 @@ These are stated so nobody assumes otherwise:
   invitations and handover for school, corporate and superadmin, reset of
   access by an administrator, template lock, outbox redaction,
   self-registration, superadmin bootstrap, CORS and headers.
+- `apps/backend/src/tests/mfaApi.e2e.py` (41 checks): setup, the code step,
+  replay, single-use challenges and recovery codes, turning it off, the
+  superadmin reset and its audit entry, and guessing into the lockout.
+- `apps/backend/src/auth/mfa.test.ts` (unit): RFC 6238 vectors, the drift
+  window, replay, sealing, recovery codes, required-role policy.
 - `apps/backend/src/auth/authSecurity.test.ts` (unit): password policy,
   production configuration, CORS and proxy settings, the rate limiter's 429,
   token hashing.

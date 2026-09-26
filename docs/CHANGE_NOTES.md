@@ -5,6 +5,75 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Foundation round, step 4: two-factor sign-in (2026-09-26)
+
+### Why
+
+Administrators and superadmins could sign in with a password alone. A single
+phished or reused password was the whole of the defence around every school's
+records and every company's payroll. The security doc listed this as the
+first thing not done yet.
+
+### What changed
+
+- **Authenticator-app codes (TOTP, RFC 6238)**, which every authenticator
+  supports.
+  - Written against Node's `crypto` rather than a package: about thirty lines,
+    checked against the RFC's own test vectors. The code that decides who signs
+    in is the last place to add a dependency.
+  - Setup is on a new **Account security** page: scan a QR code, confirm one
+    code, save ten recovery codes.
+  - Signing in then asks for a code after the password.
+- **Enforced for admins and superadmins in production** (`MFA_REQUIRED_ROLES`),
+  off elsewhere so development and tests are not blocked.
+  - Such a person signs in with a password and can reach nothing but the setup
+    page until two-factor is on.
+  - The rule is carried in the access token, so it costs no query per request.
+    A token refresh re-reads it.
+- **Decisions and their reasons:**
+  - Wrong codes count towards the existing password lockout. A per-challenge
+    limit alone would let someone with a stolen password guess without end, one
+    fresh challenge at a time.
+  - Each accepted code's time step is recorded and never accepted again, so a
+    code seen over a shoulder cannot be replayed within its 90-second window.
+  - Turning it on ends the account's other sessions. They were signed in by
+    password alone, which is exactly what two-factor is meant to stop.
+  - Secrets are encrypted at rest (AES-256-GCM) and bound to their account. The
+    key is `MFA_ENCRYPTION_KEY`, with a fallback derived from `JWT_SECRET` so an
+    existing install keeps working; production warns about the fallback.
+  - A required role cannot turn it off. Replacing a phone is a reset.
+- **Lost phone:**
+  - First, recovery codes.
+  - Then the existing **reset access**, which now also removes two-factor.
+  - For administrators, a new superadmin **Reset two-factor**, which asks how the
+    requester's identity was confirmed and records the answer in the audit trail.
+- **Found in passing:** migration 006 had created a `mfa_challenges` table for
+  an earlier design that was never built, and whose middleware accepted any
+  code. The new table is `mfa_login_challenges`; the old one is untouched and
+  documented as unused.
+- Setup scripts, `.env.example` and the compose file now carry
+  `MFA_ENCRYPTION_KEY`.
+
+### Verified
+
+- 10 unit tests, including the RFC 6238 vectors.
+- A new e2e suite, `mfaApi` (41 checks), is part of `run-all-e2e.sh`. The full
+  run is 1,930 of 1,931, the one failure being the known Windows antivirus case.
+  - The first full run found that two-factor management shared the anonymous
+    reset/activation rate limit, which earlier suites had used up. It now has its
+    own (`RATE_LIMIT_MFA_PER_15MIN`, 60).
+- Enforcement was checked against a second API started with
+  `MFA_REQUIRED_ROLES=admin`:
+  - admin pages answer `403 MFA_SETUP_REQUIRED` before setup, and still do after
+    a token refresh;
+  - they open after setup;
+  - the admin cannot turn it off;
+  - a lecturer is unaffected.
+- In the browser: setup with the QR code, the recovery-code screen, and sign-in
+  with a wrong code and then the right one.
+
+---
+
 ## Foundation round, step 3: performance baseline (2026-09-26)
 
 ### How it was measured

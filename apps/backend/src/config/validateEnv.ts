@@ -25,6 +25,10 @@ export function configProblems(env: NodeJS.ProcessEnv = process.env): string[] {
     problems.push('PUBLIC_APP_URL must be an https:// address')
   }
 
+  if (env.MFA_ENCRYPTION_KEY && Buffer.from(env.MFA_ENCRYPTION_KEY, 'base64').length !== 32) {
+    problems.push('MFA_ENCRYPTION_KEY must be 32 bytes, base64-encoded (openssl rand -base64 32)')
+  }
+
   const origins = allowedOrigins()
   if (origins.length === 0) problems.push('CORS_ORIGINS is not set (no browser could call the API)')
   if (origins.some(o => o === '*')) problems.push('CORS_ORIGINS must list origins, not "*"')
@@ -38,5 +42,10 @@ export function validateProductionConfig(): void {
   if (problems.length > 0) {
     console.error('[CONFIG] Refusing to start in production:\n  - ' + problems.join('\n  - '))
     process.exit(1)
+  }
+  if (!process.env.MFA_ENCRYPTION_KEY) {
+    // Works (the key is derived from JWT_SECRET), but rotating JWT_SECRET
+    // would then make every enrolled authenticator unreadable.
+    console.warn('[CONFIG] MFA_ENCRYPTION_KEY is not set; two-factor secrets are sealed with a key derived from JWT_SECRET.')
   }
 }

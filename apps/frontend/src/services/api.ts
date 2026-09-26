@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { frontendConfig } from '../config/environment';
-import { recoverSession, clearStoredSession, isSessionlessAuthCall } from '../utils/sessionRefresh';
+import { recoverSession, clearStoredSession, isSessionlessAuthCall, redirectForMfaSetup } from '../utils/sessionRefresh';
 import {
   AuthResponse,
   User,
@@ -45,6 +45,7 @@ class ApiClient {
           }
           clearStoredSession();
         }
+        redirectForMfaSetup(error);
         return Promise.reject(error);
       }
     );
@@ -96,6 +97,12 @@ class ApiClient {
       }
     }
     
+    return response.data;
+  }
+
+  /** The code step of a sign-in; tokens are stored by the auth store. */
+  async verifyMfa(mfaToken: string, answer: { code?: string; recoveryCode?: string }): Promise<AuthResponse> {
+    const response = await this.client.post<AuthResponse>('/auth/mfa/verify', { mfaToken, ...answer });
     return response.data;
   }
 

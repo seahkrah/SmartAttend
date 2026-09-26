@@ -9,6 +9,7 @@ import { warmUp, engineInfo } from './biometrics/engine.js'
 import { applyHttpSecurity } from './security/httpSecurity.js'
 import { validateProductionConfig } from './config/validateEnv.js'
 import authRoutes from './routes/auth.js'
+import mfaRoutes from './routes/mfa.js'
 import schoolAdminRoutes from './routes/schoolAdmin.js'
 import schoolRoutes from './routes/school.js'
 import corporateRoutes from './routes/corporate.js'
@@ -109,6 +110,7 @@ app.use((req, res, next) => {
 })
 
 // Routes
+app.use('/api/auth/mfa', mfaRoutes)
 app.use('/api/auth', schoolAdminRoutes)
 app.use('/api/auth', authRoutes)
 

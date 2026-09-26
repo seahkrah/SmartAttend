@@ -16,7 +16,7 @@ let inflight: Promise<string | null> | null = null;
 
 /** Requests that must never trigger a refresh: they are how you get a session. */
 export function isSessionlessAuthCall(url: string | undefined): boolean {
-  return /\/auth\/(login|login-superadmin|refresh|register-with-role|register-superadmin|activate|password\/(forgot|reset))\b/
+  return /\/auth\/(login|login-superadmin|refresh|register-with-role|register-superadmin|activate|password\/(forgot|reset)|mfa\/verify)\b/
     .test(url ?? '');
 }
 
@@ -71,4 +71,17 @@ export function endSession(): void {
   if (!publicPaths.some((p) => window.location.pathname.startsWith(p))) {
     window.location.href = '/login';
   }
+}
+
+/**
+ * A person whose role must use two-factor sign-in, signed in without it, is
+ * refused everything but the setup page (MFA_SETUP_REQUIRED). Takes them
+ * there. Returns whether it did.
+ */
+export function redirectForMfaSetup(error: any): boolean {
+  if (error?.response?.status !== 403 || error.response.data?.code !== 'MFA_SETUP_REQUIRED') return false;
+  if (window.location.pathname !== '/account/security') {
+    window.location.href = '/account/security?required=1';
+  }
+  return true;
 }

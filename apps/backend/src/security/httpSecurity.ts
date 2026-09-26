@@ -98,6 +98,15 @@ export const refreshLimiter = limiter('refresh', intEnv('RATE_LIMIT_REFRESH_PER_
 export const accountLimiter = limiter('account', intEnv('RATE_LIMIT_ACCOUNT_PER_15MIN', 30), 15 * 60_000,
   'Too many account requests from this network. Try again later.')
 
+/**
+ * Two-factor management by a signed-in person (setup, enable, disable, new
+ * recovery codes). Separate from `accountLimiter`, whose budget belongs to
+ * anonymous reset and activation requests; each of these calls already needs
+ * a session, and the sensitive ones the password as well.
+ */
+export const mfaManageLimiter = limiter('mfa', intEnv('RATE_LIMIT_MFA_PER_15MIN', 60), 15 * 60_000,
+  'Too many two-factor requests. Try again later.')
+
 /** Public access-request enquiries per client address. */
 export const enquiryLimiter = limiter('enquiry', intEnv('RATE_LIMIT_ENQUIRY_PER_HOUR', 20), 60 * 60_000,
   'Too many requests from this network. Please try again later, or email us instead.')

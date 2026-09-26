@@ -10,7 +10,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { recoverSession, endSession, isSessionlessAuthCall } from './sessionRefresh';
+import { recoverSession, endSession, isSessionlessAuthCall, redirectForMfaSetup } from './sessionRefresh';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -95,7 +95,7 @@ axiosClient.interceptors.response.use(
     }
 
     // Handle 403 Forbidden (role/permission denied)
-    if (error.response?.status === 403) {
+    if (error.response?.status === 403 && !redirectForMfaSetup(error)) {
       console.error('[API] Permission Denied:', error.response.data);
     }
 

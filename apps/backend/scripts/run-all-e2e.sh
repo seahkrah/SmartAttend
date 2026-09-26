@@ -60,6 +60,8 @@ SUITES=(
   # Also creates a student (another family's child), so it runs last too.
   guardiansApi
   accessRequestsApi
+  # Turns two-factor on and off for one account, and trips its lockout.
+  mfaApi
 )
 
 fail=0

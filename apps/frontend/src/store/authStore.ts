@@ -13,13 +13,44 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string, platform: 'school' | 'corporate') => Promise<void>;
-  superadminLogin: (email: string, password: string) => Promise<void>;
+  /** Resolves with `mfaToken` when the account uses two-factor sign-in: pass it to verifyMfa with a code. */
+  login: (email: string, password: string, platform: 'school' | 'corporate') => Promise<SignInStep>;
+  superadminLogin: (email: string, password: string) => Promise<SignInStep>;
+  verifyMfa: (mfaToken: string, answer: { code?: string; recoveryCode?: string }) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   setToken: (token: string) => void;
   clearError: () => void;
   loadUserFromToken: () => Promise<void>;
+}
+
+export type SignInStep = { mfaToken?: string };
+
+/** Stores a finished sign-in's tokens and user. */
+function signedIn(set: (s: Partial<AuthState>) => void, response: any) {
+  localStorage.setItem('accessToken', response.accessToken);
+  if (response.refreshToken) localStorage.setItem('refreshToken', response.refreshToken);
+  apiClient.setToken(response.accessToken);
+  set({
+    token: response.accessToken,
+    user: {
+      id: response.user.id,
+      email: response.user.email,
+      fullName: response.user.fullName,
+      role: response.user.role,
+      platform: response.user.platform || 'school',
+      mustResetPassword: response.user.mustResetPassword || false,
+    },
+    isLoading: false,
+  });
+  if (typeof response.recoveryCodesLeft === 'number' && response.recoveryCodesLeft <= 3) {
+    useToastStore.getState().addToast({
+      type: 'warning',
+      title: 'Recovery codes running low',
+      message: `${response.recoveryCodesLeft} left. Create a new set under Account security.`,
+      duration: 8000,
+    });
+  }
 }
 
 export const useAuthStore = create<AuthState>((set) => {
@@ -34,26 +65,19 @@ export const useAuthStore = create<AuthState>((set) => {
     login: async (email: string, password: string, platform: 'school' | 'corporate') => {
       set({ isLoading: true, error: null });
       try {
-        const response = await apiClient.login(platform, email, password);
-        console.log('[authStore] Login success, setting user and token');
-        set({
-          token: response.accessToken,
-          user: {
-            id: response.user.id,
-            email: response.user.email,
-            fullName: response.user.fullName,
-            role: response.user.role,
-            platform: response.user.platform,
-            mustResetPassword: response.user.mustResetPassword || false,
-          },
-          isLoading: false,
-        });
+        const response: any = await apiClient.login(platform, email, password);
+        if (response.mfaRequired) {
+          set({ isLoading: false });
+          return { mfaToken: response.mfaToken };
+        }
+        signedIn(set, response);
         useToastStore.getState().addToast({
           type: 'success',
           title: 'Login successful',
           message: `Welcome back, ${response.user.fullName}!`,
           duration: 4000,
         });
+        return {};
       } catch (error: any) {
         const errorMessage = getUserFriendlyError(error);
         set({ error: errorMessage, isLoading: false });
@@ -80,30 +104,18 @@ export const useAuthStore = create<AuthState>((set) => {
           throw new Error(response.error);
         }
 
-        localStorage.setItem('accessToken', response.accessToken);
-        localStorage.setItem('refreshToken', response.refreshToken);
-
-        // CRITICAL: Update apiClient's internal token so subsequent requests include Authorization header
-        apiClient.setToken(response.accessToken);
-
-        console.log('[authStore] Superadmin login success, setting user and token');
-        set({
-          token: response.accessToken,
-          user: {
-            id: response.user.id,
-            email: response.user.email,
-            fullName: response.user.fullName,
-            role: response.user.role,
-            platform: response.user.platform || 'school',
-          },
-          isLoading: false,
-        });
+        if (response.mfaRequired) {
+          set({ isLoading: false });
+          return { mfaToken: response.mfaToken };
+        }
+        signedIn(set, response);
         useToastStore.getState().addToast({
           type: 'success',
           title: 'Superadmin login successful',
           message: `Welcome, ${response.user.fullName}!`,
           duration: 4000,
         });
+        return {};
       } catch (error: any) {
         const errorMessage = error.message || 'Superadmin login failed';
         set({ error: errorMessage, isLoading: false });
@@ -113,6 +125,17 @@ export const useAuthStore = create<AuthState>((set) => {
           message: errorMessage,
           duration: undefined,
         });
+        throw error;
+      }
+    },
+
+    verifyMfa: async (mfaToken, answer) => {
+      set({ isLoading: true, error: null });
+      try {
+        const response: any = await apiClient.verifyMfa(mfaToken, answer);
+        signedIn(set, response);
+      } catch (error: any) {
+        set({ error: getUserFriendlyError(error), isLoading: false });
         throw error;
       }
     },

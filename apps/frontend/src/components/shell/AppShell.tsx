@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, LogOut, Menu, Search } from 'lucide-react';
+import { Bell, LogOut, Menu, Search, ShieldCheck } from 'lucide-react';
 import { JjeloTechMark, JjeloTechWordmark, BRAND_NAME } from '../BrandLogo';
 import { useAuthStore } from '../../store/authStore';
 import { activeItem, navFor, type NavItem, type Platform } from '../../navigation/navConfig';
@@ -231,6 +231,9 @@ export const AppShell: React.FC<AppShellProps> = ({
           <span className="block text-sm font-semibold text-primary truncate">{user?.fullName}</span>
           <span className="block text-xs text-muted truncate">{user?.role}</span>
         </span>
+        <Link to="/account/security" className="btn-ghost p-2" title="Account security" aria-label="Account security">
+          <ShieldCheck className="w-[18px] h-[18px]" />
+        </Link>
         <button onClick={handleLogout} className="btn-ghost p-2" title="Sign out" aria-label="Sign out">
           <LogOut className="w-[18px] h-[18px]" />
         </button>

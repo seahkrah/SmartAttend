@@ -5,12 +5,14 @@ import { PasswordInput } from '../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
+import { MfaCodeStep } from '../components/auth/MfaCodeStep';
 
 export const SuperadminLoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const { superadminLogin } = useAuthStore();
 
@@ -32,7 +34,11 @@ export const SuperadminLoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await superadminLogin(email, password);
+      const step = await superadminLogin(email, password);
+      if (step.mfaToken) {
+        setMfaToken(step.mfaToken);
+        return;
+      }
 
       // Clear form
       setEmail('');
@@ -70,6 +76,13 @@ export const SuperadminLoginPage: React.FC = () => {
 
         {/* Form Card */}
         <div className="card mb-6">
+          {mfaToken ? (
+            <MfaCodeStep
+              mfaToken={mfaToken}
+              onDone={() => navigate('/superadmin')}
+              onRestart={(reason) => { setMfaToken(null); setPassword(''); setError(reason ?? ''); }}
+            />
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Input */}
             <div>
@@ -122,6 +135,7 @@ export const SuperadminLoginPage: React.FC = () => {
               {isLoading ? 'Signing in...' : 'Sign In as Superadmin'}
             </button>
           </form>
+          )}
 
           {/* Security Notice */}
           <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">

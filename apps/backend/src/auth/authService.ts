@@ -4,6 +4,7 @@ import { query } from '../db/connection.js'
 import type { User } from '../types/database.js'
 import crypto from 'crypto'
 import { createSession } from './sessions.js'
+import { createChallenge, mfaEnabled, mfaSetupPending } from './mfaService.js'
 
 // SECURITY: Never use hardcoded fallback secrets. Fail hard if not configured.
 function requireEnvSecret(key: string): string {
@@ -35,9 +36,13 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 // Access tokens last fifteen minutes and name the server-side session they
 // belong to; every request checks that session is still live (middleware.ts).
-export function generateAccessToken(userId: string, platformId: string, roleId: string, sessionId: string): string {
+// `mfaSetup` marks a person whose role requires two-factor sign-in and who has
+// not set it up: such a token reaches only the setup routes.
+export function generateAccessToken(
+  userId: string, platformId: string, roleId: string, sessionId: string, mfaSetup = false
+): string {
   return jwt.sign(
-    { userId, platformId, roleId, sid: sessionId },
+    { userId, platformId, roleId, sid: sessionId, ...(mfaSetup ? { mfa: 'setup' } : {}) },
     JWT_SECRET,
     { expiresIn: '15m' }
   )
@@ -58,8 +63,9 @@ export async function issueTokens(
   meta: { ip?: string | null; userAgent?: string | null } = {}
 ): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
   const { sessionId, refreshToken } = await createSession(user.id, meta)
+  const mfaSetup = await mfaSetupPending(user.id, user.role_id)
   return {
-    accessToken: generateAccessToken(user.id, user.platform_id, user.role_id, sessionId),
+    accessToken: generateAccessToken(user.id, user.platform_id, user.role_id, sessionId, mfaSetup),
     refreshToken,
     sessionId,
   }
@@ -110,6 +116,11 @@ async function lockedFor(emailNorm: string): Promise<number> {
   return Math.max(1, Math.ceil((until - Date.now()) / 1000))
 }
 
+/** A wrong second-factor code counts towards the same lockout as a wrong password. */
+export async function noteFailedSignIn(email: string, ip?: string | null) {
+  await recordFailure(normEmail(email), ip)
+}
+
 async function recordFailure(emailNorm: string, ip?: string | null) {
   await query(
     `INSERT INTO auth_failed_logins (email_norm, ip) VALUES ($1, $2)`,
@@ -135,7 +146,7 @@ export async function loginUser(
   password: string,
   platformId: string,
   meta: { ip?: string | null; userAgent?: string | null } = {}
-): Promise<{ user: User; accessToken: string; refreshToken: string }> {
+): Promise<SignInResult> {
   const emailNorm = normEmail(email)
   const wait = await lockedFor(emailNorm)
   if (wait > 0) {
@@ -204,13 +215,25 @@ export async function loginUser(
     }
   }
 
+  const { password_hash, ...safeUser } = user
+
+  // The password was right. With two-factor on, the session waits for the
+  // code (POST /api/auth/mfa/verify); the lockout counter is cleared only
+  // once the code is right, so wrong codes accumulate against it.
+  if (await mfaEnabled(user.id)) {
+    return { user: safeUser, mfaRequired: true, mfaToken: await createChallenge(user.id, meta.ip) }
+  }
+
   await query(`DELETE FROM auth_failed_logins WHERE email_norm = $1`, [emailNorm])
   const { accessToken, refreshToken } = await issueTokens(user, meta)
   await query(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id])
 
-  const { password_hash, ...safeUser } = user
-  return { user: safeUser, accessToken, refreshToken }
+  return { user: safeUser, mfaRequired: false, accessToken, refreshToken }
 }
+
+export type SignInResult =
+  | { user: User; mfaRequired: false; accessToken: string; refreshToken: string }
+  | { user: User; mfaRequired: true; mfaToken: string }
 
 // Verify user exists and get their details with role
 export async function getUserWithRole(userId: string): Promise<any> {

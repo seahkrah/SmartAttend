@@ -49,6 +49,13 @@ certificate checked, against `DATABASE_SSL_CA` for a private CA. Use
 as in the compose file. There is no setting that encrypts without checking the
 certificate.
 
+Two-factor sign-in is required for superadmins and administrators in
+production (`MFA_REQUIRED_ROLES`, default `superadmin,admin`). Each of them sets
+it up on first sign-in. Set `MFA_ENCRYPTION_KEY` (`openssl rand -base64 32`)
+before anyone enrols, and keep it with the other secrets: losing it means
+everyone sets up two-factor again. `DATABASE_POOL_MAX` (default 20) should be
+the database's `max_connections` divided by the number of API replicas.
+
 ### First superadmin
 
 Either of:

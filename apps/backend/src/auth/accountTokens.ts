@@ -20,6 +20,7 @@ import { query } from '../db/connection.js'
 import { hashToken, revokeUserSessions } from './sessions.js'
 import { checkPassword } from './passwordPolicy.js'
 import { notify, channelConfig } from '../notifications/service.js'
+import { clearMfa } from './mfaService.js'
 
 type Runner = { query: (text: string, params?: any[]) => Promise<any> }
 export type TokenPurpose = 'account_activation' | 'password_reset'
@@ -173,6 +174,9 @@ export async function resetAccessByAdmin(
     [opts.userId, await unusablePasswordHash()]
   )
   await revokeUserSessions(opts.userId, 'access_reset_by_admin')
+  // A lost phone is the usual reason for a reset: two-factor goes too, and the
+  // person sets it up again after choosing their password.
+  await clearMfa(runner, opts.userId)
   const token = await issue(runner, opts.userId, 'password_reset', opts.actorId, ADMIN_RESET_TTL_MINUTES)
   const link = `${appUrl()}/reset-password?token=${token}`
   const expiresInDays = 1

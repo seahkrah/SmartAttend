@@ -94,6 +94,7 @@ const UNLISTED = new Map([
   ['/register', 'reached before there is a menu'],
   ['/register-superadmin', 'reached before there is a menu'],
   ['/change-password', 'reached from the account menu and from a forced reset'],
+  ['/account/security', 'reached from the shield in the sidebar account area, and forced for roles that must use two-factor'],
   ['/forgot-password', 'reached from the sign-in page, before there is a menu'],
   ['/reset-password', 'reached from the link in a password-reset email'],
   ['/activate', 'reached from the link in an account invitation'],

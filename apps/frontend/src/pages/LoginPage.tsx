@@ -4,22 +4,20 @@ import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuthStore } from '../store/authStore';
 import { Link, useNavigate } from 'react-router-dom';
+import { MfaCodeStep } from '../components/auth/MfaCodeStep';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [platform, setPlatform] = React.useState<'school' | 'corporate'>('school');
   const [platformMismatch, setPlatformMismatch] = React.useState<string | null>(null);
+  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState('');
   const navigate = useNavigate();
   const { login, isLoading, error, clearError } = useAuthStore();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPlatformMismatch(null);
-    try {
-      await login(email, password, platform);
-      
-      // Route based on role after login
+  // Route based on role after login
+  const goHome = () => {
       setTimeout(() => {
         const currentUser = useAuthStore.getState().user;
         
@@ -52,6 +50,19 @@ export const LoginPage: React.FC = () => {
           navigate('/dashboard');
         }
       }, 0);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPlatformMismatch(null);
+    setNotice('');
+    try {
+      const step = await login(email, password, platform);
+      if (step.mfaToken) {
+        setMfaToken(step.mfaToken);
+        return;
+      }
+      goHome();
     } catch (err: any) {
       // Check for platform mismatch error
       const responseData = err?.response?.data;
@@ -82,7 +93,19 @@ export const LoginPage: React.FC = () => {
 
         {/* Form Card */}
         <div className="card mb-6">
+          {mfaToken ? (
+            <MfaCodeStep
+              mfaToken={mfaToken}
+              onDone={goHome}
+              onRestart={(reason) => { setMfaToken(null); setPassword(''); setNotice(reason ?? ''); }}
+            />
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
+            {notice && (
+              <div role="status" className="p-3 bg-amber-500/15 border border-amber-500/50 rounded-lg text-amber-700 dark:text-amber-300 text-sm">
+                {notice}
+              </div>
+            )}
             {/* Platform Selection */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-2">
@@ -185,6 +208,7 @@ export const LoginPage: React.FC = () => {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+          )}
         </div>
 
         {/* Sign Up Link */}

@@ -35,6 +35,8 @@ services:
       # The database is reachable only on this stack's private network.
       DATABASE_SSL: "off"
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in deploy/.env}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES:-superadmin,admin}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:?set PUBLIC_APP_URL in deploy/.env}
       CORS_ORIGINS: ${PUBLIC_APP_URL}
       TRUST_PROXY: ${TRUST_PROXY:-1}

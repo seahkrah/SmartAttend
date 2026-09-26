@@ -22,6 +22,7 @@ import {
   hashPassword
 } from '../auth/authService.js'
 import { authenticateToken } from '../auth/middleware.js'
+import { mfaSetupPending } from '../auth/mfaService.js'
 import {
   resolveTenantContext,
   requireTenant,
@@ -310,7 +311,11 @@ router.post('/login', loginLimiter, async (req: LoginRequest, res: Response) => 
 
     const platformId = platformResult.rows[0].id
 
-    const { user, accessToken, refreshToken } = await loginUser(email, password, platformId, sessionMeta(req))
+    const signIn = await loginUser(email, password, platformId, sessionMeta(req))
+    if ('mfaToken' in signIn) {
+      return res.json({ mfaRequired: true, mfaToken: signIn.mfaToken })
+    }
+    const { user, accessToken, refreshToken } = signIn
 
     // Get role name and permissions
     const roleResult = await query(
@@ -672,17 +677,21 @@ router.post('/login-superadmin', loginLimiter, async (req: SuperadminLoginReques
     // Same checks, throttling and lockout as every other sign-in. Only a
     // platform superadmin gets through: anyone else's correct password on
     // this page reads as a wrong one.
-    const { user, accessToken, refreshToken } =
+    const signIn =
       await loginUser(email, password, platformResult.rows[0].id, sessionMeta(req)).catch((e) => {
         if (e instanceof LoginError && e.code === 'platform_mismatch') {
           throw new LoginError('invalid', 'Invalid email or password')
         }
         throw e
       })
-    const u: any = user
+    const u: any = signIn.user
     if (u.role_name !== 'superadmin' || u.platform_name !== 'system') {
       return res.status(401).json({ error: ErrorMessages.AUTH_INVALID_CREDENTIALS })
     }
+    if ('mfaToken' in signIn) {
+      return res.json({ mfaRequired: true, mfaToken: signIn.mfaToken })
+    }
+    const { accessToken, refreshToken } = signIn
 
     return res.json({
       message: 'Superadmin login successful',
@@ -738,7 +747,8 @@ router.post('/refresh', refreshLimiter, async (req: RefreshRequest, res: Respons
 
     return res.json({
       message: 'Token refreshed successfully',
-      accessToken: generateAccessToken(user.id, user.platform_id, user.role_id, rotated.sessionId),
+      accessToken: generateAccessToken(user.id, user.platform_id, user.role_id, rotated.sessionId,
+        await mfaSetupPending(user.id, user.role_id)),
       refreshToken: rotated.refreshToken,
     })
   } catch (error: any) {

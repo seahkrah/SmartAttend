@@ -22,6 +22,7 @@ interface TenantAdmin {
   is_active: boolean
   last_login: string | null
   awaiting_setup: boolean
+  mfa_enabled: boolean
   created_at: string
 }
 
@@ -100,6 +101,25 @@ const SuperadminAdminsPage: React.FC = () => {
       await loadAdmins()
     } catch (error: any) {
       alert(error?.response?.data?.error ?? 'Could not remove that administrator')
+    }
+  }
+
+  // For an administrator who has lost their phone and their recovery codes:
+  // their own colleagues cannot reset an administrator, so it falls to us.
+  const handleResetMfa = async (admin: TenantAdmin) => {
+    const why = prompt(
+      `Reset two-factor sign-in for ${admin.full_name}? They will be signed out everywhere and must set it up again.
+
+` +
+      'First confirm who is asking (for example by calling them on a number you already have). Note how you did:'
+    )
+    if (why === null) return
+    if (!why.trim()) { alert('Say how you confirmed who asked; it goes in the audit trail.'); return }
+    try {
+      await apiClient.delete(`/superadmin/users/${admin.id}/mfa`, { data: { justification: why.trim() } })
+      await loadAdmins()
+    } catch (error: any) {
+      alert(error?.response?.data?.error ?? 'Could not reset two-factor sign-in')
     }
   }
 
@@ -199,6 +219,11 @@ const SuperadminAdminsPage: React.FC = () => {
                   {admin.awaiting_setup && (
                     <button onClick={() => setInvite({ id: admin.id, name: admin.full_name, invitation: null })}
                       className="text-xs text-sky-700 dark:text-sky-300 hover:text-sky-700 dark:hover:text-sky-200">Invite again</button>
+                  )}
+                  {admin.mfa_enabled && (
+                    <button onClick={() => handleResetMfa(admin)}
+                      title="Two-factor sign-in is on. Reset it for a lost phone."
+                      className="text-xs text-amber-700 dark:text-amber-300 hover:underline">Reset two-factor</button>
                   )}
                 </div>
               </div>

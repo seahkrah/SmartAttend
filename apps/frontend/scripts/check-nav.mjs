@@ -109,6 +109,7 @@ const UNLISTED = new Map([
   ['/superadmin/incident/:incidentId', 'a detail page, reached from an incident rather than from a menu'],
   ['/superadmin/entities', 'an alias of /superadmin/management'],
   ['/superadmin/tenants', 'an alias of /superadmin/management'],
+  ['/guardian/children/:studentId', 'a detail page, reached from the guardian\'s list of children'],
 ]);
 
 // --- the comparison --------------------------------------------------------

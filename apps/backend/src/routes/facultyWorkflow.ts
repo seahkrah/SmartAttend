@@ -12,6 +12,7 @@ import {
 } from '../auth/tenantContextMiddleware.js'
 import { TenantScopeError } from '../db/tenantScoped.js'
 import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
+import { absencesSubmitted } from '../notifications/events.js'
 
 /**
  * SMS — the faculty attendance workflow.
@@ -219,6 +220,11 @@ router.post('/attendance/submit', async (req: TenantRequest, res: Response) => {
         RETURNING status, marks_count`,
       [ctx.userId, counted.rows[0].n, ctx.tenantId, courseId, date]
     )
+
+    // The register is the lecturer's confirmed account of the session now,
+    // so this is when guardians hear about absences. Best effort: a message
+    // that cannot be queued is logged, and never undoes the submission.
+    await absencesSubmitted({ tenantId: ctx.tenantId!, userId: ctx.userId }, courseId, date)
 
     res.json({ success: true, status: updated.rows[0].status, marks_count: updated.rows[0].marks_count })
   } catch (e) {

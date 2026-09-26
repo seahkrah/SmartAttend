@@ -286,6 +286,86 @@ export const DEFAULT_TEMPLATES: Record<string, TemplateSet> = {
     },
   },
 
+  // ----------------------------------------------------------------- guardians
+  // Sent to a student's guardians, about the student. They are addressed by
+  // the guardian's own name and always name the student, because a parent of
+  // three needs to know which child a message is about before anything else.
+  'guardian.absence': {
+    in_app: {
+      body: '{{ studentName }} was marked absent from {{ courseName }} on {{ date }}.',
+      required: ['studentName', 'courseName', 'date'],
+      category: 'attendance',
+    },
+    email: {
+      subject: '{{ studentName }} was absent from {{ courseName }} on {{ date }}',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + '{{ studentName }} was marked absent from {{ courseName }} on {{ date }}.\n\n'
+        + 'If you believe this is a mistake, or the absence was authorised, please contact the '
+        + 'school.' + SIGN_OFF,
+      required: ['firstName', 'studentName', 'courseName', 'date', 'tenantName'],
+      category: 'attendance',
+    },
+    sms: {
+      body: '{{ tenantName }}: {{ studentName }} was absent from {{ courseName }} on {{ date }}.',
+      required: ['studentName', 'courseName', 'date', 'tenantName'],
+      category: 'attendance',
+    },
+  },
+
+  'guardian.results_published': {
+    in_app: {
+      body: "{{ studentName }}'s results for {{ courseName }} have been published.",
+      required: ['studentName', 'courseName'],
+      category: 'academic',
+    },
+    email: {
+      subject: "{{ studentName }}'s {{ courseName }} results are published",
+      body:
+        'Dear {{ firstName }},\n\n'
+        + "{{ studentName }}'s results for {{ courseName }} have been published. You can read "
+        + 'them in the parent portal when you sign in.' + SIGN_OFF,
+      required: ['firstName', 'studentName', 'courseName', 'tenantName'],
+      category: 'academic',
+    },
+  },
+
+  'guardian.invoice_issued': {
+    in_app: {
+      body: 'Invoice {{ invoiceNumber }} for {{ amount }} has been raised for {{ studentName }}. {{ dueLine }}',
+      required: ['invoiceNumber', 'amount', 'studentName'],
+      category: 'fees',
+    },
+    email: {
+      subject: 'Invoice {{ invoiceNumber }} for {{ studentName }} — {{ amount }}',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + 'Invoice {{ invoiceNumber }} for {{ amount }} has been raised for {{ studentName }}. '
+        + '{{ dueLine }}\n\n'
+        + 'The full breakdown is in the parent portal when you sign in.' + SIGN_OFF,
+      required: ['firstName', 'invoiceNumber', 'amount', 'studentName', 'tenantName'],
+      category: 'fees',
+    },
+  },
+
+  'guardian.payment_received': {
+    in_app: {
+      body: '{{ amount }} received for {{ studentName }} against {{ invoiceNumber }}. Balance: {{ balance }}.',
+      required: ['amount', 'studentName', 'invoiceNumber', 'balance'],
+      category: 'fees',
+    },
+    email: {
+      subject: 'Payment received for {{ studentName }} — {{ amount }}',
+      body:
+        'Dear {{ firstName }},\n\n'
+        + 'We have received {{ amount }} for {{ studentName }} against invoice {{ invoiceNumber }}. '
+        + 'The outstanding balance on that invoice is now {{ balance }}.\n\n'
+        + 'Thank you.' + SIGN_OFF,
+      required: ['firstName', 'amount', 'studentName', 'invoiceNumber', 'balance', 'tenantName'],
+      category: 'fees',
+    },
+  },
+
   // ------------------------------------------------------------------- account
   // These carry a single-use link that sets the account's password. Their
   // wording is fixed in code (tenants cannot override it) and their bodies

@@ -174,6 +174,112 @@ async function studentRecipient(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Guardians
+// ---------------------------------------------------------------------------
+
+/**
+ * The guardians who should hear about one student, for one kind of news.
+ *
+ * Only links the school has marked as receiving notifications, and only where
+ * the guardian may see the thing the message is about: a sponsor who cannot
+ * read results must not have them summarised in an email instead. A guardian
+ * with no account is still written to by email or SMS — most parents are
+ * recorded long before anyone invites them to a portal.
+ */
+async function guardianRecipients(
+  tenantId: string,
+  studentIds: string[],
+  permission: 'can_view_attendance' | 'can_view_results' | 'can_view_fees'
+): Promise<Map<string, Recipient[]>> {
+  const byStudent = new Map<string, Recipient[]>()
+  if (studentIds.length === 0) return byStudent
+  // Guardian messages ride along with the student's; failing to find the
+  // guardians must never cost the student theirs, or the caller its request.
+  const r = await query(
+    `SELECT gs.student_id, g.user_id, g.first_name, g.last_name, g.email, g.phone,
+            s.first_name AS student_first_name, s.last_name AS student_last_name
+       FROM guardian_students gs
+       JOIN guardians g ON g.id = gs.guardian_id AND g.tenant_id = gs.tenant_id
+       JOIN students s ON s.id = gs.student_id AND s.tenant_id = gs.tenant_id
+      WHERE gs.tenant_id = $1 AND gs.student_id = ANY($2::uuid[])
+        AND gs.receives_notifications AND gs.${permission}`,
+    [tenantId, studentIds]
+  ).catch((e) => {
+    console.error('[NOTIFY] guardian lookup failed:', e)
+    return { rows: [] as any[] }
+  })
+  for (const row of r.rows) {
+    const list = byStudent.get(row.student_id) ?? []
+    list.push({
+      userId: row.user_id,
+      name: [row.first_name, row.last_name].filter(Boolean).join(' '),
+      email: row.email,
+      phone: row.phone,
+      data: {
+        firstName: row.first_name,
+        lastName: row.last_name,
+        studentName: [row.student_first_name, row.student_last_name].filter(Boolean).join(' '),
+      },
+    })
+    byStudent.set(row.student_id, list)
+  }
+  return byStudent
+}
+
+/**
+ * Tells guardians about the absences on a register the lecturer has just
+ * submitted.
+ *
+ * Sent on submission, not on each mark: a lecturer toggling a student absent
+ * and back while taking the register must not send a parent a false alarm.
+ * The dedupe key is per student, course and day, so re-submitting a corrected
+ * register does not write twice about the same absence.
+ */
+export async function absencesSubmitted(
+  ctx: NotifyContext,
+  courseId: string,
+  date: string
+): Promise<void> {
+  try {
+    await queueAbsences(ctx, courseId, date)
+  } catch (e) {
+    // Called after the register has been saved; a failure to work out who to
+    // tell must not turn a successful submission into an error.
+    console.error('[NOTIFY] absence notices failed:', e)
+  }
+}
+
+async function queueAbsences(ctx: NotifyContext, courseId: string, date: string): Promise<void> {
+  const course = await query(
+    `SELECT name FROM courses WHERE id = $1 AND tenant_id = $2`,
+    [courseId, ctx.tenantId]
+  )
+  if (course.rowCount === 0) return
+
+  const absent = await query(
+    `SELECT DISTINCT sa.student_id
+       FROM school_attendance sa
+       JOIN class_schedules cs ON cs.id = sa.schedule_id AND cs.tenant_id = sa.tenant_id
+      WHERE sa.tenant_id = $1 AND cs.course_id = $2 AND sa.attendance_date = $3
+        AND sa.status = 'absent'`,
+    [ctx.tenantId, courseId, date]
+  )
+  const studentIds = absent.rows.map((row: any) => row.student_id)
+  const guardians = await guardianRecipients(ctx.tenantId, studentIds, 'can_view_attendance')
+
+  for (const [studentId, recipients] of guardians) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'guardian.absence',
+      recipients,
+      relatedType: 'student',
+      relatedId: studentId,
+      dedupeKey: `absence:${studentId}:${courseId}:${date}`,
+      data: { courseName: course.rows[0].name, date },
+    })
+  }
+}
+
 export async function invoiceIssued(ctx: NotifyContext, invoiceId: string): Promise<void> {
   const r = await query(
     `SELECT i.number, i.total, i.currency, i.due_date, i.student_id
@@ -183,23 +289,38 @@ export async function invoiceIssued(ctx: NotifyContext, invoiceId: string): Prom
   if (r.rowCount === 0) return
   const row = r.rows[0]
 
-  const recipient = await studentRecipient({ query }, ctx.tenantId, row.student_id)
-  if (!recipient) return
+  const data = {
+    invoiceNumber: row.number,
+    amount: amountWithCurrency(row.total, row.currency),
+    dueLine: row.due_date
+      ? `It is due on ${String(row.due_date).slice(0, 10)}.`
+      : 'No due date has been set.',
+  }
 
-  await notifyQuietly({ query }, ctx, {
-    eventKey: 'fees.invoice_issued',
-    recipients: [recipient],
-    relatedType: 'invoice',
-    relatedId: invoiceId,
-    dedupeKey: `invoice:${invoiceId}:issued`,
-    data: {
-      invoiceNumber: row.number,
-      amount: amountWithCurrency(row.total, row.currency),
-      dueLine: row.due_date
-        ? `It is due on ${String(row.due_date).slice(0, 10)}.`
-        : 'No due date has been set.',
-    },
-  })
+  const recipient = await studentRecipient({ query }, ctx.tenantId, row.student_id)
+  if (recipient) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'fees.invoice_issued',
+      recipients: [recipient],
+      relatedType: 'invoice',
+      relatedId: invoiceId,
+      dedupeKey: `invoice:${invoiceId}:issued`,
+      data,
+    })
+  }
+
+  const guardians = (await guardianRecipients(ctx.tenantId, [row.student_id], 'can_view_fees'))
+    .get(row.student_id)
+  if (guardians?.length) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'guardian.invoice_issued',
+      recipients: guardians,
+      relatedType: 'invoice',
+      relatedId: invoiceId,
+      dedupeKey: `invoice:${invoiceId}:issued:guardian`,
+      data,
+    })
+  }
 }
 
 export async function paymentReceived(
@@ -215,20 +336,34 @@ export async function paymentReceived(
   if (r.rowCount === 0) return
   const row = r.rows[0]
 
-  const recipient = await studentRecipient({ query }, ctx.tenantId, row.student_id)
-  if (!recipient) return
+  const data = {
+    invoiceNumber: row.number,
+    amount: amountWithCurrency(amount, row.currency),
+    balance: amountWithCurrency(balance, row.currency),
+  }
 
-  await notifyQuietly({ query }, ctx, {
-    eventKey: 'fees.payment_received',
-    recipients: [recipient],
-    relatedType: 'invoice',
-    relatedId: invoiceId,
-    data: {
-      invoiceNumber: row.number,
-      amount: amountWithCurrency(amount, row.currency),
-      balance: amountWithCurrency(balance, row.currency),
-    },
-  })
+  const recipient = await studentRecipient({ query }, ctx.tenantId, row.student_id)
+  if (recipient) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'fees.payment_received',
+      recipients: [recipient],
+      relatedType: 'invoice',
+      relatedId: invoiceId,
+      data,
+    })
+  }
+
+  const guardians = (await guardianRecipients(ctx.tenantId, [row.student_id], 'can_view_fees'))
+    .get(row.student_id)
+  if (guardians?.length) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'guardian.payment_received',
+      recipients: guardians,
+      relatedType: 'invoice',
+      relatedId: invoiceId,
+      data,
+    })
+  }
 }
 
 /**
@@ -548,7 +683,7 @@ export async function resultsPublished(ctx: NotifyContext, courseId: string): Pr
   if (course.rowCount === 0) return
 
   const students = await query(
-    `SELECT DISTINCT s.user_id, s.first_name, s.last_name, s.email, s.phone
+    `SELECT DISTINCT s.id, s.user_id, s.first_name, s.last_name, s.email, s.phone
        FROM course_results cr
        JOIN students s ON s.id = cr.student_id AND s.tenant_id = cr.tenant_id
       WHERE cr.course_id = $1 AND cr.tenant_id = $2 AND cr.status = 'published'`,
@@ -569,4 +704,17 @@ export async function resultsPublished(ctx: NotifyContext, courseId: string): Pr
     relatedId: courseId,
     data: { courseName: course.rows[0].name },
   })
+
+  const guardians = await guardianRecipients(
+    ctx.tenantId, students.rows.map((row: any) => row.id), 'can_view_results')
+  const all = [...guardians.values()].flat()
+  if (all.length) {
+    await notifyQuietly({ query }, ctx, {
+      eventKey: 'guardian.results_published',
+      recipients: all,
+      relatedType: 'course',
+      relatedId: courseId,
+      data: { courseName: course.rows[0].name },
+    })
+  }
 }

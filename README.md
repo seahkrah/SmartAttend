@@ -20,6 +20,9 @@ in two places:
 - gradebook: assessments, marks, published results, transcripts with CGPA
 - admissions: intakes, applications, decisions, enrolment
 - fees: structures, invoices, payments, statements, clearance
+- guardians: parents, carers and sponsors linked per child with per-area
+  access, absence and fee alerts, and a read-only parent portal
+  ([docs/features/guardians.md](docs/features/guardians.md))
 
 **Employer (EMS)**
 - employees and departments
@@ -109,7 +112,6 @@ Run these before pushing; CI runs the same.
 - Email and SMS delivery depend on each tenant configuring a provider. Until
   then messages are recorded as *simulated*, never as sent.
 - Not built:
-  - guardian/parent portal
   - timetabling
   - assignments
   - online payment providers

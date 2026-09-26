@@ -70,6 +70,8 @@ export const ChangePasswordPage: React.FC = () => {
           navigate('/hr');
         } else if (currentUser?.role === 'student' || currentUser?.role === 'employee') {
           navigate('/student');
+        } else if (currentUser?.role === 'guardian') {
+          navigate('/guardian');
         } else {
           navigate('/dashboard');
         }

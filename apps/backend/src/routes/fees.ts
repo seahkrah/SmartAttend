@@ -23,6 +23,7 @@ import {
   toMinor,
   voidInvoice,
 } from '../services/feesService.js'
+import { statementFor } from '../services/studentRecordsService.js'
 import { invoiceIssued, paymentReceived } from '../notifications/events.js'
 
 /**
@@ -714,38 +715,8 @@ router.get('/statement', async (req: TenantRequest, res: Response) => {
     const student = await targetStudent(ctx, supplied)
     if (!student) return notFound(res, 'Student')
 
-    const invoices = await query(
-      `SELECT i.id, i.number, i.status, i.currency, i.total, i.due_date, i.issued_at,
-              b.amount_paid, b.balance, b.settlement, b.is_overdue
-         FROM invoices i
-         JOIN invoice_balances b ON b.invoice_id = i.id
-        WHERE i.student_id = $1 AND i.tenant_id = $2
-        ORDER BY i.created_at DESC`,
-      [student.id, ctx.tenantId]
-    )
-
-    const payments = await query(
-      `SELECT p.id, p.amount, p.currency, p.method, p.reference, p.paid_at,
-              p.reversed_at, i.number AS invoice_number
-         FROM payments p
-         JOIN invoices i ON i.id = p.invoice_id AND i.tenant_id = p.tenant_id
-        WHERE p.student_id = $1 AND p.tenant_id = $2
-        ORDER BY p.paid_at DESC`,
-      [student.id, ctx.tenantId]
-    )
-
-    const summary = await clearance(ctx.tenantId, student.id)
-
-    return res.json({
-      student: {
-        id: student.id,
-        studentNumber: student.student_id,
-        name: `${student.first_name} ${student.last_name}`,
-      },
-      summary,
-      invoices: invoices.rows,
-      payments: payments.rows,
-    })
+    // A student and the school's staff both see drafts, marked as such.
+    return res.json(await statementFor(ctx.tenantId, student, { includeDrafts: true }))
   } catch (e) {
     return fail(res, 'load statement', e)
   }

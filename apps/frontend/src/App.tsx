@@ -77,6 +77,11 @@ import SchoolAdminSchedulesPage from './pages/SchoolAdminSchedulesPage';
 import SchoolAdminEnrollmentPage from './pages/SchoolAdminEnrollmentPage';
 import SchoolAdminAttendancePage from './pages/SchoolAdminAttendancePage';
 import SchoolAdminReportsPage from './pages/SchoolAdminReportsPage';
+import SchoolAdminGuardiansPage from './pages/SchoolAdminGuardiansPage';
+
+// Parent portal
+import GuardianHomePage from './pages/GuardianHomePage';
+import GuardianChildPage from './pages/GuardianChildPage';
 
 // Corporate Admin Pages
 import CorporateAdminDashboardPage from './pages/CorporateAdminDashboardPage';
@@ -186,6 +191,7 @@ export default function App() {
                     <Route path="/dashboard" element={<SchoolAdminDashboardPage />} />
                     <Route path="/users" element={<SchoolAdminUsersPage />} />
                     <Route path="/students" element={<SchoolAdminStudentsPage />} />
+                    <Route path="/guardians" element={<SchoolAdminGuardiansPage />} />
                     <Route path="/faculty" element={<SchoolAdminFacultyPage />} />
                     <Route path="/courses" element={<SchoolAdminCoursesPage />} />
                     <Route path="/programmes" element={<SchoolAdminProgrammesPage />} />
@@ -332,6 +338,24 @@ export default function App() {
                     <Route path="/work" element={<EmployeeWorkPage />} />
                     <Route path="/check-in" element={<EmployeeSelfServiceAttendancePage />} />
                     <Route path="/settings" element={<StudentSettingsPage />} />
+                  </Routes>
+                </AppShell>
+              </RoleRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Parent portal: a guardian reads what the school shares about the
+            students linked to them. */}
+        <Route
+          path="/guardian/*"
+          element={
+            <ProtectedRoute>
+              <RoleRoute requiredRole="guardian">
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<GuardianHomePage />} />
+                    <Route path="/children/:studentId" element={<GuardianChildPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>

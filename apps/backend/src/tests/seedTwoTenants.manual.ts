@@ -115,6 +115,9 @@ async function main() {
   await query(`DELETE FROM course_sessions WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM tenant_settings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM student_courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  // Guardians hold their school with ON DELETE RESTRICT, like every other
+  // tenant-owned row; deleting them takes their links with them.
+  await query(`DELETE FROM guardians WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM students WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM class_schedules WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM rooms WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)

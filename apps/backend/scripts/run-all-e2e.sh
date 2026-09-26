@@ -57,6 +57,8 @@ SUITES=(
   # exact headcounts do not expect. The next run's fixtures remove them.
   accountSecurity
   crossTenantAudit
+  # Also creates a student (another family's child), so it runs last too.
+  guardiansApi
 )
 
 fail=0

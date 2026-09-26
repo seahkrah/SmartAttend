@@ -13,9 +13,9 @@ import {
   resolveScheme,
   schemeBands,
   computeCourseResults,
-  computeGpa,
   GradingError,
 } from '../services/gradingService.js'
+import { transcriptFor } from '../services/studentRecordsService.js'
 import { resultsPublished } from '../notifications/events.js'
 
 /**
@@ -693,46 +693,9 @@ async function transcriptHandler(req: TenantRequest, res: Response) {
     }
 
     const academicYearId = req.query.academicYearId ? String(req.query.academicYearId) : null
+    if (academicYearId && !UUID.test(academicYearId)) return notFound(res, 'Academic year')
 
-    const rows = await query(
-      `SELECT * FROM student_transcript
-        WHERE tenant_id = $1 AND student_id = $2
-          AND ($3::uuid IS NULL OR academic_year_id = $3::uuid)
-        ORDER BY academic_year NULLS LAST, semester_name NULLS LAST, course_code`,
-      [ctx.tenantId, student.id, academicYearId]
-    )
-
-    const overall = await computeGpa(ctx.tenantId, student.id, null)
-    const forYear = academicYearId
-      ? await computeGpa(ctx.tenantId, student.id, academicYearId)
-      : overall
-
-    const programme = await query(
-      `SELECT p.code, p.name, p.award, p.credits_required, sp.current_study_year, sp.status
-         FROM student_programmes sp
-         JOIN programmes p ON p.id = sp.programme_id
-        WHERE sp.student_id = $1 AND sp.tenant_id = $2 AND sp.status = 'active'
-        LIMIT 1`,
-      [student.id, ctx.tenantId]
-    )
-
-    return res.json({
-      student: {
-        id: student.id,
-        studentNumber: student.student_id,
-        firstName: student.first_name,
-        lastName: student.last_name,
-      },
-      programme: programme.rows[0] ?? null,
-      entries: rows.rows,
-      cgpa: overall.gpa,
-      gpa: forYear.gpa,
-      creditsEarned: overall.creditsEarned,
-      creditsAttempted: overall.creditsAttempted,
-      // Says whether the figures above are credit-weighted or a plain mean,
-      // so a transcript does not imply a weighting the school has not set.
-      creditWeighted: !overall.unweighted,
-    })
+    return res.json(await transcriptFor(ctx.tenantId, student, academicYearId))
   } catch (e) {
     return fail(res, 'load transcript', e)
   }

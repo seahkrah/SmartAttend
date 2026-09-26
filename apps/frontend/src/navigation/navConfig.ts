@@ -14,6 +14,7 @@ import {
   DoorOpen,
   FileText,
   GraduationCap,
+  HeartHandshake,
   Landmark,
   Layers,
   LayoutDashboard,
@@ -70,6 +71,7 @@ export type Audience =
   | 'manager'
   | 'faculty'
   | 'student'
+  | 'guardian'
   | 'employee';
 
 export interface NavItem {
@@ -122,6 +124,7 @@ const schoolAdminNav: AudienceNav = {
       items: [
         { label: 'Users', to: '/admin/school/users', icon: Users, status: 'ready' },
         { label: 'Students', to: '/admin/school/students', icon: GraduationCap, status: 'ready', countKey: 'students' },
+        { label: 'Guardians', to: '/admin/school/guardians', icon: HeartHandshake, status: 'ready' },
         { label: 'Faculty', to: '/admin/school/faculty', icon: UserCog, status: 'ready', countKey: 'faculty' },
       ],
     },
@@ -237,6 +240,26 @@ const studentNav: AudienceNav = {
       label: 'System',
       items: [
         { label: 'Settings', to: '/student/settings', icon: Settings, status: 'ready' },
+      ],
+    },
+  ],
+};
+
+/**
+ * A guardian reads what the school shares about the students linked to them.
+ * One entry: their children. Each child's page carries its own sections, so a
+ * parent of three is not given three copies of the same menu.
+ */
+const guardianNav: AudienceNav = {
+  home: '/guardian',
+  platform: 'school',
+  subtitle: 'Parent portal',
+  showPlatformSwitcher: false,
+  groups: [
+    {
+      label: 'Family',
+      items: [
+        { label: 'My children', to: '/guardian', icon: Users, status: 'ready' },
       ],
     },
   ],
@@ -458,6 +481,7 @@ export const NAVS: Record<Audience, AudienceNav> = {
   manager: managerNav,
   faculty: facultyNav,
   student: studentNav,
+  guardian: guardianNav,
   employee: employeeNav,
 };
 
@@ -486,6 +510,8 @@ export function audienceFor(
       return 'faculty';
     case 'student':
       return 'student';
+    case 'guardian':
+      return 'guardian';
     case 'employee':
       return 'employee';
     default:

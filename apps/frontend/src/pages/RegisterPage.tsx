@@ -1,346 +1,250 @@
-import React from 'react';
-import { UserPlus, Mail, Lock, Building2, AlertCircle, Check } from 'lucide-react';
+/**
+ * "Request access": a school or employer asking to use the platform.
+ *
+ * This replaced a self-registration form that asked would-be students and
+ * employees to choose a password and type their institution's internal ID —
+ * a value nobody outside the database knows. People now get accounts from
+ * their own administrator, by invitation. What this page is for is the step
+ * before: an organisation leaving the details the platform needs to get back
+ * to it.
+ *
+ * What it collects follows the usual international norms for a contact form:
+ *   - only what is needed to reply (GDPR Art. 5(1)(c) data minimisation): no
+ *     password, address, date of birth or identity numbers;
+ *   - country as an ISO 3166-1 code, phone in E.164 international format, so
+ *     a number written in Monrovia can be dialled from anywhere;
+ *   - explicit, unticked consent to be contacted, with its purpose stated,
+ *     recorded with the date and the wording's version;
+ *   - labels on every field, required fields marked, errors announced to
+ *     screen readers (WCAG 2.1 AA).
+ */
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, Send } from 'lucide-react';
+import { axiosClient } from '../utils/axiosClient';
 import { JjeloTechLogo } from '../components/BrandLogo';
-import { PasswordInput } from '../components/PasswordInput';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+
+// ISO 3166-1 alpha-2. Names come from the browser (Intl.DisplayNames), so they
+// are spelled correctly and follow the reader's language.
+const ISO_COUNTRIES =
+  'AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.split(' ');
+
+const SIZE_BANDS = ['1-50', '51-200', '201-1000', '1001-5000', '5000+'];
+
+type OrgType = 'school' | 'employer' | 'both';
+
+const EMPTY = {
+  organisationName: '',
+  organisationType: '' as OrgType | '',
+  countryCode: '',
+  sizeBand: '',
+  contactName: '',
+  jobTitle: '',
+  email: '',
+  phone: '',
+  preferredContact: 'email' as 'email' | 'phone' | 'whatsapp',
+  message: '',
+  consent: false,
+  website: '', // honeypot: hidden from people, filled by bots
+};
+
+const Field: React.FC<{ id: string; label: string; required?: boolean; hint?: string; children: React.ReactNode }> = ({
+  id, label, required, hint, children,
+}) => (
+  <div>
+    <label htmlFor={id} className="block text-sm font-medium text-slate-200">
+      {label} {required ? <span className="text-accent-300" aria-hidden>*</span> : <span className="text-slate-500 font-normal">(optional)</span>}
+    </label>
+    <div className="mt-1.5">{children}</div>
+    {hint && <p id={`${id}-hint`} className="text-xs text-slate-500 mt-1">{hint}</p>}
+  </div>
+);
 
 export const RegisterPage: React.FC = () => {
-  const [fullName, setFullName] = React.useState('');
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [confirmPassword, setConfirmPassword] = React.useState('');
-  const [phone, setPhone] = React.useState('');
-  const [platform, setPlatform] = React.useState<'school' | 'corporate'>('school');
-  const [role, setRole] = React.useState<'student' | 'faculty' | 'it' | 'employee' | 'hr' | ''>('');
-  const [entityId, setEntityId] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState('');
-  const [success, setSuccess] = React.useState(false);
-  const [registrationStatus, setRegistrationStatus] = React.useState<'active' | 'pending_approval' | ''>('');
-  const navigate = useNavigate();
+  const [form, setForm] = useState(EMPTY);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<{ reference: string } | null>(null);
 
-  const schoolRoles = [
-    { value: 'student', label: 'Student', requiresApproval: true },
-    { value: 'faculty', label: 'Faculty', requiresApproval: true },
-    { value: 'it', label: 'IT Administrator', requiresApproval: true }
-  ];
+  const countries = useMemo(() => {
+    let names: Intl.DisplayNames | null = null;
+    try { names = new Intl.DisplayNames([navigator.language, 'en'], { type: 'region' }); } catch { names = null; }
+    return ISO_COUNTRIES
+      .map((code) => ({ code, name: names?.of(code) ?? code }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
 
-  const corporateRoles = [
-    { value: 'employee', label: 'Employee', requiresApproval: true },
-    { value: 'it', label: 'IT Administrator', requiresApproval: true },
-    { value: 'hr', label: 'HR Administrator', requiresApproval: true }
-  ];
+  const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const sizeLabel = form.organisationType === 'employer' ? 'Number of employees'
+    : form.organisationType === 'both' ? 'Number of students and staff' : 'Number of students';
 
-  const availableRoles = platform === 'school' ? schoolRoles : corporateRoles;
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    // Validation
-    if (!fullName || !email || !password || !confirmPassword || !role || !entityId) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (password.length < 10) {
-      setError('Password must be at least 10 characters');
-      return;
-    }
-
-    setLoading(true);
+    setError(null);
+    setSubmitting(true);
     try {
-      const response = await axios.post('/api/auth/register-with-role', {
-        platform,
-        email,
-        fullName,
-        password,
-        confirmPassword,
-        phone: phone || undefined,
-        role,
-        entityId
+      const { data } = await axiosClient.post('/access-requests', {
+        ...form,
+        sizeBand: form.sizeBand || undefined,
+        phone: form.phone || undefined,
+        jobTitle: form.jobTitle || undefined,
+        message: form.message || undefined,
       });
-
-      setSuccess(true);
-      setRegistrationStatus(response.data.user.status);
-
-      // If requires approval, show message and redirect after delay
-      if (response.data.requiresApproval) {
-        setTimeout(() => {
-          navigate('/login', { 
-            state: { 
-              message: 'Your registration is pending admin approval. You will be notified once approved.',
-              email 
-            } 
-          });
-        }, 3000);
-      } else {
-        // If auto-approved, redirect to login
-        setTimeout(() => {
-          navigate('/login', { 
-            state: { 
-              message: 'Registration successful! Please log in.',
-              email 
-            } 
-          });
-        }, 2000);
-      }
+      setDone({ reference: data.reference ?? '' });
+      window.scrollTo({ top: 0 });
     } catch (err: any) {
-      const data = err.response?.data;
-      setError([data?.error || 'Registration failed. Please try again.', ...(data?.problems ?? [])].join(' '));
+      setError(err?.response?.data?.error ?? 'Your request could not be sent. Please check your connection and try again.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Success screen
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center px-4">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-secondary-600/20 rounded-full filter blur-3xl animate-pulse-slow"></div>
-          <div className="absolute bottom-20 right-10 w-72 h-72 bg-primary-500/20 rounded-full filter blur-3xl animate-pulse-slow"></div>
-        </div>
-
-        <div className="relative z-10 w-full max-w-md">
-          <div className="card text-center">
-            <div className="w-16 h-16 bg-green-500/20 border-2 border-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check className="w-8 h-8 text-green-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Registration Successful!</h2>
-            <p className="text-slate-300 mb-6">
-              {registrationStatus === 'pending_approval'
-                ? `Your ${role} account is pending approval from the administrator. You'll receive a notification once approved.`
-                : 'Your account has been created successfully. Redirecting to login...'}
-            </p>
-            <button
-              onClick={() => navigate('/login')}
-              className="btn-primary w-full"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const input = 'w-full rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-slate-100 placeholder:text-slate-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 flex items-center justify-center px-4 py-8">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-secondary-600/20 rounded-full filter blur-3xl animate-pulse-slow"></div>
-        <div className="absolute bottom-20 right-10 w-72 h-72 bg-primary-500/20 rounded-full filter blur-3xl animate-pulse-slow"></div>
-      </div>
+    <div className="min-h-screen bg-[#070a14] text-white px-4 py-10">
+      <div className="mx-auto w-full max-w-2xl">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white">
+          <ArrowLeft className="w-4 h-4" aria-hidden /> Back
+        </Link>
 
-      <div className="relative z-10 w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
+        <div className="text-center mt-6 mb-8">
           <JjeloTechLogo size="lg" className="justify-center text-white" />
-          <h2 className="text-2xl font-bold text-white mt-4 mb-2">Create Account</h2>
-          <p className="text-slate-400">Request access to your school or organisation</p>
+          <h1 className="text-2xl sm:text-3xl font-bold mt-6">Request access</h1>
+          <p className="text-slate-400 mt-2 max-w-lg mx-auto">
+            Tell us about your school or organisation and how to reach you. We will get in touch to discuss
+            your needs and set up your workspace.
+          </p>
         </div>
 
-        {/* Form Card */}
-        <div className="card mb-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Platform Selection */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <Building2 className="inline w-4 h-4 mr-2" />
-                Select Platform
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlatform('school');
-                    setRole('');
-                    setEntityId('');
-                  }}
-                  className={`p-2.5 rounded-lg border-2 transition-all text-sm font-medium ${
-                    platform === 'school'
-                      ? 'border-primary-500 bg-primary-500/20 text-primary-300'
-                      : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600'
-                  }`}
-                >
-                  School
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPlatform('corporate');
-                    setRole('');
-                    setEntityId('');
-                  }}
-                  className={`p-2.5 rounded-lg border-2 transition-all text-sm font-medium ${
-                    platform === 'corporate'
-                      ? 'border-primary-500 bg-primary-500/20 text-primary-300'
-                      : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600'
-                  }`}
-                >
-                  Employer
-                </button>
-              </div>
-            </div>
-
-            {/* Role Selection */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Select Role
-              </label>
-              <div className="space-y-2">
-                {availableRoles.map((r) => (
-                  <label key={r.value} className="flex items-start gap-3 p-2.5 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition">
-                    <input
-                      type="radio"
-                      value={r.value}
-                      checked={role === r.value}
-                      onChange={(e) => setRole(e.target.value as any)}
-                      className="w-4 h-4 mt-0.5"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-slate-300">{r.label}</p>
-                      {r.requiresApproval && (
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <AlertCircle className="w-3 h-3" />
-                          Requires admin approval
-                        </p>
-                      )}
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Entity Selection (placeholder - would be dynamic) */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                {platform === 'school' ? 'School' : 'Company'}
-              </label>
-              <select
-                value={entityId}
-                onChange={(e) => setEntityId(e.target.value)}
-                className="input-field"
-                required
-              >
-                <option value="">Select {platform === 'school' ? 'school' : 'company'}...</option>
-                {platform === 'school' ? (
-                  <>
-                    <option value="primary-university">Primary University</option>
-                    <option value="secondary-university">Secondary University</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="tech-corp">Tech Corp Inc</option>
-                    <option value="finance-solutions">Finance Solutions Ltd</option>
-                  </>
-                )}
-              </select>
-            </div>
-
-            {/* Full Name Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <UserPlus className="inline w-4 h-4 mr-2" />
-                Full Name
-              </label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="John Doe"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Email Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                <Mail className="inline w-4 h-4 mr-2" />
-                Email Address
-              </label>
-              <input
-                type="email"
-                className="input-field"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Phone Input */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Phone (Optional)
-              </label>
-              <input
-                type="tel"
-                className="input-field"
-                placeholder="+1 (555) 123-4567"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-
-            {/* Password Input */}
-            <PasswordInput
-              id="password"
-              name="password"
-              label={<><Lock className="inline w-4 h-4 mr-2" />Password</>}
-              placeholder="Create a strong password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mb-4"
-            />
-
-            {/* Confirm Password Input */}
-            <PasswordInput
-              id="confirmPassword"
-              name="confirmPassword"
-              label={<><Lock className="inline w-4 h-4 mr-2" />Confirm Password</>}
-              placeholder="Confirm your password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mb-4"
-            />
-
-            {/* Error Message */}
+        {done ? (
+          <div role="status" className="rounded-2xl border border-success-500/30 bg-success-500/10 p-8 text-center">
+            <CheckCircle2 className="w-10 h-10 text-success-400 mx-auto" aria-hidden />
+            <h2 className="text-xl font-semibold mt-4">Thank you — we have your request</h2>
+            <p className="text-slate-300 mt-2">
+              We will contact you by {form.preferredContact === 'email' ? `email at ${form.email}` : `${form.preferredContact === 'whatsapp' ? 'WhatsApp' : 'phone'} on ${form.phone}`}.
+            </p>
+            {done.reference && <p className="text-sm text-slate-400 mt-3">Your reference: <span className="font-mono text-slate-200">{done.reference}</span></p>}
+            <Link to="/" className="btn-primary inline-flex mt-6">Back to the home page</Link>
+          </div>
+        ) : (
+          <form onSubmit={submit} noValidate={false} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-8 space-y-8" aria-describedby={error ? 'form-error' : undefined}>
             {error && (
-              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
+              <p id="form-error" role="alert" className="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-200">
+                {error}
+              </p>
             )}
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full justify-center inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <UserPlus className="w-4 h-4" />
-              {loading ? 'Creating account...' : 'Create Account'}
-            </button>
-          </form>
-        </div>
+            <fieldset className="space-y-4">
+              <legend className="text-xs font-semibold uppercase tracking-widest text-accent-300 mb-1">Your organisation</legend>
+              <Field id="org" label="Organisation name" required>
+                <input id="org" className={input} required maxLength={200} autoComplete="organization"
+                  value={form.organisationName} onChange={(e) => set('organisationName', e.target.value)} />
+              </Field>
+              <div>
+                <span className="block text-sm font-medium text-slate-200" id="type-label">
+                  What do you need? <span className="text-accent-300" aria-hidden>*</span>
+                </span>
+                <div role="radiogroup" aria-labelledby="type-label" className="mt-1.5 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {([['school', 'School system', 'SMS'], ['employer', 'Employee system', 'EMS'], ['both', 'Both', 'SMS + EMS']] as const).map(([v, label, sub]) => (
+                    <label key={v} className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-colors ${form.organisationType === v ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700 hover:border-slate-500'}`}>
+                      <input type="radio" name="organisationType" value={v} required className="sr-only"
+                        checked={form.organisationType === v} onChange={() => set('organisationType', v)} />
+                      <span className="block text-sm font-medium">{label}</span>
+                      <span className="block text-xs text-slate-500">{sub}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field id="country" label="Country" required>
+                  <select id="country" className={input} required autoComplete="country"
+                    value={form.countryCode} onChange={(e) => set('countryCode', e.target.value)}>
+                    <option value="">Select a country</option>
+                    {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </select>
+                </Field>
+                <Field id="size" label={sizeLabel}>
+                  <select id="size" className={input} value={form.sizeBand} onChange={(e) => set('sizeBand', e.target.value)}>
+                    <option value="">Prefer not to say</option>
+                    {SIZE_BANDS.map((b) => <option key={b} value={b}>{b.replace('-', '–')}</option>)}
+                  </select>
+                </Field>
+              </div>
+            </fieldset>
 
-        {/* Login Link */}
-        <div className="text-center text-slate-400">
-          Already have an account?{' '}
-          <a href="/login" className="text-primary-400 hover:text-primary-300 font-semibold">
-            Sign in here
-          </a>
-        </div>
+            <fieldset className="space-y-4">
+              <legend className="text-xs font-semibold uppercase tracking-widest text-accent-300 mb-1">How to reach you</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field id="name" label="Your full name" required>
+                  <input id="name" className={input} required maxLength={150} autoComplete="name"
+                    value={form.contactName} onChange={(e) => set('contactName', e.target.value)} />
+                </Field>
+                <Field id="title" label="Job title">
+                  <input id="title" className={input} maxLength={150} autoComplete="organization-title"
+                    placeholder="e.g. Registrar, HR Manager"
+                    value={form.jobTitle} onChange={(e) => set('jobTitle', e.target.value)} />
+                </Field>
+                <Field id="email" label="Work email" required>
+                  <input id="email" type="email" className={input} required maxLength={255} autoComplete="email"
+                    value={form.email} onChange={(e) => set('email', e.target.value)} />
+                </Field>
+                <Field id="phone" label="Phone" required={form.preferredContact !== 'email'}
+                  hint="International format with country code, e.g. +231 77 123 4567">
+                  <input id="phone" type="tel" className={input} autoComplete="tel" inputMode="tel"
+                    required={form.preferredContact !== 'email'} placeholder="+"
+                    aria-describedby="phone-hint"
+                    value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+                </Field>
+              </div>
+              <Field id="contact" label="Preferred way to contact you" required>
+                <select id="contact" className={input} value={form.preferredContact}
+                  onChange={(e) => set('preferredContact', e.target.value as typeof EMPTY.preferredContact)}>
+                  <option value="email">Email</option>
+                  <option value="phone">Phone call</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+              </Field>
+              <Field id="message" label="Anything we should know">
+                <textarea id="message" className={input} rows={4} maxLength={2000}
+                  placeholder="What you want to manage, when you hope to start, and any questions."
+                  value={form.message} onChange={(e) => set('message', e.target.value)} />
+              </Field>
+            </fieldset>
+
+            {/* Honeypot: invisible to people and to assistive technology. */}
+            <div aria-hidden className="absolute -left-[9999px] w-px h-px overflow-hidden">
+              <label htmlFor="website">Website</label>
+              <input id="website" tabIndex={-1} autoComplete="off" value={form.website}
+                onChange={(e) => set('website', e.target.value)} />
+            </div>
+
+            <label className="flex items-start gap-3 text-sm text-slate-300">
+              <input type="checkbox" required className="mt-1 h-4 w-4 flex-shrink-0 rounded border-slate-600"
+                checked={form.consent} onChange={(e) => set('consent', e.target.checked)} />
+              <span>
+                I agree that JJELOTECH SYSTEMS may use these details to contact me about this request. They are
+                used for nothing else and are not shared. <span className="text-accent-300" aria-hidden>*</span>
+              </span>
+            </label>
+
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4">
+              <p className="text-sm text-slate-400">
+                Already have an account? <Link to="/login" className="text-brand-300 hover:text-brand-200">Sign in</Link>
+              </p>
+              <button type="submit" disabled={submitting} className="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-60">
+                <Send className="w-4 h-4" aria-hidden /> {submitting ? 'Sending…' : 'Send request'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <p className="text-center text-xs text-slate-500 mt-6">
+          Students, staff and parents: your school or employer creates your account and sends you an invitation.
+        </p>
       </div>
     </div>
   );
 };
+
+export default RegisterPage;

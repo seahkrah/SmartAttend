@@ -188,11 +188,14 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Sign Up Link */}
-        <div className="text-center text-slate-400">
-          Don't have an account?{' '}
-          <a href="/register" className="text-primary-400 hover:text-primary-300 font-semibold">
-            Sign up here
-          </a>
+        <div className="text-center text-slate-400 text-sm space-y-1">
+          <p>No account? Your school or employer sends you an invitation.</p>
+          <p>
+            New organisation?{' '}
+            <a href="/register" className="text-primary-400 hover:text-primary-300 font-semibold">
+              Request access
+            </a>
+          </p>
         </div>
       </div>
     </div>

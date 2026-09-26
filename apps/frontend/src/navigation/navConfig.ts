@@ -14,6 +14,7 @@ import {
   DoorOpen,
   FileText,
   GraduationCap,
+  Inbox,
   HeartHandshake,
   Landmark,
   Layers,
@@ -456,6 +457,7 @@ const superadminNav: AudienceNav = {
       items: [
         { label: 'Entities & tenants', to: '/superadmin/management', icon: Building2, status: 'ready' },
         { label: 'Administrators', to: '/superadmin/admins', icon: UserCog, status: 'ready' },
+        { label: 'Access requests', to: '/superadmin/access-requests', icon: Inbox, status: 'ready' },
       ],
     },
     {

@@ -51,6 +51,17 @@ async function cleanup() {
   await query(`ALTER TABLE drift_reviews DISABLE TRIGGER USER`)
   await query(`DELETE FROM drift_reviews WHERE reviewed_by IN (SELECT id FROM users WHERE email LIKE '%@sa2e.test')`)
   await query(`ALTER TABLE drift_reviews ENABLE TRIGGER USER`)
+  // Operator actions this fixture's superadmin took (access-request updates,
+  // for one) are in the domain audit log, which is immutable: deleting the
+  // user would try to null their actor_id and be refused. Same exception as
+  // the school fixture: suspended for exactly these rows, then restored.
+  await query(`ALTER TABLE audit_logs DISABLE TRIGGER USER`)
+  try {
+    await query(`DELETE FROM audit_logs WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@sa2e.test')`)
+    await query(`DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@sa2e.test')`)
+  } finally {
+    await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)
+  }
   await query(`DELETE FROM users WHERE email LIKE '%@sa2e.test'`)
 
   // Tenants the suite provisions, and the entities behind them.

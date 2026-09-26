@@ -48,6 +48,8 @@ import feesRoutes from './routes/fees.js'
 // SMS guardians: the school's management of them, and their own portal.
 import guardiansRoutes from './routes/guardians.js'
 import guardianPortalRoutes from './routes/guardianPortal.js'
+// Public "Request access" enquiries, read by the platform operator.
+import accessRequestRoutes from './routes/accessRequests.js'
 // Notification delivery: channels, templates, outbox, preferences, inbox.
 import notificationRoutes from './routes/notifications.js'
 // Document storage: upload, download, quota, access log.
@@ -164,6 +166,7 @@ app.use('/api/admissions', admissionsRoutes)
 app.use('/api/fees', feesRoutes)
 app.use('/api/guardians', guardiansRoutes)
 app.use('/api/guardian', guardianPortalRoutes)
+app.use('/api/access-requests', accessRequestRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/files', fileRoutes)
 app.use('/api/biometrics', biometricsRoutes)

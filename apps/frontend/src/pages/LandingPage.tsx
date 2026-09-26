@@ -194,7 +194,7 @@ export const LandingPage: React.FC = () => (
     <footer className="border-t border-white/10 py-8 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-400">
         <JjeloTechLogo size="sm" className="text-white" />
-        <p>© {new Date().getFullYear()} {BRAND_NAME}. All rights reserved. Powered by SmartCode.</p>
+        <p>© {new Date().getFullYear()} {BRAND_NAME}. All rights reserved. Powered by JjeloTech.</p>
       </div>
     </footer>
   </div>

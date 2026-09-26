@@ -52,26 +52,26 @@ Then set `DATABASE_URL` in whatever shell you are using and run the script.
 **Windows, `cmd.exe`** — note `set`, not `export`, and no spaces around the `=`:
 
 ```
-set DATABASE_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/smartattend
+set DATABASE_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/jjelotech
 node scripts\rotate-credentials.mjs --all
 ```
 
 **Windows, PowerShell:**
 
 ```
-$env:DATABASE_URL = "postgresql://postgres:YOURPASSWORD@localhost:5432/smartattend"
+$env:DATABASE_URL = "postgresql://postgres:YOURPASSWORD@localhost:5432/jjelotech"
 node scripts\rotate-credentials.mjs --all
 ```
 
 **macOS / Linux:**
 
 ```bash
-export DATABASE_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/smartattend
+export DATABASE_URL=postgresql://postgres:YOURPASSWORD@localhost:5432/jjelotech
 node scripts/rotate-credentials.mjs --all
 ```
 
-Use the database name your deployment actually has: `smartattend` if you have
-not yet renamed it, `jjelotech_dev` or similar once you have. `#` is not a
+Use the database name your deployment actually has, for example `jjelotech` or
+`jjelotech_dev`. `#` is not a
 comment character in `cmd.exe`, so do not paste trailing notes onto the command
 line — they become arguments.
 

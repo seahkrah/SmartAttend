@@ -97,3 +97,7 @@ export const refreshLimiter = limiter('refresh', intEnv('RATE_LIMIT_REFRESH_PER_
 /** Password-reset requests, activations, resets and registrations per client address. */
 export const accountLimiter = limiter('account', intEnv('RATE_LIMIT_ACCOUNT_PER_15MIN', 30), 15 * 60_000,
   'Too many account requests from this network. Try again later.')
+
+/** Public access-request enquiries per client address. */
+export const enquiryLimiter = limiter('enquiry', intEnv('RATE_LIMIT_ENQUIRY_PER_HOUR', 20), 60 * 60_000,
+  'Too many requests from this network. Please try again later, or email us instead.')

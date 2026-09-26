@@ -185,12 +185,20 @@ export const useAuthStore = create<AuthState>((set) => {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         set({ user: null, token: null, isLoading: false, error: 'Session expired' });
-        useToastStore.getState().addToast({
-          type: 'warning',
-          title: 'Session Expired',
-          message: 'Please log in again to continue',
-          duration: 5000,
-        });
+        // Only worth saying where the person was actually using their session.
+        // A stale token left in the browser from weeks ago would otherwise
+        // greet a visitor to the home page or the access-request form with
+        // "Session expired, please log in".
+        const PUBLIC = ['/', '/login', '/login-superadmin', '/register', '/register-superadmin',
+          '/forgot-password', '/reset-password', '/activate'];
+        if (!PUBLIC.includes(window.location.pathname)) {
+          useToastStore.getState().addToast({
+            type: 'warning',
+            title: 'Session Expired',
+            message: 'Please log in again to continue',
+            duration: 5000,
+          });
+        }
       } finally {
         loadUserInProgress = false;
         console.log('[authStore] 🔓 Finished loading user, lock released');

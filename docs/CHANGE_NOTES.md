@@ -5,6 +5,74 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Follow-up: brand cleanup and the "Request access" form (2026-09-26)
+
+### Cleanup (as requested)
+
+- The landing footer reads "Powered by JjeloTech".
+- Deleted:
+  - the SmartCode logos (`public/logos/brand-logo.png`, `alt-brand-logo.png`,
+    `logo/brand-logo1.png`, and `logo/alt-brand-logo.png`, an identical copy of the
+    public alt logo);
+  - the earlier SmartAttend logos (`logo/platform-logo1.png`,
+    `logo/alt-platform-logo.png`);
+  - the obsolete `run-hr-e2e.sh` and `run-admin-e2e.sh`;
+  - old log files (`server-output.txt` ×2, `build_errors.txt`, `test-results.txt`).
+- `SECURITY_CREDENTIAL_ROTATION.md` example database name changed to `jjelotech`.
+- Left as they are on purpose:
+  - the password policy's "smartattend" rule, which blocks guessable passwords;
+  - migration 024 and `rotate-credentials.mjs`, which must match the old account
+    addresses;
+  - the leaked file's name in the rotation guide, used by the history cleanup.
+
+### "Request access" replaces self-registration
+
+**What was wrong:** `/register` asked a would-be student or employee to choose a
+password and type their institution's internal UUID (`entityId`), a value nobody
+outside the database knows. It could only ever be completed by someone who already
+had access to the data. People now get accounts from their own administrator, by
+invitation.
+
+**What it is now:** an enquiry form for a school or employer that wants to use the
+platform. The operator gets back to them to discuss terms. It follows common
+international practice for contact forms:
+
+| Principle | How it's applied |
+|---|---|
+| Data minimisation (GDPR Art. 5(1)(c); Liberia, Ghana and Nigeria data laws follow the same principle) | Only what's needed to reply: organisation, type (SMS/EMS/both), country, optional size band, contact name, optional job title, work email, optional phone, preferred contact method, optional message. No password, address, date of birth or ID numbers. Any other fields a client sends are ignored, and a test proves they aren't stored. |
+| International formats | Country is an ISO 3166-1 alpha-2 code, with names from the browser's `Intl.DisplayNames` so they're spelled and localised correctly. Phone numbers are normalised and stored in **E.164** (`+231771234567`); spaces, brackets and a leading `00` are accepted. |
+| Consent | An unticked checkbox stating the purpose ("to contact me about this request … not shared"), recorded with its date and a wording version (`2026-09`). |
+| Reachability | Choosing phone or WhatsApp requires a number (enforced in the API and the database). |
+| Accessibility (WCAG 2.1 AA) | Every field labelled, required fields marked, optional ones say so, errors announced (`role="alert"`), correct `autocomplete` tokens. |
+| Abuse | A hidden honeypot field (a bot gets "received" but nothing is stored), and a limit of 20 requests per hour per address (`RATE_LIMIT_ENQUIRY_PER_HOUR`). |
+
+**Pieces:**
+- Migration `063_access_requests.sql` (belongs to no tenant).
+- `POST /api/access-requests` (public), and `GET` and `PATCH` for superadmins only.
+- A new superadmin page, **Access requests**. It lists enquiries with New,
+  Contacted and Closed filters, shows one-click email, phone and WhatsApp links,
+  and has internal notes. Each change is audited.
+- The sign-in page now says "No account? Your school or employer sends you an
+  invitation. New organisation? Request access".
+
+**Found in passing and fixed:** a stale token in the browser showed a "Session
+Expired – please log in" toast on public pages (home, request access). It now only
+appears on signed-in pages.
+
+**Left in place:** the old `POST /api/auth/register-with-role` endpoint. The UI no
+longer uses it, but the Approvals pages still process anything it created. Removing
+it is a product decision.
+
+**Verification:**
+- New `accessRequestsApi.e2e.py`: 24/24. It covers required fields, ISO and E.164
+  validation, consent, the honeypot, that no extra data is stored, that only a
+  superadmin can read or change requests, and status handling.
+- In the browser: the form filled in by typing and submitted, the record checked in
+  the database, the superadmin page viewed, no overflow at 375 px.
+- Full regression: see the report.
+
+---
+
 ## Phase 4: Rebrand to JJELOTECH SYSTEMS (2026-09-26)
 
 ### Brand source
@@ -40,11 +108,10 @@ changing the artwork means replacing one file and running one command.
   - Removed: developer statistics ("31+ API endpoints", "24 database tables",
     "100% TypeScript"), the unbacked "thousands of organizations" claim, a "View
     Demo" button that did nothing, and six footer links to `#`.
-  - The "Powered by SmartCode" credit is kept. SmartCode is the development vendor,
-    and removing a vendor credit is a business decision, not a rebrand one.
-- **Old assets:** the SmartAttend-era favicon and logos are removed from `public/`
-  (still in Git history). The SmartCode vendor logos stay. The `logo/` artwork
-  folder at the repository root isn't touched.
+  - The footer credit now reads "Powered by JjeloTech".
+- **Old assets:** the earlier favicon and logos are removed from `public/` (still
+  in Git history), and so are the SmartCode logos, in `public/logos/` and in the
+  `logo/` artwork folder.
 
 ### UI/UX pass
 

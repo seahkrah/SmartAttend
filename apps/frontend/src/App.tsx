@@ -25,6 +25,7 @@ import SuperadminManagementPage from './pages/SuperadminManagementPage';
 import SuperadminAdminsPage from './pages/SuperadminAdminsPage';
 import SuperadminAuditLogsPage from './pages/SuperadminAuditLogsPage';
 import SuperadminSettingsPage from './pages/SuperadminSettingsPage';
+import SuperadminAccessRequestsPage from './pages/SuperadminAccessRequestsPage';
 
 // Phase 9 Page Wrappers (with HIERARCHY tokens + error/loading states)
 import AdminTenantPanelPage from './pages/AdminTenantPanelPage';
@@ -170,6 +171,7 @@ export default function App() {
                     <Route path="/entities" element={<SuperadminManagementPage />} />
                     <Route path="/tenants" element={<SuperadminManagementPage />} />
                     <Route path="/admins" element={<SuperadminAdminsPage />} />
+                    <Route path="/access-requests" element={<SuperadminAccessRequestsPage />} />
                     <Route path="/audit" element={<SuperadminAuditLogsPage />} />
                     <Route path="/settings" element={<SuperadminSettingsPage />} />
                     <Route path="/incident/:incidentId" element={<IncidentDetailPage />} />

@@ -22,13 +22,12 @@ sizes whenever the mark changes.
 | `apple-touch-icon.png` | `index.html`: iOS home screen and link previews | 180×180, rasterised from `favicon.svg` |
 | `jjelotech-logo-wordmark.svg` | Landing page hero | Mark and wordmark, transparent, for dark backgrounds. Generated. |
 | `jjelotech-logo.svg` | README and documents | As above, with the tagline. Generated. |
-| `brand-logo.png`, `alt-brand-logo.png` | — | SmartCode (development vendor) logos, credited in the landing page footer. Unreferenced. |
 
 In the app itself the mark is drawn inline by `src/components/BrandLogo.tsx` from
 `src/components/brandMarkPaths.ts` (also generated), so it needs no image request
 and reads on light and dark surfaces alike.
 
-The SmartAttend-era assets that used to live here (`favicon.png`,
+The earlier assets that used to live here (`favicon.png`,
 `platform-logo.png`, `alt-platform-logo.png`, `../favicon 1.svg`) were removed in
 the rebrand. They're still in Git history.
 

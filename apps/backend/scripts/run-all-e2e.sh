@@ -59,6 +59,7 @@ SUITES=(
   crossTenantAudit
   # Also creates a student (another family's child), so it runs last too.
   guardiansApi
+  accessRequestsApi
 )
 
 fail=0

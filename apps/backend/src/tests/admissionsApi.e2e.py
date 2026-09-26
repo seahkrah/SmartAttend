@@ -452,11 +452,18 @@ co, r = call("POST", "/files", AT, None, base="")
 upload_cmd = [
     "curl", "-s", "-w", "\n%{http_code}", "--max-time", "25", "-X", "POST",
     "-H", f"Authorization: Bearer {AT}",
-    "-F", "file=@/dev/stdin;filename=t.pdf;type=application/pdf",
+    "-F", "file=@{};filename=t.pdf;type=application/pdf",
     "-F", "category=application_document",
     ROOT + "/files",
 ]
-proc = subprocess.run(upload_cmd, input=b"%PDF-1.7\ntrailer\n", capture_output=True)
+# A real temporary file rather than /dev/stdin, which Windows' curl cannot read.
+import tempfile
+with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+    tmp.write(b"%PDF-1.7\ntrailer\n")
+upload_cmd[upload_cmd.index("file=@{};filename=t.pdf;type=application/pdf")] = \
+    f"file=@{tmp.name};filename=t.pdf;type=application/pdf"
+proc = subprocess.run(upload_cmd, capture_output=True)
+os.unlink(tmp.name)
 out = proc.stdout.decode()
 txt, _, code = out.rpartition("\n")
 uploaded = json.loads(txt) if code.strip() == "201" else {}

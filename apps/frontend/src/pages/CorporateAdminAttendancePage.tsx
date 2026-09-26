@@ -210,7 +210,7 @@ const CorporateAdminAttendancePage: React.FC = () => {
                 </thead>
                 <tbody>
                   {records.map((r) => (
-                    <tr key={r.checkin_id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+                    <tr key={`${r.employee_id}-${r.checkin_id ?? 'none'}`} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">

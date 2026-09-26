@@ -48,7 +48,12 @@ const FacultyStudentsPage: React.FC = () => {
         axiosClient.get('/faculty/courses'),
       ])
       setStudents(studentsRes.data)
-      setCourses(coursesRes.data)
+      // /faculty/courses answers with the course's own column names (id,
+      // code, name); this page's filter was written against course_* names
+      // that endpoint never sent, so the dropdown offered one blank option.
+      setCourses((coursesRes.data ?? []).map((c: any) => ({
+        course_id: c.id, course_code: c.code, course_name: c.name,
+      })))
     } catch {
       // error
     } finally {

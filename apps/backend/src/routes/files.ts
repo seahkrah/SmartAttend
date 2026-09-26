@@ -58,11 +58,16 @@ const router = Router()
 // been identified. Memory storage would mean a 50 MB upload held in the heap
 // per concurrent request.
 const STAGING = join(tmpdir(), 'jjelotech-uploads')
-await mkdir(STAGING, { recursive: true }).catch(() => undefined)
 
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, STAGING),
+    // Made sure of per upload, not once at start-up: the system's temp
+    // cleaner (Storage Sense, systemd-tmpfiles) may remove an empty staging
+    // directory while the server runs, after which every upload failed with
+    // ENOENT until a restart.
+    destination: (_req, _file, cb) => {
+      mkdir(STAGING, { recursive: true }).then(() => cb(null, STAGING), (e) => cb(e, STAGING))
+    },
     // multer's own name, not the client's: nothing a caller sent reaches the
     // filesystem even in staging.
     filename: (_req, _file, cb) =>

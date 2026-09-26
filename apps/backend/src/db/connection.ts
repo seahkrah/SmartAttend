@@ -1,6 +1,5 @@
 import pg from 'pg'
 import dotenv from 'dotenv'
-import { runMigrations } from './migrations.js'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { readFileSync } from 'fs'
@@ -64,9 +63,13 @@ export async function initializeDatabase() {
   try {
     const result = await query('SELECT 1')
     console.log('✅ Database connection successful')
-    
-    // Run migrations
-    await runMigrations()
+    // Migrations are not applied here. They are a deliberate step
+    // (`npx tsx src/db/migrate.ts`, run by setup, CI and the deploy docs), and
+    // the server used to apply a hardcoded subset of them (001-012) on start,
+    // in an order of its own — on a fresh database that ran migrations out of
+    // sequence and left a half-built schema that looked like a working one.
+    // startServer reports anything pending, and /api/health/ready refuses
+    // traffic until it is applied.
   } catch (error) {
     console.error('❌ Database initialization failed:', error)
     throw error

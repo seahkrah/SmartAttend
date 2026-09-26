@@ -209,6 +209,14 @@ async function startServer() {
     await initializeDatabase()
     console.log('[DB] ✓ Connected')
 
+    const pending = await pendingMigrations()
+    if (pending.length > 0) {
+      console.warn(`[DB] WARNING: ${pending.length} migration(s) not applied (${pending[0]}${pending.length > 1 ? ' …' : ''}).`)
+      console.warn('[DB] Run `npx tsx src/db/migrate.ts` in apps/backend. /api/health/ready answers 503 until then.')
+    } else {
+      console.log('[DB] ✓ Schema is current')
+    }
+
     // Create HTTP server
     const server = http.createServer(app)
 

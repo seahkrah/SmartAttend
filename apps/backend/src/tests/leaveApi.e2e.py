@@ -157,9 +157,12 @@ co, r = call("POST", "/requests", EMP_A,
              {"leaveTypeId": annual, "startDate": d(0), "endDate": d(40)})
 check("more days than remain is refused", co == 409, f"({co} {r})")
 
+# Starting today, over three days: any three consecutive days include a
+# working day, so the range is never refused as empty (as "today" alone is on
+# a weekend) before the notice rule is reached.
 co, r = call("POST", "/requests", EMP_A,
              {"leaveTypeId": annual, "startDate": date.today().isoformat(),
-              "endDate": date.today().isoformat()})
+              "endDate": (date.today() + timedelta(days=2)).isoformat()})
 check("short notice is refused", co == 400 and 'notice' in str(r).lower(), f"({co} {r})")
 
 co, r = call("POST", "/requests", EMP_A, {"leaveTypeId": annual_b, "startDate": d(7), "endDate": d(8)})

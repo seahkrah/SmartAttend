@@ -8,6 +8,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { SuperadminRegisterPage } from './pages/SuperadminRegisterPage';
 import { SuperadminLoginPage } from './pages/SuperadminLoginPage';
 import HomeRedirect from './components/routing/HomeRedirect';
+import NotFoundPage from './pages/NotFoundPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { SetPasswordPage } from './pages/SetPasswordPage';
@@ -172,6 +173,7 @@ export default function App() {
                     <Route path="/audit" element={<SuperadminAuditLogsPage />} />
                     <Route path="/settings" element={<SuperadminSettingsPage />} />
                     <Route path="/incident/:incidentId" element={<IncidentDetailPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>
@@ -209,6 +211,7 @@ export default function App() {
                     <Route path="/reports" element={<SchoolAdminReportsPage />} />
                     <Route path="/approvals" element={<SchoolAdminApprovalsPage />} />
                     <Route path="/settings" element={<SchoolAdminSettingsPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>
@@ -234,6 +237,7 @@ export default function App() {
                     <Route path="/notifications" element={<AdminNotificationsPage />} />
                     <Route path="/incidents" element={<TenantIncidentsPage />} />
                     <Route path="/settings" element={<CorporateAdminSettingsPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>
@@ -252,6 +256,7 @@ export default function App() {
                     <Route path="/" element={<AdminTenantPanelPage />} />
                     <Route path="/dashboard" element={<AdminTenantPanelPage />} />
                     <Route path="/tenants" element={<AdminTenantPanelPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>
@@ -276,6 +281,7 @@ export default function App() {
                     <Route path="/gradebook" element={<FacultyGradebookPage />} />
                     <Route path="/reports" element={<FacultyReportsPage />} />
                     <Route path="/settings" element={<FacultySettingsPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>
@@ -312,6 +318,7 @@ export default function App() {
                     <Route path="/check-in" element={<EmployeeSelfServiceAttendancePage />} />
                     <Route path="/timesheets" element={
                       <HRTimesheetsPage canExport={isDirector} />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>
@@ -338,6 +345,7 @@ export default function App() {
                     <Route path="/work" element={<EmployeeWorkPage />} />
                     <Route path="/check-in" element={<EmployeeSelfServiceAttendancePage />} />
                     <Route path="/settings" element={<StudentSettingsPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>
@@ -356,6 +364,7 @@ export default function App() {
                   <Routes>
                     <Route path="/" element={<GuardianHomePage />} />
                     <Route path="/children/:studentId" element={<GuardianChildPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
               </RoleRoute>

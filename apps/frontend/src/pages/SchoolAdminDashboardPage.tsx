@@ -168,7 +168,6 @@ const SchoolAdminDashboardPage: React.FC = () => {
             value={stats.totalUsers}
             icon={<Users className="w-6 h-6 text-white" />}
             color="bg-blue-500"
-            trend="+12%"
           />
           <StatCard
             label="Active Users"
@@ -187,7 +186,6 @@ const SchoolAdminDashboardPage: React.FC = () => {
             value={`${stats.attendanceRate}%`}
             icon={<TrendingUp className="w-6 h-6 text-white" />}
             color="bg-indigo-500"
-            trend="+5%"
           />
         </div>
 

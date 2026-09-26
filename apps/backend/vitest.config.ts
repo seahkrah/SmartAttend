@@ -6,7 +6,11 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     root: process.cwd(),
-    testMatch: ['**/*.test.ts'],
+    // `include`, not Jest's `testMatch`, which Vitest ignores: with it, the
+    // default pattern also picked up stale compiled tests in dist/ and
+    // reported dozens of failures in code that no longer exists.
+    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    exclude: ['dist/**', 'node_modules/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

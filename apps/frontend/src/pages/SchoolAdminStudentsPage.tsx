@@ -32,6 +32,11 @@ const SchoolAdminStudentsPage: React.FC = () => {
   const [invite, setInvite] = useState<{ userId: string; name: string; invitation: InvitationResult | null } | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  // One page at a time, searched on the server: a school's full list runs to
+  // megabytes once it has a few thousand students.
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
   const { addToast } = useToastStore();
 
@@ -52,18 +57,21 @@ const SchoolAdminStudentsPage: React.FC = () => {
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
+  // A new search starts from the first page; typing is debounced so each
+  // keystroke is not a request.
   useEffect(() => {
-    fetchStudents();
-  }, []);
+    const t = setTimeout(() => void fetchStudents(), searchTerm ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [page, searchTerm]);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get('/api/auth/admin/school/students', {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await apiClient.get('/auth/admin/school/students', {
+        params: { page, pageSize: PAGE_SIZE, search: searchTerm.trim() || undefined },
       });
       setStudents(response.data.students);
+      setTotal(response.data.total ?? response.data.students.length);
     } catch (error: any) {
       addToast({ type: 'error', title: 'Error', message: getErrorMessage(error) });
     } finally {
@@ -271,12 +279,9 @@ const SchoolAdminStudentsPage: React.FC = () => {
     setEditingStudent(student);
   };
 
-  const filteredStudents = students.filter(student =>
-    student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // The server has already applied the search.
+  const filteredStudents = students;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <>
@@ -309,7 +314,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
           type="text"
           placeholder="Search by name, student ID, or email..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
           className="w-full px-4 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary placeholder:text-muted"
         />
       </div>
@@ -402,6 +407,18 @@ const SchoolAdminStudentsPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+          {total > PAGE_SIZE && (
+            <nav aria-label="Pages" className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-subtle text-sm">
+              <span className="text-muted">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()} students
+              </span>
+              <span className="flex gap-2">
+                <button className="btn btn-ghost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</button>
+                <span className="self-center text-muted">Page {page} of {pages}</span>
+                <button className="btn btn-ghost" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</button>
+              </span>
+            </nav>
+          )}
         </div>
       )}
 

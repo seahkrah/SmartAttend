@@ -98,29 +98,29 @@ router.get('/dashboard', requireRole('faculty'), async (req: TenantRequest, res:
       today_classes: [], attendance_rate: 0, recent_sessions: 0, course_breakdown: []
     })
 
+    // The six figures are independent, so they are fetched together rather
+    // than one after another.
+
     // Total distinct students across all schedules
-    const studentsResult = await query(
+    const studentsResultP = query(
       `SELECT COUNT(DISTINCT ss.student_id) as total
        FROM student_courses ss
        JOIN class_schedules cs ON ss.schedule_id = cs.id
        WHERE cs.faculty_id = $1 AND ss.status = 'enrolled' AND cs.tenant_id = $2`,
       [facultyId, ctx.tenantId]
     )
-    const total_students = parseInt(studentsResult.rows[0]?.total || '0')
 
     // Total courses & schedules
-    const schedulesResult = await query(
+    const schedulesResultP = query(
       `SELECT COUNT(*) as schedule_count, COUNT(DISTINCT course_id) as course_count
        FROM class_schedules WHERE faculty_id = $1 AND tenant_id = $2`,
       [facultyId, ctx.tenantId]
     )
-    const total_courses = parseInt(schedulesResult.rows[0]?.course_count || '0')
-    const total_schedules = parseInt(schedulesResult.rows[0]?.schedule_count || '0')
 
     // Today's classes (match day_of_week: 0=Sun..6=Sat)
     const today = new Date()
     const dayOfWeek = today.getDay() // JS: 0=Sun
-    const todayClasses = await query(
+    const todayClassesP = query(
       `SELECT cs.id, c.name as course_name, c.code as course_code,
               r.room_number as room_name, cs.start_time, cs.end_time, cs.section,
               (SELECT COUNT(*) FROM student_courses ss WHERE ss.schedule_id = cs.id AND ss.status = 'enrolled') as student_count
@@ -135,7 +135,7 @@ router.get('/dashboard', requireRole('faculty'), async (req: TenantRequest, res:
     )
 
     // Overall attendance rate (from all time)
-    const rateResult = await query(
+    const rateResultP = query(
       `SELECT
          COUNT(*) as total,
          COUNT(*) FILTER (WHERE sa.status IN ('present','late')) as attended
@@ -144,12 +144,9 @@ router.get('/dashboard', requireRole('faculty'), async (req: TenantRequest, res:
        WHERE cs.faculty_id = $1 AND cs.tenant_id = $2`,
       [facultyId, ctx.tenantId]
     )
-    const rateTotal = parseInt(rateResult.rows[0]?.total || '0')
-    const rateAttended = parseInt(rateResult.rows[0]?.attended || '0')
-    const attendance_rate = rateTotal > 0 ? Math.round((rateAttended / rateTotal) * 100) : 0
 
     // Recent sessions count (last 7 days)
-    const recentResult = await query(
+    const recentResultP = query(
       `SELECT COUNT(DISTINCT attendance_date) as cnt
        FROM school_attendance sa
        JOIN class_schedules cs ON sa.schedule_id = cs.id
@@ -157,10 +154,9 @@ router.get('/dashboard', requireRole('faculty'), async (req: TenantRequest, res:
          AND sa.attendance_date >= CURRENT_DATE - INTERVAL '7 days'`,
       [facultyId, ctx.tenantId]
     )
-    const recent_sessions = parseInt(recentResult.rows[0]?.cnt || '0')
 
     // Course breakdown: per-course student count
-    const breakdownResult = await query(
+    const breakdownResultP = query(
       `SELECT c.code as course_code, c.name as course_name,
               COUNT(DISTINCT ss.student_id) as student_count
        FROM class_schedules cs
@@ -171,6 +167,16 @@ router.get('/dashboard', requireRole('faculty'), async (req: TenantRequest, res:
        ORDER BY c.name`,
       [facultyId, ctx.tenantId]
     )
+
+    const [studentsResult, schedulesResult, todayClasses, rateResult, recentResult, breakdownResult] =
+      await Promise.all([studentsResultP, schedulesResultP, todayClassesP, rateResultP, recentResultP, breakdownResultP])
+    const total_students = parseInt(studentsResult.rows[0]?.total || '0')
+    const total_courses = parseInt(schedulesResult.rows[0]?.course_count || '0')
+    const total_schedules = parseInt(schedulesResult.rows[0]?.schedule_count || '0')
+    const rateTotal = parseInt(rateResult.rows[0]?.total || '0')
+    const rateAttended = parseInt(rateResult.rows[0]?.attended || '0')
+    const attendance_rate = rateTotal > 0 ? Math.round((rateAttended / rateTotal) * 100) : 0
+    const recent_sessions = parseInt(recentResult.rows[0]?.cnt || '0')
 
     return res.json({
       total_students,
@@ -206,29 +212,44 @@ router.get('/students', requireRole('faculty'), async (req: TenantRequest, res: 
     const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.json([])
 
+    // Attendance is counted per student and schedule before it meets the
+    // roster. Joining every mark to every row and then COUNT(DISTINCT date)
+    // sorted the whole attendance history (spilling to disk at a few thousand
+    // students); the unique (schedule, student, date) constraint already
+    // makes each mark one day, so a plain count is the same answer.
     const result = await query(
-      `SELECT
+      `WITH mine AS (
+         SELECT cs.id, cs.section, c.code, c.name
+           FROM class_schedules cs
+           JOIN courses c ON c.id = cs.course_id AND c.tenant_id = cs.tenant_id
+          WHERE cs.faculty_id = $1 AND cs.tenant_id = $2
+       ), att AS (
+         SELECT sa.student_id, sa.schedule_id,
+                COUNT(*) AS total_classes,
+                COUNT(*) FILTER (WHERE sa.status = 'present') AS present_count,
+                COUNT(*) FILTER (WHERE sa.status = 'absent') AS absent_count
+           FROM school_attendance sa
+          WHERE sa.tenant_id = $2 AND sa.schedule_id IN (SELECT id FROM mine)
+          GROUP BY sa.student_id, sa.schedule_id
+       )
+       SELECT
          s.id as student_id,
          s.student_id as student_code,
          s.first_name,
          s.last_name,
          s.email,
-         c.code as course_code,
-         c.name as course_name,
-         cs.section as schedule_section,
-         COUNT(DISTINCT sa_all.attendance_date) as total_classes,
-         COUNT(DISTINCT sa_all.attendance_date) FILTER (WHERE sa_all.status = 'present') as present_count,
-         COUNT(DISTINCT sa_all.attendance_date) FILTER (WHERE sa_all.status = 'absent') as absent_count
+         mine.code as course_code,
+         mine.name as course_name,
+         mine.section as schedule_section,
+         COALESCE(att.total_classes, 0) as total_classes,
+         COALESCE(att.present_count, 0) as present_count,
+         COALESCE(att.absent_count, 0) as absent_count
        FROM student_courses ss
-       JOIN class_schedules cs ON ss.schedule_id = cs.id
-       JOIN courses c ON cs.course_id = c.id
-       JOIN students s ON ss.student_id = s.id
-       LEFT JOIN school_attendance sa_all
-         ON sa_all.student_id = s.id AND sa_all.schedule_id = cs.id
-       WHERE cs.faculty_id = $1 AND ss.status = 'enrolled' AND cs.tenant_id = $2
-       GROUP BY s.id, s.student_id, s.first_name, s.last_name, s.email,
-                c.code, c.name, cs.section
-       ORDER BY s.last_name, s.first_name, c.code`,
+       JOIN mine ON mine.id = ss.schedule_id
+       JOIN students s ON s.id = ss.student_id AND s.tenant_id = ss.tenant_id
+       LEFT JOIN att ON att.student_id = s.id AND att.schedule_id = mine.id
+       WHERE ss.status = 'enrolled' AND ss.tenant_id = $2
+       ORDER BY s.last_name, s.first_name, mine.code`,
       [facultyId, ctx.tenantId]
     )
 
@@ -452,25 +473,53 @@ router.get('/reports', requireRole('faculty'), async (req: TenantRequest, res: R
 
     const dateFilter = dateConditions.length > 0 ? ` AND ${dateConditions.join(' AND ')}` : ''
 
+    // Same counts as before — sessions are distinct days across the
+    // lecturer's classes, and a day counts as present/absent/… if any class
+    // that day was — but reached by collapsing to one row per student and
+    // day first (a hash aggregate) instead of COUNT(DISTINCT) over the joined
+    // history, which sorted every attendance row and spilled to disk.
+    const scheduleConditions = conditions.filter((c) => c.startsWith('cs.'))
     const sql = `
+      WITH mine AS (
+        SELECT cs.id FROM class_schedules cs WHERE ${scheduleConditions.join(' AND ')}
+      ), roster AS (
+        SELECT DISTINCT ss.student_id
+          FROM student_courses ss
+         WHERE ss.schedule_id IN (SELECT id FROM mine) AND ss.status = 'enrolled' AND ss.tenant_id = $1
+      ), days AS (
+        SELECT sa.student_id, sa.attendance_date,
+               bool_or(sa.status = 'present') AS present,
+               bool_or(sa.status = 'absent')  AS absent,
+               bool_or(sa.status = 'late')    AS late,
+               bool_or(sa.status = 'excused') AS excused
+          FROM student_courses ss
+          JOIN school_attendance sa
+            ON sa.student_id = ss.student_id AND sa.schedule_id = ss.schedule_id AND sa.tenant_id = ss.tenant_id
+         WHERE ss.schedule_id IN (SELECT id FROM mine) AND ss.status = 'enrolled' AND ss.tenant_id = $1${dateFilter}
+         GROUP BY sa.student_id, sa.attendance_date
+      ), counts AS (
+        SELECT student_id,
+               COUNT(*) AS total_sessions,
+               COUNT(*) FILTER (WHERE present) AS present,
+               COUNT(*) FILTER (WHERE absent)  AS absent,
+               COUNT(*) FILTER (WHERE late)    AS late,
+               COUNT(*) FILTER (WHERE excused) AS excused
+          FROM days GROUP BY student_id
+      )
       SELECT
         s.id as student_id,
         s.student_id as student_code,
         s.first_name,
         s.last_name,
         s.email,
-        COUNT(DISTINCT sa.attendance_date) as total_sessions,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'present') as present,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'absent') as absent,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'late') as late,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'excused') as excused
-      FROM student_courses ss
-      JOIN class_schedules cs ON ss.schedule_id = cs.id
-      JOIN students s ON ss.student_id = s.id
-      LEFT JOIN school_attendance sa
-        ON sa.student_id = s.id AND sa.schedule_id = cs.id${dateFilter}
-      WHERE ${conditions.join(' AND ')}
-      GROUP BY s.id, s.student_id, s.first_name, s.last_name, s.email
+        COALESCE(c.total_sessions, 0) as total_sessions,
+        COALESCE(c.present, 0) as present,
+        COALESCE(c.absent, 0) as absent,
+        COALESCE(c.late, 0) as late,
+        COALESCE(c.excused, 0) as excused
+      FROM roster r
+      JOIN students s ON s.id = r.student_id AND s.tenant_id = $1
+      LEFT JOIN counts c ON c.student_id = r.student_id
       ORDER BY s.last_name, s.first_name
     `
 

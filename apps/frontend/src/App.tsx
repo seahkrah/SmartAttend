@@ -1,98 +1,22 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 // Pages
-import { LandingPage } from './pages/LandingPage';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { SuperadminRegisterPage } from './pages/SuperadminRegisterPage';
-import { SuperadminLoginPage } from './pages/SuperadminLoginPage';
 import HomeRedirect from './components/routing/HomeRedirect';
-import NotFoundPage from './pages/NotFoundPage';
-import { ChangePasswordPage } from './pages/ChangePasswordPage';
-import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
-import { SetPasswordPage } from './pages/SetPasswordPage';
-import TenantIncidentsPage from './pages/TenantIncidentsPage';
-import SchoolAdminDepartmentsPage from './pages/SchoolAdminDepartmentsPage';
-import SchoolAdminResultsPage from './pages/SchoolAdminResultsPage';
-import IncidentDetailPage from './pages/IncidentDetailPage';
 
 // Superadmin Pages
-import SuperadminConsolePage from './pages/SuperadminConsolePage';
-import SuperadminDashboardPage from './pages/SuperadminDashboardPage';
-import SuperadminIncidentsPage from './pages/SuperadminIncidentsPage';
-import SuperadminManagementPage from './pages/SuperadminManagementPage';
-import SuperadminAdminsPage from './pages/SuperadminAdminsPage';
-import SuperadminAuditLogsPage from './pages/SuperadminAuditLogsPage';
-import SuperadminSettingsPage from './pages/SuperadminSettingsPage';
-import SuperadminAccessRequestsPage from './pages/SuperadminAccessRequestsPage';
 
 // Phase 9 Page Wrappers (with HIERARCHY tokens + error/loading states)
-import AdminTenantPanelPage from './pages/AdminTenantPanelPage';
-import FacultyAttendanceWorkflowPage from './pages/FacultyAttendanceWorkflowPage';
-import HRTodayPage from './pages/HRTodayPage';
-import { HRAnalyticsPanelPage } from './pages/HRAnalyticsPanelPage';
 
 // Faculty Portal Pages
-import FacultyDashboardPage from './pages/FacultyDashboardPage';
-import FacultyStudentsPage from './pages/FacultyStudentsPage';
-import FacultyCoursesPage from './pages/FacultyCoursesPage';
-import FacultyEnrollmentPage from './pages/FacultyEnrollmentPage';
-import FacultySchedulesPage from './pages/FacultySchedulesPage';
-import FacultyReportsPage from './pages/FacultyReportsPage';
-import FacultySettingsPage from './pages/FacultySettingsPage';
 
 // Student Portal Pages
-import StudentDashboardPage from './pages/StudentDashboardPage';
-import StudentCoursesPage from './pages/StudentCoursesPage';
-import StudentAttendancePage from './pages/StudentAttendancePage';
-import StudentSchedulePage from './pages/StudentSchedulePage';
-import StudentSettingsPage from './pages/StudentSettingsPage';
 
 // School Admin Pages
-import SchoolAdminDashboardPage from './pages/SchoolAdminDashboardPage';
-import FaceMatchingAdminPage from './pages/FaceMatchingAdminPage';
-import SchoolAdminUsersPage from './pages/SchoolAdminUsersPage';
-import SchoolAdminApprovalsPage from './pages/SchoolAdminApprovalsPage';
-import SchoolAdminSettingsPage from './pages/SchoolAdminSettingsPage';
-import SchoolAdminStudentsPage from './pages/SchoolAdminStudentsPage';
-import SchoolAdminFacultyPage from './pages/SchoolAdminFacultyPage';
-import SchoolAdminCoursesPage from './pages/SchoolAdminCoursesPage';
-import SchoolAdminProgrammesPage from './pages/SchoolAdminProgrammesPage';
-import SchoolAdminAdmissionsPage from './pages/SchoolAdminAdmissionsPage';
-import SchoolAdminFinancePage from './pages/SchoolAdminFinancePage';
-import AdminNotificationsPage from './pages/AdminNotificationsPage';
-import FacultyGradebookPage from './pages/FacultyGradebookPage';
-import StudentResultsPage from './pages/StudentResultsPage';
-import StudentFeesPage from './pages/StudentFeesPage';
-import EmployeeLeavePage from './pages/EmployeeLeavePage';
-import HRLeavePage from './pages/HRLeavePage';
-import HRPayrollPage from './pages/HRPayrollPage';
-import HRContractsPage from './pages/HRContractsPage';
-import HRRosterPage from './pages/HRRosterPage';
-import HRTimesheetsPage from './pages/HRTimesheetsPage';
-import EmployeeWorkPage from './pages/EmployeeWorkPage';
-import EmployeeSelfServiceAttendancePage from './pages/EmployeeSelfServiceAttendancePage';
-import EmployeePayslipsPage from './pages/EmployeePayslipsPage';
-import SchoolAdminRoomsPage from './pages/SchoolAdminRoomsPage';
-import SchoolAdminSchedulesPage from './pages/SchoolAdminSchedulesPage';
-import SchoolAdminEnrollmentPage from './pages/SchoolAdminEnrollmentPage';
-import SchoolAdminAttendancePage from './pages/SchoolAdminAttendancePage';
-import SchoolAdminReportsPage from './pages/SchoolAdminReportsPage';
-import SchoolAdminGuardiansPage from './pages/SchoolAdminGuardiansPage';
 
 // Parent portal
-import GuardianHomePage from './pages/GuardianHomePage';
-import GuardianChildPage from './pages/GuardianChildPage';
 
 // Corporate Admin Pages
-import CorporateAdminDashboardPage from './pages/CorporateAdminDashboardPage';
-import CorporateAdminUsersPage from './pages/CorporateAdminUsersPage';
-import CorporateAdminApprovalsPage from './pages/CorporateAdminApprovalsPage';
-import CorporateAdminSettingsPage from './pages/CorporateAdminSettingsPage';
-import CorporateAdminDepartmentsPage from './pages/CorporateAdminDepartmentsPage';
-import CorporateAdminAttendancePage from './pages/CorporateAdminAttendancePage';
-import CorporateAdminReportsPage from './pages/CorporateAdminReportsPage';
 
 // Components
 import { RoleRoute, ProtectedRoute } from './components/routing/RoleRoute';
@@ -102,6 +26,85 @@ import { DarkSurface } from './theme/DarkSurface';
 
 // Store
 import { useAuthStore } from './store/authStore';
+
+// Every page is loaded on demand: a visitor downloads the shell and the pages they open,
+// not all of them. See docs/CHANGE_NOTES.md (foundation step 3).
+const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage })));
+const SuperadminRegisterPage = lazy(() => import('./pages/SuperadminRegisterPage').then((m) => ({ default: m.SuperadminRegisterPage })));
+const SuperadminLoginPage = lazy(() => import('./pages/SuperadminLoginPage').then((m) => ({ default: m.SuperadminLoginPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })));
+const SetPasswordPage = lazy(() => import('./pages/SetPasswordPage').then((m) => ({ default: m.SetPasswordPage })));
+const TenantIncidentsPage = lazy(() => import('./pages/TenantIncidentsPage'));
+const SchoolAdminDepartmentsPage = lazy(() => import('./pages/SchoolAdminDepartmentsPage'));
+const SchoolAdminResultsPage = lazy(() => import('./pages/SchoolAdminResultsPage'));
+const IncidentDetailPage = lazy(() => import('./pages/IncidentDetailPage'));
+const SuperadminConsolePage = lazy(() => import('./pages/SuperadminConsolePage'));
+const SuperadminDashboardPage = lazy(() => import('./pages/SuperadminDashboardPage'));
+const SuperadminIncidentsPage = lazy(() => import('./pages/SuperadminIncidentsPage'));
+const SuperadminManagementPage = lazy(() => import('./pages/SuperadminManagementPage'));
+const SuperadminAdminsPage = lazy(() => import('./pages/SuperadminAdminsPage'));
+const SuperadminAuditLogsPage = lazy(() => import('./pages/SuperadminAuditLogsPage'));
+const SuperadminSettingsPage = lazy(() => import('./pages/SuperadminSettingsPage'));
+const SuperadminAccessRequestsPage = lazy(() => import('./pages/SuperadminAccessRequestsPage'));
+const AdminTenantPanelPage = lazy(() => import('./pages/AdminTenantPanelPage'));
+const FacultyAttendanceWorkflowPage = lazy(() => import('./pages/FacultyAttendanceWorkflowPage'));
+const HRTodayPage = lazy(() => import('./pages/HRTodayPage'));
+const HRAnalyticsPanelPage = lazy(() => import('./pages/HRAnalyticsPanelPage').then((m) => ({ default: m.HRAnalyticsPanelPage })));
+const FacultyDashboardPage = lazy(() => import('./pages/FacultyDashboardPage'));
+const FacultyStudentsPage = lazy(() => import('./pages/FacultyStudentsPage'));
+const FacultyCoursesPage = lazy(() => import('./pages/FacultyCoursesPage'));
+const FacultyEnrollmentPage = lazy(() => import('./pages/FacultyEnrollmentPage'));
+const FacultySchedulesPage = lazy(() => import('./pages/FacultySchedulesPage'));
+const FacultyReportsPage = lazy(() => import('./pages/FacultyReportsPage'));
+const FacultySettingsPage = lazy(() => import('./pages/FacultySettingsPage'));
+const StudentDashboardPage = lazy(() => import('./pages/StudentDashboardPage'));
+const StudentCoursesPage = lazy(() => import('./pages/StudentCoursesPage'));
+const StudentAttendancePage = lazy(() => import('./pages/StudentAttendancePage'));
+const StudentSchedulePage = lazy(() => import('./pages/StudentSchedulePage'));
+const StudentSettingsPage = lazy(() => import('./pages/StudentSettingsPage'));
+const SchoolAdminDashboardPage = lazy(() => import('./pages/SchoolAdminDashboardPage'));
+const FaceMatchingAdminPage = lazy(() => import('./pages/FaceMatchingAdminPage'));
+const SchoolAdminUsersPage = lazy(() => import('./pages/SchoolAdminUsersPage'));
+const SchoolAdminApprovalsPage = lazy(() => import('./pages/SchoolAdminApprovalsPage'));
+const SchoolAdminSettingsPage = lazy(() => import('./pages/SchoolAdminSettingsPage'));
+const SchoolAdminStudentsPage = lazy(() => import('./pages/SchoolAdminStudentsPage'));
+const SchoolAdminFacultyPage = lazy(() => import('./pages/SchoolAdminFacultyPage'));
+const SchoolAdminCoursesPage = lazy(() => import('./pages/SchoolAdminCoursesPage'));
+const SchoolAdminProgrammesPage = lazy(() => import('./pages/SchoolAdminProgrammesPage'));
+const SchoolAdminAdmissionsPage = lazy(() => import('./pages/SchoolAdminAdmissionsPage'));
+const SchoolAdminFinancePage = lazy(() => import('./pages/SchoolAdminFinancePage'));
+const AdminNotificationsPage = lazy(() => import('./pages/AdminNotificationsPage'));
+const FacultyGradebookPage = lazy(() => import('./pages/FacultyGradebookPage'));
+const StudentResultsPage = lazy(() => import('./pages/StudentResultsPage'));
+const StudentFeesPage = lazy(() => import('./pages/StudentFeesPage'));
+const EmployeeLeavePage = lazy(() => import('./pages/EmployeeLeavePage'));
+const HRLeavePage = lazy(() => import('./pages/HRLeavePage'));
+const HRPayrollPage = lazy(() => import('./pages/HRPayrollPage'));
+const HRContractsPage = lazy(() => import('./pages/HRContractsPage'));
+const HRRosterPage = lazy(() => import('./pages/HRRosterPage'));
+const HRTimesheetsPage = lazy(() => import('./pages/HRTimesheetsPage'));
+const EmployeeWorkPage = lazy(() => import('./pages/EmployeeWorkPage'));
+const EmployeeSelfServiceAttendancePage = lazy(() => import('./pages/EmployeeSelfServiceAttendancePage'));
+const EmployeePayslipsPage = lazy(() => import('./pages/EmployeePayslipsPage'));
+const SchoolAdminRoomsPage = lazy(() => import('./pages/SchoolAdminRoomsPage'));
+const SchoolAdminSchedulesPage = lazy(() => import('./pages/SchoolAdminSchedulesPage'));
+const SchoolAdminEnrollmentPage = lazy(() => import('./pages/SchoolAdminEnrollmentPage'));
+const SchoolAdminAttendancePage = lazy(() => import('./pages/SchoolAdminAttendancePage'));
+const SchoolAdminReportsPage = lazy(() => import('./pages/SchoolAdminReportsPage'));
+const SchoolAdminGuardiansPage = lazy(() => import('./pages/SchoolAdminGuardiansPage'));
+const GuardianHomePage = lazy(() => import('./pages/GuardianHomePage'));
+const GuardianChildPage = lazy(() => import('./pages/GuardianChildPage'));
+const CorporateAdminDashboardPage = lazy(() => import('./pages/CorporateAdminDashboardPage'));
+const CorporateAdminUsersPage = lazy(() => import('./pages/CorporateAdminUsersPage'));
+const CorporateAdminApprovalsPage = lazy(() => import('./pages/CorporateAdminApprovalsPage'));
+const CorporateAdminSettingsPage = lazy(() => import('./pages/CorporateAdminSettingsPage'));
+const CorporateAdminDepartmentsPage = lazy(() => import('./pages/CorporateAdminDepartmentsPage'));
+const CorporateAdminAttendancePage = lazy(() => import('./pages/CorporateAdminAttendancePage'));
+const CorporateAdminReportsPage = lazy(() => import('./pages/CorporateAdminReportsPage'));
 
 export default function App() {
   const loadUserFromToken = useAuthStore((state) => state.loadUserFromToken);
@@ -127,6 +130,7 @@ export default function App() {
   return (
     <Router>
       <ToastContainer />
+      <Suspense fallback={<div className="min-h-screen bg-page" aria-busy="true" />}>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<DarkSurface><LandingPage /></DarkSurface>} />
@@ -391,6 +395,7 @@ export default function App() {
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </Router>
   );
 }

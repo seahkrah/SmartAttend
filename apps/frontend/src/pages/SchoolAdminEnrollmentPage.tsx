@@ -116,6 +116,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
       const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/students', {
         headers: { Authorization: `Bearer ${token}` },
+        params: { fields: 'summary' },
       });
       setStudents(response.data.students);
     } catch (error: any) {

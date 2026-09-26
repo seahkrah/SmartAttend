@@ -168,7 +168,7 @@ const Transcripts: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get('/auth/admin/school/students')
+    apiClient.get('/auth/admin/school/students', { params: { fields: 'summary' } })
       .then((r) => setStudents(r.data.students))
       .catch((e) => setError(errorOf(e, 'Students could not be loaded')));
   }, []);

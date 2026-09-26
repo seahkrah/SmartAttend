@@ -4,6 +4,7 @@ import { Bell, LogOut, Menu, Search } from 'lucide-react';
 import { JjeloTechMark, JjeloTechWordmark, BRAND_NAME } from '../BrandLogo';
 import { useAuthStore } from '../../store/authStore';
 import { activeItem, navFor, type NavItem, type Platform } from '../../navigation/navConfig';
+import { LoadingState } from '../states/PageStates';
 
 /**
  * The shared application shell — screens 1a and 3b.
@@ -297,7 +298,12 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           {/* No padding here: every page in this app already carries its own, and
               a second gutter would indent the whole product by two. */}
-          <main>{children}</main>
+          <main>
+            {/* Pages load on demand; the shell stays in place while one does. */}
+            <React.Suspense fallback={<div className="p-4 sm:p-6"><LoadingState label="Loading…" /></div>}>
+              {children}
+            </React.Suspense>
+          </main>
         </div>
       </div>
     </div>

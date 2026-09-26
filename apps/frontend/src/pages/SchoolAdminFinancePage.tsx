@@ -119,7 +119,7 @@ const SchoolAdminFinancePage: React.FC = () => {
         // The school's students, for the invoice form's picker. A failure
         // here should not stop the rest of the page rendering.
         axiosClient
-          .get('/auth/admin/school/students')
+          .get('/auth/admin/school/students', { params: { fields: 'summary' } })
           .then((r) => (r.data.students ?? []) as StudentOption[])
           .catch(() => [] as StudentOption[]),
       ]);

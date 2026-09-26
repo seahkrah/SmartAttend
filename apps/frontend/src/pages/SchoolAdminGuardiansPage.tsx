@@ -68,7 +68,7 @@ const SchoolAdminGuardiansPage: React.FC = () => {
 
   useEffect(() => {
     void load('');
-    apiClient.get('/auth/admin/school/students')
+    apiClient.get('/auth/admin/school/students', { params: { fields: 'summary' } })
       .then((r) => setStudents(r.data.students))
       .catch(() => setStudents([]));
   }, []);

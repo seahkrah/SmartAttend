@@ -42,9 +42,17 @@ export function databaseSsl(env: NodeJS.ProcessEnv = process.env): false | { rej
     : { rejectUnauthorized: true }
 }
 
+// node-postgres defaults to 10 connections. Every request makes a few
+// queries of its own (session, tenant context) before its real work, so 10
+// became the queue at around 20 concurrent users in load testing. Size it to
+// the database's max_connections divided by the number of API replicas.
+const poolMax = Math.max(parseInt(process.env.DATABASE_POOL_MAX ?? '', 10) || 20, 1)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: databaseSsl(),
+  max: poolMax,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000,
 })
 
 pool.on('error', (err) => {

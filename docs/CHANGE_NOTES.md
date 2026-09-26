@@ -5,6 +5,55 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Foundation round, step 3: performance baseline (2026-09-26)
+
+### How it was measured
+
+`apps/backend/scripts/load-test.mjs` signs in as the seeded test accounts and
+fires each of the busiest screens' API calls 200 times, 20 at a time, reporting
+p50 / p95 / max. The data set was sized like a mid-sized school: 3,000
+students and 120,000 attendance records in one tenant. It was removed
+afterwards; the e2e fixtures reseed.
+
+### What changed, and what it bought (p50, 20 concurrent users)
+
+| Call | Before | After | Why |
+|---|---|---|---|
+| Students page | 1,812 ms | 227 ms | Paginated on the server (`?page`, `?pageSize` ≤ 200, `?search`), 50 a page; it sent all 3,000 every time |
+| Lecturer's students | 4,909 ms | 1,513 ms | One grouped count per student and class, not a correlated subquery per row |
+| Attendance overview | 1,056 ms | 669 ms | One grouped pass instead of one per class |
+| Attendance report | 937 ms | 573 ms | Named columns; new index on (tenant, date, time marked) |
+| School dashboard | 427 ms | 246 ms | A covering index for per-class totals (migration 065) |
+| Lecturer dashboard | 817 ms | 603 ms | Its six independent queries run together |
+
+- **Pickers** (fees, guardians, results, enrolment) ask for
+  `?fields=summary`: id, name and number, not the whole record.
+- **Lecturer reports** were rewritten in stages (roster, days, counts) and checked
+  to give output identical to the old query.
+- **Database pool**: node-postgres defaults to 10 connections, which became the
+  queue at about 20 users, since each request makes a few queries before its real
+  work. It is now 20, set by `DATABASE_POOL_MAX`. Size it to the database's
+  `max_connections` divided by the number of API replicas.
+- **Frontend code splitting**: every page loads on demand (`React.lazy`), so the
+  entry bundle fell from 1,136 KB to 286 KB. A person downloads the screens they
+  open, not all 76.
+
+### Still heavy, recorded rather than hidden
+
+- **Enrolments** (~2 s): one 1.5 MB response of every enrolment in the school. The
+  fix is in the interface, which should load one class at a time; that is a
+  page redesign, left for the school-platform work.
+- **Lecturer reports** (~2.9 s) in the test's worst case: a single class of 3,000
+  students. Realistic class sizes are well under the budget.
+
+### Verified
+
+Frontend build (both route gates), 96 unit tests, SQL schema check and the full
+e2e suite: 1,889 of 1,890, the one failure being the known Windows antivirus
+quarantine of the upload test's PHP sample.
+
+---
+
 ## Foundation round, step 2: one design system (2026-09-26)
 
 ### The problem, measured

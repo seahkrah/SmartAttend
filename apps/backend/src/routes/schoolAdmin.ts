@@ -717,22 +717,57 @@ router.delete('/admin/school/departments/:departmentId', async (req: TenantReque
 // Students
 // ===========================================================================
 
+/**
+ * The school's students.
+ *
+ *   ?search=     name, student number or email (case-insensitive)
+ *   ?page=&pageSize=   one page (pageSize ≤ 200) plus `total`
+ *   ?fields=summary    id, number, names, email, status only — for pickers
+ *
+ * With none of these it returns every student in full, as it always has. At a
+ * few thousand students that is megabytes per request, so the Students page
+ * pages and the pickers ask for the summary.
+ */
 router.get('/admin/school/students', async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : ''
+    const summary = req.query.fields === 'summary'
+    const paged = req.query.page !== undefined
+    const pageSize = Math.min(Math.max(parseInt(String(req.query.pageSize ?? '50'), 10) || 50, 1), 200)
+    const page = Math.max(parseInt(String(req.query.page ?? '1'), 10) || 1, 1)
+
+    const where = `s.tenant_id = $1 AND ($2 = '' OR s.first_name ILIKE '%' || $2 || '%'
+                   OR s.last_name ILIKE '%' || $2 || '%' OR s.student_id ILIKE '%' || $2 || '%'
+                   OR s.email ILIKE '%' || $2 || '%'
+                   OR (s.first_name || ' ' || s.last_name) ILIKE '%' || $2 || '%')`
+    const columns = summary
+      ? `s.id, s.student_id, s.first_name, s.middle_name, s.last_name, s.email, s.status`
+      : `s.*, u.email AS account_email, u.full_name, u.is_active, sd.name AS department_name`
+    const params: unknown[] = [ctx.tenantId, search]
+    let limit = ''
+    if (paged) {
+      params.push(pageSize, (page - 1) * pageSize)
+      limit = `LIMIT $3 OFFSET $4`
+    }
+
     const result = await query(
-      `SELECT s.*, u.email AS account_email, u.full_name, u.is_active,
-              sd.name AS department_name
+      `SELECT ${columns}
          FROM students s
          JOIN users u ON u.id = s.user_id
          LEFT JOIN school_departments sd ON sd.id = s.department_id
-        WHERE s.tenant_id = $1
-        ORDER BY s.created_at DESC`,
-      [ctx.tenantId]
+        WHERE ${where}
+        ORDER BY ${summary ? 's.last_name, s.first_name' : 's.created_at DESC'}
+        ${limit}`,
+      params
     )
-    return res.json({
-      students: result.rows.map((s: any) => ({ ...s, department: s.department_name ?? null })),
-    })
+    const students = summary
+      ? result.rows
+      : result.rows.map((s: any) => ({ ...s, department: s.department_name ?? null }))
+
+    if (!paged) return res.json({ students })
+    const total = await query(`SELECT COUNT(*)::int AS n FROM students s WHERE ${where}`, [ctx.tenantId, search])
+    return res.json({ students, total: total.rows[0].n, page, pageSize })
   } catch (e) {
     return fail(res, 'load students', e)
   }
@@ -1624,7 +1659,10 @@ router.get('/admin/school/enrollments', async (req: TenantRequest, res: Response
   try {
     const ctx = ctxOf(req)
     const result = await query(
-      `SELECT sc.*, s.first_name, s.middle_name, s.last_name, s.student_id AS student_code,
+      // Named columns, not sc.*: the page needs these, and at a few thousand
+      // enrolments every unused column is paid for in the response.
+      `SELECT sc.id, sc.student_id, sc.schedule_id, sc.status, sc.enrolled_at,
+              s.first_name, s.middle_name, s.last_name, s.student_id AS student_code,
               c.name AS course_name, c.code AS course_code,
               cs.day_of_week, cs.days_of_week, cs.start_time, cs.end_time, cs.section,
               r.building, r.room_number,
@@ -1722,26 +1760,45 @@ router.delete('/admin/school/enrollments/:id', async (req: TenantRequest, res: R
 router.get('/admin/school/attendance/overview', async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
+    // One pass over the school's attendance, grouped by class, instead of six
+    // correlated scans per class.
     const result = await query(
-      `SELECT cs.id AS schedule_id,
+      `WITH att AS (
+         SELECT schedule_id,
+                COUNT(*) FILTER (WHERE status = 'present')::int AS total_present,
+                COUNT(*) FILTER (WHERE status = 'absent')::int  AS total_absent,
+                COUNT(*) FILTER (WHERE status = 'late')::int    AS total_late,
+                MAX(attendance_date) AS last_attendance_date
+           FROM school_attendance
+          WHERE tenant_id = $1
+          GROUP BY schedule_id
+       ), sessions AS (
+         SELECT schedule_id, COUNT(*)::int AS sessions_taken
+           FROM (SELECT DISTINCT schedule_id, attendance_date
+                   FROM school_attendance WHERE tenant_id = $1) d
+          GROUP BY schedule_id
+       ), enrolled AS (
+         SELECT schedule_id, COUNT(*)::int AS enrolled_count
+           FROM student_courses
+          WHERE tenant_id = $1 AND status = 'enrolled'
+          GROUP BY schedule_id
+       )
+       SELECT cs.id AS schedule_id,
               c.name AS course_name, c.code AS course_code,
               cs.section, cs.days_of_week, cs.day_of_week, cs.start_time, cs.end_time,
               CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
-              (SELECT COUNT(*)::int FROM student_courses sc
-                WHERE sc.schedule_id = cs.id AND sc.status = 'enrolled') AS enrolled_count,
-              (SELECT COUNT(DISTINCT sa.attendance_date)::int FROM school_attendance sa
-                WHERE sa.schedule_id = cs.id AND sa.tenant_id = $1) AS sessions_taken,
-              (SELECT COUNT(*)::int FROM school_attendance sa
-                WHERE sa.schedule_id = cs.id AND sa.tenant_id = $1 AND sa.status = 'present') AS total_present,
-              (SELECT COUNT(*)::int FROM school_attendance sa
-                WHERE sa.schedule_id = cs.id AND sa.tenant_id = $1 AND sa.status = 'absent') AS total_absent,
-              (SELECT COUNT(*)::int FROM school_attendance sa
-                WHERE sa.schedule_id = cs.id AND sa.tenant_id = $1 AND sa.status = 'late') AS total_late,
-              (SELECT MAX(sa.attendance_date) FROM school_attendance sa
-                WHERE sa.schedule_id = cs.id AND sa.tenant_id = $1) AS last_attendance_date
+              COALESCE(e.enrolled_count, 0) AS enrolled_count,
+              COALESCE(s.sessions_taken, 0) AS sessions_taken,
+              COALESCE(a.total_present, 0) AS total_present,
+              COALESCE(a.total_absent, 0) AS total_absent,
+              COALESCE(a.total_late, 0) AS total_late,
+              a.last_attendance_date
          FROM class_schedules cs
          JOIN courses c ON c.id = cs.course_id
          LEFT JOIN faculty f ON f.id = cs.faculty_id
+         LEFT JOIN att a ON a.schedule_id = cs.id
+         LEFT JOIN sessions s ON s.schedule_id = cs.id
+         LEFT JOIN enrolled e ON e.schedule_id = cs.id
         WHERE cs.tenant_id = $1
         ORDER BY c.name, cs.section`,
       [ctx.tenantId]
@@ -1773,9 +1830,13 @@ router.get('/admin/school/reports/attendance', async (req: TenantRequest, res: R
     if (studentId) add('sa.student_id = $n::uuid', studentId)
 
     const result = await query(
-      `SELECT sa.*, s.first_name, s.last_name, s.student_id,
-              c.name AS course_name, c.code AS course_code,
-              cs.days_of_week, cs.day_of_week, cs.section,
+      // The fields the report shows. sa.* sent all 23 attendance columns per
+      // row; at the 1,000-row limit that was most of an 850 KB response.
+      // student_id is the student number, as it always was (it overrode
+      // sa.student_id in the old column list).
+      `SELECT sa.id, sa.schedule_id, sa.attendance_date, sa.status, sa.marked_at,
+              s.first_name, s.last_name, s.student_id,
+              c.name AS course_name, c.code AS course_code, cs.section,
               CONCAT(f.first_name, ' ', f.last_name) AS faculty_name
          FROM school_attendance sa
          JOIN students s ON s.id = sa.student_id

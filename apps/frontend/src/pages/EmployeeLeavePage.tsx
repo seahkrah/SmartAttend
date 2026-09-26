@@ -22,10 +22,10 @@ import {
  */
 
 const STATUS_STYLES: Record<LeaveRequest['status'], string> = {
-  pending: 'bg-amber-500/15 text-amber-300',
-  approved: 'bg-success-500/15 text-success-300',
-  rejected: 'bg-danger-500/15 text-danger-300',
-  cancelled: 'bg-slate-700/40 text-slate-400',
+  pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  approved: 'bg-success-500/15 text-success-700 dark:text-success-300',
+  rejected: 'bg-danger-500/15 text-danger-700 dark:text-danger-400',
+  cancelled: 'bg-sunken text-secondary',
 };
 
 const EmployeeLeavePage: React.FC = () => {
@@ -152,8 +152,8 @@ const EmployeeLeavePage: React.FC = () => {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Leave</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <h1 className="text-2xl font-semibold text-primary">Leave</h1>
+          <p className="mt-1 text-sm text-secondary">
             Your entitlement for {year}, and the requests you have made.
           </p>
         </div>
@@ -178,14 +178,14 @@ const EmployeeLeavePage: React.FC = () => {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {balances.map((b) => (
-            <div key={b.leaveTypeId} className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-              <div className="text-xs uppercase tracking-wider text-slate-500">{b.name}</div>
-              <div className="mt-2 text-3xl font-bold text-slate-100">{b.available}</div>
-              <div className="mt-1 text-xs text-slate-500">
+            <div key={b.leaveTypeId} className="rounded-xl border border-subtle bg-card p-5">
+              <div className="text-xs uppercase tracking-wider text-muted">{b.name}</div>
+              <div className="mt-2 text-3xl font-bold text-primary">{b.available}</div>
+              <div className="mt-1 text-xs text-muted">
                 days available
                 {b.pending > 0 ? ` · ${b.pending} pending` : ''}
               </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sunken">
                 <div
                   className="h-full bg-brand-500"
                   style={{
@@ -197,7 +197,7 @@ const EmployeeLeavePage: React.FC = () => {
                   }}
                 />
               </div>
-              <div className="mt-1 text-xs text-slate-600">
+              <div className="mt-1 text-xs text-muted">
                 {b.taken} of {b.entitled + b.carriedOver} taken
               </div>
             </div>
@@ -205,9 +205,9 @@ const EmployeeLeavePage: React.FC = () => {
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-        <div className="border-b border-slate-800 px-5 py-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+      <div className="rounded-xl border border-subtle bg-card">
+        <div className="border-b border-subtle px-5 py-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-secondary">
             Your requests
           </h2>
         </div>
@@ -221,8 +221,8 @@ const EmployeeLeavePage: React.FC = () => {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-              <tr className="border-b border-slate-800">
+            <thead className="text-left text-xs uppercase tracking-wider text-muted">
+              <tr className="border-b border-subtle">
                 <th className="px-5 py-2">Type</th>
                 <th className="px-5 py-2">Dates</th>
                 <th className="px-5 py-2">Days</th>
@@ -230,27 +230,27 @@ const EmployeeLeavePage: React.FC = () => {
                 <th className="px-5 py-2" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-subtle">
               {requests.map((r) => (
                 <tr key={r.id}>
-                  <td className="px-5 py-2 text-slate-200">{r.type_name}</td>
-                  <td className="px-5 py-2 text-slate-400">
+                  <td className="px-5 py-2 text-primary">{r.type_name}</td>
+                  <td className="px-5 py-2 text-secondary">
                     {r.start_date} → {r.end_date}
                   </td>
-                  <td className="px-5 py-2 text-slate-300">{r.total_days}</td>
+                  <td className="px-5 py-2 text-secondary">{r.total_days}</td>
                   <td className="px-5 py-2">
                     <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[r.status]}`}>
                       {r.status}
                     </span>
                     {r.decision_note && (
-                      <div className="mt-1 text-xs text-slate-500">{r.decision_note}</div>
+                      <div className="mt-1 text-xs text-muted">{r.decision_note}</div>
                     )}
                   </td>
                   <td className="px-5 py-2 text-right">
                     {(r.status === 'pending' || r.status === 'approved') && (
                       <button
                         onClick={() => void cancel(r)}
-                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-danger-300"
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-secondary hover:bg-sunken hover:text-danger-700 dark:hover:text-danger-400"
                       >
                         <Ban className="h-3 w-3" />
                         Cancel
@@ -268,18 +268,18 @@ const EmployeeLeavePage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <form
             onSubmit={submit}
-            className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6"
+            className="w-full max-w-md rounded-xl border border-subtle bg-card p-6"
           >
-            <h2 className="mb-4 text-lg font-semibold text-slate-100">Request leave</h2>
+            <h2 className="mb-4 text-lg font-semibold text-primary">Request leave</h2>
 
             <div className="grid gap-3">
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Type
                 <select
                   value={form.leaveTypeId}
                   onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })}
                   required
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 >
                   <option value="">Choose…</option>
                   {types.map((t) => (
@@ -289,23 +289,23 @@ const EmployeeLeavePage: React.FC = () => {
               </label>
 
               {selectedType && selectedType.min_notice_days > 0 && (
-                <p className="text-xs text-amber-300">
+                <p className="text-xs text-amber-700 dark:text-amber-300">
                   {selectedType.name} needs {selectedType.min_notice_days} day(s) notice.
                 </p>
               )}
 
               <div className="grid grid-cols-2 gap-3">
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-secondary">
                   From
                   <input
                     type="date"
                     value={form.startDate}
                     onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                     required
-                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                    className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                   />
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-secondary">
                   To
                   <input
                     type="date"
@@ -313,39 +313,39 @@ const EmployeeLeavePage: React.FC = () => {
                     min={form.startDate || undefined}
                     onChange={(e) => setForm({ ...form, endDate: e.target.value })}
                     required
-                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                    className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                   />
                 </label>
               </div>
 
               {preview && (
-                <div className="rounded-lg border border-slate-800 bg-slate-800/40 px-3 py-2 text-sm">
-                  <span className="text-slate-200">{preview.totalDays} working day(s)</span>
+                <div className="rounded-lg border border-subtle bg-sunken px-3 py-2 text-sm">
+                  <span className="text-primary">{preview.totalDays} working day(s)</span>
                   {preview.available !== null && (
                     <span
                       className={
                         preview.totalDays > preview.available
-                          ? ' text-danger-300'
-                          : ' text-slate-500'
+                          ? ' text-danger-700 dark:text-danger-400'
+                          : ' text-muted'
                       }
                     >
                       {' '}· {preview.available} available
                       {preview.totalDays > preview.available ? ' — not enough' : ''}
                     </span>
                   )}
-                  <div className="mt-0.5 text-xs text-slate-500">
+                  <div className="mt-0.5 text-xs text-muted">
                     Weekends in the range are not deducted.
                   </div>
                 </div>
               )}
 
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Reason
                 <textarea
                   value={form.reason}
                   onChange={(e) => setForm({ ...form, reason: e.target.value })}
                   rows={2}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
             </div>
@@ -354,7 +354,7 @@ const EmployeeLeavePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300"
+                className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary"
               >
                 Cancel
               </button>

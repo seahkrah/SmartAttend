@@ -60,71 +60,71 @@ export const StudentCoursesPage: React.FC = () => {
   return (
     <>
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-2">My Courses</h1>
-        <p className="text-slate-400 mb-8">
+        <h1 className="text-3xl font-bold text-primary mb-2">My Courses</h1>
+        <p className="text-secondary mb-8">
           {courses.length} course{courses.length !== 1 ? 's' : ''} enrolled
         </p>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-slate-400">Loading courses...</span>
+            <span className="ml-3 text-secondary">Loading courses...</span>
           </div>
         ) : courses.length === 0 ? (
-          <div className="text-center py-20 bg-slate-800 rounded-lg border border-slate-700">
+          <div className="text-center py-20 bg-sunken rounded-lg border border-subtle">
             <div className="text-5xl mb-4">📚</div>
-            <p className="text-xl text-slate-400">No courses enrolled</p>
-            <p className="text-sm text-slate-500 mt-2">Contact your admin or faculty to be enrolled in courses.</p>
+            <p className="text-xl text-secondary">No courses enrolled</p>
+            <p className="text-sm text-muted mt-2">Contact your admin or faculty to be enrolled in courses.</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {courses.map((course) => (
               <div
                 key={course.schedule_id}
-                className="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:border-emerald-600/50 transition-colors"
+                className="bg-sunken rounded-xl border border-subtle p-5 hover:border-emerald-600/50 transition-colors"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">{course.name}</h3>
-                    <p className="text-sm text-slate-400">{course.code}{course.section ? ` • Section ${course.section}` : ''}</p>
+                    <h3 className="text-lg font-semibold text-primary">{course.name}</h3>
+                    <p className="text-sm text-secondary">{course.code}{course.section ? ` • Section ${course.section}` : ''}</p>
                   </div>
                   {course.credits && (
-                    <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-1 rounded border border-emerald-700/50">
+                    <span className="text-xs bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded border border-emerald-200 dark:border-emerald-700/50">
                       {course.credits} cr
                     </span>
                   )}
                 </div>
 
                 {course.description && (
-                  <p className="text-xs text-slate-500 mb-3 line-clamp-2">{course.description}</p>
+                  <p className="text-xs text-muted mb-3 line-clamp-2">{course.description}</p>
                 )}
 
-                <div className="space-y-1.5 text-sm text-slate-400">
+                <div className="space-y-1.5 text-sm text-secondary">
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-500 w-16">Days:</span>
-                    <span className="text-slate-300">{formatDays(course.day_of_week, course.days_of_week)}</span>
+                    <span className="text-muted w-16">Days:</span>
+                    <span className="text-secondary">{formatDays(course.day_of_week, course.days_of_week)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-500 w-16">Time:</span>
-                    <span className="text-slate-300">
+                    <span className="text-muted w-16">Time:</span>
+                    <span className="text-secondary">
                       {course.start_time?.slice(0, 5)} – {course.end_time?.slice(0, 5)}
                     </span>
                   </div>
                   {course.room_name && (
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500 w-16">Room:</span>
-                      <span className="text-slate-300">{course.room_name}</span>
+                      <span className="text-muted w-16">Room:</span>
+                      <span className="text-secondary">{course.room_name}</span>
                     </div>
                   )}
                   {course.faculty_name && (
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500 w-16">Faculty:</span>
-                      <span className="text-slate-300">{course.faculty_name}</span>
+                      <span className="text-muted w-16">Faculty:</span>
+                      <span className="text-secondary">{course.faculty_name}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-slate-700/50 text-xs text-slate-500">
+                <div className="mt-3 pt-3 border-t border-subtle text-xs text-muted">
                   Enrolled {new Date(course.enrolled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
               </div>

@@ -255,8 +255,8 @@ const SchoolAdminFacultyPage: React.FC = () => {
       <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Faculty Management</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage faculty members in your school</p>
+          <h1 className="text-2xl font-bold text-primary">Faculty Management</h1>
+          <p className="text-sm text-secondary mt-1">Manage faculty members in your school</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -273,7 +273,7 @@ const SchoolAdminFacultyPage: React.FC = () => {
           placeholder="Search by name, faculty ID, email, college, or department..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400"
+          className="w-full px-4 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary placeholder:text-muted"
         />
       </div>
 
@@ -281,11 +281,11 @@ const SchoolAdminFacultyPage: React.FC = () => {
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Loading faculty...</p>
+          <p className="text-secondary mt-4">Loading faculty...</p>
         </div>
       ) : filteredFaculty.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="text-gray-600 mb-4">
+        <div className="bg-card rounded-lg shadow p-12 text-center">
+          <p className="text-secondary mb-4">
             {searchTerm ? 'No faculty members found matching your search.' : 'No faculty members yet.'}
           </p>
           {!searchTerm && (
@@ -298,32 +298,32 @@ const SchoolAdminFacultyPage: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-card rounded-lg shadow overflow-x-auto">
+          <table className="min-w-full divide-y divide-subtle">
+            <thead className="bg-sunken">
               <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Faculty ID</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">Name</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-52">Email</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-44">College</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Department</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Status</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">Actions</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-28">Faculty ID</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-48">Name</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-52">Email</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-44">College</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-40">Department</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-20">Status</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-48">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-subtle">
               {filteredFaculty.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-4 text-sm font-medium text-gray-900 truncate max-w-[7rem]">{member.faculty_id || '-'}</td>
-                  <td className="px-3 py-4 text-sm text-gray-900 truncate max-w-[12rem]">
+                <tr key={member.id} className="hover:bg-sunken">
+                  <td className="px-3 py-4 text-sm font-medium text-primary truncate max-w-[7rem]">{member.faculty_id || '-'}</td>
+                  <td className="px-3 py-4 text-sm text-primary truncate max-w-[12rem]">
                     {member.first_name} {member.middle_name ? member.middle_name + ' ' : ''}{member.last_name}
                   </td>
-                  <td className="px-3 py-4 text-sm text-gray-600 truncate max-w-[13rem]">{member.email}</td>
-                  <td className="px-3 py-4 text-sm text-gray-600 truncate max-w-[11rem]">{member.college || '-'}</td>
-                  <td className="px-3 py-4 text-sm text-gray-600 truncate max-w-[10rem]">{member.department || '-'}</td>
+                  <td className="px-3 py-4 text-sm text-secondary truncate max-w-[13rem]">{member.email}</td>
+                  <td className="px-3 py-4 text-sm text-secondary truncate max-w-[11rem]">{member.college || '-'}</td>
+                  <td className="px-3 py-4 text-sm text-secondary truncate max-w-[10rem]">{member.department || '-'}</td>
                   <td className="px-3 py-4">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      member.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      member.is_active ? 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-300'
                     }`}>
                       {member.is_active ? 'Active' : 'Suspended'}
                     </span>
@@ -332,19 +332,19 @@ const SchoolAdminFacultyPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => openEditModal(member)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleSuspendFaculty(member)}
-                        className={`font-medium ${member.is_active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}`}
+                        className={`font-medium ${member.is_active ? 'text-yellow-700 dark:text-yellow-300 hover:text-yellow-800 dark:hover:text-yellow-300' : 'text-green-600 dark:text-green-300 hover:text-green-800 dark:hover:text-green-300'}`}
                       >
                         {member.is_active ? 'Suspend' : 'Activate'}
                       </button>
                       <button
                         onClick={() => setConfirmDelete(member)}
-                        className="text-red-600 hover:text-red-800 font-medium"
+                        className="text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-300 font-medium"
                       >
                         Delete
                       </button>
@@ -360,27 +360,27 @@ const SchoolAdminFacultyPage: React.FC = () => {
       {/* Add/Edit Modal */}
       {(showAddModal || editingFaculty) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">{editingFaculty ? 'Edit Faculty' : 'Add New Faculty'}</h2>
             <form onSubmit={editingFaculty ? handleUpdateFaculty : handleCreateFaculty}>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Faculty ID *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Faculty ID *</label>
                   <input
                     type="text"
                     required
                     value={formData.facultyId}
                     onChange={(e) => setFormData({ ...formData, facultyId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="e.g., F12345"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Title</label>
                   <select
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                   >
                     <option value="Mr.">Mr.</option>
@@ -393,11 +393,11 @@ const SchoolAdminFacultyPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Gender</label>
                   <select
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                   >
                     <option value="">Prefer not to say</option>
@@ -407,90 +407,90 @@ const SchoolAdminFacultyPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">First Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Middle Name</label>
                   <input
                     type="text"
                     value={formData.middleName}
                     onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Last Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Email *</label>
                   <input
                     type="email"
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     disabled={!!editingFaculty}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-sunken text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Phone</label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="+1234567890"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Address</label>
                   <input
                     type="text"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="e.g., 123 Main St, City, State"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">College *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">College *</label>
                   <input
                     type="text"
                     value={formData.college}
                     onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="e.g., College of Engineering"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Department *</label>
                   <input
                     type="text"
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="e.g., Computer Science"
                     required
                   />
                 </div>
               </div>
               {!editingFaculty && (
-                <p className="text-sm text-gray-500 mt-4 bg-blue-50 p-3 rounded">
+                <p className="text-sm text-muted mt-4 bg-blue-50 dark:bg-blue-500/15 p-3 rounded">
                   ℹ️ A user account will be automatically created. Faculty will set password on first login.
                 </p>
               )}
@@ -502,14 +502,14 @@ const SchoolAdminFacultyPage: React.FC = () => {
                     setEditingFaculty(null);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-subtle text-secondary rounded-lg hover:bg-sunken"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-raised disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? (
                     <span className="flex items-center justify-center gap-2">
@@ -531,16 +531,16 @@ const SchoolAdminFacultyPage: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Delete</h3>
-            <p className="text-gray-600 mb-4">
+          <div className="bg-card rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-primary mb-2">Confirm Delete</h3>
+            <p className="text-secondary mb-4">
               Are you sure you want to delete <strong>{confirmDelete.first_name} {confirmDelete.last_name}</strong>? 
               This will permanently remove their faculty record and user account. This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-subtle text-secondary rounded-lg hover:bg-sunken"
               >
                 Cancel
               </button>

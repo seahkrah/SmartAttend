@@ -36,8 +36,8 @@ export const ForgotPasswordPage: React.FC = () => {
     <AuthShell subtitle="Reset your password">
       {sent ? (
         <div className="space-y-4">
-          <p className="text-slate-200" role="status">{sent}</p>
-          <p className="text-sm text-slate-400">
+          <p className="text-primary" role="status">{sent}</p>
+          <p className="text-sm text-secondary">
             Check your inbox and spam folder. If nothing arrives, your organisation may not have email set up;
             ask your administrator to reset access for you.
           </p>
@@ -50,15 +50,15 @@ export const ForgotPasswordPage: React.FC = () => {
               <button key={p} type="button" role="radio" aria-checked={platform === p}
                 onClick={() => setPlatform(p)}
                 className={`py-2 rounded-lg border text-sm font-medium ${platform === p
-                  ? 'border-primary-500 bg-primary-500/20 text-white' : 'border-slate-700 text-slate-400'}`}>
+                  ? 'border-primary-500 bg-primary-500/20 text-primary' : 'border-subtle text-secondary'}`}>
                 {p === 'school' ? 'School' : 'Employer'}
               </button>
             ))}
           </div>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">Email address</label>
+            <label htmlFor="email" className="block text-sm font-medium text-secondary mb-2">Email address</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
+              <Mail className="absolute left-3 top-3 w-5 h-5 text-muted" />
               <input id="email" type="email" required autoComplete="email" value={email}
                 onChange={(e) => setEmail(e.target.value)} className="input-field pl-10" placeholder="you@example.com" />
             </div>
@@ -68,8 +68,8 @@ export const ForgotPasswordPage: React.FC = () => {
             className="btn-primary w-full justify-center inline-flex items-center gap-2 disabled:opacity-50">
             <Send className="w-4 h-4" />{busy ? 'Sending…' : 'Send reset link'}
           </button>
-          <p className="text-center text-sm text-slate-400">
-            <Link to="/login" className="text-primary-400 hover:text-primary-300">Back to sign in</Link>
+          <p className="text-center text-sm text-secondary">
+            <Link to="/login" className="text-primary-700 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">Back to sign in</Link>
           </p>
         </form>
       )}

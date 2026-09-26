@@ -85,7 +85,7 @@ const FacultyStudentsPage: React.FC = () => {
         {/* Header + stats */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <p className="text-slate-400 text-sm">
+            <p className="text-secondary text-sm">
               {uniqueStudentIds} unique student{uniqueStudentIds !== 1 ? 's' : ''} across{' '}
               {courses.length} course{courses.length !== 1 ? 's' : ''}
             </p>
@@ -95,21 +95,21 @@ const FacultyStudentsPage: React.FC = () => {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted" />
             <input
               type="text"
               placeholder="Search by name, ID, or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-indigo-500 outline-none"
+              className="w-full pl-10 pr-4 py-2 bg-sunken border border-subtle rounded-lg text-primary text-sm placeholder:text-muted focus:border-indigo-500 outline-none"
             />
           </div>
           <div className="relative">
-            <Filter className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+            <Filter className="absolute left-3 top-2.5 w-4 h-4 text-muted" />
             <select
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
-              className="pl-10 pr-8 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm appearance-none cursor-pointer focus:border-indigo-500 outline-none min-w-[200px]"
+              className="pl-10 pr-8 py-2 bg-sunken border border-subtle rounded-lg text-primary text-sm appearance-none cursor-pointer focus:border-indigo-500 outline-none min-w-[200px]"
             >
               <option value="all">All Courses</option>
               {courses.map((c) => (
@@ -118,7 +118,7 @@ const FacultyStudentsPage: React.FC = () => {
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-muted pointer-events-none" />
           </div>
         </div>
 
@@ -126,65 +126,65 @@ const FacultyStudentsPage: React.FC = () => {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-slate-400">Loading students...</span>
+            <span className="ml-3 text-secondary">Loading students...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16 bg-slate-800/50 rounded-xl border border-slate-700">
-            <Users className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-            <p className="text-slate-400">
+          <div className="text-center py-16 bg-sunken rounded-xl border border-subtle">
+            <Users className="w-12 h-12 mx-auto mb-3 text-muted" />
+            <p className="text-secondary">
               {searchTerm || selectedCourse !== 'all'
                 ? 'No students match your filters'
                 : 'No students enrolled in your schedules'}
             </p>
           </div>
         ) : (
-          <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+          <div className="bg-sunken rounded-xl border border-subtle overflow-hidden">
             <table className="w-full">
-              <thead className="bg-slate-700/60">
+              <thead className="bg-sunken">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Student</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Course</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">Classes</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">Present</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">Absent</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">Rate</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider">Student</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider">Course</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-secondary uppercase tracking-wider">Classes</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-secondary uppercase tracking-wider">Present</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-secondary uppercase tracking-wider">Absent</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-secondary uppercase tracking-wider">Rate</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-subtle">
                 {filtered.map((s, idx) => {
                   const rate = s.total_classes > 0
                     ? Math.round((s.present_count / s.total_classes) * 100)
                     : null
                   return (
-                    <tr key={`${s.student_id}-${s.course_code}`} className="hover:bg-slate-700/30 transition-colors">
-                      <td className="px-4 py-3 text-sm text-slate-500">{idx + 1}</td>
+                    <tr key={`${s.student_id}-${s.course_code}`} className="hover:bg-sunken transition-colors">
+                      <td className="px-4 py-3 text-sm text-muted">{idx + 1}</td>
                       <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-white">{s.first_name} {s.last_name}</div>
-                        <div className="text-xs text-slate-500">{s.email}</div>
+                        <div className="text-sm font-medium text-primary">{s.first_name} {s.last_name}</div>
+                        <div className="text-xs text-muted">{s.email}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm font-mono text-slate-400">{s.student_code || '—'}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-secondary">{s.student_code || '—'}</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">{s.course_code}</span>
+                        <span className="text-xs bg-sunken text-secondary px-2 py-1 rounded">{s.course_code}</span>
                         {s.schedule_section > 0 && (
-                          <span className="text-xs text-slate-500 ml-1">S{s.schedule_section}</span>
+                          <span className="text-xs text-muted ml-1">S{s.schedule_section}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-slate-300">{s.total_classes}</td>
-                      <td className="px-4 py-3 text-center text-sm text-green-400">{s.present_count}</td>
-                      <td className="px-4 py-3 text-center text-sm text-red-400">{s.absent_count}</td>
+                      <td className="px-4 py-3 text-center text-sm text-secondary">{s.total_classes}</td>
+                      <td className="px-4 py-3 text-center text-sm text-green-700 dark:text-green-400">{s.present_count}</td>
+                      <td className="px-4 py-3 text-center text-sm text-red-700 dark:text-red-400">{s.absent_count}</td>
                       <td className="px-4 py-3 text-center">
                         {rate !== null ? (
                           <span
                             className={`text-sm font-semibold ${
-                              rate >= 75 ? 'text-green-400' : rate >= 50 ? 'text-amber-400' : 'text-red-400'
+                              rate >= 75 ? 'text-green-700 dark:text-green-400' : rate >= 50 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400'
                             }`}
                           >
                             {rate}%
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-500">—</span>
+                          <span className="text-xs text-muted">—</span>
                         )}
                       </td>
                     </tr>

@@ -115,7 +115,7 @@ const FacultySchedulesPage: React.FC = () => {
       <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-3 text-slate-400">Loading schedules...</span>
+          <span className="ml-3 text-secondary">Loading schedules...</span>
         </div>
       </>
     )
@@ -125,9 +125,9 @@ const FacultySchedulesPage: React.FC = () => {
     return (
       <>
         <div className="text-center py-20">
-          <CalendarDays className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-          <p className="text-slate-400 text-lg">No schedules assigned</p>
-          <p className="text-slate-500 text-sm mt-1">
+          <CalendarDays className="w-12 h-12 mx-auto mb-3 text-muted" />
+          <p className="text-secondary text-lg">No schedules assigned</p>
+          <p className="text-muted text-sm mt-1">
             Contact your administrator to assign class schedules.
           </p>
         </div>
@@ -140,21 +140,21 @@ const FacultySchedulesPage: React.FC = () => {
       <div className="space-y-6">
         {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wider">Schedules</p>
-            <p className="text-2xl font-bold text-white mt-1">{schedules.length}</p>
+          <div className="rounded-xl bg-sunken border border-subtle p-4">
+            <p className="text-xs text-muted uppercase tracking-wider">Schedules</p>
+            <p className="text-2xl font-bold text-primary mt-1">{schedules.length}</p>
           </div>
-          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wider">Courses</p>
-            <p className="text-2xl font-bold text-white mt-1">{uniqueCourses}</p>
+          <div className="rounded-xl bg-sunken border border-subtle p-4">
+            <p className="text-xs text-muted uppercase tracking-wider">Courses</p>
+            <p className="text-2xl font-bold text-primary mt-1">{uniqueCourses}</p>
           </div>
-          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wider">Total Enrolled</p>
-            <p className="text-2xl font-bold text-white mt-1">{totalStudents}</p>
+          <div className="rounded-xl bg-sunken border border-subtle p-4">
+            <p className="text-xs text-muted uppercase tracking-wider">Total Enrolled</p>
+            <p className="text-2xl font-bold text-primary mt-1">{totalStudents}</p>
           </div>
-          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
-            <p className="text-xs text-slate-500 uppercase tracking-wider">Active Days</p>
-            <p className="text-2xl font-bold text-white mt-1">{activeDays}/7</p>
+          <div className="rounded-xl bg-sunken border border-subtle p-4">
+            <p className="text-xs text-muted uppercase tracking-wider">Active Days</p>
+            <p className="text-2xl font-bold text-primary mt-1">{activeDays}/7</p>
           </div>
         </div>
 
@@ -165,7 +165,7 @@ const FacultySchedulesPage: React.FC = () => {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'timetable'
                 ? 'bg-violet-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                : 'bg-sunken text-secondary hover:text-primary hover:bg-sunken'
             }`}
           >
             Timetable View
@@ -175,7 +175,7 @@ const FacultySchedulesPage: React.FC = () => {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'list'
                 ? 'bg-violet-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                : 'bg-sunken text-secondary hover:text-primary hover:bg-sunken'
             }`}
           >
             List View
@@ -192,8 +192,8 @@ const FacultySchedulesPage: React.FC = () => {
                   key={dayIdx}
                   className={`text-center py-2 rounded-t-lg text-sm font-semibold ${
                     dayIdx === todayIdx
-                      ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      ? 'bg-violet-600/30 text-violet-700 dark:text-violet-300 border border-violet-500/40'
+                      : 'bg-sunken text-secondary border border-subtle'
                   }`}
                 >
                   {DAY_SHORT[dayIdx]}
@@ -209,7 +209,7 @@ const FacultySchedulesPage: React.FC = () => {
               {[1, 2, 3, 4, 5, 6, 0].map((dayIdx) => (
                 <div key={`col-${dayIdx}`} className="space-y-2 min-h-[120px]">
                   {daySchedules[dayIdx].length === 0 ? (
-                    <div className="text-center py-8 text-slate-600 text-xs">No classes</div>
+                    <div className="text-center py-8 text-muted text-xs">No classes</div>
                   ) : (
                     daySchedules[dayIdx]
                       .sort((a, b) => a.start_time.localeCompare(b.start_time))
@@ -255,7 +255,7 @@ const FacultySchedulesPage: React.FC = () => {
               return (
                 <div
                   key={s.id}
-                  className="rounded-xl border border-slate-700 bg-slate-800/50 p-5 flex items-center justify-between hover:bg-slate-800/80 transition-colors group"
+                  className="rounded-xl border border-subtle bg-sunken p-5 flex items-center justify-between hover:bg-sunken transition-colors group"
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div
@@ -264,13 +264,13 @@ const FacultySchedulesPage: React.FC = () => {
                       <BookOpen className="w-5 h-5 text-white" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-white font-semibold text-base">
+                      <h3 className="text-primary font-semibold text-base">
                         {s.course_code} — {s.course_name}
                       </h3>
-                      <p className="text-slate-400 text-sm mt-0.5">
+                      <p className="text-secondary text-sm mt-0.5">
                         Section {s.section}
                       </p>
-                      <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-slate-400">
+                      <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-secondary">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" />
                           {formatTime(s.start_time)} – {formatTime(s.end_time)}

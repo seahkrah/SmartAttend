@@ -127,7 +127,7 @@ const IncidentDetailPage: React.FC = () => {
         <p className="text-secondary whitespace-pre-line">{incident.description}</p>
       </header>
 
-      {saveError && <div role="alert" className="card text-sm text-danger-600">{saveError}</div>}
+      {saveError && <div role="alert" className="card text-sm text-danger-600 dark:text-danger-400">{saveError}</div>}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="card space-y-2 text-sm">

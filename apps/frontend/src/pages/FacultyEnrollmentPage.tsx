@@ -178,7 +178,7 @@ const FacultyEnrollmentPage: React.FC = () => {
       <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-3 text-slate-400">Loading schedules...</span>
+          <span className="ml-3 text-secondary">Loading schedules...</span>
         </div>
       </>
     )
@@ -188,9 +188,9 @@ const FacultyEnrollmentPage: React.FC = () => {
     return (
       <>
         <div className="text-center py-20">
-          <AlertCircle className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-          <p className="text-slate-400 text-lg">No schedules assigned</p>
-          <p className="text-slate-500 text-sm mt-1">Contact your admin to assign class schedules first.</p>
+          <AlertCircle className="w-12 h-12 mx-auto mb-3 text-muted" />
+          <p className="text-secondary text-lg">No schedules assigned</p>
+          <p className="text-muted text-sm mt-1">Contact your admin to assign class schedules first.</p>
         </div>
       </>
     )
@@ -208,7 +208,7 @@ const FacultyEnrollmentPage: React.FC = () => {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
                 selectedSchedule?.id === s.id
                   ? 'bg-teal-600 border-teal-500 text-white'
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                  : 'bg-sunken border-subtle text-secondary hover:bg-sunken'
               }`}
             >
               {s.course_code} — Sec {s.section}
@@ -219,11 +219,11 @@ const FacultyEnrollmentPage: React.FC = () => {
 
         {/* Schedule details */}
         {selectedSchedule && (
-          <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 flex items-center gap-4 flex-wrap">
-            <BookOpen className="w-5 h-5 text-teal-400 flex-shrink-0" />
+          <div className="p-4 rounded-lg bg-sunken border border-subtle flex items-center gap-4 flex-wrap">
+            <BookOpen className="w-5 h-5 text-teal-700 dark:text-teal-400 flex-shrink-0" />
             <div>
-              <span className="text-white font-medium">{selectedSchedule.course_name}</span>
-              <span className="text-slate-400 text-sm ml-2">
+              <span className="text-primary font-medium">{selectedSchedule.course_name}</span>
+              <span className="text-secondary text-sm ml-2">
                 Section {selectedSchedule.section} • {selectedSchedule.room_name || 'No room'} •{' '}
                 {selectedSchedule.start_time?.slice(0, 5)}–{selectedSchedule.end_time?.slice(0, 5)}
               </span>
@@ -238,47 +238,47 @@ const FacultyEnrollmentPage: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* ── Enrolled students ── */}
-            <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-              <div className="border-b border-slate-700 px-4 py-3 flex items-center gap-2">
-                <Users className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-semibold text-white">
+            <div className="rounded-xl border border-subtle bg-sunken overflow-hidden">
+              <div className="border-b border-subtle px-4 py-3 flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                <h3 className="text-sm font-semibold text-primary">
                   Enrolled ({enrolled.length})
                 </h3>
               </div>
               <div className="p-3">
                 <div className="relative mb-3">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted" />
                   <input
                     type="text"
                     placeholder="Search enrolled..."
                     value={searchEnrolled}
                     onChange={(e) => setSearchEnrolled(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-teal-500 outline-none"
+                    className="w-full pl-10 pr-4 py-2 bg-card border border-subtle rounded-lg text-primary text-sm placeholder:text-muted focus:border-teal-500 outline-none"
                   />
                 </div>
                 <div className="space-y-1 max-h-[400px] overflow-y-auto">
                   {filteredEnrolled.length === 0 ? (
-                    <p className="text-center py-8 text-slate-500 text-sm">
+                    <p className="text-center py-8 text-muted text-sm">
                       {enrolled.length === 0 ? 'No students enrolled yet' : 'No matches'}
                     </p>
                   ) : (
                     filteredEnrolled.map((s) => (
                       <div
                         key={s.student_id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
+                        className="flex items-center justify-between p-3 rounded-lg bg-sunken hover:bg-sunken transition-colors"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-white truncate">
+                          <p className="text-sm font-medium text-primary truncate">
                             {s.first_name} {s.last_name}
                           </p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-muted">
                             {s.student_code} • {s.email}
                           </p>
                         </div>
                         <button
                           onClick={() => handleRemove(s.student_id)}
                           disabled={removing === s.student_id}
-                          className="ml-2 p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors flex-shrink-0 disabled:opacity-50"
+                          className="ml-2 p-1.5 rounded-lg text-red-700 dark:text-red-400 hover:bg-red-500/20 transition-colors flex-shrink-0 disabled:opacity-50"
                           title="Remove from schedule"
                         >
                           <UserMinus className="w-4 h-4" />
@@ -291,47 +291,47 @@ const FacultyEnrollmentPage: React.FC = () => {
             </div>
 
             {/* ── Available students ── */}
-            <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-              <div className="border-b border-slate-700 px-4 py-3 flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-teal-400" />
-                <h3 className="text-sm font-semibold text-white">
+            <div className="rounded-xl border border-subtle bg-sunken overflow-hidden">
+              <div className="border-b border-subtle px-4 py-3 flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                <h3 className="text-sm font-semibold text-primary">
                   Available to Add ({available.length})
                 </h3>
               </div>
               <div className="p-3">
                 <div className="relative mb-3">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted" />
                   <input
                     type="text"
                     placeholder="Search available..."
                     value={searchAvailable}
                     onChange={(e) => setSearchAvailable(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-teal-500 outline-none"
+                    className="w-full pl-10 pr-4 py-2 bg-card border border-subtle rounded-lg text-primary text-sm placeholder:text-muted focus:border-teal-500 outline-none"
                   />
                 </div>
                 <div className="space-y-1 max-h-[400px] overflow-y-auto">
                   {filteredAvailable.length === 0 ? (
-                    <p className="text-center py-8 text-slate-500 text-sm">
+                    <p className="text-center py-8 text-muted text-sm">
                       {available.length === 0 ? 'All students are enrolled' : 'No matches'}
                     </p>
                   ) : (
                     filteredAvailable.map((s) => (
                       <div
                         key={s.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors"
+                        className="flex items-center justify-between p-3 rounded-lg bg-sunken hover:bg-sunken transition-colors"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-white truncate">
+                          <p className="text-sm font-medium text-primary truncate">
                             {s.first_name} {s.last_name}
                           </p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-muted">
                             {s.student_id} • {s.email}
                           </p>
                         </div>
                         <button
                           onClick={() => handleAdd(s.id)}
                           disabled={adding === s.id}
-                          className="ml-2 p-1.5 rounded-lg text-teal-400 hover:bg-teal-500/20 transition-colors flex-shrink-0 disabled:opacity-50"
+                          className="ml-2 p-1.5 rounded-lg text-teal-700 dark:text-teal-400 hover:bg-teal-500/20 transition-colors flex-shrink-0 disabled:opacity-50"
                           title="Add to schedule"
                         >
                           <UserPlus className="w-4 h-4" />

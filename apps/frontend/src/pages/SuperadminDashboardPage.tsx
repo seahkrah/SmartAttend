@@ -133,7 +133,7 @@ const SuperadminDashboardPage: React.FC = () => {
         <Split title="Tenants by status" parts={[
           { label: 'Active', value: stats.tenants_active, cls: 'bg-success-500' },
           { label: 'Suspended', value: stats.tenants_suspended, cls: 'bg-accent-500' },
-          { label: 'Archived', value: stats.tenants_archived, cls: 'bg-slate-400' },
+          { label: 'Archived', value: stats.tenants_archived, cls: 'bg-raised' },
         ]} />
         <Split title="People" parts={[
           { label: 'Students', value: stats.students, cls: 'bg-brand-500' },
@@ -141,7 +141,7 @@ const SuperadminDashboardPage: React.FC = () => {
         ]} />
         <Split title="Accounts" parts={[
           { label: 'Active', value: stats.users_active, cls: 'bg-success-500' },
-          { label: 'Deactivated', value: stats.users_locked, cls: 'bg-slate-400' },
+          { label: 'Deactivated', value: stats.users_locked, cls: 'bg-raised' },
         ]} />
       </div>
 

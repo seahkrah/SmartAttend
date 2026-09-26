@@ -142,16 +142,16 @@ const CorporateAdminSettingsPage: React.FC = () => {
       <div className="space-y-6 max-w-3xl">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-white">Organization Settings</h1>
-          <p className="text-slate-400 mt-1">Manage your corporate organization profile</p>
+          <h1 className="text-2xl font-bold text-primary">Organization Settings</h1>
+          <p className="text-secondary mt-1">Manage your corporate organization profile</p>
         </div>
 
         {/* Message */}
         {message && (
           <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
             message.type === 'success'
-              ? 'bg-teal-500/10 border border-teal-500/30 text-teal-400'
-              : 'bg-red-500/10 border border-red-500/30 text-red-400'
+              ? 'bg-teal-500/10 border border-teal-500/30 text-teal-700 dark:text-teal-400'
+              : 'bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-400'
           }`}>
             {message.type === 'success'
               ? <CheckCircle2 className="w-4 h-4" />
@@ -161,14 +161,14 @@ const CorporateAdminSettingsPage: React.FC = () => {
         )}
 
         {/* Organization Info Card */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
+        <div className="bg-card border border-subtle rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-subtle">
             <div className="p-3 bg-indigo-500/20 rounded-lg">
-              <Building2 className="w-5 h-5 text-indigo-400" />
+              <Building2 className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Organization Profile</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-lg font-semibold text-primary">Organization Profile</h3>
+              <p className="text-xs text-muted">
                 Code: {settings?.code} · Created: {settings?.created_at ? new Date(settings.created_at).toLocaleDateString() : '—'}
               </p>
             </div>
@@ -176,54 +176,54 @@ const CorporateAdminSettingsPage: React.FC = () => {
 
           <form onSubmit={handleSave} className="space-y-5">
             <div>
-              <label className="flex items-center gap-2 text-sm text-slate-400 mb-1">
+              <label className="flex items-center gap-2 text-sm text-secondary mb-1">
                 <Building2 className="w-3.5 h-3.5" /> Organization Name *
               </label>
               <input type="text" required value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="flex items-center gap-2 text-sm text-slate-400 mb-1">
+                <label className="flex items-center gap-2 text-sm text-secondary mb-1">
                   <Mail className="w-3.5 h-3.5" /> Contact Email *
                 </label>
                 <input type="email" required value={form.contact_email}
                   onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
               <div>
-                <label className="flex items-center gap-2 text-sm text-slate-400 mb-1">
+                <label className="flex items-center gap-2 text-sm text-secondary mb-1">
                   <Phone className="w-3.5 h-3.5" /> Contact Phone
                 </label>
                 <input type="text" value={form.contact_phone}
                   onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
             </div>
 
             <div>
-              <label className="flex items-center gap-2 text-sm text-slate-400 mb-1">
+              <label className="flex items-center gap-2 text-sm text-secondary mb-1">
                 <MapPin className="w-3.5 h-3.5" /> Headquarters Address
               </label>
               <textarea value={form.headquarters_address} rows={2}
                 onChange={(e) => setForm({ ...form, headquarters_address: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
               />
             </div>
 
             <div>
-              <label className="flex items-center gap-2 text-sm text-slate-400 mb-1">
+              <label className="flex items-center gap-2 text-sm text-secondary mb-1">
                 <Briefcase className="w-3.5 h-3.5" /> Industry
               </label>
               <input type="text" value={form.industry}
                 onChange={(e) => setForm({ ...form, industry: e.target.value })}
                 placeholder="e.g. Healthcare, Technology, Finance..."
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary placeholder:text-muted focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
 
@@ -238,10 +238,10 @@ const CorporateAdminSettingsPage: React.FC = () => {
 
           {/* Password Reset Section */}
           <div className="mt-8">
-            <h2 className="text-xl font-bold text-white mb-6">Reset Password</h2>
+            <h2 className="text-xl font-bold text-primary mb-6">Reset Password</h2>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6">
               <div className="relative">
-                <label className="block text-sm text-slate-300 mb-2">Current Password</label>
+                <label className="block text-sm text-secondary mb-2">Current Password</label>
                 <input
                   type={showCurrent ? 'text' : 'password'}
                   value={currentPassword}
@@ -251,7 +251,7 @@ const CorporateAdminSettingsPage: React.FC = () => {
                 />
                 <button
                   type="button"
-                  className="absolute top-8 right-3 text-slate-400 hover:text-slate-200"
+                  className="absolute top-8 right-3 text-secondary hover:text-primary"
                   tabIndex={-1}
                   onClick={() => setShowCurrent(v => !v)}
                 >
@@ -259,7 +259,7 @@ const CorporateAdminSettingsPage: React.FC = () => {
                 </button>
               </div>
               <div className="relative">
-                <label className="block text-sm text-slate-300 mb-2">New Password</label>
+                <label className="block text-sm text-secondary mb-2">New Password</label>
                 <input
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
@@ -269,7 +269,7 @@ const CorporateAdminSettingsPage: React.FC = () => {
                 />
                 <button
                   type="button"
-                  className="absolute top-8 right-3 text-slate-400 hover:text-slate-200"
+                  className="absolute top-8 right-3 text-secondary hover:text-primary"
                   tabIndex={-1}
                   onClick={() => setShowNew(v => !v)}
                 >
@@ -277,7 +277,7 @@ const CorporateAdminSettingsPage: React.FC = () => {
                 </button>
               </div>
               <div>
-                <label className="block text-sm text-slate-300 mb-2">Confirm New Password</label>
+                <label className="block text-sm text-secondary mb-2">Confirm New Password</label>
                 <input
                   type="password"
                   value={confirmPassword}
@@ -287,14 +287,14 @@ const CorporateAdminSettingsPage: React.FC = () => {
                 />
                 {confirmPassword.length > 0 && (
                   passwordsMatch ? (
-                    <div className="text-green-400 text-sm mt-1">Passwords match</div>
+                    <div className="text-green-700 dark:text-green-400 text-sm mt-1">Passwords match</div>
                   ) : (
-                    <div className="text-red-400 text-sm mt-1">Passwords do not match</div>
+                    <div className="text-red-700 dark:text-red-400 text-sm mt-1">Passwords do not match</div>
                   )
                 )}
               </div>
-              {error && <div className="text-red-400 text-sm">{error}</div>}
-              {success && <div className="text-green-400 text-sm">Password reset successful!</div>}
+              {error && <div className="text-red-700 dark:text-red-400 text-sm">{error}</div>}
+              {success && <div className="text-green-700 dark:text-green-400 text-sm">Password reset successful!</div>}
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -311,12 +311,12 @@ const CorporateAdminSettingsPage: React.FC = () => {
         {/* ═════════════════════════════════════ */}
         {/* NOTIFICATIONS                        */}
         {/* ═════════════════════════════════════ */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700">
-          <div className="px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <div className="bg-sunken rounded-xl border border-subtle">
+          <div className="px-6 py-4 border-b border-subtle">
+            <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
               🔔 Notifications
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-secondary mt-1">
               Choose what you hear about, and where.
             </p>
           </div>

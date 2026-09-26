@@ -87,30 +87,30 @@ const SchoolAdminReportsPage: React.FC = () => {
     <>
       <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Attendance Reports & Analytics</h1>
-        <p className="text-sm text-gray-600 mt-1">Generate and export attendance reports</p>
+        <h1 className="text-2xl font-bold text-primary">Attendance Reports & Analytics</h1>
+        <p className="text-sm text-secondary mt-1">Generate and export attendance reports</p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-card rounded-lg shadow p-6 mb-6">
         <h2 className="font-semibold text-lg mb-4">Filters</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <label className="block text-sm font-medium text-secondary mb-1">Start Date</label>
             <input
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <label className="block text-sm font-medium text-secondary mb-1">End Date</label>
             <input
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
             />
           </div>
           <div className="flex items-end gap-2">
@@ -137,43 +137,43 @@ const SchoolAdminReportsPage: React.FC = () => {
       {records.length > 0 ? (
         <>
           <div className="mb-4 flex justify-between items-center">
-            <p className="text-sm text-gray-600">Showing {records.length} records</p>
+            <p className="text-sm text-secondary">Showing {records.length} records</p>
           </div>
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="bg-card rounded-lg shadow overflow-x-auto">
+            <table className="min-w-full divide-y divide-subtle">
+              <thead className="bg-sunken">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Course</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faculty</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marked At</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Student</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Course</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Faculty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase">Marked At</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-subtle">
                 {records.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.attendance_date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={record.id} className="hover:bg-sunken">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">{record.attendance_date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                       {record.first_name} {record.last_name}
-                      <span className="block text-xs text-gray-500">{record.student_id}</span>
+                      <span className="block text-xs text-muted">{record.student_id}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                       {record.course_code}
-                      <span className="block text-xs text-gray-500">{record.course_name}</span>
+                      <span className="block text-xs text-muted">{record.course_name}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        record.status === 'present' ? 'bg-green-100 text-green-800' :
-                        record.status === 'absent' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
+                        record.status === 'present' ? 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300' :
+                        record.status === 'absent' ? 'bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-300' :
+                        'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-800 dark:text-yellow-300'
                       }`}>
                         {record.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{record.faculty_name || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary">{record.faculty_name || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary">
                       {new Date(record.marked_at).toLocaleString()}
                     </td>
                   </tr>
@@ -183,10 +183,10 @@ const SchoolAdminReportsPage: React.FC = () => {
           </div>
         </>
       ) : (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
+        <div className="bg-card rounded-lg shadow p-12 text-center">
           <div className="text-6xl mb-4">📊</div>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">No Records Yet</h3>
-          <p className="text-gray-500">Select filters and click "Generate Report" to view attendance data</p>
+          <h3 className="text-xl font-semibold text-secondary mb-2">No Records Yet</h3>
+          <p className="text-muted">Select filters and click "Generate Report" to view attendance data</p>
         </div>
       )}
       </div>

@@ -282,8 +282,8 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
       <div className="p-6">
         <div className="mb-6 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Enrollment</h1>
-            <p className="text-sm text-gray-600 mt-1">Enroll students into course sections</p>
+            <h1 className="text-2xl font-bold text-primary">Enrollment</h1>
+            <p className="text-sm text-secondary mt-1">Enroll students into course sections</p>
           </div>
           <button
             onClick={() => setShowEnrollModal(true)}
@@ -300,12 +300,12 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
             placeholder="Search by name, ID or course..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full max-w-xs px-4 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
           <select
             value={filterSchedule}
             onChange={e => setFilterSchedule(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+            className="px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
             style={selectStyle}
           >
             <option value="">All Sections</option>
@@ -319,57 +319,57 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
 
         {loading ? (
           <div className="flex justify-center items-center py-12">
-            <div className="text-gray-600">Loading enrollments...</div>
+            <div className="text-secondary">Loading enrollments...</div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-card rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-subtle">
+                <thead className="bg-sunken">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">#</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day(s)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-12">#</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Student ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Student Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Course</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Section</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Day(s)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Time</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-subtle">
                   {filteredEnrollments.map((enrollment, index) => (
-                    <tr key={enrollment.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                    <tr key={enrollment.id} className="hover:bg-sunken">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-muted font-medium">
                         {index + 1}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-primary font-mono">
                         {enrollment.student_code}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-primary">
                           {enrollment.first_name} {enrollment.middle_name ? enrollment.middle_name + ' ' : ''}{enrollment.last_name}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{enrollment.course_code}</div>
-                        <div className="text-sm text-gray-500">{enrollment.course_name}</div>
+                        <div className="text-sm font-medium text-primary">{enrollment.course_code}</div>
+                        <div className="text-sm text-muted">{enrollment.course_name}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-primary font-medium">
                         {enrollment.section}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                         {formatDays(enrollment.days_of_week, enrollment.day_of_week)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                         {enrollment.start_time} – {enrollment.end_time}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
                           enrollment.status === 'enrolled'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300'
+                            : 'bg-sunken text-primary'
                         }`}>
                           {enrollment.status}
                         </span>
@@ -377,7 +377,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button
                           onClick={() => handleUnenroll(enrollment)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 dark:text-red-300 hover:text-red-900 dark:hover:text-red-300"
                         >
                           Unenroll
                         </button>
@@ -386,7 +386,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                   ))}
                   {filteredEnrollments.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-500">
+                      <td colSpan={9} className="px-6 py-8 text-center text-sm text-muted">
                         {enrollments.length === 0
                           ? 'No students enrolled yet. Click "+ Enroll Students" to get started.'
                           : 'No enrollments match your search.'}
@@ -397,7 +397,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
               </table>
             </div>
             {filteredEnrollments.length > 0 && (
-              <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
+              <div className="px-6 py-3 bg-sunken border-t border-subtle text-sm text-secondary">
                 Showing {filteredEnrollments.length} enrollment(s)
               </div>
             )}
@@ -407,13 +407,13 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
         {/* Enroll Modal */}
         {showEnrollModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-card rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <h2 className="text-xl font-bold mb-4">Enroll Students</h2>
 
                 {/* Step 1: Select Section */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Select Course Section *
                   </label>
                   <select
@@ -422,7 +422,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                       setSelectedSchedule(e.target.value);
                       setSelectedStudents([]);
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                     style={selectStyle}
                   >
                     <option value="">Choose a section...</option>
@@ -439,16 +439,16 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                   const sched = schedules.find(s => s.id === selectedSchedule);
                   if (!sched) return null;
                   return (
-                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-sm font-medium text-blue-900">
+                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-500/15 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="text-sm font-medium text-blue-900 dark:text-blue-300">
                         {sched.course_code} – {sched.course_name}
                       </div>
-                      <div className="text-xs text-blue-700 mt-1">
+                      <div className="text-xs text-blue-700 dark:text-blue-300 mt-1">
                         Section {sched.section} · {formatDays(sched.days_of_week, sched.day_of_week)} · {sched.start_time}–{sched.end_time}
                         {sched.building && ` · ${sched.building} ${sched.room_number}`}
                         {sched.faculty_name && ` · ${sched.faculty_name}`}
                       </div>
-                      <div className="text-xs text-blue-600 mt-1">
+                      <div className="text-xs text-blue-600 dark:text-blue-300 mt-1">
                         Currently enrolled: {enrollmentCounts[sched.id] || 0} student(s)
                       </div>
                     </div>
@@ -459,14 +459,14 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                 {selectedSchedule && (
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-secondary">
                         Select Students ({selectedStudents.length} selected)
                       </label>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={selectAllVisible}
-                          className="text-xs text-blue-600 hover:text-blue-800"
+                          className="text-xs text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-300"
                         >
                           Select all visible
                         </button>
@@ -474,7 +474,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={deselectAll}
-                            className="text-xs text-red-600 hover:text-red-800"
+                            className="text-xs text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-300"
                           >
                             Clear selection
                           </button>
@@ -486,11 +486,11 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                       placeholder="Search students by name or ID..."
                       value={studentSearch}
                       onChange={e => setStudentSearch(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-2"
+                      className="w-full px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-2"
                     />
-                    <div className="border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
+                    <div className="border border-subtle rounded-lg max-h-60 overflow-y-auto">
                       {filteredAvailableStudents.length === 0 ? (
-                        <div className="p-4 text-sm text-gray-500 text-center">
+                        <div className="p-4 text-sm text-muted text-center">
                           {availableStudents.length === 0
                             ? 'All students are already enrolled in this section.'
                             : 'No students match your search.'}
@@ -499,21 +499,21 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                         filteredAvailableStudents.map(student => (
                           <label
                             key={student.id}
-                            className={`flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                              selectedStudents.includes(student.id) ? 'bg-blue-50' : ''
+                            className={`flex items-center px-3 py-2 hover:bg-sunken cursor-pointer border-b border-subtle last:border-b-0 ${
+                              selectedStudents.includes(student.id) ? 'bg-blue-50 dark:bg-blue-500/15' : ''
                             }`}
                           >
                             <input
                               type="checkbox"
                               checked={selectedStudents.includes(student.id)}
                               onChange={() => toggleStudent(student.id)}
-                              className="mr-3 h-4 w-4 text-blue-600 rounded border-gray-300"
+                              className="mr-3 h-4 w-4 text-blue-600 dark:text-blue-300 rounded border-subtle"
                             />
                             <div className="flex-1">
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-primary">
                                 {student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}
                               </span>
-                              <span className="text-xs text-gray-500 ml-2 font-mono">{student.student_id}</span>
+                              <span className="text-xs text-muted ml-2 font-mono">{student.student_id}</span>
                             </div>
                           </label>
                         ))
@@ -532,7 +532,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
                       setSelectedStudents([]);
                       setStudentSearch('');
                     }}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    className="px-4 py-2 text-secondary bg-sunken rounded-lg hover:bg-sunken"
                   >
                     Cancel
                   </button>

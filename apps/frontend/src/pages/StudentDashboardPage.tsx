@@ -40,10 +40,10 @@ interface DashboardData {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  present: 'text-green-400 bg-green-900/30 border-green-700/50',
-  late: 'text-amber-400 bg-amber-900/30 border-amber-700/50',
-  absent: 'text-red-400 bg-red-900/30 border-red-700/50',
-  excused: 'text-blue-400 bg-blue-900/30 border-blue-700/50',
+  present: 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700/50',
+  late: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700/50',
+  absent: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50',
+  excused: 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700/50',
 }
 
 const STATUS_ICONS: Record<string, string> = {
@@ -82,21 +82,21 @@ export const StudentDashboardPage: React.FC = () => {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-slate-400">Loading dashboard...</span>
+            <span className="ml-3 text-secondary">Loading dashboard...</span>
           </div>
         ) : !data ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-4">📭</div>
-            <p className="text-xl text-slate-400">No data available</p>
+            <p className="text-xl text-secondary">No data available</p>
           </div>
         ) : (
           <>
             {/* Welcome Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-bold text-primary">
                 Welcome back, {data.student_name.split(' ')[0]}!
               </h1>
-              <p className="text-slate-400 mt-1">
+              <p className="text-secondary mt-1">
                 {data.student_code} • {data.enrolled_courses} course{data.enrolled_courses !== 1 ? 's' : ''} enrolled
               </p>
             </div>
@@ -104,7 +104,7 @@ export const StudentDashboardPage: React.FC = () => {
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {/* Attendance Rate */}
-              <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 text-center">
+              <div className="bg-sunken rounded-xl border border-subtle p-5 text-center">
                 <div className="relative w-20 h-20 mx-auto mb-3">
                   <svg className="w-20 h-20 -rotate-90" viewBox="0 0 72 72">
                     <circle cx="36" cy="36" r="30" fill="none" stroke="#334155" strokeWidth="6" />
@@ -116,65 +116,65 @@ export const StudentDashboardPage: React.FC = () => {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-lg font-bold text-white">{att?.rate || 0}%</span>
+                    <span className="text-lg font-bold text-primary">{att?.rate || 0}%</span>
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Attendance Rate</p>
+                <p className="text-xs text-secondary uppercase tracking-wider">Attendance Rate</p>
               </div>
 
               {/* Present */}
-              <div className="bg-slate-800 rounded-xl border border-green-800/50 p-5 text-center">
-                <div className="text-3xl font-bold text-green-400 mb-1">{att?.present || 0}</div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Present</p>
-                <p className="text-xs text-slate-500 mt-1">of {att?.total_sessions || 0} sessions</p>
+              <div className="bg-sunken rounded-xl border border-green-200 dark:border-green-800/50 p-5 text-center">
+                <div className="text-3xl font-bold text-green-700 dark:text-green-400 mb-1">{att?.present || 0}</div>
+                <p className="text-xs text-secondary uppercase tracking-wider">Present</p>
+                <p className="text-xs text-muted mt-1">of {att?.total_sessions || 0} sessions</p>
               </div>
 
               {/* Late */}
-              <div className="bg-slate-800 rounded-xl border border-amber-800/50 p-5 text-center">
-                <div className="text-3xl font-bold text-amber-400 mb-1">{att?.late || 0}</div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Late</p>
+              <div className="bg-sunken rounded-xl border border-amber-200 dark:border-amber-800/50 p-5 text-center">
+                <div className="text-3xl font-bold text-amber-700 dark:text-amber-400 mb-1">{att?.late || 0}</div>
+                <p className="text-xs text-secondary uppercase tracking-wider">Late</p>
               </div>
 
               {/* Absent */}
-              <div className="bg-slate-800 rounded-xl border border-red-800/50 p-5 text-center">
-                <div className="text-3xl font-bold text-red-400 mb-1">{att?.absent || 0}</div>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Absent</p>
+              <div className="bg-sunken rounded-xl border border-red-200 dark:border-red-800/50 p-5 text-center">
+                <div className="text-3xl font-bold text-red-700 dark:text-red-400 mb-1">{att?.absent || 0}</div>
+                <p className="text-xs text-secondary uppercase tracking-wider">Absent</p>
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
               {/* Today's Schedule */}
-              <div className="bg-slate-800 rounded-xl border border-slate-700">
-                <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
-                  <h3 className="font-semibold text-white">Today's Schedule</h3>
+              <div className="bg-sunken rounded-xl border border-subtle">
+                <div className="px-5 py-4 border-b border-subtle flex items-center justify-between">
+                  <h3 className="font-semibold text-primary">Today's Schedule</h3>
                   <button
                     onClick={() => navigate('/student/schedule')}
-                    className="text-xs text-emerald-400 hover:text-emerald-300"
+                    className="text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
                   >
                     View Full →
                   </button>
                 </div>
                 <div className="p-4">
                   {data.today_schedule.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-6">No classes today 🎉</p>
+                    <p className="text-sm text-muted text-center py-6">No classes today 🎉</p>
                   ) : (
                     <div className="space-y-3">
                       {data.today_schedule.map((cls) => (
                         <div
                           key={cls.id}
-                          className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg border border-slate-700/50"
+                          className="flex items-center gap-3 p-3 bg-sunken rounded-lg border border-subtle"
                         >
                           <div className="w-12 text-center">
-                            <div className="text-sm font-bold text-white">
+                            <div className="text-sm font-bold text-primary">
                               {cls.start_time?.slice(0, 5)}
                             </div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted">
                               {cls.end_time?.slice(0, 5)}
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{cls.course_name}</p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-sm font-medium text-primary truncate">{cls.course_name}</p>
+                            <p className="text-xs text-secondary">
                               {cls.course_code}
                               {cls.section ? ` • Sec ${cls.section}` : ''}
                               {cls.room_name ? ` • ${cls.room_name}` : ''}
@@ -188,36 +188,36 @@ export const StudentDashboardPage: React.FC = () => {
               </div>
 
               {/* Recent Attendance */}
-              <div className="bg-slate-800 rounded-xl border border-slate-700">
-                <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
-                  <h3 className="font-semibold text-white">Recent Attendance</h3>
+              <div className="bg-sunken rounded-xl border border-subtle">
+                <div className="px-5 py-4 border-b border-subtle flex items-center justify-between">
+                  <h3 className="font-semibold text-primary">Recent Attendance</h3>
                   <button
                     onClick={() => navigate('/student/attendance')}
-                    className="text-xs text-emerald-400 hover:text-emerald-300"
+                    className="text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
                   >
                     View All →
                   </button>
                 </div>
                 <div className="p-4">
                   {data.recent_attendance.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-6">No attendance records yet</p>
+                    <p className="text-sm text-muted text-center py-6">No attendance records yet</p>
                   ) : (
                     <div className="space-y-2">
                       {data.recent_attendance.map((rec, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-700/50 bg-slate-700/20"
+                          className="flex items-center gap-3 p-2.5 rounded-lg border border-subtle bg-sunken"
                         >
                           <span
                             className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold border ${
-                              STATUS_COLORS[rec.status] || 'text-slate-400 bg-slate-800 border-slate-600'
+                              STATUS_COLORS[rec.status] || 'text-secondary bg-sunken border-strong'
                             }`}
                           >
                             {STATUS_ICONS[rec.status] || '?'}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white truncate">{rec.course_name}</p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-sm text-primary truncate">{rec.course_name}</p>
+                            <p className="text-xs text-muted">
                               {new Date(rec.attendance_date).toLocaleDateString('en-US', {
                                 month: 'short', day: 'numeric',
                               })}

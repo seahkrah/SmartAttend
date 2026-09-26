@@ -93,7 +93,7 @@ const SuperadminAccessRequestsPage: React.FC = () => {
         ))}
       </nav>
 
-      {notice && <p role="alert" className="text-sm text-danger-600">{notice}</p>}
+      {notice && <p role="alert" className="text-sm text-danger-600 dark:text-danger-400">{notice}</p>}
 
       {error ? (
         <ErrorState title="Access requests could not be loaded" description={error} onRetry={() => void load()} />

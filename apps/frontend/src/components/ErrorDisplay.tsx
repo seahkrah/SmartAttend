@@ -55,9 +55,9 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
   if (isDismissed) return null;
 
   const iconMap = {
-    error: <AlertCircle className="w-5 h-5 text-red-400" />,
-    warning: <AlertTriangle className="w-5 h-5 text-yellow-400" />,
-    info: <Info className="w-5 h-5 text-blue-400" />
+    error: <AlertCircle className="w-5 h-5 text-red-700 dark:text-red-400" />,
+    warning: <AlertTriangle className="w-5 h-5 text-yellow-700 dark:text-yellow-400" />,
+    info: <Info className="w-5 h-5 text-blue-700 dark:text-blue-400" />
   };
 
   const bgColorMap = {
@@ -67,9 +67,9 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
   };
 
   const textColorMap = {
-    error: 'text-red-300',
-    warning: 'text-yellow-300',
-    info: 'text-blue-300'
+    error: 'text-red-700 dark:text-red-300',
+    warning: 'text-yellow-700 dark:text-yellow-300',
+    info: 'text-blue-700 dark:text-blue-300'
   };
 
   return (
@@ -80,7 +80,7 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
           {iconMap[severity]}
           <div className="flex-1">
             <p className={`font-semibold ${textColorMap[severity]}`}>{title}</p>
-            <p className="text-sm text-slate-300 mt-1">{message}</p>
+            <p className="text-sm text-secondary mt-1">{message}</p>
 
             {/* Action */}
             {action && (
@@ -101,7 +101,7 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
               setIsDismissed(true);
               onDismiss?.();
             }}
-            className="mt-1 text-slate-500 hover:text-slate-300 transition-colors"
+            className="mt-1 text-muted hover:text-secondary transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -110,10 +110,10 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
 
       {/* Technical Details (expandable) */}
       {details && (
-        <div className="mt-4 border-t border-slate-700 pt-4">
+        <div className="mt-4 border-t border-subtle pt-4">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-colors"
+            className="flex items-center gap-2 text-xs text-secondary hover:text-secondary transition-colors"
           >
             <ChevronDown
               className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -122,7 +122,7 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
           </button>
 
           {isExpanded && (
-            <pre className="mt-2 p-2 bg-slate-900/50 rounded text-xs text-slate-400 overflow-auto max-h-32">
+            <pre className="mt-2 p-2 bg-card rounded text-xs text-secondary overflow-auto max-h-32">
               {details}
             </pre>
           )}
@@ -155,7 +155,7 @@ export const FieldError: React.FC<FieldErrorProps> = ({ message, touched, classN
   if (!message || !touched) return null;
 
   return (
-    <p className={`text-xs text-red-400 mt-1 flex items-center gap-1 ${className}`}>
+    <p className={`text-xs text-red-700 dark:text-red-400 mt-1 flex items-center gap-1 ${className}`}>
       <AlertCircle className="w-3 h-3" />
       {message}
     </p>
@@ -193,8 +193,8 @@ export interface EmptyStateProps {
 export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, message, action }) => (
   <div className="flex flex-col items-center justify-center p-12 text-center">
     {icon && <div className="mb-4 opacity-50">{icon}</div>}
-    <p className="text-lg font-semibold text-white mb-2">{title}</p>
-    <p className="text-slate-400 mb-6 max-w-md">{message}</p>
+    <p className="text-lg font-semibold text-primary mb-2">{title}</p>
+    <p className="text-secondary mb-6 max-w-md">{message}</p>
 
     {action && (
       <button
@@ -223,14 +223,14 @@ export interface NoResultsProps {
  */
 export const NoResults: React.FC<NoResultsProps> = ({ searchTerm, onClearSearch }) => (
   <div className="text-center py-12">
-    <p className="text-slate-400 text-lg">
+    <p className="text-secondary text-lg">
       {searchTerm ? `No results for "${searchTerm}"` : 'No items found'}
     </p>
 
     {searchTerm && onClearSearch && (
       <button
         onClick={onClearSearch}
-        className="mt-4 text-blue-400 hover:text-blue-300 transition-colors underline"
+        className="mt-4 text-blue-700 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors underline"
       >
         Clear search
       </button>
@@ -259,13 +259,13 @@ export interface SuccessStateProps {
 export const SuccessState: React.FC<SuccessStateProps> = ({ title, message, action }) => (
   <div className="p-6 rounded-lg bg-green-500/10 border border-green-500/30 text-center">
     <div className="text-4xl mb-3">✓</div>
-    <p className="font-semibold text-green-300 text-lg mb-1">{title}</p>
-    <p className="text-sm text-slate-300 mb-4">{message}</p>
+    <p className="font-semibold text-green-700 dark:text-green-300 text-lg mb-1">{title}</p>
+    <p className="text-sm text-secondary mb-4">{message}</p>
 
     {action && (
       <button
         onClick={action.onClick}
-        className="text-green-400 hover:text-green-300 font-medium transition-colors"
+        className="text-green-700 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"
       >
         {action.label}
       </button>
@@ -289,7 +289,7 @@ export interface InlineErrorProps {
  * Minimal error display (no dismiss, no details)
  */
 export const InlineError: React.FC<InlineErrorProps> = ({ message, icon = true, className }) => (
-  <div className={`flex items-center gap-2 p-2 rounded bg-red-500/10 border border-red-500/30 text-red-300 text-xs ${className}`}>
+  <div className={`flex items-center gap-2 p-2 rounded bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-xs ${className}`}>
     {icon && <AlertCircle className="w-3 h-3 flex-shrink-0" />}
     {message}
   </div>

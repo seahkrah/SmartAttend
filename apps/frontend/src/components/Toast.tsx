@@ -70,10 +70,10 @@ export const useToastStore = create<ToastStore>((set) => ({
  */
 const ToastItem: React.FC<{ toast: Toast; onRemove: (id: string) => void }> = ({ toast, onRemove }) => {
   const iconMap = {
-    success: <CheckCircle2 className="w-5 h-5 text-green-400" />,
-    error: <AlertCircle className="w-5 h-5 text-red-400" />,
-    warning: <AlertTriangle className="w-5 h-5 text-yellow-400" />,
-    info: <Info className="w-5 h-5 text-blue-400" />
+    success: <CheckCircle2 className="w-5 h-5 text-green-700 dark:text-green-400" />,
+    error: <AlertCircle className="w-5 h-5 text-red-700 dark:text-red-400" />,
+    warning: <AlertTriangle className="w-5 h-5 text-yellow-700 dark:text-yellow-400" />,
+    info: <Info className="w-5 h-5 text-blue-700 dark:text-blue-400" />
   };
 
   const bgColorMap = {
@@ -84,10 +84,10 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: (id: string) => void }> = ({
   };
 
   const textColorMap = {
-    success: 'text-green-300',
-    error: 'text-red-300',
-    warning: 'text-yellow-300',
-    info: 'text-blue-300'
+    success: 'text-green-700 dark:text-green-300',
+    error: 'text-red-700 dark:text-red-300',
+    warning: 'text-yellow-700 dark:text-yellow-300',
+    info: 'text-blue-700 dark:text-blue-300'
   };
 
   return (
@@ -96,7 +96,7 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: (id: string) => void }> = ({
 
       <div className="flex-1">
         <p className={`font-semibold ${textColorMap[toast.type]}`}>{toast.title}</p>
-        {toast.message && <p className="text-sm text-slate-400 mt-1">{toast.message}</p>}
+        {toast.message && <p className="text-sm text-secondary mt-1">{toast.message}</p>}
 
         {toast.action && (
           <button
@@ -113,7 +113,7 @@ const ToastItem: React.FC<{ toast: Toast; onRemove: (id: string) => void }> = ({
 
       <button
         onClick={() => onRemove(toast.id)}
-        className="mt-1 text-slate-500 hover:text-slate-300 transition-colors"
+        className="mt-1 text-muted hover:text-secondary transition-colors"
       >
         <X className="w-4 h-4" />
       </button>

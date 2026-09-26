@@ -118,8 +118,8 @@ const SchoolAdminCoursesPage: React.FC = () => {
       <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Course Management</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage courses offered at your school</p>
+          <h1 className="text-2xl font-bold text-primary">Course Management</h1>
+          <p className="text-sm text-secondary mt-1">Manage courses offered at your school</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -135,7 +135,7 @@ const SchoolAdminCoursesPage: React.FC = () => {
           placeholder="Search courses..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
@@ -144,41 +144,41 @@ const SchoolAdminCoursesPage: React.FC = () => {
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : filteredCourses.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
+        <div className="bg-card rounded-lg shadow p-12 text-center">
           <div className="text-6xl mb-4">📚</div>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">No Courses Found</h3>
-          <p className="text-gray-500 mb-4">
+          <h3 className="text-xl font-semibold text-secondary mb-2">No Courses Found</h3>
+          <p className="text-muted mb-4">
             {searchTerm ? 'Try a different search term' : 'Add your first course to get started'}
           </p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredCourses.map((course) => (
-            <div key={course.id} className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
+            <div key={course.id} className="bg-card rounded-lg shadow p-6 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="font-bold text-lg text-gray-900">{course.code}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{course.name}</p>
+                  <h3 className="font-bold text-lg text-primary">{course.code}</h3>
+                  <p className="text-sm text-secondary mt-1">{course.name}</p>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => openEditModal(course)}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    className="text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(course)}
-                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                    className="text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium"
                   >
                     Delete
                   </button>
                 </div>
               </div>
-              {course.description && <p className="text-sm text-gray-500 mb-2">{course.description}</p>}
-              <div className="flex items-center justify-between text-sm text-gray-600">
+              {course.description && <p className="text-sm text-muted mb-2">{course.description}</p>}
+              <div className="flex items-center justify-between text-sm text-secondary">
                 <span>{course.credits || 0} Credits</span>
-                {course.department_name && <span className="text-xs bg-gray-100 px-2 py-1 rounded">{course.department_name}</span>}
+                {course.department_name && <span className="text-xs bg-sunken px-2 py-1 rounded">{course.department_name}</span>}
               </div>
             </div>
           ))}
@@ -187,47 +187,47 @@ const SchoolAdminCoursesPage: React.FC = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="bg-card rounded-lg max-w-md w-full p-6">
             <h2 className="text-xl font-bold mb-4">{editingCourse ? 'Edit Course' : 'Add New Course'}</h2>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Course Code</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Course Code</label>
                   <input
                     type="text"
                     required
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Course Name</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Course Name</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Description</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     rows={3}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Credits</label>
+                    <label className="block text-sm font-medium text-secondary mb-1">Credits</label>
                     <input
                       type="number"
                       value={formData.credits}
                       onChange={(e) => setFormData({ ...formData, credits: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     />
                   </div>
                 </div>
@@ -236,7 +236,7 @@ const SchoolAdminCoursesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setShowModal(false); setEditingCourse(null); resetForm(); }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-subtle text-secondary rounded-lg hover:bg-sunken"
                 >
                   Cancel
                 </button>

@@ -152,14 +152,14 @@ const FacultyReportsPage: React.FC = () => {
   }, [rows])
 
   const rateColor = (pct: number) =>
-    pct >= 75 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400'
+    pct >= 75 ? 'text-emerald-700 dark:text-emerald-400' : pct >= 50 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400'
 
   const rateBg = (pct: number) =>
     pct >= 75
-      ? 'bg-emerald-500/20 text-emerald-400'
+      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
       : pct >= 50
-      ? 'bg-amber-500/20 text-amber-400'
-      : 'bg-red-500/20 text-red-400'
+      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+      : 'bg-red-500/20 text-red-700 dark:text-red-400'
 
   const exportCSV = () => {
     if (filteredRows.length === 0) return
@@ -184,7 +184,7 @@ const FacultyReportsPage: React.FC = () => {
       <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-3 text-slate-400">Loading...</span>
+          <span className="ml-3 text-secondary">Loading...</span>
         </div>
       </>
     )
@@ -194,22 +194,22 @@ const FacultyReportsPage: React.FC = () => {
     <>
       <div className="space-y-6">
         {/* ── Filter panel ── */}
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
+        <div className="rounded-xl border border-subtle bg-sunken p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Filter className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-sm font-semibold text-white">Report Filters</h3>
+            <Filter className="w-4 h-4 text-cyan-700 dark:text-cyan-400" />
+            <h3 className="text-sm font-semibold text-primary">Report Filters</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Course */}
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Course</label>
+              <label className="text-xs text-secondary mb-1 block">Course</label>
               <select
                 value={selectedCourse}
                 onChange={(e) => {
                   setSelectedCourse(e.target.value)
                   setSelectedSchedule('all')
                 }}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-cyan-500 outline-none"
+                className="w-full px-3 py-2 bg-card border border-subtle rounded-lg text-primary text-sm focus:border-cyan-500 outline-none"
               >
                 <option value="all">All Courses</option>
                 {courses.map((c) => (
@@ -222,11 +222,11 @@ const FacultyReportsPage: React.FC = () => {
 
             {/* Schedule */}
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Schedule / Section</label>
+              <label className="text-xs text-secondary mb-1 block">Schedule / Section</label>
               <select
                 value={selectedSchedule}
                 onChange={(e) => setSelectedSchedule(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-cyan-500 outline-none"
+                className="w-full px-3 py-2 bg-card border border-subtle rounded-lg text-primary text-sm focus:border-cyan-500 outline-none"
               >
                 <option value="all">All Sections</option>
                 {filteredSchedules.map((s) => (
@@ -239,23 +239,23 @@ const FacultyReportsPage: React.FC = () => {
 
             {/* Date from */}
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">From Date</label>
+              <label className="text-xs text-secondary mb-1 block">From Date</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-cyan-500 outline-none"
+                className="w-full px-3 py-2 bg-card border border-subtle rounded-lg text-primary text-sm focus:border-cyan-500 outline-none"
               />
             </div>
 
             {/* Date to */}
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">To Date</label>
+              <label className="text-xs text-secondary mb-1 block">To Date</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-cyan-500 outline-none"
+                className="w-full px-3 py-2 bg-card border border-subtle rounded-lg text-primary text-sm focus:border-cyan-500 outline-none"
               />
             </div>
           </div>
@@ -275,7 +275,7 @@ const FacultyReportsPage: React.FC = () => {
             {rows.length > 0 && (
               <button
                 onClick={exportCSV}
-                className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 bg-sunken hover:bg-raised text-primary rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
                 Export CSV
@@ -287,61 +287,61 @@ const FacultyReportsPage: React.FC = () => {
         {/* ── Summary cards ── */}
         {summary && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+            <div className="rounded-xl bg-sunken border border-subtle p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Users className="w-4 h-4 text-blue-400" />
-                <span className="text-xs text-slate-500 uppercase">Students</span>
+                <Users className="w-4 h-4 text-blue-700 dark:text-blue-400" />
+                <span className="text-xs text-muted uppercase">Students</span>
               </div>
-              <p className="text-2xl font-bold text-white">{summary.total_students}</p>
+              <p className="text-2xl font-bold text-primary">{summary.total_students}</p>
             </div>
-            <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+            <div className="rounded-xl bg-sunken border border-subtle p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-4 h-4 text-violet-400" />
-                <span className="text-xs text-slate-500 uppercase">Sessions</span>
+                <Calendar className="w-4 h-4 text-violet-700 dark:text-violet-400" />
+                <span className="text-xs text-muted uppercase">Sessions</span>
               </div>
-              <p className="text-2xl font-bold text-white">{summary.total_sessions}</p>
+              <p className="text-2xl font-bold text-primary">{summary.total_sessions}</p>
             </div>
-            <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+            <div className="rounded-xl bg-sunken border border-subtle p-4">
               <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs text-slate-500 uppercase">Avg Rate</span>
+                <TrendingUp className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                <span className="text-xs text-muted uppercase">Avg Rate</span>
               </div>
               <p className={`text-2xl font-bold ${rateColor(summary.avg_attendance_rate)}`}>
                 {summary.avg_attendance_rate}%
               </p>
             </div>
-            <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+            <div className="rounded-xl bg-sunken border border-subtle p-4">
               <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs text-slate-500 uppercase">Highest</span>
+                <CheckCircle className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                <span className="text-xs text-muted uppercase">Highest</span>
               </div>
-              <p className="text-2xl font-bold text-emerald-400">{summary.highest_rate}%</p>
+              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{summary.highest_rate}%</p>
             </div>
-            <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+            <div className="rounded-xl bg-sunken border border-subtle p-4">
               <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="w-4 h-4 text-red-400" />
-                <span className="text-xs text-slate-500 uppercase">Lowest</span>
+                <AlertCircle className="w-4 h-4 text-red-700 dark:text-red-400" />
+                <span className="text-xs text-muted uppercase">Lowest</span>
               </div>
-              <p className="text-2xl font-bold text-red-400">{summary.lowest_rate}%</p>
+              <p className="text-2xl font-bold text-red-700 dark:text-red-400">{summary.lowest_rate}%</p>
             </div>
           </div>
         )}
 
         {/* ── Results table ── */}
         {hasGenerated && (
-          <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-white">
+          <div className="rounded-xl border border-subtle bg-sunken overflow-hidden">
+            <div className="px-5 py-3 border-b border-subtle flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-primary">
                 Attendance Results ({filteredRows.length} student{filteredRows.length !== 1 ? 's' : ''})
               </h3>
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted" />
                 <input
                   type="text"
                   placeholder="Search students..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-cyan-500 outline-none w-64"
+                  className="pl-10 pr-4 py-2 bg-card border border-subtle rounded-lg text-primary text-sm placeholder:text-muted focus:border-cyan-500 outline-none w-64"
                 />
               </div>
             </div>
@@ -351,7 +351,7 @@ const FacultyReportsPage: React.FC = () => {
                 <div className="w-6 h-6 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : filteredRows.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 text-sm">
+              <div className="text-center py-12 text-muted text-sm">
                 {rows.length === 0
                   ? 'No attendance records found for the selected filters.'
                   : 'No matches for your search.'}
@@ -360,29 +360,29 @@ const FacultyReportsPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-700 bg-slate-800/80">
+                    <tr className="text-xs text-muted uppercase tracking-wider border-b border-subtle bg-sunken">
                       <th className="text-left py-3 px-4">#</th>
                       <th className="text-left py-3 px-4">Student</th>
                       <th className="text-left py-3 px-4">ID</th>
                       <th className="text-center py-3 px-3">Sessions</th>
                       <th className="text-center py-3 px-3">
                         <span className="inline-flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Present
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" /> Present
                         </span>
                       </th>
                       <th className="text-center py-3 px-3">
                         <span className="inline-flex items-center gap-1">
-                          <XCircle className="w-3.5 h-3.5 text-red-400" /> Absent
+                          <XCircle className="w-3.5 h-3.5 text-red-700 dark:text-red-400" /> Absent
                         </span>
                       </th>
                       <th className="text-center py-3 px-3">
                         <span className="inline-flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-amber-400" /> Late
+                          <Clock className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" /> Late
                         </span>
                       </th>
                       <th className="text-center py-3 px-3">
                         <span className="inline-flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 text-blue-400" /> Excused
+                          <AlertCircle className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400" /> Excused
                         </span>
                       </th>
                       <th className="text-center py-3 px-4">Rate</th>
@@ -392,21 +392,21 @@ const FacultyReportsPage: React.FC = () => {
                     {filteredRows.map((r, idx) => (
                       <tr
                         key={r.student_id}
-                        className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors"
+                        className="border-b border-subtle hover:bg-sunken transition-colors"
                       >
-                        <td className="py-3 px-4 text-slate-500">{idx + 1}</td>
+                        <td className="py-3 px-4 text-muted">{idx + 1}</td>
                         <td className="py-3 px-4">
-                          <p className="text-white font-medium">
+                          <p className="text-primary font-medium">
                             {r.first_name} {r.last_name}
                           </p>
-                          <p className="text-xs text-slate-500">{r.email}</p>
+                          <p className="text-xs text-muted">{r.email}</p>
                         </td>
-                        <td className="py-3 px-4 text-slate-400 font-mono text-xs">{r.student_code}</td>
-                        <td className="py-3 px-3 text-center text-slate-300 font-medium">{r.total_sessions}</td>
-                        <td className="py-3 px-3 text-center text-emerald-400 font-semibold">{r.present}</td>
-                        <td className="py-3 px-3 text-center text-red-400 font-semibold">{r.absent}</td>
-                        <td className="py-3 px-3 text-center text-amber-400 font-semibold">{r.late}</td>
-                        <td className="py-3 px-3 text-center text-blue-400 font-semibold">{r.excused}</td>
+                        <td className="py-3 px-4 text-secondary font-mono text-xs">{r.student_code}</td>
+                        <td className="py-3 px-3 text-center text-secondary font-medium">{r.total_sessions}</td>
+                        <td className="py-3 px-3 text-center text-emerald-700 dark:text-emerald-400 font-semibold">{r.present}</td>
+                        <td className="py-3 px-3 text-center text-red-700 dark:text-red-400 font-semibold">{r.absent}</td>
+                        <td className="py-3 px-3 text-center text-amber-700 dark:text-amber-400 font-semibold">{r.late}</td>
+                        <td className="py-3 px-3 text-center text-blue-700 dark:text-blue-400 font-semibold">{r.excused}</td>
                         <td className="py-3 px-4 text-center">
                           <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${rateBg(r.rate)}`}>
                             {r.rate}%
@@ -424,9 +424,9 @@ const FacultyReportsPage: React.FC = () => {
         {/* Prompt if not generated yet */}
         {!hasGenerated && (
           <div className="text-center py-16">
-            <BarChart3 className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-            <p className="text-slate-400 text-lg">Select filters and generate a report</p>
-            <p className="text-slate-500 text-sm mt-1">
+            <BarChart3 className="w-12 h-12 mx-auto mb-3 text-muted" />
+            <p className="text-secondary text-lg">Select filters and generate a report</p>
+            <p className="text-muted text-sm mt-1">
               Choose a course, date range, and click Generate Report to view attendance data.
             </p>
           </div>

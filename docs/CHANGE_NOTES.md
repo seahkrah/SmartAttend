@@ -5,6 +5,78 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Foundation round, step 2: one design system (2026-09-26)
+
+### The problem, measured
+
+The theme follows the person's operating system: light or dark. But only
+**11 of 80 pages** used the design system's tokens (`text-primary`, `bg-card`,
+`border-subtle` …). **52 hardcoded a dark palette** (`text-slate-400`,
+`bg-slate-900` …), 17 mixed the two, and several school-admin pages were written
+light-only (`bg-white`). The results:
+
+- On a computer set to **light**, the sign-in card turned white inside a dark page,
+  and its labels were grey on white.
+- The legacy pages were dark islands in a light app, and the light-only pages were
+  white islands in a dark one.
+- Status colours tuned for one background, like pale `text-amber-300`, were
+  unreadable on the other.
+
+### What changed
+
+- **Dark by design, declared.** The theme system already intended sign-in, public
+  pages, the superadmin console and attendance capture to be dark, but nothing
+  enforced it. A new `DarkSurface` wrapper (`src/theme/DarkSurface.tsx`) now
+  declares them in `App.tsx`. Everything else follows the person's theme.
+- **Every page on the tokens.** A one-off codemod mapped about 2,860 legacy
+  classes onto the theme tokens:
+  - text becomes `text-primary`, `text-secondary` or `text-muted`;
+  - surfaces become `bg-page`, `bg-card`, `bg-sunken` or `bg-raised`;
+  - borders and dividers become `border-subtle`, `border-strong` or
+    `divide-subtle` (a new utility).
+
+  It also paired single-theme status colours with their opposite: for example
+  `text-emerald-400` became `text-emerald-700 dark:text-emerald-400`, and
+  `bg-blue-50` gained `dark:bg-blue-500/15`. White text stays white where it
+  sits on a solid colour or gradient. The codemod was run until it made no
+  further changes (idempotent). **79 of 80 pages** now use the design system. The
+  one exception is deliberate: dark text on the roster's coloured shift chips.
+- **Classes that never existed:** `danger-200/300/900` referred to shades the
+  palette doesn't define. The dark "Reject" button on HR leave fell back to the
+  light-mode red at 1.86:1. They now use real shades.
+- **Low-contrast yellow** (`yellow-500/600` on white, 2.9:1) is darkened to 700.
+
+### Found in passing: dates
+
+Every `DATE` column reached the screen as a timestamp: leave requests read
+"2027-04-12T00:00:00.000Z → …". node-postgres turns a date into a JavaScript
+`Date` at local midnight. That also shifts it a day west of the server, and makes
+`String(d).slice(0, 10)` a weekday name. Four modules had each written their own
+`isoDay()` workaround, and one comment records a closed admissions intake that
+kept accepting applications because of it. The driver now returns `DATE` as
+`'YYYY-MM-DD'` (`db/connection.ts`). The existing workarounds accept strings and
+keep working, and timestamps are unaffected. This also fixes the due date in
+invoice emails, which used `String(due_date).slice(0, 10)`.
+
+### Verification
+
+- **A contrast crawler measured it.** For every menu page of all nine roles, in
+  light and in dark, it computed the WCAG contrast ratio of every visible piece of
+  text against its actual background and flagged anything under 3:1. Every role
+  now passes in both themes (text on gradients is excluded, since it can't be
+  measured). What it caught and got fixed: the yellow link, the dark-mode
+  "Reject", the gradebook badge, the HR analytics page (its styles lived in
+  `utils/visualHierarchy.ts`), and the superadmin incident links.
+- **Visually:** converted legacy pages checked by screenshot in light mode.
+  Sign-in, forced dark on a light-mode computer, has 0 contrast failures.
+- **Gates:** frontend build (0 nav and 0 API-contract problems), 96/96 unit tests,
+  0 SQL mismatches, and e2e 1,889/1,890. The one failure is the known antivirus
+  quarantine on this machine.
+- CI on GitHub passed for the previous push: types and build, migrations + SQL +
+  API e2e on Linux, and container images.
+
+---
+
 ## Follow-up: brand cleanup and the "Request access" form (2026-09-26)
 
 ### Cleanup (as requested)

@@ -29,12 +29,12 @@ import { axiosClient } from '../utils/axiosClient';
  */
 
 const SETTLEMENT_STYLE: Record<Settlement, string> = {
-  draft: 'bg-slate-700/60 text-slate-300',
-  unpaid: 'bg-rose-500/15 text-rose-300',
-  part_paid: 'bg-amber-500/15 text-amber-300',
-  paid: 'bg-emerald-500/15 text-emerald-300',
-  overpaid: 'bg-sky-500/15 text-sky-300',
-  void: 'bg-slate-600/50 text-slate-500 line-through',
+  draft: 'bg-sunken text-secondary',
+  unpaid: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  part_paid: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  paid: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  overpaid: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+  void: 'bg-raised text-muted line-through',
 };
 
 const SETTLEMENT_LABEL: Record<Settlement, string> = {
@@ -409,8 +409,8 @@ const SchoolAdminFinancePage: React.FC = () => {
 
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Fees &amp; Invoices</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <h1 className="text-2xl font-semibold text-primary">Fees &amp; Invoices</h1>
+          <p className="text-sm text-secondary mt-1">
             What is charged, what has been billed, and what is still owed.
           </p>
         </div>
@@ -442,13 +442,13 @@ const SchoolAdminFinancePage: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-subtle pb-3">
         {(['invoices', 'structures', 'debtors', 'payments'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${
-              tab === t ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+              tab === t ? 'bg-sunken text-primary' : 'text-secondary hover:text-primary'
             }`}
           >
             {t}
@@ -459,14 +459,14 @@ const SchoolAdminFinancePage: React.FC = () => {
             <select
               value={settlementFilter}
               onChange={(e) => setSettlementFilter(e.target.value as '' | Settlement)}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+              className="rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary"
             >
               <option value="">Any settlement</option>
               {(Object.keys(SETTLEMENT_LABEL) as Settlement[]).map((s) => (
                 <option key={s} value={s}>{SETTLEMENT_LABEL[s]}</option>
               ))}
             </select>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary">
               <input
                 type="checkbox"
                 checked={overdueOnly}
@@ -475,12 +475,12 @@ const SchoolAdminFinancePage: React.FC = () => {
               Overdue only
             </label>
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Number or student"
-                className="w-56 rounded-lg border border-slate-700 bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500"
+                className="w-56 rounded-lg border border-subtle bg-card py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted"
               />
             </div>
           </div>
@@ -500,9 +500,9 @@ const SchoolAdminFinancePage: React.FC = () => {
             ) : filteredInvoices.length === 0 ? (
               <NoResults searchTerm={search} />
             ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-800">
+              <div className="overflow-hidden rounded-xl border border-subtle">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
                     <tr>
                       <th className="px-4 py-3">Invoice</th>
                       <th className="px-4 py-3">Student</th>
@@ -511,25 +511,25 @@ const SchoolAdminFinancePage: React.FC = () => {
                       <th className="px-4 py-3">State</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-subtle">
                     {filteredInvoices.map((i) => (
                       <tr
                         key={i.id}
                         onClick={() => void openInvoice(i.id)}
-                        className={`cursor-pointer hover:bg-slate-800/60 ${
-                          detail?.invoice.id === i.id ? 'bg-slate-800/80' : ''
+                        className={`cursor-pointer hover:bg-sunken ${
+                          detail?.invoice.id === i.id ? 'bg-sunken' : ''
                         }`}
                       >
-                        <td className="px-4 py-3 font-mono text-xs text-slate-300">{i.number}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-secondary">{i.number}</td>
                         <td className="px-4 py-3">
-                          <p className="text-slate-200">{i.first_name} {i.last_name}</p>
-                          <p className="font-mono text-xs text-slate-500">{i.student_number}</p>
+                          <p className="text-primary">{i.first_name} {i.last_name}</p>
+                          <p className="font-mono text-xs text-muted">{i.student_number}</p>
                         </td>
-                        <td className="px-4 py-3 text-right text-slate-200">
+                        <td className="px-4 py-3 text-right text-primary">
                           {formatMoney(i.total, i.currency)}
                         </td>
                         <td className={`px-4 py-3 text-right ${
-                          Number(i.balance) > 0 ? 'text-amber-300' : 'text-slate-400'
+                          Number(i.balance) > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-secondary'
                         }`}>
                           {formatMoney(i.balance)}
                         </td>
@@ -538,7 +538,7 @@ const SchoolAdminFinancePage: React.FC = () => {
                             {SETTLEMENT_LABEL[i.settlement]}
                           </span>
                           {i.is_overdue && (
-                            <span className="ml-1 inline-flex rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-300">
+                            <span className="ml-1 inline-flex rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-700 dark:text-rose-300">
                               overdue
                             </span>
                           )}
@@ -553,23 +553,23 @@ const SchoolAdminFinancePage: React.FC = () => {
 
           <aside>
             {detailLoading ? (
-              <div className="rounded-xl border border-slate-800 p-8 text-center text-sm text-slate-400">
+              <div className="rounded-xl border border-subtle p-8 text-center text-sm text-secondary">
                 Loading…
               </div>
             ) : !detail ? (
-              <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+              <div className="rounded-xl border border-dashed border-subtle p-8 text-center text-sm text-muted">
                 Select an invoice.
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="rounded-xl border border-subtle bg-card p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-mono text-sm text-slate-300">{detail.invoice.number}</p>
-                      <p className="text-lg font-semibold text-slate-100">
+                      <p className="font-mono text-sm text-secondary">{detail.invoice.number}</p>
+                      <p className="text-lg font-semibold text-primary">
                         {detail.invoice.first_name} {detail.invoice.last_name}
                       </p>
-                      <p className="font-mono text-xs text-slate-500">{detail.invoice.student_number}</p>
+                      <p className="font-mono text-xs text-muted">{detail.invoice.student_number}</p>
                     </div>
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${SETTLEMENT_STYLE[detail.invoice.settlement]}`}>
                       {SETTLEMENT_LABEL[detail.invoice.settlement]}
@@ -577,43 +577,43 @@ const SchoolAdminFinancePage: React.FC = () => {
                   </div>
 
                   <table className="mt-4 w-full text-sm">
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-subtle">
                       {detail.lines.map((l) => (
                         <tr key={l.id}>
                           <td className="py-2">
-                            <p className={l.line_type === 'discount' ? 'text-emerald-300' : 'text-slate-300'}>
+                            <p className={l.line_type === 'discount' ? 'text-emerald-700 dark:text-emerald-300' : 'text-secondary'}>
                               {l.description}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted">
                               {l.code}
                               {Number(l.quantity) !== 1 && ` · ${l.quantity} × ${formatMoney(l.unit_amount)}`}
                             </p>
                           </td>
                           <td className={`py-2 text-right ${
-                            l.line_type === 'discount' ? 'text-emerald-300' : 'text-slate-200'
+                            l.line_type === 'discount' ? 'text-emerald-700 dark:text-emerald-300' : 'text-primary'
                           }`}>
                             {l.line_type === 'discount' ? '−' : ''}{formatMoney(l.amount)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="border-t border-slate-700">
+                    <tfoot className="border-t border-subtle">
                       <tr>
-                        <td className="pt-2 text-slate-400">Total</td>
-                        <td className="pt-2 text-right font-semibold text-slate-100">
+                        <td className="pt-2 text-secondary">Total</td>
+                        <td className="pt-2 text-right font-semibold text-primary">
                           {formatMoney(detail.invoice.total, detail.invoice.currency)}
                         </td>
                       </tr>
                       <tr>
-                        <td className="text-slate-400">Paid</td>
-                        <td className="text-right text-slate-300">
+                        <td className="text-secondary">Paid</td>
+                        <td className="text-right text-secondary">
                           {formatMoney(detail.invoice.amount_paid)}
                         </td>
                       </tr>
                       <tr>
-                        <td className="text-slate-400">Balance</td>
+                        <td className="text-secondary">Balance</td>
                         <td className={`text-right font-semibold ${
-                          Number(detail.invoice.balance) > 0 ? 'text-amber-300' : 'text-emerald-300'
+                          Number(detail.invoice.balance) > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'
                         }`}>
                           {formatMoney(detail.invoice.balance)}
                         </td>
@@ -642,7 +642,7 @@ const SchoolAdminFinancePage: React.FC = () => {
                     {detail.invoice.status !== 'void' && (
                       <button
                         onClick={() => void voidInvoice()}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-rose-300 hover:bg-slate-800"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-xs text-rose-700 dark:text-rose-300 hover:bg-sunken"
                       >
                         <Ban className="h-3.5 w-3.5" /> Void
                       </button>
@@ -650,41 +650,41 @@ const SchoolAdminFinancePage: React.FC = () => {
                   </div>
 
                   {detail.invoice.status === 'issued' && (
-                    <p className="mt-3 text-xs text-slate-500">
+                    <p className="mt-3 text-xs text-muted">
                       Issued invoices are fixed. Correct a mistake by voiding this one and raising
                       another.
                     </p>
                   )}
                   {detail.invoice.void_reason && (
-                    <p className="mt-3 text-xs text-rose-300">
+                    <p className="mt-3 text-xs text-rose-700 dark:text-rose-300">
                       Voided: {detail.invoice.void_reason}
                     </p>
                   )}
                 </div>
 
                 {detail.payments.length > 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">Payments</p>
+                  <div className="rounded-xl border border-subtle bg-card p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted">Payments</p>
                     <ul className="mt-3 space-y-3">
                       {detail.payments.map((p) => (
                         <li key={p.id} className="flex items-start justify-between gap-3">
                           <div>
-                            <p className={`text-sm ${p.reversed_at ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                            <p className={`text-sm ${p.reversed_at ? 'text-muted line-through' : 'text-primary'}`}>
                               {formatMoney(p.amount, p.currency)}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted">
                               {new Date(p.paid_at).toLocaleDateString()} · {p.method.replace('_', ' ')}
                               {p.reference ? ` · ${p.reference}` : ''}
                             </p>
                             {p.reversal_reason && (
-                              <p className="text-xs text-rose-300">Reversed: {p.reversal_reason}</p>
+                              <p className="text-xs text-rose-700 dark:text-rose-300">Reversed: {p.reversal_reason}</p>
                             )}
                           </div>
                           {!p.reversed_at && (
                             <button
                               onClick={() => void reverse(p.id)}
                               title="Reverse this payment"
-                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-rose-300"
+                              className="rounded-lg p-1.5 text-secondary hover:bg-sunken hover:text-rose-700 dark:hover:text-rose-300"
                             >
                               <Undo2 className="h-4 w-4" />
                             </button>
@@ -706,7 +706,7 @@ const SchoolAdminFinancePage: React.FC = () => {
           <div>
             <button
               onClick={() => setShowStructureForm(true)}
-              className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+              className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-subtle px-3 py-2 text-sm text-primary hover:bg-sunken"
             >
               <Plus className="h-4 w-4" /> New fee structure
             </button>
@@ -725,13 +725,13 @@ const SchoolAdminFinancePage: React.FC = () => {
                       onClick={() => void openStructure(s.id)}
                       className={`w-full rounded-lg border p-3 text-left ${
                         structureDetail?.structure.id === s.id
-                          ? 'border-brand-600 bg-slate-800/80'
-                          : 'border-slate-800 hover:bg-slate-800/50'
+                          ? 'border-brand-600 bg-sunken'
+                          : 'border-subtle hover:bg-sunken'
                       }`}
                     >
-                      <p className="font-medium text-slate-200">{s.name}</p>
-                      <p className="font-mono text-xs text-slate-500">{s.code}</p>
-                      <p className="mt-1 text-xs text-slate-400">
+                      <p className="font-medium text-primary">{s.name}</p>
+                      <p className="font-mono text-xs text-muted">{s.code}</p>
+                      <p className="mt-1 text-xs text-secondary">
                         {s.item_count ?? 0} items ·{' '}
                         {formatMoney(s.mandatory_total ?? '0', s.currency)} mandatory
                       </p>
@@ -744,23 +744,23 @@ const SchoolAdminFinancePage: React.FC = () => {
 
           <div>
             {!structureDetail ? (
-              <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+              <div className="rounded-xl border border-dashed border-subtle p-8 text-center text-sm text-muted">
                 Select a fee structure to see and edit its items.
               </div>
             ) : (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+              <div className="rounded-xl border border-subtle bg-card p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-100">
+                    <h2 className="text-lg font-semibold text-primary">
                       {structureDetail.structure.name}
                     </h2>
-                    <p className="font-mono text-xs text-slate-500">
+                    <p className="font-mono text-xs text-muted">
                       {structureDetail.structure.code} · {structureDetail.structure.currency}
                     </p>
                   </div>
                   <button
                     onClick={() => void removeStructure(structureDetail.structure)}
-                    className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-rose-300 hover:bg-slate-800"
+                    className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-rose-700 dark:text-rose-300 hover:bg-sunken"
                   >
                     Delete
                   </button>
@@ -768,7 +768,7 @@ const SchoolAdminFinancePage: React.FC = () => {
 
                 {structureDetail.items.length > 0 && (
                   <table className="mt-4 w-full text-sm">
-                    <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
+                    <thead className="text-left text-xs uppercase tracking-wide text-muted">
                       <tr>
                         <th className="pb-2">Item</th>
                         <th className="pb-2">Category</th>
@@ -776,24 +776,24 @@ const SchoolAdminFinancePage: React.FC = () => {
                         <th className="pb-2"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
+                    <tbody className="divide-y divide-subtle">
                       {structureDetail.items.map((i) => (
                         <tr key={i.id}>
                           <td className="py-2">
-                            <p className="text-slate-200">{i.name}</p>
-                            <p className="font-mono text-xs text-slate-500">
+                            <p className="text-primary">{i.name}</p>
+                            <p className="font-mono text-xs text-muted">
                               {i.code}
                               {!i.is_mandatory && ' · optional'}
                             </p>
                           </td>
-                          <td className="py-2 capitalize text-slate-400">{i.category}</td>
-                          <td className="py-2 text-right text-slate-200">
+                          <td className="py-2 capitalize text-secondary">{i.category}</td>
+                          <td className="py-2 text-right text-primary">
                             {formatMoney(i.amount)}
                           </td>
                           <td className="py-2 text-right">
                             <button
                               onClick={() => void removeItem(i)}
-                              className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-rose-300"
+                              className="rounded-lg p-1 text-muted hover:bg-sunken hover:text-rose-700 dark:hover:text-rose-300"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -804,7 +804,7 @@ const SchoolAdminFinancePage: React.FC = () => {
                   </table>
                 )}
 
-                <form onSubmit={addItem} className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-800 pt-4">
+                <form onSubmit={addItem} className="mt-4 grid grid-cols-2 gap-2 border-t border-subtle pt-4">
                   <input required placeholder="Code" value={itemForm.code}
                     onChange={(e) => setItemForm({ ...itemForm, code: e.target.value })}
                     className={inputClass} />
@@ -821,7 +821,7 @@ const SchoolAdminFinancePage: React.FC = () => {
                   <input required placeholder="Amount" inputMode="decimal" value={itemForm.amount}
                     onChange={(e) => setItemForm({ ...itemForm, amount: e.target.value })}
                     className={inputClass} />
-                  <label className="col-span-2 flex items-center gap-2 text-sm text-slate-300">
+                  <label className="col-span-2 flex items-center gap-2 text-sm text-secondary">
                     <input type="checkbox" checked={itemForm.isMandatory}
                       onChange={(e) => setItemForm({ ...itemForm, isMandatory: e.target.checked })} />
                     Charged to everyone (uncheck for an optional extra)
@@ -846,9 +846,9 @@ const SchoolAdminFinancePage: React.FC = () => {
             message="Every issued invoice has been settled."
           />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-800">
+          <div className="overflow-hidden rounded-xl border border-subtle">
             <table className="w-full text-sm">
-              <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3">Student</th>
                   <th className="px-4 py-3 text-right">Billed</th>
@@ -857,27 +857,27 @@ const SchoolAdminFinancePage: React.FC = () => {
                   <th className="px-4 py-3">Overdue</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-subtle">
                 {debtors.map((d) => (
-                  <tr key={`${d.student_id}-${d.currency}`} className="hover:bg-slate-800/40">
+                  <tr key={`${d.student_id}-${d.currency}`} className="hover:bg-sunken">
                     <td className="px-4 py-3">
-                      <p className="text-slate-200">{d.first_name} {d.last_name}</p>
-                      <p className="font-mono text-xs text-slate-500">{d.student_number}</p>
+                      <p className="text-primary">{d.first_name} {d.last_name}</p>
+                      <p className="font-mono text-xs text-muted">{d.student_number}</p>
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-400">
+                    <td className="px-4 py-3 text-right text-secondary">
                       {formatMoney(d.billed, d.currency)}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-400">{formatMoney(d.paid)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-amber-300">
+                    <td className="px-4 py-3 text-right text-secondary">{formatMoney(d.paid)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-amber-700 dark:text-amber-300">
                       {formatMoney(d.balance)}
                     </td>
                     <td className="px-4 py-3">
                       {d.overdue_count > 0 ? (
-                        <span className="inline-flex rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-300">
+                        <span className="inline-flex rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-700 dark:text-rose-300">
                           {d.overdue_count} overdue
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-500">—</span>
+                        <span className="text-xs text-muted">—</span>
                       )}
                     </td>
                   </tr>
@@ -897,9 +897,9 @@ const SchoolAdminFinancePage: React.FC = () => {
             message="Money taken against an issued invoice appears here."
           />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-800">
+          <div className="overflow-hidden rounded-xl border border-subtle">
             <table className="w-full text-sm">
-              <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3">When</th>
                   <th className="px-4 py-3">Student</th>
@@ -908,18 +908,18 @@ const SchoolAdminFinancePage: React.FC = () => {
                   <th className="px-4 py-3 text-right">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-subtle">
                 {overview.recentPayments.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-800/40">
-                    <td className="px-4 py-3 text-slate-400">
+                  <tr key={p.id} className="hover:bg-sunken">
+                    <td className="px-4 py-3 text-secondary">
                       {new Date(p.paid_at).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-slate-200">{p.first_name} {p.last_name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{p.invoice_number}</td>
-                    <td className="px-4 py-3 capitalize text-slate-400">
+                    <td className="px-4 py-3 text-primary">{p.first_name} {p.last_name}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-secondary">{p.invoice_number}</td>
+                    <td className="px-4 py-3 capitalize text-secondary">
                       {p.method.replace('_', ' ')}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-200">
+                    <td className="px-4 py-3 text-right text-primary">
                       {formatMoney(p.amount, p.currency)}
                     </td>
                   </tr>
@@ -995,10 +995,10 @@ const SchoolAdminFinancePage: React.FC = () => {
 
             {optionalItems.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-medium text-slate-400">Optional extras</p>
+                <p className="mb-1 text-xs font-medium text-secondary">Optional extras</p>
                 <div className="space-y-1">
                   {optionalItems.map((i) => (
-                    <label key={i.id} className="flex items-center gap-2 text-sm text-slate-300">
+                    <label key={i.id} className="flex items-center gap-2 text-sm text-secondary">
                       <input
                         type="checkbox"
                         checked={invoiceForm.optionalItemIds.includes(i.id)}
@@ -1023,7 +1023,7 @@ const SchoolAdminFinancePage: React.FC = () => {
                 onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
                 className={inputClass} />
             </Field>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary">
               <input type="checkbox" checked={invoiceForm.issue}
                 onChange={(e) => setInvoiceForm({ ...invoiceForm, issue: e.target.checked })} />
               Issue it now — its amounts become fixed
@@ -1036,9 +1036,9 @@ const SchoolAdminFinancePage: React.FC = () => {
       {showPaymentForm && detail && (
         <Modal title="Record a payment" onClose={() => setShowPaymentForm(false)}>
           <form onSubmit={takePayment} className="space-y-3">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-secondary">
               {formatMoney(detail.invoice.balance, detail.invoice.currency)} outstanding on{' '}
-              <span className="font-mono text-slate-300">{detail.invoice.number}</span>.
+              <span className="font-mono text-secondary">{detail.invoice.number}</span>.
             </p>
             <Field label="Amount">
               <input required inputMode="decimal" value={paymentForm.amount}
@@ -1063,7 +1063,7 @@ const SchoolAdminFinancePage: React.FC = () => {
                   placeholder="Deposit slip or transaction id" className={inputClass} />
               </Field>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary">
               <input type="checkbox" checked={paymentForm.allowOverpayment}
                 onChange={(e) => setPaymentForm({
                   ...paymentForm, allowOverpayment: e.target.checked,
@@ -1079,21 +1079,21 @@ const SchoolAdminFinancePage: React.FC = () => {
 };
 
 const inputClass =
-  'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500';
+  'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
 
 const Card: React.FC<{
   label: string; value: string; icon: React.ElementType; tone?: 'emerald' | 'amber' | 'rose';
 }> = ({ label, value, icon: Icon, tone }) => (
-  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+  <div className="rounded-xl border border-subtle bg-card p-4">
     <div className="flex items-center justify-between">
-      <p className="text-sm text-slate-400">{label}</p>
-      <Icon className="h-4 w-4 text-slate-500" />
+      <p className="text-sm text-secondary">{label}</p>
+      <Icon className="h-4 w-4 text-muted" />
     </div>
     <p className={`mt-2 text-xl font-semibold ${
-      tone === 'emerald' ? 'text-emerald-300'
-      : tone === 'amber' ? 'text-amber-300'
-      : tone === 'rose' ? 'text-rose-300'
-      : 'text-slate-100'
+      tone === 'emerald' ? 'text-emerald-700 dark:text-emerald-300'
+      : tone === 'amber' ? 'text-amber-700 dark:text-amber-300'
+      : tone === 'rose' ? 'text-rose-700 dark:text-rose-300'
+      : 'text-primary'
     }`}>
       {value}
     </p>
@@ -1102,7 +1102,7 @@ const Card: React.FC<{
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <label className="block">
-    <span className="mb-1 block text-xs font-medium text-slate-400">{label}</span>
+    <span className="mb-1 block text-xs font-medium text-secondary">{label}</span>
     {children}
   </label>
 );
@@ -1112,7 +1112,7 @@ const FormActions: React.FC<{ saving: boolean; onCancel: () => void; submitLabel
 }) => (
   <div className="flex justify-end gap-2 pt-2">
     <button type="button" onClick={onCancel}
-      className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">
+      className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover:bg-sunken">
       Cancel
     </button>
     <button type="submit" disabled={saving}
@@ -1126,10 +1126,10 @@ const Modal: React.FC<{ title: string; onClose: () => void; children: React.Reac
   title, onClose, children,
 }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-    <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-subtle bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-        <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800">
+        <h2 className="text-lg font-semibold text-primary">{title}</h2>
+        <button onClick={onClose} className="rounded-lg p-1 text-secondary hover:bg-sunken">
           <X className="h-4 w-4" />
         </button>
       </div>

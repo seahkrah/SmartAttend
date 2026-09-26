@@ -102,7 +102,7 @@ const TenantIncidentsPage: React.FC = () => {
                 <tr key={r.id} className="border-b border-subtle">
                   <td className="py-2 pr-4 text-muted">{r.incident_number}</td>
                   <td className="py-2 pr-4">
-                    <button className="text-brand-600 hover:underline text-left" onClick={() => setSelected(r)}>{r.title}</button>
+                    <button className="text-brand-600 dark:text-brand-300 hover:underline text-left" onClick={() => setSelected(r)}>{r.title}</button>
                     {!r.acknowledged_at && ACTIVE.includes(r.status) && (
                       <span className="ml-2 badge badge-warning">Not acknowledged</span>
                     )}
@@ -178,7 +178,7 @@ const IncidentPanel: React.FC<{ incidentId: string; onClose: () => void; onChang
           <button className="btn btn-ghost" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        {error && <p role="alert" className="text-sm text-danger-600">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-600 dark:text-danger-400">{error}</p>}
         {!incident ? (
           !error && <LoadingState label="Loading…" />
         ) : (

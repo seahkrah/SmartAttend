@@ -269,8 +269,8 @@ const SchoolAdminSchedulesPage: React.FC = () => {
       <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Schedule Management</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage class schedules</p>
+          <h1 className="text-2xl font-bold text-primary">Schedule Management</h1>
+          <p className="text-sm text-secondary mt-1">Manage class schedules</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -286,65 +286,65 @@ const SchoolAdminSchedulesPage: React.FC = () => {
           placeholder="Search schedules..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full max-w-md px-4 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          <div className="text-gray-600">Loading schedules...</div>
+          <div className="text-secondary">Loading schedules...</div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-card rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-subtle">
+              <thead className="bg-sunken">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">#</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faculty</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider w-12">#</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Course</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Section</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Faculty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Room</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Day</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-subtle">
                 {filteredSchedules.map((schedule, index) => (
-                  <tr key={schedule.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                  <tr key={schedule.id} className="hover:bg-sunken">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-muted font-medium">
                       {index + 1}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{schedule.course_code}</div>
-                      <div className="text-sm text-gray-500">{schedule.course_name}</div>
+                      <div className="text-sm font-medium text-primary">{schedule.course_code}</div>
+                      <div className="text-sm text-muted">{schedule.course_name}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary font-medium">
                       {schedule.section}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                       {schedule.faculty_name || 'Not assigned'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                       {schedule.building} {schedule.room_number}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                       {formatDays(schedule)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary">
                       {schedule.start_time} - {schedule.end_time}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() => openEditModal(schedule)}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        className="text-blue-600 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-300 mr-4"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDeleteSchedule(schedule)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-600 dark:text-red-300 hover:text-red-900 dark:hover:text-red-300"
                       >
                         Delete
                       </button>
@@ -353,7 +353,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                 ))}
                 {filteredSchedules.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan={8} className="px-6 py-4 text-center text-sm text-muted">
                       No schedules found
                     </td>
                   </tr>
@@ -367,7 +367,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
       {/* Add/Edit Modal */}
       {(showAddModal || editingSchedule) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h2 className="text-xl font-bold mb-4">
                 {editingSchedule ? 'Edit Schedule' : 'Add New Schedule'}
@@ -376,13 +376,13 @@ const SchoolAdminSchedulesPage: React.FC = () => {
               <form onSubmit={editingSchedule ? handleUpdateSchedule : handleCreateSchedule}>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-secondary mb-1">
                       Course *
                     </label>
                     <select
                       value={formData.courseId}
                       onChange={(e) => setFormData({ ...formData, courseId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                      className="w-full px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                       style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                       required
                       disabled={!!editingSchedule}
@@ -397,13 +397,13 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-secondary mb-1">
                       Faculty *
                     </label>
                     <select
                       value={formData.facultyId}
                       onChange={(e) => setFormData({ ...formData, facultyId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                      className="w-full px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                       style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                       required
                       disabled={!!editingSchedule}
@@ -418,13 +418,13 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-secondary mb-1">
                       Room *
                     </label>
                     <select
                       value={formData.roomId}
                       onChange={(e) => setFormData({ ...formData, roomId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                      className="w-full px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                       style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                       required
                     >
@@ -438,8 +438,8 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                   </div>
 
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Days of Week * <span className="text-xs text-gray-400">(select {scheduleDayFormat})</span>
+                    <label className="block text-sm font-medium text-secondary mb-1">
+                      Days of Week * <span className="text-xs text-muted">(select {scheduleDayFormat})</span>
                     </label>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {DAYS_OF_WEEK.map((_day, index) => {
@@ -455,8 +455,8 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                               isSelected
                                 ? 'bg-blue-600 text-white border-blue-600'
                                 : isDisabled
-                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer'
+                                ? 'bg-sunken text-muted border-subtle cursor-not-allowed'
+                                : 'bg-card text-secondary border-subtle hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/15 cursor-pointer'
                             }`}
                           >
                             {DAYS_SHORT[index]}
@@ -465,34 +465,34 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                       })}
                     </div>
                     {formData.daysOfWeek.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-1">
+                      <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
                         Selected: {formData.daysOfWeek.map(d => DAYS_OF_WEEK[d]).join(', ')}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-secondary mb-1">
                       Start Time *
                     </label>
                     <input
                       type="time"
                       value={formData.startTime}
                       onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                      className="w-full px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-primary"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-secondary mb-1">
                       End Time *
                     </label>
                     <input
                       type="time"
                       value={formData.endTime}
                       onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                      className="w-full px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-primary"
                       required
                     />
                   </div>
@@ -506,7 +506,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
                       setEditingSchedule(null);
                       resetForm();
                     }}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    className="px-4 py-2 text-secondary bg-sunken rounded-lg hover:bg-sunken"
                   >
                     Cancel
                   </button>

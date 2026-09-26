@@ -12,6 +12,16 @@ dotenv.config({ path: join(__dirname, '..', '..', '.env') })
 
 const { Pool } = pg
 
+// A DATE column is a calendar day, and is returned as one: 'YYYY-MM-DD'.
+// node-postgres otherwise builds a JS Date at the server's local midnight,
+// which serialises to the API as '2027-04-12T00:00:00.000Z' (shown raw on
+// screens), moves to the previous day when converted anywhere west of the
+// server, and turns String(d).slice(0, 10) into a weekday name. Four modules
+// had grown their own isoDay() workaround; this makes it true everywhere.
+// Timestamps (TIMESTAMP, TIMESTAMPTZ) are unaffected.
+const PG_DATE_OID = 1082
+pg.types.setTypeParser(PG_DATE_OID, (value: string) => value)
+
 console.log('[DB] DATABASE_URL:', process.env.DATABASE_URL ? '***configured***' : '***NOT SET***')
 
 /**

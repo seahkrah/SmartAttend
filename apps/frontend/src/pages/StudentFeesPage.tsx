@@ -21,12 +21,12 @@ import {
  */
 
 const SETTLEMENT_STYLE: Record<Settlement, string> = {
-  draft: 'bg-slate-700/60 text-slate-300',
-  unpaid: 'bg-rose-500/15 text-rose-300',
-  part_paid: 'bg-amber-500/15 text-amber-300',
-  paid: 'bg-emerald-500/15 text-emerald-300',
-  overpaid: 'bg-sky-500/15 text-sky-300',
-  void: 'bg-slate-600/50 text-slate-500 line-through',
+  draft: 'bg-sunken text-secondary',
+  unpaid: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  part_paid: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  paid: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  overpaid: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+  void: 'bg-raised text-muted line-through',
 };
 
 const SETTLEMENT_LABEL: Record<Settlement, string> = {
@@ -93,8 +93,8 @@ const StudentFeesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Fees</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <h1 className="text-2xl font-semibold text-primary">Fees</h1>
+        <p className="text-sm text-secondary mt-1">
           What has been billed to you, what you have paid, and what is left.
         </p>
       </div>
@@ -102,23 +102,23 @@ const StudentFeesPage: React.FC = () => {
       <div
         className={`rounded-xl border p-5 ${
           summary.cleared
-            ? 'border-emerald-800/60 bg-emerald-950/30'
-            : 'border-amber-800/60 bg-amber-950/20'
+            ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30'
+            : 'border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20'
         }`}
       >
         <div className="flex items-start gap-3">
           {summary.cleared ? (
-            <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-400" />
+            <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-700 dark:text-emerald-400" />
           ) : (
-            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-400" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700 dark:text-amber-400" />
           )}
           <div>
-            <p className={`font-semibold ${summary.cleared ? 'text-emerald-200' : 'text-amber-200'}`}>
+            <p className={`font-semibold ${summary.cleared ? 'text-emerald-700 dark:text-emerald-200' : 'text-amber-700 dark:text-amber-200'}`}>
               {summary.cleared
                 ? 'Your account is clear'
                 : `${formatMoney(summary.balance, currency)} outstanding`}
             </p>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-secondary">
               {summary.cleared
                 ? 'Nothing issued to you is outstanding.'
                 : summary.overdueCount > 0
@@ -130,16 +130,16 @@ const StudentFeesPage: React.FC = () => {
 
         <dl className="mt-4 grid grid-cols-3 gap-4 border-t border-white/5 pt-4 text-sm">
           <div>
-            <dt className="text-xs text-slate-500">Billed</dt>
-            <dd className="text-slate-200">{formatMoney(summary.billed, currency)}</dd>
+            <dt className="text-xs text-muted">Billed</dt>
+            <dd className="text-primary">{formatMoney(summary.billed, currency)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">Paid</dt>
-            <dd className="text-slate-200">{formatMoney(summary.paid)}</dd>
+            <dt className="text-xs text-muted">Paid</dt>
+            <dd className="text-primary">{formatMoney(summary.paid)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">Outstanding</dt>
-            <dd className={summary.cleared ? 'text-emerald-300' : 'text-amber-300'}>
+            <dt className="text-xs text-muted">Outstanding</dt>
+            <dd className={summary.cleared ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}>
               {formatMoney(summary.balance)}
             </dd>
           </div>
@@ -147,7 +147,7 @@ const StudentFeesPage: React.FC = () => {
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">
+        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
           Invoices
         </h2>
         {invoices.length === 0 ? (
@@ -159,16 +159,16 @@ const StudentFeesPage: React.FC = () => {
         ) : (
           <ul className="space-y-2">
             {invoices.map((i) => (
-              <li key={i.id} className="overflow-hidden rounded-xl border border-slate-800">
+              <li key={i.id} className="overflow-hidden rounded-xl border border-subtle">
                 <button
                   onClick={() => void toggle(i.id)}
-                  className="flex w-full items-center justify-between gap-3 bg-slate-900/60 p-4 text-left hover:bg-slate-800/60"
+                  className="flex w-full items-center justify-between gap-3 bg-card p-4 text-left hover:bg-sunken"
                 >
                   <div>
-                    <p className="font-mono text-xs text-slate-500">{i.number}</p>
-                    <p className="text-slate-200">{formatMoney(i.total, i.currency)}</p>
+                    <p className="font-mono text-xs text-muted">{i.number}</p>
+                    <p className="text-primary">{formatMoney(i.total, i.currency)}</p>
                     {i.due_date && (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted">
                         Due {new Date(i.due_date).toLocaleDateString()}
                       </p>
                     )}
@@ -179,13 +179,13 @@ const StudentFeesPage: React.FC = () => {
                         {SETTLEMENT_LABEL[i.settlement]}
                       </span>
                       {Number(i.balance) > 0 && i.status === 'issued' && (
-                        <p className="mt-1 text-xs text-amber-300">
+                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                           {formatMoney(i.balance)} left
                         </p>
                       )}
                     </div>
                     <ChevronDown
-                      className={`h-4 w-4 text-slate-500 transition-transform ${
+                      className={`h-4 w-4 text-muted transition-transform ${
                         expanded === i.id ? 'rotate-180' : ''
                       }`}
                     />
@@ -193,42 +193,42 @@ const StudentFeesPage: React.FC = () => {
                 </button>
 
                 {expanded === i.id && (
-                  <div className="border-t border-slate-800 bg-slate-950/40 p-4">
+                  <div className="border-t border-subtle bg-page p-4">
                     {!detail ? (
-                      <p className="text-sm text-slate-500">Loading…</p>
+                      <p className="text-sm text-muted">Loading…</p>
                     ) : (
                       <table className="w-full text-sm">
-                        <tbody className="divide-y divide-slate-800/60">
+                        <tbody className="divide-y divide-subtle">
                           {detail.lines.map((l) => (
                             <tr key={l.id}>
                               <td className="py-2">
-                                <p className={l.line_type === 'discount' ? 'text-emerald-300' : 'text-slate-300'}>
+                                <p className={l.line_type === 'discount' ? 'text-emerald-700 dark:text-emerald-300' : 'text-secondary'}>
                                   {l.description}
                                 </p>
                                 {Number(l.quantity) !== 1 && (
-                                  <p className="text-xs text-slate-500">
+                                  <p className="text-xs text-muted">
                                     {l.quantity} × {formatMoney(l.unit_amount)}
                                   </p>
                                 )}
                               </td>
                               <td className={`py-2 text-right ${
-                                l.line_type === 'discount' ? 'text-emerald-300' : 'text-slate-200'
+                                l.line_type === 'discount' ? 'text-emerald-700 dark:text-emerald-300' : 'text-primary'
                               }`}>
                                 {l.line_type === 'discount' ? '−' : ''}{formatMoney(l.amount)}
                               </td>
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="border-t border-slate-700">
+                        <tfoot className="border-t border-subtle">
                           <tr>
-                            <td className="pt-2 text-slate-400">Total</td>
-                            <td className="pt-2 text-right font-semibold text-slate-100">
+                            <td className="pt-2 text-secondary">Total</td>
+                            <td className="pt-2 text-right font-semibold text-primary">
                               {formatMoney(detail.invoice.total, detail.invoice.currency)}
                             </td>
                           </tr>
                           <tr>
-                            <td className="text-slate-400">Paid</td>
-                            <td className="text-right text-slate-300">
+                            <td className="text-secondary">Paid</td>
+                            <td className="text-right text-secondary">
                               {formatMoney(detail.invoice.amount_paid)}
                             </td>
                           </tr>
@@ -244,30 +244,30 @@ const StudentFeesPage: React.FC = () => {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">
+        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
           Payments received
         </h2>
         {payments.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-800 p-6 text-center text-sm text-slate-500">
+          <p className="rounded-xl border border-dashed border-subtle p-6 text-center text-sm text-muted">
             No payments have been recorded against your account.
           </p>
         ) : (
-          <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-800">
+          <ul className="divide-y divide-subtle overflow-hidden rounded-xl border border-subtle">
             {payments.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-3 bg-slate-900/40 p-4">
+              <li key={p.id} className="flex items-center justify-between gap-3 bg-card p-4">
                 <div>
-                  <p className={`text-sm ${p.reversed_at ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                  <p className={`text-sm ${p.reversed_at ? 'text-muted line-through' : 'text-primary'}`}>
                     {formatMoney(p.amount, p.currency)}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted">
                     {new Date(p.paid_at).toLocaleDateString()} · {p.method.replace('_', ' ')}
                     {p.invoice_number ? ` · ${p.invoice_number}` : ''}
                   </p>
                 </div>
                 {p.reversed_at ? (
-                  <span className="text-xs text-rose-300">Reversed</span>
+                  <span className="text-xs text-rose-700 dark:text-rose-300">Reversed</span>
                 ) : (
-                  <Wallet className="h-4 w-4 text-emerald-400" />
+                  <Wallet className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                 )}
               </li>
             ))}

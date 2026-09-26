@@ -92,17 +92,17 @@ const NotificationPreferences: React.FC = () => {
   }, [preferences]);
 
   if (loading) {
-    return <p className="text-sm text-slate-500">Loading your preferences…</p>;
+    return <p className="text-sm text-muted">Loading your preferences…</p>;
   }
 
   if (byCategory.length === 0) {
-    return <p className="text-sm text-slate-500">There is nothing to configure yet.</p>;
+    return <p className="text-sm text-muted">There is nothing to configure yet.</p>;
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-800">
+    <div className="overflow-hidden rounded-xl border border-subtle">
       <table className="w-full text-sm">
-        <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+        <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
           <tr>
             <th className="px-4 py-3">What</th>
             {CHANNELS.map((c) => (
@@ -110,22 +110,22 @@ const NotificationPreferences: React.FC = () => {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800">
+        <tbody className="divide-y divide-subtle">
           {byCategory.map(([category, row]) => (
-            <tr key={category} className="hover:bg-slate-800/30">
-              <td className="px-4 py-3 text-slate-200">
+            <tr key={category} className="hover:bg-sunken">
+              <td className="px-4 py-3 text-primary">
                 {CATEGORY_LABEL[category] ?? category}
               </td>
               {CHANNELS.map((channel) => {
                 const pref = row.get(channel);
-                if (!pref) return <td key={channel} className="px-4 py-3 text-center text-slate-600">—</td>;
+                if (!pref) return <td key={channel} className="px-4 py-3 text-center text-muted">—</td>;
                 const key = `${category}:${channel}`;
                 return (
                   <td key={channel} className="px-4 py-3 text-center">
                     {pref.locked ? (
                       <span
                         title="Account and system messages carry account recovery and cannot be switched off"
-                        className="inline-flex items-center gap-1 text-xs text-slate-500"
+                        className="inline-flex items-center gap-1 text-xs text-muted"
                       >
                         <Lock className="h-3 w-3" /> Always
                       </span>
@@ -146,7 +146,7 @@ const NotificationPreferences: React.FC = () => {
           ))}
         </tbody>
       </table>
-      <p className="border-t border-slate-800 bg-slate-900/40 px-4 py-3 text-xs text-slate-500">
+      <p className="border-t border-subtle bg-card px-4 py-3 text-xs text-muted">
         A channel your institution has not configured will not reach you whatever is set here.
       </p>
     </div>

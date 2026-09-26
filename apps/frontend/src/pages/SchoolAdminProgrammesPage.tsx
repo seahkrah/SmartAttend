@@ -195,8 +195,8 @@ const SchoolAdminProgrammesPage: React.FC = () => {
 
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Programmes &amp; Curriculum</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <h1 className="text-2xl font-semibold text-primary">Programmes &amp; Curriculum</h1>
+          <p className="text-sm text-secondary mt-1">
             What a student reads, and which courses it requires in each year.
           </p>
         </div>
@@ -212,12 +212,12 @@ const SchoolAdminProgrammesPage: React.FC = () => {
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <div>
           <div className="relative mb-3">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search programmes"
-              className="w-full rounded-lg border border-slate-700 bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500"
+              className="w-full rounded-lg border border-subtle bg-card py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted"
             />
           </div>
 
@@ -238,15 +238,15 @@ const SchoolAdminProgrammesPage: React.FC = () => {
                     className={`w-full rounded-lg border p-3 text-left transition ${
                       selected?.id === p.id
                         ? 'border-brand-500 bg-brand-500/10'
-                        : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                        : 'border-subtle bg-card hover:border-subtle'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-slate-100">{p.code}</span>
-                      <span className="text-xs text-slate-500">{p.duration_years} yr</span>
+                      <span className="font-medium text-primary">{p.code}</span>
+                      <span className="text-xs text-muted">{p.duration_years} yr</span>
                     </div>
-                    <div className="text-sm text-slate-300">{p.name}</div>
-                    <div className="mt-1 text-xs text-slate-500">
+                    <div className="text-sm text-secondary">{p.name}</div>
+                    <div className="mt-1 text-xs text-muted">
                       {p.course_count ?? 0} course(s) · {p.student_count ?? 0} student(s)
                     </div>
                   </button>
@@ -267,11 +267,11 @@ const SchoolAdminProgrammesPage: React.FC = () => {
             <LoadingOverlay message="Loading curriculum…" />
           ) : (
             <div className="space-y-5">
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="rounded-xl border border-subtle bg-card p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-100">{selected.name}</h2>
-                    <p className="text-sm text-slate-400">
+                    <h2 className="text-lg font-semibold text-primary">{selected.name}</h2>
+                    <p className="text-sm text-secondary">
                       {selected.code}
                       {selected.award ? ` · ${selected.award}` : ''}
                       {selected.credits_required ? ` · ${selected.credits_required} credits` : ''}
@@ -279,7 +279,7 @@ const SchoolAdminProgrammesPage: React.FC = () => {
                   </div>
                   <button
                     onClick={() => void removeProgramme(selected)}
-                    className="rounded-lg border border-danger-700/60 px-3 py-1.5 text-sm text-danger-300 hover:bg-danger-900/30"
+                    className="rounded-lg border border-danger-700/60 px-3 py-1.5 text-sm text-danger-700 dark:text-danger-400 hover:bg-danger-500/10"
                   >
                     Delete
                   </button>
@@ -288,16 +288,16 @@ const SchoolAdminProgrammesPage: React.FC = () => {
 
               <form
                 onSubmit={addCourse}
-                className="rounded-xl border border-slate-800 bg-slate-900/60 p-4"
+                className="rounded-xl border border-subtle bg-card p-4"
               >
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-secondary">
                   Add a course
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-[1fr_100px_140px_100px_auto]">
                   <select
                     value={entryForm.courseId}
                     onChange={(e) => setEntryForm({ ...entryForm, courseId: e.target.value })}
-                    className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+                    className="rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary"
                   >
                     <option value="">Select a course…</option>
                     {courses
@@ -314,12 +314,12 @@ const SchoolAdminProgrammesPage: React.FC = () => {
                     value={entryForm.studyYear}
                     onChange={(e) => setEntryForm({ ...entryForm, studyYear: e.target.value })}
                     placeholder="Year"
-                    className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+                    className="rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary"
                   />
                   <select
                     value={entryForm.requirement}
                     onChange={(e) => setEntryForm({ ...entryForm, requirement: e.target.value })}
-                    className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+                    className="rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary"
                   >
                     {REQUIREMENTS.map((r) => (
                       <option key={r} value={r}>{r}</option>
@@ -331,7 +331,7 @@ const SchoolAdminProgrammesPage: React.FC = () => {
                     value={entryForm.credits}
                     onChange={(e) => setEntryForm({ ...entryForm, credits: e.target.value })}
                     placeholder="Credits"
-                    className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+                    className="rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary"
                   />
                   <button
                     type="submit"
@@ -351,21 +351,21 @@ const SchoolAdminProgrammesPage: React.FC = () => {
                 />
               ) : (
                 byYear.map(([year, entries]) => (
-                  <div key={year} className="rounded-xl border border-slate-800 bg-slate-900/60">
-                    <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold text-slate-300">
+                  <div key={year} className="rounded-xl border border-subtle bg-card">
+                    <div className="border-b border-subtle px-5 py-3 text-sm font-semibold text-secondary">
                       Year {year}
-                      <span className="ml-2 text-xs font-normal text-slate-500">
+                      <span className="ml-2 text-xs font-normal text-muted">
                         {entries.length} course(s)
                       </span>
                     </div>
-                    <ul className="divide-y divide-slate-800">
+                    <ul className="divide-y divide-subtle">
                       {entries.map((entry) => (
                         <li key={entry.id} className="flex items-center justify-between gap-3 px-5 py-3">
                           <div>
-                            <div className="text-sm text-slate-200">
+                            <div className="text-sm text-primary">
                               {entry.course_code} — {entry.course_name}
                             </div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted">
                               {entry.requirement}
                               {entry.credits ?? entry.course_credits
                                 ? ` · ${entry.credits ?? entry.course_credits} credits`
@@ -375,7 +375,7 @@ const SchoolAdminProgrammesPage: React.FC = () => {
                           <button
                             onClick={() => void removeEntry(entry)}
                             aria-label={`Remove ${entry.course_code}`}
-                            className="rounded p-1.5 text-slate-500 hover:bg-slate-800 hover:text-danger-300"
+                            className="rounded p-1.5 text-muted hover:bg-sunken hover:text-danger-700 dark:hover:text-danger-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -394,49 +394,49 @@ const SchoolAdminProgrammesPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <form
             onSubmit={submitProgramme}
-            className="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-6"
+            className="w-full max-w-lg rounded-xl border border-subtle bg-card p-6"
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-100">New programme</h2>
+              <h2 className="text-lg font-semibold text-primary">New programme</h2>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
                 aria-label="Close"
-                className="rounded p-1 text-slate-400 hover:bg-slate-800"
+                className="rounded p-1 text-secondary hover:bg-sunken"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Code
                 <input
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
                   required
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Award
                 <input
                   value={form.award}
                   onChange={(e) => setForm({ ...form, award: e.target.value })}
                   placeholder="BSc (Hons)"
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
-              <label className="sm:col-span-2 text-sm text-slate-300">
+              <label className="sm:col-span-2 text-sm text-secondary">
                 Name
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Duration (years)
                 <input
                   type="number"
@@ -445,17 +445,17 @@ const SchoolAdminProgrammesPage: React.FC = () => {
                   step="0.5"
                   value={form.durationYears}
                   onChange={(e) => setForm({ ...form, durationYears: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Credits required
                 <input
                   type="number"
                   min={1}
                   value={form.creditsRequired}
                   onChange={(e) => setForm({ ...form, creditsRequired: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
             </div>
@@ -464,7 +464,7 @@ const SchoolAdminProgrammesPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300"
+                className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary"
               >
                 Cancel
               </button>

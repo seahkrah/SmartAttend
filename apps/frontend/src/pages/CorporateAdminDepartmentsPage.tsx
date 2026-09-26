@@ -139,8 +139,8 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Departments</h1>
-            <p className="text-slate-400 mt-1">
+            <h1 className="text-2xl font-bold text-primary">Departments</h1>
+            <p className="text-secondary mt-1">
               {departments.length} department(s) · {totalEmployees} total employees
             </p>
           </div>
@@ -156,10 +156,10 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
             <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
           </div>
         ) : departments.length === 0 ? (
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-12 text-center">
-            <FolderTree className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 text-lg">No departments yet</p>
-            <p className="text-sm text-slate-500 mt-1">Create departments to organize your employees</p>
+          <div className="bg-card border border-subtle rounded-xl p-12 text-center">
+            <FolderTree className="w-16 h-16 text-muted mx-auto mb-4" />
+            <p className="text-secondary text-lg">No departments yet</p>
+            <p className="text-sm text-muted mt-1">Create departments to organize your employees</p>
             <button onClick={openAddModal}
               className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
               <Plus className="w-4 h-4 inline mr-2" />Create Department
@@ -169,37 +169,37 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {departments.map((dept) => (
               <div key={dept.id}
-                className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-colors group">
+                className="bg-card border border-subtle rounded-xl p-6 hover:border-subtle transition-colors group">
                 <div className="flex items-start justify-between mb-4">
                   <div className="p-3 bg-teal-500/20 rounded-lg">
-                    <Building2 className="w-5 h-5 text-teal-400" />
+                    <Building2 className="w-5 h-5 text-teal-700 dark:text-teal-400" />
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEditModal(dept)}
-                      className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                      className="p-1.5 text-secondary hover:text-primary hover:bg-sunken rounded-lg transition-colors"
                       title="Edit">
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button onClick={() => handleDelete(dept)}
-                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
+                      className="p-1.5 text-secondary hover:text-red-700 dark:hover:text-red-400 hover:bg-sunken rounded-lg transition-colors"
                       title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-1">{dept.name}</h3>
+                <h3 className="text-lg font-semibold text-primary mb-1">{dept.name}</h3>
                 {dept.description && (
-                  <p className="text-sm text-slate-400 mb-3 line-clamp-2">{dept.description}</p>
+                  <p className="text-sm text-secondary mb-3 line-clamp-2">{dept.description}</p>
                 )}
-                <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-800">
+                <div className="flex items-center gap-4 mt-4 pt-4 border-t border-subtle">
                   <div className="flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm text-slate-400">{dept.employee_count} employee(s)</span>
+                    <Users className="w-4 h-4 text-muted" />
+                    <span className="text-sm text-secondary">{dept.employee_count} employee(s)</span>
                   </div>
                   {dept.head_name && (
                     <div className="flex items-center gap-1.5">
-                      <UserCircle className="w-4 h-4 text-slate-500" />
-                      <span className="text-sm text-slate-400">{dept.head_name}</span>
+                      <UserCircle className="w-4 h-4 text-muted" />
+                      <span className="text-sm text-secondary">{dept.head_name}</span>
                     </div>
                   )}
                 </div>
@@ -212,42 +212,42 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
       {/* Add/Edit Department Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md mx-4 shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-slate-700">
-              <h2 className="text-xl font-semibold text-white">
+          <div className="bg-card border border-subtle rounded-xl w-full max-w-md mx-4 shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-subtle">
+              <h2 className="text-xl font-semibold text-primary">
                 {editingDept ? 'Edit Department' : 'Add Department'}
               </h2>
-              <button onClick={() => { setShowModal(false); setError('') }} className="text-slate-400 hover:text-white">
+              <button onClick={() => { setShowModal(false); setError('') }} className="text-secondary hover:text-primary">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               {error && (
-                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-700 dark:text-red-400 text-sm">
                   {error}
                 </div>
               )}
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Department Name *</label>
+                <label className="block text-sm text-secondary mb-1">Department Name *</label>
                 <input type="text" required value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="e.g. Engineering"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Description</label>
+                <label className="block text-sm text-secondary mb-1">Description</label>
                 <textarea value={form.description} rows={3}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                   placeholder="Optional description..."
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Department Head</label>
+                <label className="block text-sm text-secondary mb-1">Department Head</label>
                 <select value={form.head_id}
                   onChange={(e) => setForm({ ...form, head_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-indigo-500">
+                  className="w-full px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:ring-2 focus:ring-indigo-500">
                   <option value="">No Head Assigned</option>
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
@@ -258,7 +258,7 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => { setShowModal(false); setError('') }}
-                  className="px-4 py-2 text-slate-400 hover:text-white transition-colors">
+                  className="px-4 py-2 text-secondary hover:text-primary transition-colors">
                   Cancel
                 </button>
                 <button type="submit" disabled={saving}

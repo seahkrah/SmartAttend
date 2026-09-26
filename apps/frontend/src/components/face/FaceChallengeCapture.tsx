@@ -171,7 +171,7 @@ export function FaceChallengeCapture<T>({
                  className="w-full h-full object-cover -scale-x-100" />
           {(phase.kind === 'starting' || phase.kind === 'submitting' || phase.kind === 'camera') && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50" role="status" aria-live="polite">
-              <p className="text-white text-sm">
+              <p className="text-primary text-sm">
                 {phase.kind === 'camera' ? 'Opening the camera…'
                   : phase.kind === 'starting' ? 'Preparing…' : 'Checking the photos…'}
               </p>
@@ -179,10 +179,10 @@ export function FaceChallengeCapture<T>({
           )}
           {phase.kind === 'capturing' && (
             <div className="absolute inset-x-0 bottom-0 bg-black/60 px-4 py-3 flex items-center justify-between">
-              <p className="text-white font-medium" aria-live="assertive">
+              <p className="text-primary font-medium" aria-live="assertive">
                 Step {phase.step + 1} of {phase.steps.length}: {POSE_INSTRUCTIONS[phase.steps[phase.step]]}
               </p>
-              <span className={`text-xs ${secondsLeft < 20 ? 'text-amber-300' : 'text-slate-300'}`}>{secondsLeft}s</span>
+              <span className={`text-xs ${secondsLeft < 20 ? 'text-amber-700 dark:text-amber-300' : 'text-secondary'}`}>{secondsLeft}s</span>
             </div>
           )}
         </div>
@@ -197,19 +197,19 @@ export function FaceChallengeCapture<T>({
 
         <div className="px-5 py-4 space-y-3">
           {phase.kind === 'camera_error' && (
-            <p className="text-sm text-danger-600 flex gap-2"><ShieldAlert className="w-4 h-4 shrink-0" />{phase.message}</p>
+            <p className="text-sm text-danger-600 dark:text-danger-400 flex gap-2"><ShieldAlert className="w-4 h-4 shrink-0" />{phase.message}</p>
           )}
           {phase.kind === 'refused' && (
-            <p className="text-sm text-danger-600 flex gap-2" role="alert"><ShieldAlert className="w-4 h-4 shrink-0" />{phase.message}</p>
+            <p className="text-sm text-danger-600 dark:text-danger-400 flex gap-2" role="alert"><ShieldAlert className="w-4 h-4 shrink-0" />{phase.message}</p>
           )}
           {phase.kind === 'done' && (
-            <p className="text-sm text-success-600 flex gap-2" role="status"><CheckCircle2 className="w-4 h-4" />{phase.message}</p>
+            <p className="text-sm text-success-600 dark:text-success-300 flex gap-2" role="status"><CheckCircle2 className="w-4 h-4" />{phase.message}</p>
           )}
           {captureError && (
-            <p className="text-sm text-amber-600" role="alert">{captureError}</p>
+            <p className="text-sm text-amber-600 dark:text-amber-300" role="alert">{captureError}</p>
           )}
           {expired && (
-            <p className="text-sm text-amber-600" role="alert">This capture has expired. Start again.</p>
+            <p className="text-sm text-amber-600 dark:text-amber-300" role="alert">This capture has expired. Start again.</p>
           )}
 
           <div className="flex justify-end gap-2">

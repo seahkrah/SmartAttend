@@ -39,16 +39,16 @@ import { filesService, type StoredFile } from '../services/filesService';
  */
 
 const STATUS_STYLE: Record<ApplicationStatus, string> = {
-  draft: 'bg-slate-700/60 text-slate-300',
-  submitted: 'bg-blue-500/15 text-blue-300',
-  under_review: 'bg-indigo-500/15 text-indigo-300',
-  offer: 'bg-amber-500/15 text-amber-300',
-  accepted: 'bg-emerald-500/15 text-emerald-300',
-  enrolled: 'bg-emerald-500/25 text-emerald-200',
-  waitlisted: 'bg-violet-500/15 text-violet-300',
-  declined: 'bg-slate-600/50 text-slate-400',
-  rejected: 'bg-rose-500/15 text-rose-300',
-  withdrawn: 'bg-slate-600/50 text-slate-400',
+  draft: 'bg-sunken text-secondary',
+  submitted: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+  under_review: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
+  offer: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  accepted: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  enrolled: 'bg-emerald-500/25 text-emerald-700 dark:text-emerald-200',
+  waitlisted: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+  declined: 'bg-raised text-secondary',
+  rejected: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  withdrawn: 'bg-raised text-secondary',
 };
 
 const STATUS_LABEL: Record<ApplicationStatus, string> = {
@@ -470,15 +470,15 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
 
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Admissions</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <h1 className="text-2xl font-semibold text-primary">Admissions</h1>
+          <p className="text-sm text-secondary mt-1">
             From an enquiry to an enrolled student, with every decision on the record.
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowApplicantForm(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-lg border border-subtle px-3 py-2 text-sm font-medium text-primary hover:bg-sunken"
           >
             <UserPlus className="h-4 w-4" />
             New applicant
@@ -502,36 +502,36 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
             { label: 'Offers outstanding', value: overview.offersOutstanding, icon: FileText },
             { label: 'Ready to enrol', value: overview.readyToEnrol, icon: GraduationCap },
           ].map((card) => (
-            <div key={card.label} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <div key={card.label} className="rounded-xl border border-subtle bg-card p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-400">{card.label}</p>
-                <card.icon className="h-4 w-4 text-slate-500" />
+                <p className="text-sm text-secondary">{card.label}</p>
+                <card.icon className="h-4 w-4 text-muted" />
               </div>
-              <p className="mt-2 text-2xl font-semibold text-slate-100">{card.value}</p>
+              <p className="mt-2 text-2xl font-semibold text-primary">{card.value}</p>
             </div>
           ))}
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-subtle pb-3">
         {(['applications', 'intakes', 'applicants'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${
-              tab === t ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+              tab === t ? 'bg-sunken text-primary' : 'text-secondary hover:text-primary'
             }`}
           >
             {t}
           </button>
         ))}
         <div className="ml-auto relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, email or reference"
-            className="w-72 rounded-lg border border-slate-700 bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-500"
+            className="w-72 rounded-lg border border-subtle bg-card py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted"
           />
         </div>
       </div>
@@ -544,7 +544,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
               <select
                 value={intakeFilter}
                 onChange={(e) => setIntakeFilter(e.target.value)}
-                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+                className="rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary"
               >
                 <option value="">All intakes</option>
                 {intakes.map((i) => (
@@ -554,7 +554,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as '' | ApplicationStatus)}
-                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+                className="rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary"
               >
                 <option value="">Any status</option>
                 {(Object.keys(STATUS_LABEL) as ApplicationStatus[]).map((s) => (
@@ -572,9 +572,9 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
             ) : filteredApplications.length === 0 ? (
               <NoResults searchTerm={search} />
             ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-800">
+              <div className="overflow-hidden rounded-xl border border-subtle">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
                     <tr>
                       <th className="px-4 py-3">Applicant</th>
                       <th className="px-4 py-3">Intake</th>
@@ -582,24 +582,24 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                       <th className="px-4 py-3">Reference</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-subtle">
                     {filteredApplications.map((a) => (
                       <tr
                         key={a.id}
                         onClick={() => void openApplication(a.id)}
-                        className={`cursor-pointer hover:bg-slate-800/60 ${
-                          detail?.application.id === a.id ? 'bg-slate-800/80' : ''
+                        className={`cursor-pointer hover:bg-sunken ${
+                          detail?.application.id === a.id ? 'bg-sunken' : ''
                         }`}
                       >
                         <td className="px-4 py-3">
-                          <p className="font-medium text-slate-200">
+                          <p className="font-medium text-primary">
                             {a.first_name} {a.last_name}
                           </p>
-                          <p className="text-xs text-slate-500">{a.email}</p>
+                          <p className="text-xs text-muted">{a.email}</p>
                         </td>
-                        <td className="px-4 py-3 text-slate-300">{a.intake_name}</td>
+                        <td className="px-4 py-3 text-secondary">{a.intake_name}</td>
                         <td className="px-4 py-3"><StatusChip status={a.status} /></td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-400">{a.reference}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-secondary">{a.reference}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -610,98 +610,98 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
 
           <aside>
             {detailLoading ? (
-              <div className="rounded-xl border border-slate-800 p-8 text-center text-sm text-slate-400">
+              <div className="rounded-xl border border-subtle p-8 text-center text-sm text-secondary">
                 Loading…
               </div>
             ) : !detail ? (
-              <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+              <div className="rounded-xl border border-dashed border-subtle p-8 text-center text-sm text-muted">
                 Select an application to review it.
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="rounded-xl border border-subtle bg-card p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-100">
+                      <h2 className="text-lg font-semibold text-primary">
                         {detail.application.first_name} {detail.application.last_name}
                       </h2>
-                      <p className="text-xs text-slate-500">{detail.application.email}</p>
+                      <p className="text-xs text-muted">{detail.application.email}</p>
                     </div>
                     <StatusChip status={detail.application.status} />
                   </div>
 
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <dt className="text-slate-500">Intake</dt>
-                      <dd className="text-slate-300">{detail.application.intake_name}</dd>
+                      <dt className="text-muted">Intake</dt>
+                      <dd className="text-secondary">{detail.application.intake_name}</dd>
                     </div>
                     <div>
-                      <dt className="text-slate-500">Reference</dt>
-                      <dd className="font-mono text-slate-300">{detail.application.reference}</dd>
+                      <dt className="text-muted">Reference</dt>
+                      <dd className="font-mono text-secondary">{detail.application.reference}</dd>
                     </div>
                     {detail.application.prior_school && (
                       <div>
-                        <dt className="text-slate-500">Prior school</dt>
-                        <dd className="text-slate-300">{detail.application.prior_school}</dd>
+                        <dt className="text-muted">Prior school</dt>
+                        <dd className="text-secondary">{detail.application.prior_school}</dd>
                       </div>
                     )}
                     {detail.application.offered_programme_name && (
                       <div>
-                        <dt className="text-slate-500">Offered</dt>
-                        <dd className="text-slate-300">{detail.application.offered_programme_name}</dd>
+                        <dt className="text-muted">Offered</dt>
+                        <dd className="text-secondary">{detail.application.offered_programme_name}</dd>
                       </div>
                     )}
                     {detail.application.student_number && (
                       <div>
-                        <dt className="text-slate-500">Student number</dt>
-                        <dd className="font-mono text-emerald-300">{detail.application.student_number}</dd>
+                        <dt className="text-muted">Student number</dt>
+                        <dd className="font-mono text-emerald-700 dark:text-emerald-300">{detail.application.student_number}</dd>
                       </div>
                     )}
                     {detail.application.reviewed_by_name && (
                       <div>
-                        <dt className="text-slate-500">Last decided by</dt>
-                        <dd className="text-slate-300">{detail.application.reviewed_by_name}</dd>
+                        <dt className="text-muted">Last decided by</dt>
+                        <dd className="text-secondary">{detail.application.reviewed_by_name}</dd>
                       </div>
                     )}
                   </dl>
 
                   {detail.choices.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Programme choices</p>
-                      <ol className="mt-1 space-y-1 text-sm text-slate-300">
+                      <p className="text-xs uppercase tracking-wide text-muted">Programme choices</p>
+                      <ol className="mt-1 space-y-1 text-sm text-secondary">
                         {detail.choices.map((c) => (
                           <li key={c.id}>
                             {c.preference_rank}. {c.programme_name}{' '}
-                            <span className="text-xs text-slate-500">({c.programme_code})</span>
+                            <span className="text-xs text-muted">({c.programme_code})</span>
                           </li>
                         ))}
                       </ol>
                     </div>
                   )}
 
-                  <div className="mt-4 border-t border-slate-800 pt-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">Documents</p>
+                  <div className="mt-4 border-t border-subtle pt-4">
+                    <p className="text-xs uppercase tracking-wide text-muted">Documents</p>
 
                     {detail.documents.length > 0 ? (
                       <ul className="mt-2 space-y-2">
                         {detail.documents.map((doc) => (
                           <li
                             key={doc.id}
-                            className="rounded-lg border border-slate-800 bg-slate-950/40 p-3"
+                            className="rounded-lg border border-subtle bg-page p-3"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="truncate text-sm text-slate-200">{doc.label}</p>
-                                <p className="text-xs text-slate-500">
+                                <p className="truncate text-sm text-primary">{doc.label}</p>
+                                <p className="text-xs text-muted">
                                   {doc.kind}
                                   {doc.is_required ? ' · required' : ' · optional'}
                                 </p>
                               </div>
                               <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                                doc.status === 'verified' ? 'bg-emerald-500/15 text-emerald-300'
-                                : doc.status === 'rejected' ? 'bg-rose-500/15 text-rose-300'
-                                : doc.status === 'received' ? 'bg-amber-500/15 text-amber-300'
-                                : 'bg-slate-700/60 text-slate-400'
+                                doc.status === 'verified' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                : doc.status === 'rejected' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                                : doc.status === 'received' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                : 'bg-sunken text-secondary'
                               }`}>
                                 {doc.status}
                               </span>
@@ -711,7 +711,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                               {doc.file_id && (
                                 <button
                                   onClick={() => void downloadDocument(doc.file_id!, doc.label)}
-                                  className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                                  className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-primary hover:bg-sunken"
                                 >
                                   Download
                                 </button>
@@ -719,7 +719,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                               {doc.status !== 'verified' && doc.file_id && (
                                 <button
                                   onClick={() => void setDocumentStatus(doc.id, 'verified')}
-                                  className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-emerald-300 hover:bg-slate-800"
+                                  className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-sunken"
                                 >
                                   Verify
                                 </button>
@@ -727,13 +727,13 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                               {doc.status !== 'rejected' && doc.file_id && (
                                 <button
                                   onClick={() => void setDocumentStatus(doc.id, 'rejected')}
-                                  className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-rose-300 hover:bg-slate-800"
+                                  className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-rose-700 dark:text-rose-300 hover:bg-sunken"
                                 >
                                   Reject
                                 </button>
                               )}
                               {!doc.file_id && (
-                                <span className="text-xs text-slate-500">
+                                <span className="text-xs text-muted">
                                   Nothing uploaded yet
                                 </span>
                               )}
@@ -742,7 +742,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                         ))}
                       </ul>
                     ) : (
-                      <p className="mt-2 text-xs text-slate-500">
+                      <p className="mt-2 text-xs text-muted">
                         No documents on this application yet.
                       </p>
                     )}
@@ -795,7 +795,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                             });
                             setDecision({ to: t });
                           }}
-                          className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800"
+                          className="rounded-lg border border-subtle px-3 py-1.5 text-xs font-medium text-primary hover:bg-sunken"
                         >
                           {STATUS_LABEL[t]}
                         </button>
@@ -814,23 +814,23 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                  <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
+                <div className="rounded-xl border border-subtle bg-card p-4">
+                  <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted">
                     <History className="h-3.5 w-3.5" />
                     History
                   </p>
                   <ol className="mt-3 space-y-3">
                     {events.map((e) => (
-                      <li key={e.id} className="border-l border-slate-700 pl-3">
-                        <p className="text-sm text-slate-200">
+                      <li key={e.id} className="border-l border-subtle pl-3">
+                        <p className="text-sm text-primary">
                           {e.from_status ? `${STATUS_LABEL[e.from_status]} → ` : ''}
                           {STATUS_LABEL[e.to_status]}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted">
                           {new Date(e.occurred_at).toLocaleString()}
                           {e.actor_name ? ` · ${e.actor_name}` : ''}
                         </p>
-                        {e.note && <p className="mt-1 text-xs text-slate-400">{e.note}</p>}
+                        {e.note && <p className="mt-1 text-xs text-secondary">{e.note}</p>}
                       </li>
                     ))}
                   </ol>
@@ -863,28 +863,28 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {intakes.map((i) => (
-                <div key={i.id} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div key={i.id} className="rounded-xl border border-subtle bg-card p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="font-semibold text-slate-100">{i.name}</h3>
-                      <p className="font-mono text-xs text-slate-500">{i.code}</p>
+                      <h3 className="font-semibold text-primary">{i.name}</h3>
+                      <p className="font-mono text-xs text-muted">{i.code}</p>
                     </div>
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs capitalize text-slate-300">
+                    <span className="rounded-full bg-sunken px-2 py-0.5 text-xs capitalize text-secondary">
                       {i.status}
                     </span>
                   </div>
 
-                  <p className="mt-3 text-xs text-slate-400">
+                  <p className="mt-3 text-xs text-secondary">
                     {new Date(i.opens_at).toLocaleDateString()} –{' '}
                     {new Date(i.closes_at).toLocaleDateString()}
                   </p>
 
                   <div className="mt-3 flex gap-4 text-sm">
-                    <span className="text-slate-300">
+                    <span className="text-secondary">
                       {i.application_count ?? 0} application{(i.application_count ?? 0) === 1 ? '' : 's'}
                     </span>
                     {i.capacity != null && (
-                      <span className="text-slate-400">
+                      <span className="text-secondary">
                         {i.places_taken ?? 0}/{i.capacity} places
                       </span>
                     )}
@@ -894,7 +894,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                     {i.status !== 'open' && (
                       <button
                         onClick={() => void setIntakeStatus(i, 'open')}
-                        className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-emerald-300 hover:bg-slate-800"
+                        className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-sunken"
                       >
                         Open
                       </button>
@@ -902,7 +902,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                     {i.status === 'open' && (
                       <button
                         onClick={() => void setIntakeStatus(i, 'closed')}
-                        className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-amber-300 hover:bg-slate-800"
+                        className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-amber-700 dark:text-amber-300 hover:bg-sunken"
                       >
                         Close
                       </button>
@@ -910,20 +910,20 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                     {i.status !== 'archived' && (
                       <button
                         onClick={() => void setIntakeStatus(i, 'archived')}
-                        className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800"
+                        className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-secondary hover:bg-sunken"
                       >
                         Archive
                       </button>
                     )}
                     <button
                       onClick={() => void showFunnel(i)}
-                      className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800"
+                      className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-secondary hover:bg-sunken"
                     >
                       Funnel
                     </button>
                     <button
                       onClick={() => void removeIntake(i)}
-                      className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-rose-300 hover:bg-slate-800"
+                      className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-rose-700 dark:text-rose-300 hover:bg-sunken"
                     >
                       Delete
                     </button>
@@ -947,9 +947,9 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
           ) : filteredApplicants.length === 0 ? (
             <NoResults searchTerm={search} />
           ) : (
-            <div className="overflow-hidden rounded-xl border border-slate-800">
+            <div className="overflow-hidden rounded-xl border border-subtle">
               <table className="w-full text-sm">
-                <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+                <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Email</th>
@@ -958,20 +958,20 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                     <th className="px-4 py-3">Outcome</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
+                <tbody className="divide-y divide-subtle">
                   {filteredApplicants.map((a) => (
-                    <tr key={a.id} className="hover:bg-slate-800/40">
-                      <td className="px-4 py-3 text-slate-200">{a.first_name} {a.last_name}</td>
-                      <td className="px-4 py-3 text-slate-400">{a.email}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-400">{a.reference}</td>
-                      <td className="px-4 py-3 text-slate-300">{a.application_count ?? 0}</td>
+                    <tr key={a.id} className="hover:bg-sunken">
+                      <td className="px-4 py-3 text-primary">{a.first_name} {a.last_name}</td>
+                      <td className="px-4 py-3 text-secondary">{a.email}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-secondary">{a.reference}</td>
+                      <td className="px-4 py-3 text-secondary">{a.application_count ?? 0}</td>
                       <td className="px-4 py-3">
                         {a.converted_student_id ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
                             <CheckCircle2 className="h-3.5 w-3.5" /> Enrolled
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-500">In progress</span>
+                          <span className="text-xs text-muted">In progress</span>
                         )}
                       </td>
                     </tr>
@@ -1120,7 +1120,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
                 {programmes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </Field>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary">
               <input type="checkbox" checked={applicationForm.submit}
                 onChange={(e) => setApplicationForm({ ...applicationForm, submit: e.target.checked })} />
               Submit it now rather than saving a draft
@@ -1157,7 +1157,7 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
             </Field>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setDecision(null)}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">
+                className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover:bg-sunken">
                 Cancel
               </button>
               <button
@@ -1175,9 +1175,9 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
       {enrolling && detail && (
         <Modal title="Enrol as a student" onClose={() => setEnrolling(false)}>
           <form onSubmit={enrol} className="space-y-3">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-secondary">
               This creates the login, the student record and the programme enrolment for{' '}
-              <span className="text-slate-200">
+              <span className="text-primary">
                 {detail.application.first_name} {detail.application.last_name}
               </span>. The one-time password is shown once, here.
             </p>
@@ -1225,9 +1225,9 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
               ['Enrolled', funnel.enrolled],
               ['Rejected', funnel.rejected],
             ].map(([label, value]) => (
-              <div key={String(label)} className="rounded-lg border border-slate-800 p-3">
-                <dt className="text-xs text-slate-500">{label}</dt>
-                <dd className="text-lg font-semibold text-slate-100">{value}</dd>
+              <div key={String(label)} className="rounded-lg border border-subtle p-3">
+                <dt className="text-xs text-muted">{label}</dt>
+                <dd className="text-lg font-semibold text-primary">{value}</dd>
               </div>
             ))}
           </dl>
@@ -1237,10 +1237,10 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
               ['Acceptance', funnel.acceptanceRate],
               ['Yield', funnel.yieldRate],
             ].map(([label, value]) => (
-              <div key={String(label)} className="rounded-lg border border-slate-800 p-3">
-                <p className="text-xs text-slate-500">{label}</p>
+              <div key={String(label)} className="rounded-lg border border-subtle p-3">
+                <p className="text-xs text-muted">{label}</p>
                 {/* A null rate means nothing to divide by, which is not 0%. */}
-                <p className="text-lg font-semibold text-slate-100">
+                <p className="text-lg font-semibold text-primary">
                   {value === null || value === undefined ? '—' : `${value}%`}
                 </p>
               </div>
@@ -1253,11 +1253,11 @@ const SchoolAdminAdmissionsPage: React.FC = () => {
 };
 
 const inputClass =
-  'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500';
+  'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <label className="block">
-    <span className="mb-1 block text-xs font-medium text-slate-400">{label}</span>
+    <span className="mb-1 block text-xs font-medium text-secondary">{label}</span>
     {children}
   </label>
 );
@@ -1267,7 +1267,7 @@ const FormActions: React.FC<{ saving: boolean; onCancel: () => void; submitLabel
 }) => (
   <div className="flex justify-end gap-2 pt-2">
     <button type="button" onClick={onCancel}
-      className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">
+      className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover:bg-sunken">
       Cancel
     </button>
     <button type="submit" disabled={saving}
@@ -1281,10 +1281,10 @@ const Modal: React.FC<{ title: string; onClose: () => void; children: React.Reac
   title, onClose, children,
 }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-    <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-subtle bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-        <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800">
+        <h2 className="text-lg font-semibold text-primary">{title}</h2>
+        <button onClick={onClose} className="rounded-lg p-1 text-secondary hover:bg-sunken">
           <X className="h-4 w-4" />
         </button>
       </div>

@@ -104,7 +104,7 @@ const SuperadminAdminsPage: React.FC = () => {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full text-slate-400">Loading administrators…</div>
+    return <div className="flex items-center justify-center h-full text-secondary">Loading administrators…</div>
   }
 
   return (
@@ -128,32 +128,32 @@ const SuperadminAdminsPage: React.FC = () => {
         </button>
 
         {loadError && (
-          <div role="alert" className="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm">{loadError}</div>
+          <div role="alert" className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm">{loadError}</div>
         )}
 
         {showForm && (
-          <form onSubmit={handleAddAdmin} className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4">
+          <form onSubmit={handleAddAdmin} className="p-6 rounded-xl bg-sunken border border-subtle space-y-4">
             {formError && (
-              <div role="alert" className="p-3 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm">{formError}</div>
+              <div role="alert" className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm">{formError}</div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <label className="block">
-                <span className="block text-sm font-medium text-slate-300 mb-2">Full name</span>
+                <span className="block text-sm font-medium text-secondary mb-2">Full name</span>
                 <input type="text" value={formData.fullName} required
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-orange-500 outline-none" />
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:border-orange-500 outline-none" />
               </label>
               <label className="block">
-                <span className="block text-sm font-medium text-slate-300 mb-2">Email</span>
+                <span className="block text-sm font-medium text-secondary mb-2">Email</span>
                 <input type="email" value={formData.email} required
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-orange-500 outline-none" />
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:border-orange-500 outline-none" />
               </label>
               <label className="block">
-                <span className="block text-sm font-medium text-slate-300 mb-2">Tenant</span>
+                <span className="block text-sm font-medium text-secondary mb-2">Tenant</span>
                 <select value={formData.tenantId} required
                   onChange={(e) => setFormData({ ...formData, tenantId: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-orange-500 outline-none">
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:border-orange-500 outline-none">
                   <option value="">Choose a tenant…</option>
                   {tenants.map((t) => (
                     <option key={t.id} value={t.id}>{t.name} ({t.kind === 'school' ? 'School' : 'Company'})</option>
@@ -161,7 +161,7 @@ const SuperadminAdminsPage: React.FC = () => {
                 </select>
               </label>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-secondary">
               The administrator is invited to choose their own password. If the tenant has no email set up yet,
               you can hand them a one-time setup link instead.
             </p>
@@ -175,38 +175,38 @@ const SuperadminAdminsPage: React.FC = () => {
         {admins.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {admins.map((admin) => (
-              <div key={`${admin.id}-${admin.tenant_id}`} className="p-6 rounded-xl bg-slate-800/50 border border-slate-700">
+              <div key={`${admin.id}-${admin.tenant_id}`} className="p-6 rounded-xl bg-sunken border border-subtle">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h4 className="font-bold text-white text-lg">{admin.full_name}</h4>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <h4 className="font-bold text-primary text-lg">{admin.full_name}</h4>
+                    <p className="text-sm text-secondary mt-1">
                       {admin.awaiting_setup ? 'Invited — awaiting setup' : admin.is_active ? 'Administrator' : 'Deactivated'}
                     </p>
                   </div>
                   <button onClick={() => handleDeleteAdmin(admin)} aria-label={`Remove ${admin.full_name}`}
-                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400">
+                    className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="space-y-2 mb-4 text-sm">
-                  <p className="flex items-center gap-2 text-slate-300 break-all"><Mail className="w-4 h-4 text-slate-500" />{admin.email}</p>
-                  <p className="flex items-center gap-2 text-slate-300"><Building2 className="w-4 h-4 text-slate-500" />{admin.tenant_name ?? 'No tenant'}</p>
+                  <p className="flex items-center gap-2 text-secondary break-all"><Mail className="w-4 h-4 text-muted" />{admin.email}</p>
+                  <p className="flex items-center gap-2 text-secondary"><Building2 className="w-4 h-4 text-muted" />{admin.tenant_name ?? 'No tenant'}</p>
                 </div>
-                <div className="pt-4 border-t border-slate-700 flex items-center justify-between">
-                  <p className="text-xs text-slate-500">
+                <div className="pt-4 border-t border-subtle flex items-center justify-between">
+                  <p className="text-xs text-muted">
                     {admin.last_login ? `Last signed in ${new Date(admin.last_login).toLocaleDateString()}` : `Appointed ${new Date(admin.created_at).toLocaleDateString()}`}
                   </p>
                   {admin.awaiting_setup && (
                     <button onClick={() => setInvite({ id: admin.id, name: admin.full_name, invitation: null })}
-                      className="text-xs text-sky-300 hover:text-sky-200">Invite again</button>
+                      className="text-xs text-sky-700 dark:text-sky-300 hover:text-sky-700 dark:hover:text-sky-200">Invite again</button>
                   )}
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="p-12 text-center rounded-xl bg-slate-800/30 border border-dashed border-slate-700">
-            <p className="text-slate-400 text-lg">No tenant administrators yet</p>
+          <div className="p-12 text-center rounded-xl bg-sunken border border-dashed border-subtle">
+            <p className="text-secondary text-lg">No tenant administrators yet</p>
           </div>
         )}
       </div>

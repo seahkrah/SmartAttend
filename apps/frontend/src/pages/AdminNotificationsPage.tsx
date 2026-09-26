@@ -27,13 +27,13 @@ import {
  */
 
 const STATUS_STYLE: Record<MessageStatus, string> = {
-  pending: 'bg-slate-700/60 text-slate-300',
-  sending: 'bg-blue-500/15 text-blue-300',
-  sent: 'bg-emerald-500/15 text-emerald-300',
-  simulated: 'bg-amber-500/15 text-amber-300',
-  failed: 'bg-rose-500/15 text-rose-300',
-  cancelled: 'bg-slate-600/50 text-slate-500 line-through',
-  suppressed: 'bg-violet-500/15 text-violet-300',
+  pending: 'bg-sunken text-secondary',
+  sending: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+  sent: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  simulated: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  failed: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  cancelled: 'bg-raised text-muted line-through',
+  suppressed: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
 };
 
 const STATUS_LABEL: Record<MessageStatus, string> = {
@@ -410,15 +410,15 @@ const AdminNotificationsPage: React.FC = () => {
 
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Notifications</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <h1 className="text-2xl font-semibold text-primary">Notifications</h1>
+          <p className="mt-1 text-sm text-secondary">
             How this institution reaches people, and what it has actually sent.
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => void loadMessages()}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-lg border border-subtle px-3 py-2 text-sm text-primary hover:bg-sunken"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
@@ -436,14 +436,14 @@ const AdminNotificationsPage: React.FC = () => {
 
       {/* The banner this whole module exists for. */}
       {logChannels.length > 0 && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-800/60 bg-amber-950/25 p-4">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/25 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div>
-            <p className="font-medium text-amber-200">
+            <p className="font-medium text-amber-700 dark:text-amber-200">
               Nothing is actually being sent on{' '}
               {logChannels.map((c) => CHANNEL_LABEL[c.channel]).join(', ')}
             </p>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-secondary">
               {simulatedCount > 0
                 ? `${simulatedCount} message${simulatedCount === 1 ? ' has' : 's have'} been rendered and recorded without leaving the system. `
                 : 'Messages on these channels are rendered and recorded without leaving the system. '}
@@ -462,7 +462,7 @@ const AdminNotificationsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-subtle pb-3">
         {([
           ['outbox', 'Outbox'], ['channels', 'Channels'],
           ['templates', 'Templates'], ['suppressions', 'Suppressed'],
@@ -471,7 +471,7 @@ const AdminNotificationsPage: React.FC = () => {
             key={key}
             onClick={() => setTab(key)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              tab === key ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+              tab === key ? 'bg-sunken text-primary' : 'text-secondary hover:text-primary'
             }`}
           >
             {label}
@@ -512,9 +512,9 @@ const AdminNotificationsPage: React.FC = () => {
                 message="Messages queued by admissions, fees, leave and results appear here."
               />
             ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-800">
+              <div className="overflow-hidden rounded-xl border border-subtle">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
                     <tr>
                       <th className="px-4 py-3">To</th>
                       <th className="px-4 py-3">About</th>
@@ -522,26 +522,26 @@ const AdminNotificationsPage: React.FC = () => {
                       <th className="px-4 py-3">State</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-subtle">
                     {messages.map((m) => (
                       <tr
                         key={m.id}
                         onClick={() => void notificationsService.message(m.id).then(setDetail)}
-                        className={`cursor-pointer hover:bg-slate-800/60 ${
-                          detail?.message.id === m.id ? 'bg-slate-800/80' : ''
+                        className={`cursor-pointer hover:bg-sunken ${
+                          detail?.message.id === m.id ? 'bg-sunken' : ''
                         }`}
                       >
                         <td className="px-4 py-3">
-                          <p className="text-slate-200">
+                          <p className="text-primary">
                             {m.recipient_full_name ?? m.recipient_name ?? '—'}
                           </p>
-                          <p className="truncate text-xs text-slate-500">{m.destination}</p>
+                          <p className="truncate text-xs text-muted">{m.destination}</p>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="truncate text-slate-300">{m.subject ?? m.event_key ?? '—'}</p>
-                          <p className="text-xs text-slate-500">{m.event_key}</p>
+                          <p className="truncate text-secondary">{m.subject ?? m.event_key ?? '—'}</p>
+                          <p className="text-xs text-muted">{m.event_key}</p>
                         </td>
-                        <td className="px-4 py-3 text-slate-400">{CHANNEL_LABEL[m.channel]}</td>
+                        <td className="px-4 py-3 text-secondary">{CHANNEL_LABEL[m.channel]}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[m.status]}`}>
                             {STATUS_LABEL[m.status]}
@@ -557,18 +557,18 @@ const AdminNotificationsPage: React.FC = () => {
 
           <aside>
             {!detail ? (
-              <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+              <div className="rounded-xl border border-dashed border-subtle p-8 text-center text-sm text-muted">
                 Select a message.
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="rounded-xl border border-subtle bg-card p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-100">
+                      <p className="truncate font-medium text-primary">
                         {detail.message.subject ?? detail.message.event_key}
                       </p>
-                      <p className="truncate text-xs text-slate-500">{detail.message.destination}</p>
+                      <p className="truncate text-xs text-muted">{detail.message.destination}</p>
                     </div>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[detail.message.status]}`}>
                       {STATUS_LABEL[detail.message.status]}
@@ -576,18 +576,18 @@ const AdminNotificationsPage: React.FC = () => {
                   </div>
 
                   {detail.message.status === 'simulated' && (
-                    <p className="mt-3 rounded-lg border border-amber-800/60 bg-amber-950/25 p-3 text-xs text-amber-200">
+                    <p className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/25 p-3 text-xs text-amber-700 dark:text-amber-200">
                       This message was rendered and recorded but not transmitted. The{' '}
                       {CHANNEL_LABEL[detail.message.channel]} channel is on the log provider.
                     </p>
                   )}
 
-                  <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/60 p-3 text-xs text-slate-300">
+                  <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-page p-3 text-xs text-secondary">
                     {detail.message.body ?? ''}
                   </pre>
 
                   {detail.message.last_error && (
-                    <p className="mt-3 text-xs text-rose-300">{detail.message.last_error}</p>
+                    <p className="mt-3 text-xs text-rose-700 dark:text-rose-300">{detail.message.last_error}</p>
                   )}
 
                   <div className="mt-4 flex gap-2">
@@ -595,13 +595,13 @@ const AdminNotificationsPage: React.FC = () => {
                       <>
                         <button
                           onClick={() => void retry(detail.message.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-xs text-primary hover:bg-sunken"
                         >
                           <Undo2 className="h-3.5 w-3.5" /> Try again
                         </button>
                         <button
                           onClick={() => void cancel(detail.message.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-rose-300 hover:bg-slate-800"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-xs text-rose-700 dark:text-rose-300 hover:bg-sunken"
                         >
                           <Ban className="h-3.5 w-3.5" /> Cancel
                         </button>
@@ -611,21 +611,21 @@ const AdminNotificationsPage: React.FC = () => {
                 </div>
 
                 {detail.attempts.length > 0 && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">Attempts</p>
+                  <div className="rounded-xl border border-subtle bg-card p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted">Attempts</p>
                     <ul className="mt-3 space-y-3">
                       {detail.attempts.map((a) => (
-                        <li key={a.id} className="border-l border-slate-700 pl-3">
-                          <p className="text-sm text-slate-200">
+                        <li key={a.id} className="border-l border-subtle pl-3">
+                          <p className="text-sm text-primary">
                             #{a.attempt} · {STATUS_LABEL[a.status as MessageStatus]} via{' '}
                             {PROVIDER_LABEL[a.provider]}
                           </p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-muted">
                             {new Date(a.occurred_at).toLocaleString()}
                             {a.duration_ms != null ? ` · ${a.duration_ms}ms` : ''}
                           </p>
                           {(a.error || a.provider_response) && (
-                            <p className={`mt-1 text-xs ${a.error ? 'text-rose-300' : 'text-slate-400'}`}>
+                            <p className={`mt-1 text-xs ${a.error ? 'text-rose-700 dark:text-rose-300' : 'text-secondary'}`}>
                               {a.error ?? a.provider_response}
                             </p>
                           )}
@@ -644,40 +644,40 @@ const AdminNotificationsPage: React.FC = () => {
       {tab === 'channels' && (
         <div className="grid gap-4 md:grid-cols-2">
           {channels.map((c) => (
-            <div key={c.channel} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <div key={c.channel} className="rounded-xl border border-subtle bg-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold text-slate-100">{CHANNEL_LABEL[c.channel]}</h3>
-                  <p className="text-xs text-slate-500">{PROVIDER_LABEL[c.provider]}</p>
+                  <h3 className="font-semibold text-primary">{CHANNEL_LABEL[c.channel]}</h3>
+                  <p className="text-xs text-muted">{PROVIDER_LABEL[c.provider]}</p>
                 </div>
                 {!c.isEnabled ? (
-                  <span className="rounded-full bg-slate-700/60 px-2 py-0.5 text-xs text-slate-400">Off</span>
+                  <span className="rounded-full bg-sunken px-2 py-0.5 text-xs text-secondary">Off</span>
                 ) : c.provider === 'log' ? (
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
                     Not sending
                   </span>
                 ) : c.ready ? (
-                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-300">
                     Ready
                   </span>
                 ) : (
-                  <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-300">
+                  <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-700 dark:text-rose-300">
                     Not ready
                   </span>
                 )}
               </div>
 
-              {c.reason && <p className="mt-2 text-xs text-rose-300">{c.reason}</p>}
+              {c.reason && <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{c.reason}</p>}
 
               {c.fromAddress && (
-                <p className="mt-2 text-xs text-slate-400">From {c.fromAddress}</p>
+                <p className="mt-2 text-xs text-secondary">From {c.fromAddress}</p>
               )}
 
               {c.secretEnvVar && (
-                <p className="mt-1 text-xs text-slate-500">
-                  Credential from <code className="text-slate-400">{c.secretEnvVar}</code>
+                <p className="mt-1 text-xs text-muted">
+                  Credential from <code className="text-secondary">{c.secretEnvVar}</code>
                   {c.secretIsSet === false && (
-                    <span className="text-rose-300"> — not set on this server</span>
+                    <span className="text-rose-700 dark:text-rose-300"> — not set on this server</span>
                   )}
                 </p>
               )}
@@ -685,14 +685,14 @@ const AdminNotificationsPage: React.FC = () => {
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => openChannel(c)}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                  className="rounded-lg border border-subtle px-3 py-1.5 text-xs text-primary hover:bg-sunken"
                 >
                   Configure
                 </button>
                 <button
                   onClick={() => void testChannel(c.channel)}
                   disabled={saving || !c.isEnabled}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-xs text-primary hover:bg-sunken disabled:opacity-40"
                 >
                   <Radio className="h-3.5 w-3.5" /> Send me a test
                 </button>
@@ -706,26 +706,26 @@ const AdminNotificationsPage: React.FC = () => {
       {tab === 'templates' && (
         <div className="space-y-4">
           {templates.map((event) => (
-            <div key={event.eventKey} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-              <p className="font-mono text-sm text-slate-300">{event.eventKey}</p>
+            <div key={event.eventKey} className="rounded-xl border border-subtle bg-card p-4">
+              <p className="font-mono text-sm text-secondary">{event.eventKey}</p>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {event.channels.map((ch) => (
                   <button
                     key={ch.channel}
                     onClick={() => openTemplate(event.eventKey, ch)}
-                    className="rounded-lg border border-slate-800 p-3 text-left hover:bg-slate-800/50"
+                    className="rounded-lg border border-subtle p-3 text-left hover:bg-sunken"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-200">{CHANNEL_LABEL[ch.channel]}</span>
+                      <span className="text-sm text-primary">{CHANNEL_LABEL[ch.channel]}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs ${
                         ch.source === 'tenant'
-                          ? 'bg-brand-500/15 text-brand-300'
-                          : 'bg-slate-700/60 text-slate-400'
+                          ? 'bg-brand-500/15 text-brand-700 dark:text-brand-300'
+                          : 'bg-sunken text-secondary'
                       }`}>
                         {ch.source === 'tenant' ? 'Your wording' : 'Standard'}
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                    <p className="mt-1 line-clamp-2 text-xs text-muted">
                       {ch.subject ? `${ch.subject} — ` : ''}{ch.body}
                     </p>
                   </button>
@@ -742,7 +742,7 @@ const AdminNotificationsPage: React.FC = () => {
           <div className="mb-3 flex justify-end">
             <button
               onClick={() => setShowSuppressForm(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-lg border border-subtle px-3 py-2 text-sm text-primary hover:bg-sunken"
             >
               <ShieldOff className="h-4 w-4" /> Suppress an address
             </button>
@@ -755,9 +755,9 @@ const AdminNotificationsPage: React.FC = () => {
               message="An address that bounces permanently, or a person who asks not to be written to, appears here."
             />
           ) : (
-            <div className="overflow-hidden rounded-xl border border-slate-800">
+            <div className="overflow-hidden rounded-xl border border-subtle">
               <table className="w-full text-sm">
-                <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wide text-slate-500">
+                <thead className="bg-card text-left text-xs uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-4 py-3">Address</th>
                     <th className="px-4 py-3">Channel</th>
@@ -765,19 +765,19 @@ const AdminNotificationsPage: React.FC = () => {
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
+                <tbody className="divide-y divide-subtle">
                   {suppressions.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-800/40">
-                      <td className="px-4 py-3 text-slate-200">{s.destination}</td>
-                      <td className="px-4 py-3 text-slate-400">{CHANNEL_LABEL[s.channel]}</td>
+                    <tr key={s.id} className="hover:bg-sunken">
+                      <td className="px-4 py-3 text-primary">{s.destination}</td>
+                      <td className="px-4 py-3 text-secondary">{CHANNEL_LABEL[s.channel]}</td>
                       <td className="px-4 py-3">
-                        <p className="text-slate-300">{s.reason.replace('_', ' ')}</p>
-                        {s.note && <p className="text-xs text-slate-500">{s.note}</p>}
+                        <p className="text-secondary">{s.reason.replace('_', ' ')}</p>
+                        {s.note && <p className="text-xs text-muted">{s.note}</p>}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => void unsuppress(s)}
-                          className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800"
+                          className="rounded-lg border border-subtle px-2.5 py-1 text-xs text-secondary hover:bg-sunken"
                         >
                           Lift
                         </button>
@@ -847,7 +847,7 @@ const AdminNotificationsPage: React.FC = () => {
                 <input value={channelForm.secretEnvVar}
                   onChange={(e) => setChannelForm({ ...channelForm, secretEnvVar: e.target.value })}
                   placeholder="SMTP_PASSWORD" className={inputClass} />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-muted">
                   The name of a variable set on the server — not the password itself. Credentials
                   are never stored in the database.
                 </p>
@@ -882,7 +882,7 @@ const AdminNotificationsPage: React.FC = () => {
                 className={inputClass} />
             </Field>
 
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary">
               <input type="checkbox" checked={channelForm.isEnabled}
                 onChange={(e) => setChannelForm({ ...channelForm, isEnabled: e.target.checked })} />
               This channel is switched on
@@ -899,7 +899,7 @@ const AdminNotificationsPage: React.FC = () => {
           onClose={() => setEditingTemplate(null)}
         >
           <form onSubmit={saveTemplate} className="space-y-3">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               Available: {editingTemplate.channel.variables.map((v) => `{{ ${v} }}`).join(', ')}
             </p>
 
@@ -918,18 +918,18 @@ const AdminNotificationsPage: React.FC = () => {
             </Field>
 
             <button type="button" onClick={() => void runPreview()}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800">
+              className="inline-flex items-center gap-2 rounded-lg border border-subtle px-3 py-1.5 text-xs text-primary hover:bg-sunken">
               <FileText className="h-3.5 w-3.5" /> Preview
             </button>
 
             {preview && (
-              <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+              <div className="rounded-lg border border-subtle bg-page p-3">
                 {preview.subject && (
-                  <p className="mb-2 text-sm font-medium text-slate-200">{preview.subject}</p>
+                  <p className="mb-2 text-sm font-medium text-primary">{preview.subject}</p>
                 )}
-                <pre className="whitespace-pre-wrap text-xs text-slate-300">{preview.body}</pre>
+                <pre className="whitespace-pre-wrap text-xs text-secondary">{preview.body}</pre>
                 {preview.missing.length > 0 && (
-                  <p className="mt-2 text-xs text-amber-300">
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
                     Nothing supplied for: {preview.missing.join(', ')}
                   </p>
                 )}
@@ -940,13 +940,13 @@ const AdminNotificationsPage: React.FC = () => {
               {editingTemplate.channel.templateId ? (
                 <button type="button"
                   onClick={() => void revertTemplate(editingTemplate.channel.templateId!)}
-                  className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800">
+                  className="rounded-lg border border-subtle px-3 py-2 text-sm text-secondary hover:bg-sunken">
                   Revert to standard
                 </button>
               ) : <span />}
               <div className="flex gap-2">
                 <button type="button" onClick={() => setEditingTemplate(null)}
-                  className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">
+                  className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover:bg-sunken">
                   Cancel
                 </button>
                 <button type="submit" disabled={saving}
@@ -962,7 +962,7 @@ const AdminNotificationsPage: React.FC = () => {
       {showSuppressForm && (
         <Modal title="Suppress an address" onClose={() => setShowSuppressForm(false)}>
           <form onSubmit={addSuppression} className="space-y-3">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-secondary">
               Nothing further will be sent to this address on this channel.
             </p>
             <Field label="Channel">
@@ -1004,21 +1004,21 @@ const AdminNotificationsPage: React.FC = () => {
 };
 
 const inputClass =
-  'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500';
+  'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
 
 const Card: React.FC<{
   label: string; value: number; icon: React.ElementType; tone?: 'emerald' | 'amber' | 'rose';
 }> = ({ label, value, icon: Icon, tone }) => (
-  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+  <div className="rounded-xl border border-subtle bg-card p-4">
     <div className="flex items-center justify-between">
-      <p className="text-sm text-slate-400">{label}</p>
-      <Icon className="h-4 w-4 text-slate-500" />
+      <p className="text-sm text-secondary">{label}</p>
+      <Icon className="h-4 w-4 text-muted" />
     </div>
     <p className={`mt-2 text-2xl font-semibold ${
-      tone === 'emerald' ? 'text-emerald-300'
-      : tone === 'amber' ? 'text-amber-300'
-      : tone === 'rose' ? 'text-rose-300'
-      : 'text-slate-100'
+      tone === 'emerald' ? 'text-emerald-700 dark:text-emerald-300'
+      : tone === 'amber' ? 'text-amber-700 dark:text-amber-300'
+      : tone === 'rose' ? 'text-rose-700 dark:text-rose-300'
+      : 'text-primary'
     }`}>
       {value}
     </p>
@@ -1027,7 +1027,7 @@ const Card: React.FC<{
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <label className="block">
-    <span className="mb-1 block text-xs font-medium text-slate-400">{label}</span>
+    <span className="mb-1 block text-xs font-medium text-secondary">{label}</span>
     {children}
   </label>
 );
@@ -1037,7 +1037,7 @@ const FormActions: React.FC<{ saving: boolean; onCancel: () => void; submitLabel
 }) => (
   <div className="flex justify-end gap-2 pt-2">
     <button type="button" onClick={onCancel}
-      className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">
+      className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary hover:bg-sunken">
       Cancel
     </button>
     <button type="submit" disabled={saving}
@@ -1051,10 +1051,10 @@ const Modal: React.FC<{ title: string; onClose: () => void; children: React.Reac
   title, onClose, children,
 }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-    <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-5">
+    <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-subtle bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="truncate text-lg font-semibold text-slate-100">{title}</h2>
-        <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800">
+        <h2 className="truncate text-lg font-semibold text-primary">{title}</h2>
+        <button onClick={onClose} className="rounded-lg p-1 text-secondary hover:bg-sunken">
           <X className="h-4 w-4" />
         </button>
       </div>

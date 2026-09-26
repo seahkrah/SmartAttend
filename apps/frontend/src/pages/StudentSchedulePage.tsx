@@ -90,14 +90,14 @@ export const StudentSchedulePage: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">My Schedule</h1>
-            <p className="text-slate-400 mt-1">Weekly class timetable</p>
+            <h1 className="text-3xl font-bold text-primary">My Schedule</h1>
+            <p className="text-secondary mt-1">Weekly class timetable</p>
           </div>
-          <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+          <div className="flex bg-sunken rounded-lg p-1 border border-subtle">
             <button
               onClick={() => setView('timetable')}
               className={`px-3 py-1.5 text-xs font-medium rounded ${
-                view === 'timetable' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                view === 'timetable' ? 'bg-emerald-600 text-white' : 'text-secondary hover:text-white'
               }`}
             >
               Timetable
@@ -105,7 +105,7 @@ export const StudentSchedulePage: React.FC = () => {
             <button
               onClick={() => setView('list')}
               className={`px-3 py-1.5 text-xs font-medium rounded ${
-                view === 'list' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                view === 'list' ? 'bg-emerald-600 text-white' : 'text-secondary hover:text-white'
               }`}
             >
               List
@@ -116,13 +116,13 @@ export const StudentSchedulePage: React.FC = () => {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-slate-400">Loading schedule...</span>
+            <span className="ml-3 text-secondary">Loading schedule...</span>
           </div>
         ) : schedule.length === 0 ? (
-          <div className="text-center py-20 bg-slate-800 rounded-lg border border-slate-700">
+          <div className="text-center py-20 bg-sunken rounded-lg border border-subtle">
             <div className="text-5xl mb-4">📅</div>
-            <p className="text-xl text-slate-400">No schedule found</p>
-            <p className="text-sm text-slate-500 mt-2">You haven't been enrolled in any classes yet.</p>
+            <p className="text-xl text-secondary">No schedule found</p>
+            <p className="text-sm text-muted mt-2">You haven't been enrolled in any classes yet.</p>
           </div>
         ) : view === 'timetable' ? (
           /* ── Timetable View ── */
@@ -133,15 +133,15 @@ export const StudentSchedulePage: React.FC = () => {
               return (
                 <div
                   key={dayIdx}
-                  className={`bg-slate-800 rounded-lg border ${
-                    isToday ? 'border-emerald-600/50 ring-1 ring-emerald-600/20' : 'border-slate-700'
+                  className={`bg-sunken rounded-lg border ${
+                    isToday ? 'border-emerald-600/50 ring-1 ring-emerald-600/20' : 'border-subtle'
                   }`}
                 >
                   <div className={`px-3 py-2 border-b ${
-                    isToday ? 'border-emerald-700/50 bg-emerald-900/20' : 'border-slate-700 bg-slate-700/40'
+                    isToday ? 'border-emerald-200 dark:border-emerald-700/50 bg-emerald-50 dark:bg-emerald-900/20' : 'border-subtle bg-sunken'
                   }`}>
                     <p className={`text-xs font-semibold uppercase tracking-wider ${
-                      isToday ? 'text-emerald-400' : 'text-slate-400'
+                      isToday ? 'text-emerald-700 dark:text-emerald-400' : 'text-secondary'
                     }`}>
                       {SHORT_DAYS[dayIdx]}
                       {isToday && <span className="ml-1 text-emerald-500">•</span>}
@@ -149,19 +149,19 @@ export const StudentSchedulePage: React.FC = () => {
                   </div>
                   <div className="p-2 space-y-2 min-h-[80px]">
                     {items.length === 0 ? (
-                      <p className="text-xs text-slate-600 text-center py-4">Free</p>
+                      <p className="text-xs text-muted text-center py-4">Free</p>
                     ) : (
                       items.map((item, i) => (
                         <div
                           key={`${item.schedule_id}-${i}`}
-                          className={`p-2 rounded bg-slate-700/40 border-l-2 ${DAY_COLORS[dayIdx % DAY_COLORS.length]}`}
+                          className={`p-2 rounded bg-sunken border-l-2 ${DAY_COLORS[dayIdx % DAY_COLORS.length]}`}
                         >
-                          <p className="text-xs font-semibold text-white truncate">{item.course_code}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                          <p className="text-xs font-semibold text-primary truncate">{item.course_code}</p>
+                          <p className="text-xs text-secondary mt-0.5">
                             {item.start_time?.slice(0, 5)}–{item.end_time?.slice(0, 5)}
                           </p>
                           {item.room_name && (
-                            <p className="text-xs text-slate-500 mt-0.5">📍 {item.room_name}</p>
+                            <p className="text-xs text-muted mt-0.5">📍 {item.room_name}</p>
                           )}
                         </div>
                       ))
@@ -181,7 +181,7 @@ export const StudentSchedulePage: React.FC = () => {
               return (
                 <div key={dayIdx}>
                   <h3 className={`text-sm font-semibold uppercase tracking-wider mb-2 ${
-                    isToday ? 'text-emerald-400' : 'text-slate-400'
+                    isToday ? 'text-emerald-700 dark:text-emerald-400' : 'text-secondary'
                   }`}>
                     {dayName} {isToday && '(Today)'}
                   </h3>
@@ -189,24 +189,24 @@ export const StudentSchedulePage: React.FC = () => {
                     {items.map((item, i) => (
                       <div
                         key={`${item.schedule_id}-${i}`}
-                        className={`flex items-center gap-4 p-4 bg-slate-800 rounded-lg border ${
-                          isToday ? 'border-emerald-700/50' : 'border-slate-700'
+                        className={`flex items-center gap-4 p-4 bg-sunken rounded-lg border ${
+                          isToday ? 'border-emerald-200 dark:border-emerald-700/50' : 'border-subtle'
                         }`}
                       >
                         <div className="w-20 text-center">
-                          <div className="text-sm font-bold text-white">{item.start_time?.slice(0, 5)}</div>
-                          <div className="text-xs text-slate-500">{item.end_time?.slice(0, 5)}</div>
+                          <div className="text-sm font-bold text-primary">{item.start_time?.slice(0, 5)}</div>
+                          <div className="text-xs text-muted">{item.end_time?.slice(0, 5)}</div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white">{item.course_name}</p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-sm font-medium text-primary">{item.course_name}</p>
+                          <p className="text-xs text-secondary">
                             {item.course_code}
                             {item.section ? ` • Sec ${item.section}` : ''}
                             {item.room_name ? ` • ${item.room_name}` : ''}
                           </p>
                         </div>
                         {item.faculty_name && (
-                          <div className="text-xs text-slate-500 hidden md:block">{item.faculty_name}</div>
+                          <div className="text-xs text-muted hidden md:block">{item.faculty_name}</div>
                         )}
                       </div>
                     ))}

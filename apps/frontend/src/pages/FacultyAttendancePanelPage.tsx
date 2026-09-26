@@ -34,7 +34,7 @@ export const FacultyAttendancePanelPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-card p-6">
       {error && (
         <ErrorAlert
           title="Failed to load courses"
@@ -54,7 +54,7 @@ export const FacultyAttendancePanelPage: React.FC = () => {
         {/* Course Selection */}
         <div className="mt-8 grid gap-4">
           {courses.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-8 text-secondary">
               <p className="text-lg">No courses assigned</p>
               <p className="text-sm">You don't have any active courses for attendance marking</p>
             </div>
@@ -66,7 +66,7 @@ export const FacultyAttendancePanelPage: React.FC = () => {
                 className={`p-6 rounded-lg border-2 transition-all ${
                   selectedCourseId === course.id
                     ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                    : 'border-subtle bg-sunken hover:border-strong'
                 }`}
               >
                 <div className={HIERARCHY.PRIMARY.className}>{course.name}</div>
@@ -78,16 +78,16 @@ export const FacultyAttendancePanelPage: React.FC = () => {
 
         {/* Progress if course selected */}
         {selectedCourseId && courseRoster && (
-          <div className="mt-8 p-6 bg-slate-800 rounded-lg border border-slate-700">
+          <div className="mt-8 p-6 bg-sunken rounded-lg border border-subtle">
             <div className={HIERARCHY.PRIMARY.className}>Progress</div>
             <div className="flex items-center gap-4">
-              <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
+              <div className="flex-1 bg-sunken rounded-full h-2 overflow-hidden">
                 <div 
                   className="h-full bg-blue-500 transition-all duration-300"
                   style={{ width: `${(markedCount / totalCount) * 100}%` }}
                 />
               </div>
-              <span className="text-sm text-slate-400">{markedCount}/{totalCount}</span>
+              <span className="text-sm text-secondary">{markedCount}/{totalCount}</span>
             </div>
           </div>
         )}

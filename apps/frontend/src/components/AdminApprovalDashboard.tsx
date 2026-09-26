@@ -133,9 +133,9 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
       <div className="p-6">
         <div className="text-center">
           <div className="inline-block animate-spin">
-            <Clock className="w-8 h-8 text-primary-400" />
+            <Clock className="w-8 h-8 text-primary-700 dark:text-primary-400" />
           </div>
-          <p className="text-slate-400 mt-4">Loading pending approvals...</p>
+          <p className="text-secondary mt-4">Loading pending approvals...</p>
         </div>
       </div>
     );
@@ -146,15 +146,15 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-white">User Approvals</h1>
-          <p className="text-slate-400 mt-1">
+          <h1 className="text-3xl font-bold text-primary">User Approvals</h1>
+          <p className="text-secondary mt-1">
             {totalPending} pending approval{totalPending !== 1 ? 's' : ''}
           </p>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-300 transition"
+            className="text-secondary hover:text-secondary transition"
           >
             ✕
           </button>
@@ -163,7 +163,7 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+        <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 dark:text-red-300 text-sm">
           {error}
         </div>
       )}
@@ -172,8 +172,8 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
       {approvals.school && approvals.school.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Building2 className="w-5 h-5 text-primary-400" />
-            <h2 className="text-xl font-bold text-white">School Registrations</h2>
+            <Building2 className="w-5 h-5 text-primary-700 dark:text-primary-400" />
+            <h2 className="text-xl font-bold text-primary">School Registrations</h2>
           </div>
           <div className="grid gap-4">
             {approvals.school.map((approval) => (
@@ -204,7 +204,7 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Building2 className="w-5 h-5 text-secondary-400" />
-            <h2 className="text-xl font-bold text-white">Corporate Registrations</h2>
+            <h2 className="text-xl font-bold text-primary">Corporate Registrations</h2>
           </div>
           <div className="grid gap-4">
             {approvals.corporate.map((approval) => (
@@ -232,10 +232,10 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
 
       {/* No Pending Approvals */}
       {totalPending === 0 && (
-        <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700">
-          <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">All caught up!</h3>
-          <p className="text-slate-400">There are no pending approvals at this time.</p>
+        <div className="text-center py-12 bg-sunken rounded-lg border border-subtle">
+          <CheckCircle className="w-12 h-12 text-green-700 dark:text-green-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-primary mb-2">All caught up!</h3>
+          <p className="text-secondary">There are no pending approvals at this time.</p>
         </div>
       )}
     </div>
@@ -268,25 +268,25 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
   const entity = approval.school_entity || approval.corporate_entity;
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+    <div className="bg-sunken border border-subtle rounded-lg p-4">
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-4 flex-1">
           <div className="w-12 h-12 rounded-full bg-primary-500/20 border border-primary-500/50 flex items-center justify-center flex-shrink-0">
-            <User className="w-6 h-6 text-primary-400" />
+            <User className="w-6 h-6 text-primary-700 dark:text-primary-400" />
           </div>
           <div className="flex-1">
-            <h3 className="font-bold text-white">{approval.user.full_name}</h3>
-            <p className="text-sm text-slate-400">{approval.user.email}</p>
+            <h3 className="font-bold text-primary">{approval.user.full_name}</h3>
+            <p className="text-sm text-secondary">{approval.user.email}</p>
             <div className="mt-2 flex items-center gap-4">
-              <span className="inline-block px-3 py-1 bg-blue-500/20 border border-blue-500/50 rounded text-blue-300 text-sm font-medium capitalize">
+              <span className="inline-block px-3 py-1 bg-blue-500/20 border border-blue-500/50 rounded text-blue-700 dark:text-blue-300 text-sm font-medium capitalize">
                 {approval.requested_role}
               </span>
               {entity && (
-                <span className="text-sm text-slate-400">
+                <span className="text-sm text-secondary">
                   {entity.name}
                 </span>
               )}
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted">
                 {new Date(approval.requested_at).toLocaleDateString()}
               </span>
             </div>
@@ -299,7 +299,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
             <button
               onClick={onApprove}
               disabled={isProcessing}
-              className="p-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 hover:bg-green-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-700 dark:text-green-400 hover:bg-green-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Approve"
             >
               <CheckCircle className="w-5 h-5" />
@@ -307,7 +307,7 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
             <button
               onClick={onReject}
               disabled={isProcessing}
-              className="p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 hover:bg-red-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 dark:text-red-400 hover:bg-red-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Reject"
             >
               <XCircle className="w-5 h-5" />
@@ -318,8 +318,8 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
 
       {/* Rejection Modal */}
       {showRejectionModal && (
-        <div className="border-t border-slate-700 pt-4">
-          <p className="text-sm text-slate-300 mb-3">Rejection reason (optional):</p>
+        <div className="border-t border-subtle pt-4">
+          <p className="text-sm text-secondary mb-3">Rejection reason (optional):</p>
           <textarea
             value={rejectionReason}
             onChange={(e) => onRejectionReasonChange(e.target.value)}
@@ -330,14 +330,14 @@ const ApprovalCard: React.FC<ApprovalCardProps> = ({
             <button
               onClick={onRejectionCancel}
               disabled={isProcessing}
-              className="px-4 py-2 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700 transition disabled:opacity-50"
+              className="px-4 py-2 border border-strong rounded-lg text-secondary hover:bg-sunken transition disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={onRejectionSubmit}
               disabled={isProcessing}
-              className="px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 hover:bg-red-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 dark:text-red-400 hover:bg-red-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isProcessing ? 'Processing...' : 'Reject'}
             </button>

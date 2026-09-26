@@ -58,8 +58,8 @@ const SchoolAdminAttendancePage: React.FC = () => {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Attendance Overview</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-primary">Attendance Overview</h1>
+          <p className="text-sm text-secondary mt-1">
             Monitor attendance across all class schedules
           </p>
         </div>
@@ -67,27 +67,27 @@ const SchoolAdminAttendancePage: React.FC = () => {
         {/* Summary Cards */}
         {data.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="text-2xl font-bold text-gray-900">{data.length}</div>
-              <div className="text-sm text-gray-500">Total Schedules</div>
+            <div className="bg-card rounded-lg border border-subtle p-4">
+              <div className="text-2xl font-bold text-primary">{data.length}</div>
+              <div className="text-sm text-muted">Total Schedules</div>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="text-2xl font-bold text-green-600">
+            <div className="bg-card rounded-lg border border-subtle p-4">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-300">
                 {data.reduce((sum, d) => sum + parseInt(d.total_present), 0)}
               </div>
-              <div className="text-sm text-gray-500">Total Present Marks</div>
+              <div className="text-sm text-muted">Total Present Marks</div>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="text-2xl font-bold text-red-600">
+            <div className="bg-card rounded-lg border border-subtle p-4">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-300">
                 {data.reduce((sum, d) => sum + parseInt(d.total_absent), 0)}
               </div>
-              <div className="text-sm text-gray-500">Total Absent Marks</div>
+              <div className="text-sm text-muted">Total Absent Marks</div>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="text-2xl font-bold text-blue-600">
+            <div className="bg-card rounded-lg border border-subtle p-4">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">
                 {data.reduce((sum, d) => sum + parseInt(d.sessions_taken), 0)}
               </div>
-              <div className="text-sm text-gray-500">Sessions Recorded</div>
+              <div className="text-sm text-muted">Sessions Recorded</div>
             </div>
           </div>
         )}
@@ -96,54 +96,54 @@ const SchoolAdminAttendancePage: React.FC = () => {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-gray-500">Loading...</span>
+            <span className="ml-3 text-muted">Loading...</span>
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg border border-gray-200">
-            <p className="text-lg text-gray-500">No attendance data yet</p>
-            <p className="text-sm text-gray-400 mt-1">Attendance will appear here once faculty start marking.</p>
+          <div className="text-center py-16 bg-card rounded-lg border border-subtle">
+            <p className="text-lg text-muted">No attendance data yet</p>
+            <p className="text-sm text-muted mt-1">Attendance will appear here once faculty start marking.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-card rounded-lg border border-subtle overflow-hidden">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-sunken">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Course</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Faculty</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Schedule</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Enrolled</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Sessions</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Rate</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Last Taken</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase">Course</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase">Faculty</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase">Schedule</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted uppercase">Enrolled</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted uppercase">Sessions</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted uppercase">Rate</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted uppercase">Last Taken</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-subtle">
                 {data.map((row, idx) => {
                   const rate = getAttendanceRate(row);
                   return (
-                    <tr key={row.schedule_id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm text-gray-400">{idx + 1}</td>
+                    <tr key={row.schedule_id} className="hover:bg-sunken transition-colors">
+                      <td className="px-4 py-3 text-sm text-muted">{idx + 1}</td>
                       <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-primary">
                           {row.course_name}
                           {row.section ? ` (Sec ${row.section})` : ''}
                         </div>
-                        <div className="text-xs text-gray-400">{row.course_code}</div>
+                        <div className="text-xs text-muted">{row.course_code}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-secondary">
                         {row.faculty_name || '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm text-gray-600">{row.days_of_week || '—'}</div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-sm text-secondary">{row.days_of_week || '—'}</div>
+                        <div className="text-xs text-muted">
                           {row.start_time?.slice(0, 5)}–{row.end_time?.slice(0, 5)}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                      <td className="px-4 py-3 text-center text-sm text-secondary">
                         {row.enrolled_count}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                      <td className="px-4 py-3 text-center text-sm text-secondary">
                         {row.sessions_taken}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -151,19 +151,19 @@ const SchoolAdminAttendancePage: React.FC = () => {
                           <span
                             className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
                               rate >= 80
-                                ? 'bg-green-100 text-green-700'
+                                ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300'
                                 : rate >= 60
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-red-100 text-red-700'
+                                ? 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                : 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300'
                             }`}
                           >
                             {rate}%
                           </span>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-muted">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
+                      <td className="px-4 py-3 text-sm text-muted">
                         {row.last_attendance_date
                           ? new Date(row.last_attendance_date).toLocaleDateString('en-US', {
                               month: 'short',

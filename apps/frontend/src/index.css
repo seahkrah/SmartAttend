@@ -95,6 +95,10 @@
   .border-strong {
     border-color: rgb(var(--border-strong));
   }
+  /* Row dividers (the theme-aware form of divide-slate-*). */
+  .divide-subtle > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgb(var(--border-subtle));
+  }
   .text-primary {
     color: rgb(var(--text-primary));
   }

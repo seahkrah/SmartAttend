@@ -23,7 +23,7 @@ export const AdminTenantPanelPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-card p-6">
       {error && (
         <ErrorAlert
           title="Failed to load approvals"

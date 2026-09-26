@@ -76,8 +76,8 @@ export const LoginPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <JjeloTechLogo size="lg" tagline className="justify-center text-white" />
-          <p className="text-slate-400 mt-4">Sign in to your school or organisation</p>
+          <JjeloTechLogo size="lg" tagline className="justify-center text-primary" />
+          <p className="text-secondary mt-4">Sign in to your school or organisation</p>
         </div>
 
         {/* Form Card */}
@@ -85,11 +85,11 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Platform Selection */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-secondary mb-2">
                 Sign in to
               </label>
               <div className="flex gap-3">
-                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'school' ? '#5d7fff' : undefined }}>
+                <label className="flex-1 flex items-center gap-2 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-sunken transition" style={{ borderColor: platform === 'school' ? '#5d7fff' : undefined }}>
                   <input
                     type="radio"
                     value="school"
@@ -97,9 +97,9 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">School <span className="block text-slate-500 text-xs">SMS</span></span>
+                  <span className="text-secondary">School <span className="block text-muted text-xs">SMS</span></span>
                 </label>
-                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'corporate' ? '#5d7fff' : undefined }}>
+                <label className="flex-1 flex items-center gap-2 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-sunken transition" style={{ borderColor: platform === 'corporate' ? '#5d7fff' : undefined }}>
                   <input
                     type="radio"
                     value="corporate"
@@ -107,14 +107,14 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">Employer <span className="block text-slate-500 text-xs">EMS</span></span>
+                  <span className="text-secondary">Employer <span className="block text-muted text-xs">EMS</span></span>
                 </label>
               </div>
             </div>
 
             {/* Email Input */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-secondary mb-2">
                 <Mail className="inline w-4 h-4 mr-2" />
                 Email Address
               </label>
@@ -141,7 +141,7 @@ export const LoginPage: React.FC = () => {
 
             {/* Error Message */}
             {error && !platformMismatch && (
-              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 dark:text-red-300 text-sm">
                 {error}
               </div>
             )}
@@ -149,10 +149,10 @@ export const LoginPage: React.FC = () => {
             {/* Platform Mismatch Warning */}
             {platformMismatch && (
               <div className="p-4 bg-amber-500/15 border border-amber-500/50 rounded-lg">
-                <p className="text-amber-300 text-sm font-medium mb-2">
+                <p className="text-amber-700 dark:text-amber-300 text-sm font-medium mb-2">
                   ⚠️ Wrong platform selected
                 </p>
-                <p className="text-amber-200/80 text-sm mb-3">
+                <p className="text-amber-700 dark:text-amber-200/80 text-sm mb-3">
                   Your account is registered under the <strong className="text-amber-100">{platformMismatch === 'school' ? 'School' : 'Employer'}</strong> platform. Please switch to continue.
                 </p>
                 <button
@@ -162,7 +162,7 @@ export const LoginPage: React.FC = () => {
                     setPlatformMismatch(null);
                     clearError();
                   }}
-                  className="w-full py-2 px-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-200 text-sm font-medium transition-colors"
+                  className="w-full py-2 px-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-700 dark:text-amber-200 text-sm font-medium transition-colors"
                 >
                   Switch to {platformMismatch === 'school' ? 'School' : 'Employer'} and retry
                 </button>
@@ -170,7 +170,7 @@ export const LoginPage: React.FC = () => {
             )}
 
             <div className="flex justify-end text-sm">
-              <Link to={`/forgot-password?platform=${platform}`} className="text-primary-400 hover:text-primary-300 font-medium">
+              <Link to={`/forgot-password?platform=${platform}`} className="text-primary-700 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
                 Forgot password?
               </Link>
             </div>
@@ -188,11 +188,11 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Sign Up Link */}
-        <div className="text-center text-slate-400 text-sm space-y-1">
+        <div className="text-center text-secondary text-sm space-y-1">
           <p>No account? Your school or employer sends you an invitation.</p>
           <p>
             New organisation?{' '}
-            <a href="/register" className="text-primary-400 hover:text-primary-300 font-semibold">
+            <a href="/register" className="text-primary-700 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold">
               Request access
             </a>
           </p>

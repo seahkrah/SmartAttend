@@ -89,17 +89,17 @@ export const ChangePasswordPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <JjeloTechLogo className="justify-center mb-4 text-white" size="lg" />
+          <JjeloTechLogo className="justify-center mb-4 text-primary" size="lg" />
         </div>
 
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10">
           <div className="flex items-center gap-3 mb-2">
-            <Shield className="w-6 h-6 text-amber-400" />
-            <h2 className="text-xl font-bold text-white">
+            <Shield className="w-6 h-6 text-amber-700 dark:text-amber-400" />
+            <h2 className="text-xl font-bold text-primary">
               {user?.mustResetPassword ? 'Choose a new password' : 'Change password'}
             </h2>
           </div>
-          <p className="text-sm text-slate-300 mb-6">
+          <p className="text-sm text-secondary mb-6">
             {user?.mustResetPassword
               ? 'Your administrator has asked you to choose a new password before continuing.'
               : 'Other devices signed in to your account will be signed out.'}
@@ -109,7 +109,7 @@ export const ChangePasswordPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-200 mb-1">
+              <label className="block text-sm font-medium text-primary mb-1">
                 Current Password
               </label>
               <PasswordInput
@@ -122,7 +122,7 @@ export const ChangePasswordPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-200 mb-1">
+              <label className="block text-sm font-medium text-primary mb-1">
                 New Password
               </label>
               <PasswordInput
@@ -135,7 +135,7 @@ export const ChangePasswordPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-200 mb-1">
+              <label className="block text-sm font-medium text-primary mb-1">
                 Confirm New Password
               </label>
               <PasswordInput

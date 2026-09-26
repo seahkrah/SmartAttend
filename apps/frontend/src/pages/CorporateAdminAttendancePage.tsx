@@ -105,34 +105,34 @@ const CorporateAdminAttendancePage: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Attendance</h1>
-            <p className="text-slate-400 mt-1">Daily attendance tracking and overview</p>
+            <h1 className="text-2xl font-bold text-primary">Attendance</h1>
+            <p className="text-secondary mt-1">Daily attendance tracking and overview</p>
           </div>
         </div>
 
         {/* Date & Filters */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+          <div className="flex items-center gap-1 bg-sunken border border-subtle rounded-lg overflow-hidden">
             <button onClick={() => navigateDate(-1)}
-              className="p-2 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+              className="p-2 hover:bg-sunken text-secondary hover:text-primary transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-              className="px-2 py-2 bg-transparent text-white text-sm focus:outline-none"
+              className="px-2 py-2 bg-transparent text-primary text-sm focus:outline-none"
             />
             <button onClick={() => navigateDate(1)} disabled={isToday}
-              className="p-2 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors disabled:opacity-30">
+              className="p-2 hover:bg-sunken text-secondary hover:text-primary transition-colors disabled:opacity-30">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
           {!isToday && (
             <button onClick={() => setDate(new Date().toISOString().split('T')[0])}
-              className="px-3 py-2 text-sm text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 rounded-lg hover:bg-indigo-500/10 transition-colors">
+              className="px-3 py-2 text-sm text-indigo-700 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 border border-indigo-500/30 rounded-lg hover:bg-indigo-500/10 transition-colors">
               Today
             </button>
           )}
           <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500">
+            className="px-3 py-2 bg-sunken border border-subtle rounded-lg text-primary text-sm focus:ring-2 focus:ring-indigo-500">
             <option value="">All Departments</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
@@ -142,40 +142,40 @@ const CorporateAdminAttendancePage: React.FC = () => {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="flex items-center gap-4 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-4 p-4 bg-sunken border border-subtle rounded-xl">
             <div className="p-3 bg-indigo-500/20 rounded-lg">
-              <Users className="w-5 h-5 text-indigo-400" />
+              <Users className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{summary.total}</p>
-              <p className="text-xs text-slate-400">Total Employees</p>
+              <p className="text-2xl font-bold text-primary">{summary.total}</p>
+              <p className="text-xs text-secondary">Total Employees</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-4 p-4 bg-sunken border border-subtle rounded-xl">
             <div className="p-3 bg-teal-500/20 rounded-lg">
-              <CheckCircle2 className="w-5 h-5 text-teal-400" />
+              <CheckCircle2 className="w-5 h-5 text-teal-700 dark:text-teal-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{summary.present}</p>
-              <p className="text-xs text-slate-400">Present</p>
+              <p className="text-2xl font-bold text-primary">{summary.present}</p>
+              <p className="text-xs text-secondary">Present</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-4 p-4 bg-sunken border border-subtle rounded-xl">
             <div className="p-3 bg-red-500/20 rounded-lg">
-              <XCircle className="w-5 h-5 text-red-400" />
+              <XCircle className="w-5 h-5 text-red-700 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{summary.absent}</p>
-              <p className="text-xs text-slate-400">Absent</p>
+              <p className="text-2xl font-bold text-primary">{summary.absent}</p>
+              <p className="text-xs text-secondary">Absent</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-4 p-4 bg-sunken border border-subtle rounded-xl">
             <div className="p-3 bg-violet-500/20 rounded-lg">
-              <ClipboardCheck className="w-5 h-5 text-violet-400" />
+              <ClipboardCheck className="w-5 h-5 text-violet-700 dark:text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{summary.rate}%</p>
-              <p className="text-xs text-slate-400">Attendance Rate</p>
+              <p className="text-2xl font-bold text-primary">{summary.rate}%</p>
+              <p className="text-xs text-secondary">Attendance Rate</p>
             </div>
           </div>
         </div>
@@ -186,76 +186,76 @@ const CorporateAdminAttendancePage: React.FC = () => {
             <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
           </div>
         ) : records.length === 0 ? (
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-12 text-center">
-            <ClipboardCheck className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 text-lg">No attendance records</p>
-            <p className="text-sm text-slate-500 mt-1">
+          <div className="bg-card border border-subtle rounded-xl p-12 text-center">
+            <ClipboardCheck className="w-16 h-16 text-muted mx-auto mb-4" />
+            <p className="text-secondary text-lg">No attendance records</p>
+            <p className="text-sm text-muted mt-1">
               {isToday ? 'No check-ins recorded for today yet' : `No records for ${new Date(date).toLocaleDateString()}`}
             </p>
           </div>
         ) : (
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="bg-card border border-subtle rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-700">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Employee</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Department</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Check In</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Check Out</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Duration</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Type</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-slate-400">Verified</th>
+                  <tr className="border-b border-subtle">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Employee</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Department</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Check In</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Check Out</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Duration</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Type</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Verified</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map((r) => (
-                    <tr key={`${r.employee_id}-${r.checkin_id ?? 'none'}`} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+                    <tr key={`${r.employee_id}-${r.checkin_id ?? 'none'}`} className="border-b border-subtle hover:bg-sunken transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                            <span className="text-indigo-400 text-xs font-medium">
+                            <span className="text-indigo-700 dark:text-indigo-400 text-xs font-medium">
                               {r.first_name[0]}{r.last_name[0]}
                             </span>
                           </div>
                           <div>
-                            <p className="text-white text-sm">{r.first_name} {r.last_name}</p>
-                            <p className="text-xs text-slate-500">{r.emp_code}</p>
+                            <p className="text-primary text-sm">{r.first_name} {r.last_name}</p>
+                            <p className="text-xs text-muted">{r.emp_code}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-slate-300">
+                      <td className="py-3 px-4 text-sm text-secondary">
                         {r.department_name || '—'}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-teal-400" />
-                          <span className="text-sm text-white">{formatTime(r.check_in_time)}</span>
+                          <Clock className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+                          <span className="text-sm text-primary">{formatTime(r.check_in_time)}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4">
                         {r.check_out_time ? (
                           <div className="flex items-center gap-1.5">
-                            <LogOut className="w-3.5 h-3.5 text-orange-400" />
-                            <span className="text-sm text-white">{formatTime(r.check_out_time)}</span>
+                            <LogOut className="w-3.5 h-3.5 text-orange-700 dark:text-orange-400" />
+                            <span className="text-sm text-primary">{formatTime(r.check_out_time)}</span>
                           </div>
                         ) : (
-                          <span className="text-sm text-slate-500 italic">Still in</span>
+                          <span className="text-sm text-muted italic">Still in</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-sm text-slate-300">
+                      <td className="py-3 px-4 text-sm text-secondary">
                         {getDuration(r.check_in_time, r.check_out_time)}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300 capitalize">
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-sunken text-secondary capitalize">
                           {r.check_in_type}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         {r.face_verified ? (
-                          <CheckCircle2 className="w-4 h-4 text-teal-400" />
+                          <CheckCircle2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
                         ) : (
-                          <XCircle className="w-4 h-4 text-slate-500" />
+                          <XCircle className="w-4 h-4 text-muted" />
                         )}
                       </td>
                     </tr>

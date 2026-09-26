@@ -193,7 +193,7 @@ const SchoolAdminGuardiansPage: React.FC = () => {
 
       {notice && (
         <p role={notice.tone === 'error' ? 'alert' : 'status'}
-          className={`text-sm ${notice.tone === 'error' ? 'text-danger-600' : 'text-success-600'}`}>
+          className={`text-sm ${notice.tone === 'error' ? 'text-danger-600 dark:text-danger-400' : 'text-success-600 dark:text-success-300'}`}>
           {notice.text}
         </p>
       )}
@@ -339,7 +339,7 @@ const GuardianForm: React.FC<{
       <h2 id="guardian-form" className="font-semibold text-primary">
         {editing === 'new' ? 'Add guardian' : `Edit ${editing.first_name} ${editing.last_name}`}
       </h2>
-      {error && <p role="alert" className="text-sm text-danger-600">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-600 dark:text-danger-400">{error}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="block text-sm text-secondary">First name
           <input className="input-field w-full mt-1" required maxLength={100} value={form.firstName}
@@ -455,7 +455,7 @@ const ManageGuardian: React.FC<{
           <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><X className="w-4 h-4" /></button>
         </div>
 
-        {error && <p role="alert" className="text-sm text-danger-600">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-600 dark:text-danger-400">{error}</p>}
 
         <section className="rounded-lg border border-subtle p-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">

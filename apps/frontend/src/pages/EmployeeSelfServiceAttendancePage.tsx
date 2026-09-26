@@ -37,10 +37,10 @@ import {
  */
 
 const STATE_STYLE: Record<string, string> = {
-  VERIFIED: 'bg-success-600/20 text-success-300',
-  MANUAL_OVERRIDE: 'bg-brand-500/20 text-brand-300',
-  FLAGGED: 'bg-amber-500/20 text-amber-300',
-  REVOKED: 'bg-rose-600/20 text-rose-300',
+  VERIFIED: 'bg-success-600/20 text-success-700 dark:text-success-300',
+  MANUAL_OVERRIDE: 'bg-brand-500/20 text-brand-700 dark:text-brand-300',
+  FLAGGED: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+  REVOKED: 'bg-rose-600/20 text-rose-700 dark:text-rose-300',
 };
 
 function timeOf(iso: string | null): string {
@@ -156,8 +156,8 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
 
   if (loading) return <LoadingOverlay message="Loading your attendance…" />;
 
-  const card = 'rounded-xl border border-slate-800 bg-slate-900/60';
-  const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600';
+  const card = 'rounded-xl border border-subtle bg-card';
+  const field = 'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
 
   if (!error && data && !data.employee) {
     return (
@@ -181,8 +181,8 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Check in</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-primary">Check in</h1>
+        <p className="mt-1 text-sm text-secondary">
           Start and end your working day. These are the hours your timesheet is built from.
         </p>
       </div>
@@ -194,14 +194,14 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
           {open ? (
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 text-sm font-medium text-success-300">
+                <div className="flex items-center gap-2 text-sm font-medium text-success-700 dark:text-success-300">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-success-400" />
                   On the clock
                 </div>
-                <div className="mt-2 text-3xl font-semibold text-slate-100">
+                <div className="mt-2 text-3xl font-semibold text-primary">
                   {elapsedSince(open.checkInTime, now)}
                 </div>
-                <div className="mt-1 text-sm text-slate-400">
+                <div className="mt-1 text-sm text-secondary">
                   since {timeOf(open.checkInTime)}
                   {' · '}{open.checkInType === 'field' ? 'in the field' : 'at the office'}
                   {open.siteLocation && ` · ${open.siteLocation}`}
@@ -217,13 +217,13 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-400">
-                <span className="h-2 w-2 rounded-full bg-slate-600" />
+              <div className="flex items-center gap-2 text-sm font-medium text-secondary">
+                <span className="h-2 w-2 rounded-full bg-raised" />
                 Not checked in
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="mb-1 block text-xs uppercase tracking-wider text-slate-500">Where</label>
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-muted">Where</label>
                   <div className="flex gap-2">
                     {(['office', 'field'] as CheckInType[]).map((t) => (
                       <button
@@ -231,8 +231,8 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                         onClick={() => setCheckInType(t)}
                         className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${
                           checkInType === t
-                            ? 'border-brand-500 bg-brand-600/20 text-brand-200'
-                            : 'border-slate-700 text-slate-400 hover:bg-slate-800'
+                            ? 'border-brand-500 bg-brand-600/20 text-brand-700 dark:text-brand-200'
+                            : 'border-subtle text-secondary hover:bg-sunken'
                         }`}
                       >
                         {t === 'office' ? 'Office' : 'Field'}
@@ -241,7 +241,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-xs uppercase tracking-wider text-slate-500">
+                  <label className="mb-1 block text-xs uppercase tracking-wider text-muted">
                     Site (optional)
                   </label>
                   <input className={field} placeholder="e.g. Depot 4" value={site} maxLength={255}
@@ -260,7 +260,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                   <button
                     onClick={() => setFaceOpen(true)}
                     disabled={busy}
-                    className="inline-flex items-center gap-2 rounded-xl border border-brand-500 px-6 py-3 text-base font-semibold text-brand-200 hover:bg-brand-600/20 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-brand-500 px-6 py-3 text-base font-semibold text-brand-700 dark:text-brand-200 hover:bg-brand-600/20 disabled:opacity-50"
                   >
                     <ScanFace className="h-5 w-5" /> Check in with face
                   </button>
@@ -268,7 +268,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
               </div>
             </div>
           )}
-          <p className="mt-5 flex items-start gap-2 text-xs text-slate-500">
+          <p className="mt-5 flex items-start gap-2 text-xs text-muted">
             <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             The time is taken from the server, not this device. A check-in is recorded as
             face-matched only when it follows a face match made on the server moments before.
@@ -276,19 +276,19 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
         </div>
 
         <div className={`${card} p-6`}>
-          <div className="text-xs uppercase tracking-wider text-slate-500">This week</div>
-          <div className="mt-2 text-3xl font-semibold text-slate-100">
+          <div className="text-xs uppercase tracking-wider text-muted">This week</div>
+          <div className="mt-2 text-3xl font-semibold text-primary">
             {formatHours(week?.verifiedHours ?? '0')} h
           </div>
-          <div className="mt-1 text-sm text-slate-400">
+          <div className="mt-1 text-sm text-secondary">
             counted since {week?.from ?? '—'}
           </div>
           {week && Number(week.flaggedHours) > 0 && (
-            <div className="mt-3 text-xs text-amber-300">
+            <div className="mt-3 text-xs text-amber-700 dark:text-amber-300">
               {formatHours(week.flaggedHours)} h more are flagged for review and not counted yet.
             </div>
           )}
-          <div className="mt-3 text-xs text-slate-500">
+          <div className="mt-3 text-xs text-muted">
             Only completed check-ins count — a shift still in progress is added when you check out.
           </div>
         </div>
@@ -296,15 +296,15 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
 
       {stale.length > 0 && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
             <AlertTriangle className="h-4 w-4" />
             {stale.length} check-in{stale.length === 1 ? ' was' : 's were'} never checked out
           </div>
-          <p className="mt-1 text-sm text-amber-200/80">
+          <p className="mt-1 text-sm text-amber-700 dark:text-amber-200/80">
             A check-in left open for more than a day is not closed automatically, because that
             would record a shift of days. It counts for nothing until HR corrects it.
           </p>
-          <ul className="mt-2 space-y-1 text-sm text-amber-200/80">
+          <ul className="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-200/80">
             {stale.map((c) => (
               <li key={c.id}>{dayOf(c.checkInTime)} from {timeOf(c.checkInTime)}</li>
             ))}
@@ -313,7 +313,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
       )}
 
       <div className={card}>
-        <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+        <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
           The last 30 days
         </div>
         {history.length === 0 ? (
@@ -327,8 +327,8 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-                <tr className="border-b border-slate-800">
+              <thead className="text-left text-xs uppercase tracking-wider text-muted">
+                <tr className="border-b border-subtle">
                   <th className="px-5 py-3">Day</th>
                   <th className="px-5 py-3">In</th>
                   <th className="px-5 py-3">Out</th>
@@ -337,20 +337,20 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                   <th className="px-5 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-subtle">
                 {history.map((c) => (
-                  <tr key={c.id} className="text-slate-300">
+                  <tr key={c.id} className="text-secondary">
                     <td className="px-5 py-2.5">{dayOf(c.checkInTime)}</td>
                     <td className="px-5 py-2.5">{timeOf(c.checkInTime)}</td>
                     <td className="px-5 py-2.5">
                       {c.checkOutTime ? timeOf(c.checkOutTime) : (
-                        <span className="text-slate-500">open</span>
+                        <span className="text-muted">open</span>
                       )}
                     </td>
-                    <td className="px-5 py-2.5 text-right text-slate-100">
+                    <td className="px-5 py-2.5 text-right text-primary">
                       {c.hours === null ? '—' : formatHours(c.hours)}
                     </td>
-                    <td className="px-5 py-2.5 text-xs text-slate-500">
+                    <td className="px-5 py-2.5 text-xs text-muted">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
                         {c.checkInType === 'field' ? 'Field' : 'Office'}
@@ -362,7 +362,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                         {CHECKIN_STATE_LABEL[c.state] ?? c.state}
                       </span>
                       {c.faceVerified && (
-                        <span className="ml-2 text-xs text-slate-500">face matched</span>
+                        <span className="ml-2 text-xs text-muted">face matched</span>
                       )}
                     </td>
                   </tr>
@@ -374,8 +374,8 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
 
         {face?.enabled && data?.employee && (
           <div className={`${card} p-6 space-y-2`}>
-            <div className="text-xs uppercase tracking-wider text-slate-500">Face check-in</div>
-            <p className="text-sm text-slate-300">
+            <div className="text-xs uppercase tracking-wider text-muted">Face check-in</div>
+            <p className="text-sm text-secondary">
               {face.enrolled
                 ? 'You can check in with your face. The photos are compared on the server and not kept.'
                 : face.consent
@@ -383,7 +383,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                   : 'Face check-in is optional. If you agree, HR enrols your face in person; you can withdraw at any time, which deletes it.'}
             </p>
             <button
-              className="text-sm text-brand-300 hover:underline disabled:opacity-50"
+              className="text-sm text-brand-700 dark:text-brand-300 hover:underline disabled:opacity-50"
               disabled={busy}
               onClick={async () => {
                 const id = data.employee!.id;

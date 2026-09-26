@@ -88,14 +88,14 @@ const FacultyCoursesPage: React.FC = () => {
   }
 
   const rateColor = (pct: number) =>
-    pct >= 75 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400'
+    pct >= 75 ? 'text-emerald-700 dark:text-emerald-400' : pct >= 50 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400'
 
   if (loading) {
     return (
       <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-3 text-slate-400">Loading courses...</span>
+          <span className="ml-3 text-secondary">Loading courses...</span>
         </div>
       </>
     )
@@ -106,9 +106,9 @@ const FacultyCoursesPage: React.FC = () => {
       <div className="space-y-4">
         {courses.length === 0 ? (
           <div className="text-center py-20">
-            <BookOpen className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-            <p className="text-slate-400 text-lg">No courses assigned</p>
-            <p className="text-slate-500 text-sm mt-1">
+            <BookOpen className="w-12 h-12 mx-auto mb-3 text-muted" />
+            <p className="text-secondary text-lg">No courses assigned</p>
+            <p className="text-muted text-sm mt-1">
               Contact your administrator to assign class schedules.
             </p>
           </div>
@@ -121,19 +121,19 @@ const FacultyCoursesPage: React.FC = () => {
             return (
               <div
                 key={course.id}
-                className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden"
+                className="rounded-xl border border-subtle bg-sunken overflow-hidden"
               >
                 <button
                   onClick={() => toggleCourse(course.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-800/80 transition-colors"
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-sunken transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
                       <BookOpen className="w-5 h-5 text-white" />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-white font-semibold">{course.code}</h3>
-                      <p className="text-sm text-slate-400">{course.name}</p>
+                      <h3 className="text-primary font-semibold">{course.code}</h3>
+                      <p className="text-sm text-secondary">{course.name}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -142,17 +142,17 @@ const FacultyCoursesPage: React.FC = () => {
                         {avg}% avg
                       </span>
                     )}
-                    <span className="text-xs text-slate-500">{course.credits} cr</span>
+                    <span className="text-xs text-muted">{course.credits} cr</span>
                     {isOpen ? (
-                      <ChevronUp className="w-5 h-5 text-slate-500" />
+                      <ChevronUp className="w-5 h-5 text-muted" />
                     ) : (
-                      <ChevronDown className="w-5 h-5 text-slate-500" />
+                      <ChevronDown className="w-5 h-5 text-muted" />
                     )}
                   </div>
                 </button>
 
                 {isOpen && (
-                  <div className="border-t border-slate-700 px-6 py-4">
+                  <div className="border-t border-subtle px-6 py-4">
                     {loadingSummary === course.id ? (
                       <div className="flex items-center justify-center py-8">
                         <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -161,37 +161,37 @@ const FacultyCoursesPage: React.FC = () => {
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-700">
+                            <tr className="text-xs text-muted uppercase tracking-wider border-b border-subtle">
                               <th className="text-left py-2 px-2">Student</th>
                               <th className="text-center py-2 px-2">
-                                <CheckCircle className="w-4 h-4 inline text-emerald-400" /> Present
+                                <CheckCircle className="w-4 h-4 inline text-emerald-700 dark:text-emerald-400" /> Present
                               </th>
                               <th className="text-center py-2 px-2">
-                                <XCircle className="w-4 h-4 inline text-red-400" /> Absent
+                                <XCircle className="w-4 h-4 inline text-red-700 dark:text-red-400" /> Absent
                               </th>
                               <th className="text-center py-2 px-2">
-                                <Clock className="w-4 h-4 inline text-amber-400" /> Late
+                                <Clock className="w-4 h-4 inline text-amber-700 dark:text-amber-400" /> Late
                               </th>
                               <th className="text-center py-2 px-2">
-                                <AlertCircle className="w-4 h-4 inline text-blue-400" /> Excused
+                                <AlertCircle className="w-4 h-4 inline text-blue-700 dark:text-blue-400" /> Excused
                               </th>
                               <th className="text-center py-2 px-2">Rate</th>
                             </tr>
                           </thead>
                           <tbody>
                             {summary.map((s) => (
-                              <tr key={s.student_id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                                <td className="py-2.5 px-2 text-white">{s.student_name}</td>
-                                <td className="py-2.5 px-2 text-center text-emerald-400 font-medium">
+                              <tr key={s.student_id} className="border-b border-subtle hover:bg-sunken">
+                                <td className="py-2.5 px-2 text-primary">{s.student_name}</td>
+                                <td className="py-2.5 px-2 text-center text-emerald-700 dark:text-emerald-400 font-medium">
                                   {s.present}
                                 </td>
-                                <td className="py-2.5 px-2 text-center text-red-400 font-medium">
+                                <td className="py-2.5 px-2 text-center text-red-700 dark:text-red-400 font-medium">
                                   {s.absent}
                                 </td>
-                                <td className="py-2.5 px-2 text-center text-amber-400 font-medium">
+                                <td className="py-2.5 px-2 text-center text-amber-700 dark:text-amber-400 font-medium">
                                   {s.late}
                                 </td>
-                                <td className="py-2.5 px-2 text-center text-blue-400 font-medium">
+                                <td className="py-2.5 px-2 text-center text-blue-700 dark:text-blue-400 font-medium">
                                   {s.excused}
                                 </td>
                                 <td className={`py-2.5 px-2 text-center font-bold ${rateColor(s.attendance_percent)}`}>
@@ -203,7 +203,7 @@ const FacultyCoursesPage: React.FC = () => {
                         </table>
                       </div>
                     ) : (
-                      <p className="text-center text-slate-500 py-6 text-sm">
+                      <p className="text-center text-muted py-6 text-sm">
                         No attendance records yet for this course.
                       </p>
                     )}

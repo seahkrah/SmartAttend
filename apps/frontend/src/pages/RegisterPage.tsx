@@ -52,11 +52,11 @@ const Field: React.FC<{ id: string; label: string; required?: boolean; hint?: st
   id, label, required, hint, children,
 }) => (
   <div>
-    <label htmlFor={id} className="block text-sm font-medium text-slate-200">
-      {label} {required ? <span className="text-accent-300" aria-hidden>*</span> : <span className="text-slate-500 font-normal">(optional)</span>}
+    <label htmlFor={id} className="block text-sm font-medium text-primary">
+      {label} {required ? <span className="text-accent-700 dark:text-accent-300" aria-hidden>*</span> : <span className="text-muted font-normal">(optional)</span>}
     </label>
     <div className="mt-1.5">{children}</div>
-    {hint && <p id={`${id}-hint`} className="text-xs text-slate-500 mt-1">{hint}</p>}
+    {hint && <p id={`${id}-hint`} className="text-xs text-muted mt-1">{hint}</p>}
   </div>
 );
 
@@ -99,19 +99,19 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
-  const input = 'w-full rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-slate-100 placeholder:text-slate-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30';
+  const input = 'w-full rounded-lg border border-subtle bg-card px-3 py-2.5 text-primary placeholder:text-muted focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30';
 
   return (
-    <div className="min-h-screen bg-[#070a14] text-white px-4 py-10">
+    <div className="min-h-screen bg-[#070a14] text-primary px-4 py-10">
       <div className="mx-auto w-full max-w-2xl">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-secondary hover:text-primary">
           <ArrowLeft className="w-4 h-4" aria-hidden /> Back
         </Link>
 
         <div className="text-center mt-6 mb-8">
-          <JjeloTechLogo size="lg" className="justify-center text-white" />
+          <JjeloTechLogo size="lg" className="justify-center text-primary" />
           <h1 className="text-2xl sm:text-3xl font-bold mt-6">Request access</h1>
-          <p className="text-slate-400 mt-2 max-w-lg mx-auto">
+          <p className="text-secondary mt-2 max-w-lg mx-auto">
             Tell us about your school or organisation and how to reach you. We will get in touch to discuss
             your needs and set up your workspace.
           </p>
@@ -119,39 +119,39 @@ export const RegisterPage: React.FC = () => {
 
         {done ? (
           <div role="status" className="rounded-2xl border border-success-500/30 bg-success-500/10 p-8 text-center">
-            <CheckCircle2 className="w-10 h-10 text-success-400 mx-auto" aria-hidden />
+            <CheckCircle2 className="w-10 h-10 text-success-700 dark:text-success-400 mx-auto" aria-hidden />
             <h2 className="text-xl font-semibold mt-4">Thank you — we have your request</h2>
-            <p className="text-slate-300 mt-2">
+            <p className="text-secondary mt-2">
               We will contact you by {form.preferredContact === 'email' ? `email at ${form.email}` : `${form.preferredContact === 'whatsapp' ? 'WhatsApp' : 'phone'} on ${form.phone}`}.
             </p>
-            {done.reference && <p className="text-sm text-slate-400 mt-3">Your reference: <span className="font-mono text-slate-200">{done.reference}</span></p>}
+            {done.reference && <p className="text-sm text-secondary mt-3">Your reference: <span className="font-mono text-primary">{done.reference}</span></p>}
             <Link to="/" className="btn-primary inline-flex mt-6">Back to the home page</Link>
           </div>
         ) : (
           <form onSubmit={submit} noValidate={false} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-8 space-y-8" aria-describedby={error ? 'form-error' : undefined}>
             {error && (
-              <p id="form-error" role="alert" className="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-200">
+              <p id="form-error" role="alert" className="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-700 dark:text-danger-400">
                 {error}
               </p>
             )}
 
             <fieldset className="space-y-4">
-              <legend className="text-xs font-semibold uppercase tracking-widest text-accent-300 mb-1">Your organisation</legend>
+              <legend className="text-xs font-semibold uppercase tracking-widest text-accent-700 dark:text-accent-300 mb-1">Your organisation</legend>
               <Field id="org" label="Organisation name" required>
                 <input id="org" className={input} required maxLength={200} autoComplete="organization"
                   value={form.organisationName} onChange={(e) => set('organisationName', e.target.value)} />
               </Field>
               <div>
-                <span className="block text-sm font-medium text-slate-200" id="type-label">
-                  What do you need? <span className="text-accent-300" aria-hidden>*</span>
+                <span className="block text-sm font-medium text-primary" id="type-label">
+                  What do you need? <span className="text-accent-700 dark:text-accent-300" aria-hidden>*</span>
                 </span>
                 <div role="radiogroup" aria-labelledby="type-label" className="mt-1.5 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {([['school', 'School system', 'SMS'], ['employer', 'Employee system', 'EMS'], ['both', 'Both', 'SMS + EMS']] as const).map(([v, label, sub]) => (
-                    <label key={v} className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-colors ${form.organisationType === v ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700 hover:border-slate-500'}`}>
+                    <label key={v} className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-colors ${form.organisationType === v ? 'border-brand-500 bg-brand-500/10' : 'border-subtle hover:border-strong'}`}>
                       <input type="radio" name="organisationType" value={v} required className="sr-only"
                         checked={form.organisationType === v} onChange={() => set('organisationType', v)} />
                       <span className="block text-sm font-medium">{label}</span>
-                      <span className="block text-xs text-slate-500">{sub}</span>
+                      <span className="block text-xs text-muted">{sub}</span>
                     </label>
                   ))}
                 </div>
@@ -174,7 +174,7 @@ export const RegisterPage: React.FC = () => {
             </fieldset>
 
             <fieldset className="space-y-4">
-              <legend className="text-xs font-semibold uppercase tracking-widest text-accent-300 mb-1">How to reach you</legend>
+              <legend className="text-xs font-semibold uppercase tracking-widest text-accent-700 dark:text-accent-300 mb-1">How to reach you</legend>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field id="name" label="Your full name" required>
                   <input id="name" className={input} required maxLength={150} autoComplete="name"
@@ -219,18 +219,18 @@ export const RegisterPage: React.FC = () => {
                 onChange={(e) => set('website', e.target.value)} />
             </div>
 
-            <label className="flex items-start gap-3 text-sm text-slate-300">
-              <input type="checkbox" required className="mt-1 h-4 w-4 flex-shrink-0 rounded border-slate-600"
+            <label className="flex items-start gap-3 text-sm text-secondary">
+              <input type="checkbox" required className="mt-1 h-4 w-4 flex-shrink-0 rounded border-strong"
                 checked={form.consent} onChange={(e) => set('consent', e.target.checked)} />
               <span>
                 I agree that JJELOTECH SYSTEMS may use these details to contact me about this request. They are
-                used for nothing else and are not shared. <span className="text-accent-300" aria-hidden>*</span>
+                used for nothing else and are not shared. <span className="text-accent-700 dark:text-accent-300" aria-hidden>*</span>
               </span>
             </label>
 
             <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4">
-              <p className="text-sm text-slate-400">
-                Already have an account? <Link to="/login" className="text-brand-300 hover:text-brand-200">Sign in</Link>
+              <p className="text-sm text-secondary">
+                Already have an account? <Link to="/login" className="text-brand-700 dark:text-brand-300 hover:text-brand-700 dark:hover:text-brand-200">Sign in</Link>
               </p>
               <button type="submit" disabled={submitting} className="btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-60">
                 <Send className="w-4 h-4" aria-hidden /> {submitting ? 'Sending…' : 'Send request'}
@@ -239,7 +239,7 @@ export const RegisterPage: React.FC = () => {
           </form>
         )}
 
-        <p className="text-center text-xs text-slate-500 mt-6">
+        <p className="text-center text-xs text-muted mt-6">
           Students, staff and parents: your school or employer creates your account and sends you an invitation.
         </p>
       </div>

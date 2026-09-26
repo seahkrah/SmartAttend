@@ -209,9 +209,9 @@ const SchoolAdminUsersPage: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      suspended: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      disabled: 'bg-red-500/20 text-red-400 border-red-500/30',
+      active: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+      suspended: 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30',
+      disabled: 'bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30',
     }
     return styles[status as keyof typeof styles] || styles.active
   }
@@ -252,7 +252,7 @@ const SchoolAdminUsersPage: React.FC = () => {
       {/* Confirm Dialog */}
       {confirmDialog?.open && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-sunken border border-subtle rounded-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center gap-3 mb-4">
               <div
                 className={`p-2 rounded-lg ${
@@ -261,17 +261,17 @@ const SchoolAdminUsersPage: React.FC = () => {
               >
                 <AlertTriangle
                   className={`w-6 h-6 ${
-                    confirmDialog.type === 'danger' ? 'text-red-400' : 'text-amber-400'
+                    confirmDialog.type === 'danger' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'
                   }`}
                 />
               </div>
-              <h3 className="text-lg font-semibold text-white">{confirmDialog.title}</h3>
+              <h3 className="text-lg font-semibold text-primary">{confirmDialog.title}</h3>
             </div>
-            <p className="text-slate-300 mb-6">{confirmDialog.message}</p>
+            <p className="text-secondary mb-6">{confirmDialog.message}</p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-sunken hover:bg-raised text-primary rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -294,8 +294,8 @@ const SchoolAdminUsersPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Users</h1>
-            <p className="text-slate-400 mt-1">Manage users in your school</p>
+            <h1 className="text-2xl font-bold text-primary">Users</h1>
+            <p className="text-secondary mt-1">Manage users in your school</p>
           </div>
           <button 
             onClick={() => setShowAddUserModal(true)}
@@ -309,19 +309,19 @@ const SchoolAdminUsersPage: React.FC = () => {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
             <input
               type="text"
               placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 bg-sunken border border-subtle rounded-lg text-primary placeholder:text-muted focus:outline-none focus:border-blue-500"
             />
           </div>
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+            className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
           >
             <option value="all">All Roles</option>
             <option value="faculty">Faculty</option>
@@ -331,7 +331,7 @@ const SchoolAdminUsersPage: React.FC = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+            className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -340,66 +340,66 @@ const SchoolAdminUsersPage: React.FC = () => {
           </select>
           <button
             onClick={fetchUsers}
-            className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors"
+            className="p-2 bg-sunken border border-subtle rounded-lg hover:bg-sunken transition-colors"
           >
-            <RefreshCw className="w-5 h-5 text-slate-400" />
+            <RefreshCw className="w-5 h-5 text-secondary" />
           </button>
         </div>
 
         {/* Users Table */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+        <div className="bg-card border border-subtle rounded-xl overflow-hidden">
           <table className="w-full">
-            <thead className="bg-slate-800/50">
+            <thead className="bg-sunken">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-secondary uppercase tracking-wider">
                   User
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-secondary uppercase tracking-wider">
                   Role
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-secondary uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-secondary uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-secondary uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-subtle">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-secondary">
                     Loading users...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
-                    <Users className="w-12 h-12 mx-auto mb-3 text-slate-600" />
+                  <td colSpan={5} className="px-6 py-12 text-center text-secondary">
+                    <Users className="w-12 h-12 mx-auto mb-3 text-muted" />
                     <p>No users found</p>
                   </td>
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={user.id} className="hover:bg-sunken transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                          <span className="text-blue-400 font-medium">
+                          <span className="text-blue-700 dark:text-blue-400 font-medium">
                             {user.fullName?.charAt(0).toUpperCase() || 'U'}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-white">{user.fullName}</p>
-                          <p className="text-sm text-slate-400">{user.email}</p>
+                          <p className="font-medium text-primary">{user.fullName}</p>
+                          <p className="text-sm text-secondary">{user.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-slate-700 text-slate-300 rounded-full text-sm capitalize">
+                      <span className="px-3 py-1 bg-sunken text-secondary rounded-full text-sm capitalize">
                         {user.role}
                       </span>
                     </td>
@@ -412,12 +412,12 @@ const SchoolAdminUsersPage: React.FC = () => {
                         {user.status}
                       </span>
                       {user.awaitingSetup && (
-                        <span className="ml-2 px-2 py-0.5 rounded-full text-xs border border-sky-500/40 bg-sky-500/10 text-sky-300">
+                        <span className="ml-2 px-2 py-0.5 rounded-full text-xs border border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300">
                           Awaiting setup
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-slate-400 text-sm">
+                    <td className="px-6 py-4 text-secondary text-sm">
                       {new Date(user.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -425,7 +425,7 @@ const SchoolAdminUsersPage: React.FC = () => {
                         {user.awaitingSetup && user.role !== 'admin' && (
                           <button
                             onClick={() => setInvite({ userId: user.id, name: user.fullName, invitation: null })}
-                            className="px-2 py-1 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 rounded transition-colors text-xs font-medium"
+                            className="px-2 py-1 bg-sky-500/20 hover:bg-sky-500/30 text-sky-700 dark:text-sky-300 rounded transition-colors text-xs font-medium"
                             title="Send a new invitation"
                           >
                             Invite
@@ -434,7 +434,7 @@ const SchoolAdminUsersPage: React.FC = () => {
                         {!user.awaitingSetup && user.role !== 'admin' && (
                           <button
                             onClick={() => setInvite({ userId: user.id, name: user.fullName, invitation: null, kind: 'reset' })}
-                            className="px-2 py-1 bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 rounded transition-colors text-xs font-medium"
+                            className="px-2 py-1 bg-raised hover:bg-raised text-secondary rounded transition-colors text-xs font-medium"
                             title="Reset this person's access"
                           >
                             Reset access
@@ -442,28 +442,28 @@ const SchoolAdminUsersPage: React.FC = () => {
                         )}
                         <button
                           onClick={() => setEditingUser(user)}
-                          className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors text-xs font-medium"
+                          className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-700 dark:text-blue-400 rounded transition-colors text-xs font-medium"
                           title="Edit user"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => confirmAction(user.id, 'suspend', user.fullName)}
-                          className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded transition-colors text-xs font-medium"
+                          className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-400 rounded transition-colors text-xs font-medium"
                           title="Suspend user"
                         >
                           Suspend
                         </button>
                         <button
                           onClick={() => confirmAction(user.id, 'disable', user.fullName)}
-                          className="px-2 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded transition-colors text-xs font-medium"
+                          className="px-2 py-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-700 dark:text-orange-400 rounded transition-colors text-xs font-medium"
                           title="Disable user"
                         >
                           Disable
                         </button>
                         <button
                           onClick={() => confirmAction(user.id, 'delete', user.fullName)}
-                          className="px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors text-xs font-medium"
+                          className="px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-700 dark:text-red-400 rounded transition-colors text-xs font-medium"
                           title="Delete user"
                         >
                           Delete
@@ -481,56 +481,56 @@ const SchoolAdminUsersPage: React.FC = () => {
       {/* Add User Modal */}
       {showAddUserModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-white mb-4">Add New User</h3>
+          <div className="bg-sunken border border-subtle rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-primary mb-4">Add New User</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Full Name
                 </label>
                 <input
                   type="text"
                   value={newUserData.fullName}
                   onChange={(e) => setNewUserData({ ...newUserData, fullName: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   placeholder="John Doe"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Email
                 </label>
                 <input
                   type="email"
                   value={newUserData.email}
                   onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   placeholder="john@school.edu"
                 />
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-secondary">
                 They will be invited to choose their own password. Nobody else, including you, ever knows it.
               </p>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Phone
                 </label>
                 <input
                   type="tel"
                   value={newUserData.phone}
                   onChange={(e) => setNewUserData({ ...newUserData, phone: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   placeholder="+1234567890"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Role
                 </label>
                 <select
                   value={newUserData.role}
                   onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                 >
                   <option value="faculty">Faculty</option>
                   <option value="admin">Admin</option>
@@ -544,7 +544,7 @@ const SchoolAdminUsersPage: React.FC = () => {
                   setShowAddUserModal(false)
                   setNewUserData({ email: '', fullName: '', role: 'faculty', phone: '' })
                 }}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-sunken hover:bg-raised text-primary rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -562,63 +562,63 @@ const SchoolAdminUsersPage: React.FC = () => {
       {/* Edit User Modal */}
       {editingUser && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-white mb-4">Edit User</h3>
+          <div className="bg-sunken border border-subtle rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-primary mb-4">Edit User</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Full Name
                 </label>
                 <input
                   type="text"
                   value={editingUser.fullName}
                   onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   placeholder="John Doe"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Email
                 </label>
                 <input
                   type="email"
                   value={editingUser.email}
                   disabled
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-400 cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-secondary cursor-not-allowed"
                   placeholder="john@school.edu"
                 />
-                <p className="text-xs text-slate-500 mt-1">Email cannot be changed</p>
+                <p className="text-xs text-muted mt-1">Email cannot be changed</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Phone
                 </label>
                 <input
                   type="tel"
                   value={editingUser.phone || ''}
                   onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   placeholder="+1234567890"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Role
                 </label>
                 <input
                   type="text"
                   value={editingUser.role.charAt(0).toUpperCase() + editingUser.role.slice(1)}
                   disabled
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-400 cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-secondary cursor-not-allowed"
                 />
-                <p className="text-xs text-slate-500 mt-1">Role cannot be changed after creation</p>
+                <p className="text-xs text-muted mt-1">Role cannot be changed after creation</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setEditingUser(null)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-sunken hover:bg-raised text-primary rounded-lg transition-colors"
               >
                 Cancel
               </button>

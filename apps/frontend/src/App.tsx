@@ -98,6 +98,7 @@ import CorporateAdminReportsPage from './pages/CorporateAdminReportsPage';
 import { RoleRoute, ProtectedRoute } from './components/routing/RoleRoute';
 import { AppShell } from './components/shell/AppShell';
 import { ToastContainer } from './components/Toast';
+import { DarkSurface } from './theme/DarkSurface';
 
 // Store
 import { useAuthStore } from './store/authStore';
@@ -128,25 +129,25 @@ export default function App() {
       <ToastContainer />
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/login-superadmin" element={<SuperadminLoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/register-superadmin" element={<SuperadminRegisterPage />} />
-        <Route path="/change-password" element={<ChangePasswordPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<SetPasswordPage mode="reset" />} />
-        <Route path="/activate" element={<SetPasswordPage mode="activate" />} />
+        <Route path="/" element={<DarkSurface><LandingPage /></DarkSurface>} />
+        <Route path="/login" element={<DarkSurface><LoginPage /></DarkSurface>} />
+        <Route path="/login-superadmin" element={<DarkSurface><SuperadminLoginPage /></DarkSurface>} />
+        <Route path="/register" element={<DarkSurface><RegisterPage /></DarkSurface>} />
+        <Route path="/register-superadmin" element={<DarkSurface><SuperadminRegisterPage /></DarkSurface>} />
+        <Route path="/change-password" element={<DarkSurface><ChangePasswordPage /></DarkSurface>} />
+        <Route path="/forgot-password" element={<DarkSurface><ForgotPasswordPage /></DarkSurface>} />
+        <Route path="/reset-password" element={<DarkSurface><SetPasswordPage mode="reset" /></DarkSurface>} />
+        <Route path="/activate" element={<DarkSurface><SetPasswordPage mode="activate" /></DarkSurface>} />
 
         {/* Unauthorized */}
         <Route
           path="/unauthorized"
           element={
-            <div className="flex items-center justify-center h-screen bg-slate-900 text-white">
+            <div className="flex items-center justify-center h-screen bg-card text-primary">
               <div className="text-center">
                 <h1 className="text-4xl font-bold mb-4">403</h1>
                 <p className="text-xl mb-4">Not Authorized</p>
-                <p className="text-slate-400 mb-6">Your role does not have access to this page.</p>
+                <p className="text-secondary mb-6">Your role does not have access to this page.</p>
                 <a href="/login" className="text-blue-500 hover:underline">
                   Return to Login
                 </a>
@@ -161,6 +162,7 @@ export default function App() {
           element={
             <ProtectedRoute>
               <RoleRoute requiredRole="superadmin">
+                <DarkSurface>
                 <AppShell>
                   <Routes>
                     <Route path="/" element={<SuperadminConsolePage />} />
@@ -178,6 +180,7 @@ export default function App() {
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppShell>
+                </DarkSurface>
               </RoleRoute>
             </ProtectedRoute>
           }
@@ -278,7 +281,7 @@ export default function App() {
                     <Route path="/students" element={<FacultyStudentsPage />} />
                     <Route path="/courses" element={<FacultyCoursesPage />} />
                     <Route path="/enrollment" element={<FacultyEnrollmentPage />} />
-                    <Route path="/attendance" element={<FacultyAttendanceWorkflowPage />} />
+                    <Route path="/attendance" element={<DarkSurface><FacultyAttendanceWorkflowPage /></DarkSurface>} />
                     <Route path="/schedules" element={<FacultySchedulesPage />} />
                     <Route path="/gradebook" element={<FacultyGradebookPage />} />
                     <Route path="/reports" element={<FacultyReportsPage />} />

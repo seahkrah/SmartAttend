@@ -116,7 +116,7 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
       </header>
 
       {notice && (
-        <div role="status" className={`card text-sm ${notice.tone === 'ok' ? 'text-success-700' : 'text-danger-600'}`}>
+        <div role="status" className={`card text-sm ${notice.tone === 'ok' ? 'text-success-700 dark:text-success-300' : 'text-danger-600 dark:text-danger-400'}`}>
           {notice.text}
         </div>
       )}
@@ -124,7 +124,7 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
       <section className="card space-y-3" aria-labelledby="fm-settings">
         <h2 id="fm-settings" className="font-semibold text-primary">Settings</h2>
         {!settings.configured ? (
-          <p className="text-sm text-danger-600">
+          <p className="text-sm text-danger-600 dark:text-danger-400">
             This server has no template encryption key, so face matching cannot run. The operator must set
             BIOMETRIC_TEMPLATE_KEY.
           </p>
@@ -220,7 +220,7 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
                         </button>
                       )}
                       {p.consent_granted_at && (
-                        <button className="btn btn-ghost text-xs text-danger-600" onClick={() => setWithdrawFor(p)}>
+                        <button className="btn btn-ghost text-xs text-danger-600 dark:text-danger-400" onClick={() => setWithdrawFor(p)}>
                           <ShieldOff className="w-3.5 h-3.5 inline mr-1" />Withdraw consent
                         </button>
                       )}
@@ -243,7 +243,7 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
               <li key={e.id} className="py-1.5 flex flex-wrap gap-x-3">
                 <span className="text-muted w-40">{new Date(e.created_at).toLocaleString()}</span>
                 <span className="text-primary">{ACTION_LABELS[e.action] ?? e.action}</span>
-                <span className={e.outcome === 'success' ? 'text-success-700' : 'text-danger-600'}>
+                <span className={e.outcome === 'success' ? 'text-success-700 dark:text-success-300' : 'text-danger-600 dark:text-danger-400'}>
                   {e.outcome}{e.reason ? ` (${e.reason.replace(/_/g, ' ')})` : ''}
                 </span>
                 {e.distance !== null && <span className="text-muted">distance {e.distance.toFixed(2)} / {e.threshold?.toFixed(2)}</span>}

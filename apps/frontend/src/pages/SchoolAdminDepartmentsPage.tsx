@@ -108,7 +108,7 @@ const SchoolAdminDepartmentsPage: React.FC = () => {
         </button>
       </header>
 
-      {notice && <p role="alert" className="text-sm text-danger-600">{notice}</p>}
+      {notice && <p role="alert" className="text-sm text-danger-600 dark:text-danger-400">{notice}</p>}
 
       {error ? (
         <ErrorState title="Departments could not be loaded" description={error} onRetry={() => void load()} />
@@ -157,7 +157,7 @@ const SchoolAdminDepartmentsPage: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="dept-form">
           <form className="card w-full max-w-lg space-y-3" onSubmit={save}>
             <h2 id="dept-form" className="font-semibold text-primary">{editing === 'new' ? 'Add department' : `Edit ${editing.name}`}</h2>
-            {formError && <p role="alert" className="text-sm text-danger-600">{formError}</p>}
+            {formError && <p role="alert" className="text-sm text-danger-600 dark:text-danger-400">{formError}</p>}
             <label className="block text-sm text-secondary">Name
               <input className="input-field w-full mt-1" required minLength={2} maxLength={120} value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })} />

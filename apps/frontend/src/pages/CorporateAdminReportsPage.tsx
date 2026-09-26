@@ -94,8 +94,8 @@ const CorporateAdminReportsPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Reports & Analytics</h1>
-            <p className="text-slate-400 mt-1">Attendance insights and trends</p>
+            <h1 className="text-2xl font-bold text-primary">Reports & Analytics</h1>
+            <p className="text-secondary mt-1">Attendance insights and trends</p>
           </div>
           <div className="flex items-center gap-2">
             {[7, 14, 30].map((d) => (
@@ -103,7 +103,7 @@ const CorporateAdminReportsPage: React.FC = () => {
                 className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                   days === d
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                    : 'bg-sunken text-secondary hover:text-primary border border-subtle'
                 }`}>
                 {d}d
               </button>
@@ -113,33 +113,33 @@ const CorporateAdminReportsPage: React.FC = () => {
 
         {/* Summary Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center gap-4 p-5 bg-slate-800/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-4 p-5 bg-sunken border border-subtle rounded-xl">
             <div className="p-3 bg-indigo-500/20 rounded-lg">
-              <BarChart3 className="w-5 h-5 text-indigo-400" />
+              <BarChart3 className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalCheckins}</p>
-              <p className="text-xs text-slate-400">Total Check‑ins ({days}d)</p>
+              <p className="text-2xl font-bold text-primary">{totalCheckins}</p>
+              <p className="text-xs text-secondary">Total Check‑ins ({days}d)</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 p-5 bg-slate-800/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-4 p-5 bg-sunken border border-subtle rounded-xl">
             <div className="p-3 bg-teal-500/20 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-teal-400" />
+              <TrendingUp className="w-5 h-5 text-teal-700 dark:text-teal-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{avgDaily}</p>
-              <p className="text-xs text-slate-400">Avg daily check‑ins</p>
+              <p className="text-2xl font-bold text-primary">{avgDaily}</p>
+              <p className="text-xs text-secondary">Avg daily check‑ins</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 p-5 bg-slate-800/50 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-4 p-5 bg-sunken border border-subtle rounded-xl">
             <div className="p-3 bg-violet-500/20 rounded-lg">
-              <Calendar className="w-5 h-5 text-violet-400" />
+              <Calendar className="w-5 h-5 text-violet-700 dark:text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-primary">
                 {peakDay ? new Date(peakDay.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-secondary">
                 Peak day ({peakDay?.checkins || 0} check‑ins)
               </p>
             </div>
@@ -147,8 +147,8 @@ const CorporateAdminReportsPage: React.FC = () => {
         </div>
 
         {/* Daily Trend Chart (HTML bars) */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Daily Attendance Trend</h3>
+        <div className="bg-card border border-subtle rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-primary mb-4">Daily Attendance Trend</h3>
           {(data?.dailyTrend?.length ?? 0) > 0 ? (
             <div className="flex items-end gap-1 h-48 overflow-x-auto pb-2">
               {data!.dailyTrend.map((d) => {
@@ -161,12 +161,12 @@ const CorporateAdminReportsPage: React.FC = () => {
                         style={{ height: `${Math.max(height, 2)}%` }}
                         title={`${d.date}: ${d.checkins} check-ins`}
                       />
-                      <div className="absolute -top-6 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-indigo-300 whitespace-nowrap">
+                      <div className="absolute -top-6 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
                         {d.checkins}
                       </div>
                     </div>
                     {days <= 14 && (
-                      <span className="text-[10px] text-slate-500 mt-1">
+                      <span className="text-[10px] text-muted mt-1">
                         {new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </span>
                     )}
@@ -175,15 +175,15 @@ const CorporateAdminReportsPage: React.FC = () => {
               })}
             </div>
           ) : (
-            <p className="text-slate-500 text-center py-8">No data for this period</p>
+            <p className="text-muted text-center py-8">No data for this period</p>
           )}
         </div>
 
         {/* Department Breakdown & Late Arrivals */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Department Breakdown */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Department Breakdown</h3>
+          <div className="bg-card border border-subtle rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-primary mb-4">Department Breakdown</h3>
             {(data?.departmentBreakdown?.length ?? 0) > 0 ? (
               <div className="space-y-3">
                 {data!.departmentBreakdown.map((dept, i) => {
@@ -193,14 +193,14 @@ const CorporateAdminReportsPage: React.FC = () => {
                     <div key={i} className="space-y-1">
                       <div className="flex justify-between">
                         <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-teal-400" />
-                          <span className="text-sm text-white">{dept.department_name || 'Unassigned'}</span>
+                          <Building2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                          <span className="text-sm text-primary">{dept.department_name || 'Unassigned'}</span>
                         </div>
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-secondary">
                           {dept.total_checkins} check-ins · {dept.unique_employees} employees
                         </span>
                       </div>
-                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-sunken rounded-full overflow-hidden">
                         <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
@@ -208,30 +208,30 @@ const CorporateAdminReportsPage: React.FC = () => {
                 })}
               </div>
             ) : (
-              <p className="text-slate-500 text-center py-8">No department data</p>
+              <p className="text-muted text-center py-8">No department data</p>
             )}
           </div>
 
           {/* Late Arrivals */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-orange-400" />
+          <div className="bg-card border border-subtle rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-700 dark:text-orange-400" />
               Late Arrivals (after 9 AM)
             </h3>
             {(data?.lateArrivals?.length ?? 0) > 0 ? (
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {data!.lateArrivals.map((la, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg">
+                  <div key={i} className="flex items-center gap-3 p-3 bg-sunken rounded-lg">
                     <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center">
-                      <span className="text-orange-400 text-xs font-medium">
+                      <span className="text-orange-700 dark:text-orange-400 text-xs font-medium">
                         {la.first_name[0]}{la.last_name[0]}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{la.first_name} {la.last_name}</p>
-                      <p className="text-xs text-slate-500">{la.employee_code} {la.department_name ? `· ${la.department_name}` : ''}</p>
+                      <p className="text-sm text-primary truncate">{la.first_name} {la.last_name}</p>
+                      <p className="text-xs text-muted">{la.employee_code} {la.department_name ? `· ${la.department_name}` : ''}</p>
                     </div>
-                    <div className="flex items-center gap-1 text-orange-400">
+                    <div className="flex items-center gap-1 text-orange-700 dark:text-orange-400">
                       <Clock className="w-3.5 h-3.5" />
                       <span className="text-xs">
                         {new Date(la.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -242,8 +242,8 @@ const CorporateAdminReportsPage: React.FC = () => {
               </div>
             ) : (
               <div className="text-center py-8">
-                <Clock className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400">No late arrivals in this period</p>
+                <Clock className="w-12 h-12 text-muted mx-auto mb-3" />
+                <p className="text-secondary">No late arrivals in this period</p>
               </div>
             )}
           </div>

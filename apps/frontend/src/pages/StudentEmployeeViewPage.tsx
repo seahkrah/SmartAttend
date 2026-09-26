@@ -35,7 +35,7 @@ export const StudentEmployeeViewPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-card p-6">
       {error && (
         <ErrorAlert
           title="Failed to load attendance"
@@ -48,7 +48,7 @@ export const StudentEmployeeViewPage: React.FC = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Profile Card */}
         {profile && (
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+          <div className="bg-sunken border border-subtle rounded-lg p-6">
             <div className={HIERARCHY.PRIMARY.className}>{profile.name}</div>
             <div className={HIERARCHY.SECONDARY.className}>{profile.email}</div>
             <div className={`mt-2 ${HIERARCHY.TERTIARY.className}`}>ID: {profile.id}</div>
@@ -74,7 +74,7 @@ export const StudentEmployeeViewPage: React.FC = () => {
               {courses.map((course) => (
                 <div
                   key={course.course_id}
-                  className={`p-4 rounded-lg border border-slate-700 bg-slate-800/50 ${
+                  className={`p-4 rounded-lg border border-subtle bg-sunken ${
                     STATUS_COLORS[getAttendanceStatus(course.attendance_percent)]
                   }`}
                 >

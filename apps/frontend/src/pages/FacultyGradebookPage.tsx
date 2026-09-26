@@ -209,17 +209,17 @@ const FacultyGradebookPage: React.FC = () => {
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Gradebook</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <h1 className="text-2xl font-semibold text-primary">Gradebook</h1>
+          <p className="text-sm text-secondary mt-1">
             Assessments, marks and the running result for your courses.
           </p>
         </div>
-        <label className="text-sm text-slate-300">
+        <label className="text-sm text-secondary">
           Course
           <select
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
-            className="mt-1 block rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+            className="mt-1 block rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
           >
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
@@ -232,17 +232,17 @@ const FacultyGradebookPage: React.FC = () => {
 
       {error && <ErrorAlert title="Could not load the gradebook" message={error} onDismiss={() => setError(null)} />}
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-5 py-3">
+      <div className="rounded-xl border border-subtle bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-subtle px-5 py-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-secondary">
               Assessments
             </h2>
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 weightComplete
-                  ? 'bg-success-500/15 text-success-300'
-                  : 'bg-amber-500/15 text-amber-300'
+                  ? 'bg-success-500/15 text-success-700 dark:text-success-300'
+                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
               }`}
             >
               {weightTotal}% of 100%
@@ -258,7 +258,7 @@ const FacultyGradebookPage: React.FC = () => {
         </div>
 
         {!weightComplete && assessments.length > 0 && (
-          <div className="flex items-start gap-2 border-b border-slate-800 bg-amber-500/5 px-5 py-3 text-sm text-amber-200">
+          <div className="flex items-start gap-2 border-b border-subtle bg-amber-500/5 px-5 py-3 text-sm text-amber-700 dark:text-amber-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               These assessments carry {weightTotal}% of the course. Results computed now are
@@ -276,15 +276,15 @@ const FacultyGradebookPage: React.FC = () => {
             />
           </div>
         ) : (
-          <ul className="divide-y divide-slate-800">
+          <ul className="divide-y divide-subtle">
             {assessments.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                 <button
                   onClick={() => void openMarkSheet(a)}
                   className="flex-1 text-left"
                 >
-                  <div className="text-sm font-medium text-slate-100">{a.title}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-sm font-medium text-primary">{a.title}</div>
+                  <div className="text-xs text-muted">
                     {a.kind} · out of {a.max_score} · {a.weight}% of the course
                     {a.graded_count !== undefined ? ` · ${a.graded_count} marked` : ''}
                   </div>
@@ -292,7 +292,7 @@ const FacultyGradebookPage: React.FC = () => {
                 <button
                   onClick={() => void removeAssessment(a)}
                   aria-label={`Delete ${a.title}`}
-                  className="rounded p-1.5 text-slate-500 hover:bg-slate-800 hover:text-danger-300"
+                  className="rounded p-1.5 text-muted hover:bg-sunken hover:text-danger-700 dark:hover:text-danger-400"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -303,11 +303,11 @@ const FacultyGradebookPage: React.FC = () => {
       </div>
 
       {activeAssessment && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-5 py-3">
+        <div className="rounded-xl border border-subtle bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-subtle px-5 py-3">
             <div>
-              <h2 className="text-sm font-semibold text-slate-200">{activeAssessment.title}</h2>
-              <p className="text-xs text-slate-500">
+              <h2 className="text-sm font-semibold text-primary">{activeAssessment.title}</h2>
+              <p className="text-xs text-muted">
                 Marks out of {activeAssessment.max_score}
               </p>
             </div>
@@ -322,21 +322,21 @@ const FacultyGradebookPage: React.FC = () => {
           </div>
 
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-              <tr className="border-b border-slate-800">
+            <thead className="text-left text-xs uppercase tracking-wider text-muted">
+              <tr className="border-b border-subtle">
                 <th className="px-5 py-2">Student</th>
                 <th className="px-5 py-2 w-32">Score</th>
                 <th className="px-5 py-2 w-40">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-subtle">
               {marks.map((m) => (
                 <tr key={m.student_id}>
                   <td className="px-5 py-2">
-                    <div className="text-slate-200">
+                    <div className="text-primary">
                       {m.first_name} {m.last_name}
                     </div>
-                    <div className="text-xs text-slate-500">{m.student_number}</div>
+                    <div className="text-xs text-muted">{m.student_number}</div>
                   </td>
                   <td className="px-5 py-2">
                     <input
@@ -352,7 +352,7 @@ const FacultyGradebookPage: React.FC = () => {
                         })
                       }
                       aria-label={`Score for ${m.first_name} ${m.last_name}`}
-                      className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200 disabled:opacity-40"
+                      className="w-24 rounded-lg border border-subtle bg-card px-2 py-1 text-primary disabled:opacity-40"
                     />
                   </td>
                   <td className="px-5 py-2">
@@ -360,7 +360,7 @@ const FacultyGradebookPage: React.FC = () => {
                       value={m.status ?? 'pending'}
                       onChange={(e) => setMark(m.student_id, { status: e.target.value as ScoreStatus })}
                       aria-label={`Status for ${m.first_name} ${m.last_name}`}
-                      className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
+                      className="rounded-lg border border-subtle bg-card px-2 py-1 text-primary"
                     >
                       {STATUSES.map((s) => (
                         <option key={s} value={s}>{s}</option>
@@ -375,16 +375,16 @@ const FacultyGradebookPage: React.FC = () => {
       )}
 
       {results.length > 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-          <div className="border-b border-slate-800 px-5 py-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
+        <div className="rounded-xl border border-subtle bg-card">
+          <div className="border-b border-subtle px-5 py-3">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-secondary">
               <Award className="h-4 w-4" />
               Running results
             </h2>
           </div>
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-              <tr className="border-b border-slate-800">
+            <thead className="text-left text-xs uppercase tracking-wider text-muted">
+              <tr className="border-b border-subtle">
                 <th className="px-5 py-2">Student</th>
                 <th className="px-5 py-2">Total</th>
                 <th className="px-5 py-2">Grade</th>
@@ -392,28 +392,28 @@ const FacultyGradebookPage: React.FC = () => {
                 <th className="px-5 py-2">State</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-subtle">
               {results.map((r) => (
                 <tr key={r.studentId}>
-                  <td className="px-5 py-2 text-slate-200">
+                  <td className="px-5 py-2 text-primary">
                     {r.student ? `${r.student.first_name} ${r.student.last_name}` : r.studentId}
                   </td>
-                  <td className="px-5 py-2 text-slate-300">{r.totalScore}%</td>
+                  <td className="px-5 py-2 text-secondary">{r.totalScore}%</td>
                   <td className="px-5 py-2">
-                    <span className={r.isPass ? 'text-success-300' : 'text-danger-300'}>
+                    <span className={r.isPass ? 'text-success-700 dark:text-success-300' : 'text-danger-700 dark:text-danger-400'}>
                       {r.letter ?? '—'}
                     </span>
                   </td>
-                  <td className="px-5 py-2 text-slate-400">
+                  <td className="px-5 py-2 text-secondary">
                     {r.weightGraded}% of {r.weightDeclared}%
                     {r.pending > 0 ? ` · ${r.pending} pending` : ''}
                   </td>
-                  <td className="px-5 py-2 text-slate-400">{r.status}</td>
+                  <td className="px-5 py-2 text-secondary">{r.status}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="border-t border-slate-800 px-5 py-3 text-xs text-slate-500">
+          <p className="border-t border-subtle px-5 py-3 text-xs text-muted">
             Percentages are over the assessments marked so far. Only a registrar can publish
             results, and only once the weights total 100%.
           </p>
@@ -424,43 +424,43 @@ const FacultyGradebookPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <form
             onSubmit={createAssessment}
-            className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6"
+            className="w-full max-w-md rounded-xl border border-subtle bg-card p-6"
           >
-            <h2 className="mb-4 text-lg font-semibold text-slate-100">New assessment</h2>
+            <h2 className="mb-4 text-lg font-semibold text-primary">New assessment</h2>
             <div className="grid gap-3">
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Title
                 <input
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   required
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
               <div className="grid grid-cols-3 gap-3">
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-secondary">
                   Kind
                   <select
                     value={form.kind}
                     onChange={(e) => setForm({ ...form, kind: e.target.value as Assessment['kind'] })}
-                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                    className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                   >
                     {KINDS.map((k) => (
                       <option key={k} value={k}>{k}</option>
                     ))}
                   </select>
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-secondary">
                   Out of
                   <input
                     type="number"
                     min={1}
                     value={form.maxScore}
                     onChange={(e) => setForm({ ...form, maxScore: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                    className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                   />
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-secondary">
                   Weight %
                   <input
                     type="number"
@@ -469,11 +469,11 @@ const FacultyGradebookPage: React.FC = () => {
                     value={form.weight}
                     onChange={(e) => setForm({ ...form, weight: e.target.value })}
                     required
-                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                    className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                   />
                 </label>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted">
                 {100 - weightTotal}% of this course is still unallocated.
               </p>
             </div>
@@ -481,7 +481,7 @@ const FacultyGradebookPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300"
+                className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary"
               >
                 Cancel
               </button>

@@ -114,10 +114,10 @@ const SchoolAdminSettingsPage: React.FC = () => {
     description?: string
     children: React.ReactNode
   }> = ({ label, description, children }) => (
-    <div className="flex items-center justify-between py-4 border-b border-slate-700 last:border-0">
+    <div className="flex items-center justify-between py-4 border-b border-subtle last:border-0">
       <div>
-        <p className="font-medium text-white">{label}</p>
-        {description && <p className="text-sm text-slate-400 mt-1">{description}</p>}
+        <p className="font-medium text-primary">{label}</p>
+        {description && <p className="text-sm text-secondary mt-1">{description}</p>}
       </div>
       {children}
     </div>
@@ -130,11 +130,11 @@ const SchoolAdminSettingsPage: React.FC = () => {
     <button
       onClick={() => onChange(!checked)}
       className={`relative w-12 h-6 rounded-full transition-colors ${
-        checked ? 'bg-blue-500' : 'bg-slate-600'
+        checked ? 'bg-blue-500' : 'bg-raised'
       }`}
     >
       <div
-        className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+        className={`absolute top-1 w-4 h-4 rounded-full bg-card transition-transform ${
           checked ? 'left-7' : 'left-1'
         }`}
       />
@@ -156,8 +156,8 @@ const SchoolAdminSettingsPage: React.FC = () => {
       <div className="flex gap-6">
         {/* Settings Navigation */}
         <div className="w-64 shrink-0">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+          <div className="bg-card border border-subtle rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-4">
               Settings
             </h3>
             <nav className="space-y-1">
@@ -167,8 +167,8 @@ const SchoolAdminSettingsPage: React.FC = () => {
                   onClick={() => setActiveSection(section.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
                     activeSection === section.id
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'text-slate-300 hover:bg-slate-800'
+                      ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-500/30'
+                      : 'text-secondary hover:bg-sunken'
                   }`}
                 >
                   {section.icon}
@@ -181,24 +181,24 @@ const SchoolAdminSettingsPage: React.FC = () => {
 
         {/* Settings Content */}
         <div className="flex-1">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
+          <div className="bg-card border border-subtle rounded-xl p-6">
             {/* General Settings */}
             {activeSection === 'general' && (
               <div>
-                <h2 className="text-xl font-bold text-white mb-6">General Settings</h2>
+                <h2 className="text-xl font-bold text-primary mb-6">General Settings</h2>
                 <SettingRow label="School Name" description="Display name for your school">
                   <input
                     type="text"
                     value={settings.schoolName}
                     onChange={(e) => setSettings({ ...settings, schoolName: e.target.value })}
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 w-64"
+                    className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500 w-64"
                   />
                 </SettingRow>
                 <SettingRow label="Timezone" description="Default timezone for attendance tracking">
                   <select
                     value={settings.timezone}
                     onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   >
                     <option value="UTC">UTC</option>
                     <option value="America/New_York">Eastern Time</option>
@@ -213,7 +213,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
             {/* Scheduling Settings */}
             {activeSection === 'scheduling' && (
               <div>
-                <h2 className="text-xl font-bold text-white mb-6">Scheduling Settings</h2>
+                <h2 className="text-xl font-bold text-primary mb-6">Scheduling Settings</h2>
                 <SettingRow 
                   label="Schedule Day Format" 
                   description="How many days per week each course meets. This controls the day picker when creating schedules."
@@ -221,7 +221,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
                   <select
                     value={settings.scheduleDayFormat}
                     onChange={(e) => setSettings({ ...settings, scheduleDayFormat: e.target.value })}
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   >
                     <option value="1">1 Day (e.g. Monday)</option>
                     <option value="2">2 Days (e.g. Mon, Wed)</option>
@@ -231,10 +231,10 @@ const SchoolAdminSettingsPage: React.FC = () => {
                     <option value="6">6 Days (Mon–Sat)</option>
                   </select>
                 </SettingRow>
-                <div className="mt-4 bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                  <p className="text-sm text-slate-300">
-                    <strong className="text-white">How it works:</strong> When creating a schedule, 
-                    the admin will pick exactly <strong className="text-blue-400">{settings.scheduleDayFormat}</strong> day(s) 
+                <div className="mt-4 bg-sunken border border-subtle rounded-lg p-4">
+                  <p className="text-sm text-secondary">
+                    <strong className="text-primary">How it works:</strong> When creating a schedule, 
+                    the admin will pick exactly <strong className="text-blue-700 dark:text-blue-400">{settings.scheduleDayFormat}</strong> day(s) 
                     from the week. The same time slot will apply to all selected days. 
                     Each day creates a separate schedule entry for attendance tracking.
                   </p>
@@ -245,7 +245,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
             {/* Attendance Settings */}
             {activeSection === 'attendance' && (
               <div>
-                <h2 className="text-xl font-bold text-white mb-6">Attendance Settings</h2>
+                <h2 className="text-xl font-bold text-primary mb-6">Attendance Settings</h2>
                 <SettingRow label="Start Time" description="When attendance tracking begins">
                   <input
                     type="time"
@@ -253,7 +253,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
                     onChange={(e) =>
                       setSettings({ ...settings, attendanceStartTime: e.target.value })
                     }
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   />
                 </SettingRow>
                 <SettingRow label="End Time" description="When attendance tracking ends">
@@ -263,7 +263,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
                     onChange={(e) =>
                       setSettings({ ...settings, attendanceEndTime: e.target.value })
                     }
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500"
                   />
                 </SettingRow>
                 <SettingRow
@@ -278,7 +278,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
                     onChange={(e) =>
                       setSettings({ ...settings, maxAbsencesBeforeAlert: parseInt(e.target.value) })
                     }
-                    className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500 w-24"
+                    className="px-4 py-2 bg-sunken border border-subtle rounded-lg text-primary focus:outline-none focus:border-blue-500 w-24"
                   />
                 </SettingRow>
               </div>
@@ -287,7 +287,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
             {/* User Management Settings */}
             {activeSection === 'users' && (
               <div>
-                <h2 className="text-xl font-bold text-white mb-6">User Management</h2>
+                <h2 className="text-xl font-bold text-primary mb-6">User Management</h2>
                 <SettingRow
                   label="Auto-Approve Students"
                   description="Automatically approve new student registrations"
@@ -314,7 +314,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
             {/* Notification Settings */}
             {activeSection === 'notifications' && (
               <div>
-                <h2 className="text-xl font-bold text-white mb-6">Notification Settings</h2>
+                <h2 className="text-xl font-bold text-primary mb-6">Notification Settings</h2>
                 <SettingRow
                   label="New Registration Alerts"
                   description="Receive notifications when new users register"
@@ -352,9 +352,9 @@ const SchoolAdminSettingsPage: React.FC = () => {
             {/* Security Settings */}
             {activeSection === 'security' && (
               <div>
-                <h2 className="text-xl font-bold text-white mb-6">Security Settings</h2>
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-4">
-                  <p className="text-slate-300">
+                <h2 className="text-xl font-bold text-primary mb-6">Security Settings</h2>
+                <div className="bg-sunken border border-subtle rounded-lg p-4 mb-4">
+                  <p className="text-secondary">
                     Security settings are managed by the superadmin. Contact your system
                     administrator for security-related changes.
                   </p>
@@ -363,7 +363,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
             )}
 
             {/* Save Button */}
-            <div className="flex justify-end mt-6 pt-6 border-t border-slate-700">
+            <div className="flex justify-end mt-6 pt-6 border-t border-subtle">
               <button
                 onClick={handleSave}
                 disabled={saving}
@@ -397,12 +397,12 @@ const SchoolAdminSettingsPage: React.FC = () => {
         {/* ═════════════════════════════════════ */}
         {/* NOTIFICATIONS                        */}
         {/* ═════════════════════════════════════ */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700">
-          <div className="px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <div className="bg-sunken rounded-xl border border-subtle">
+          <div className="px-6 py-4 border-b border-subtle">
+            <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
               🔔 Notifications
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-secondary mt-1">
               Choose what you hear about, and where.
             </p>
           </div>

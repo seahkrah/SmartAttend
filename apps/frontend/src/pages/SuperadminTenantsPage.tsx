@@ -75,22 +75,22 @@ const SuperadminTenantsPage: React.FC = () => {
     onToggle: (id: string, status: boolean) => void
     onDelete: (id: string) => void
   }) => (
-    <div className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors group">
+    <div className="p-4 rounded-lg bg-sunken border border-subtle hover:border-strong transition-colors group">
       <div className="flex items-center justify-between mb-3">
         <div className="flex-1">
-          <h4 className="font-bold text-white">{tenant.name}</h4>
-          <p className="text-sm text-slate-400">{tenant.code}</p>
+          <h4 className="font-bold text-primary">{tenant.name}</h4>
+          <p className="text-sm text-secondary">{tenant.code}</p>
         </div>
         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
           tenant.is_active
-            ? 'bg-green-500/20 text-green-400'
-            : 'bg-red-500/20 text-red-400'
+            ? 'bg-green-500/20 text-green-700 dark:text-green-400'
+            : 'bg-red-500/20 text-red-700 dark:text-red-400'
         }`}>
           {tenant.is_active ? 'Active' : 'Inactive'}
         </span>
       </div>
 
-      <div className="text-sm text-slate-300 mb-4 space-y-1">
+      <div className="text-sm text-secondary mb-4 space-y-1">
         <p>📧 {tenant.email}</p>
         <p>👥 {tenant.user_count} users</p>
       </div>
@@ -98,7 +98,7 @@ const SuperadminTenantsPage: React.FC = () => {
       <div className="flex gap-2">
         <button
           onClick={() => onEdit(tenant.id)}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm text-slate-300 hover:text-white"
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-sunken hover:bg-raised rounded-lg transition-colors text-sm text-secondary hover:text-primary"
           title="Edit tenant"
         >
           <Edit2 className="w-4 h-4" />
@@ -108,8 +108,8 @@ const SuperadminTenantsPage: React.FC = () => {
           onClick={() => onToggle(tenant.id, tenant.is_active)}
           className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${
             tenant.is_active
-              ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
-              : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+              ? 'bg-orange-500/20 text-orange-700 dark:text-orange-400 hover:bg-orange-500/30'
+              : 'bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-500/30'
           }`}
           title={tenant.is_active ? 'Lock tenant' : 'Unlock tenant'}
         >
@@ -118,7 +118,7 @@ const SuperadminTenantsPage: React.FC = () => {
         </button>
         <button
           onClick={() => onDelete(tenant.id)}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm"
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-700 dark:text-red-400 rounded-lg transition-colors text-sm"
           title="Delete tenant"
         >
           <Trash2 className="w-4 h-4" />
@@ -132,7 +132,7 @@ const SuperadminTenantsPage: React.FC = () => {
     return (
       <>
         <div className="flex items-center justify-center h-full">
-          <div className="text-slate-400">Loading tenants...</div>
+          <div className="text-secondary">Loading tenants...</div>
         </div>
       </>
     )
@@ -154,27 +154,27 @@ const SuperadminTenantsPage: React.FC = () => {
         {showForm && (
           <form
             onSubmit={handleAddTenant}
-            className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 space-y-4"
+            className="p-6 rounded-xl bg-sunken border border-subtle space-y-4"
           >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Tenant Name</label>
+                  <label className="block text-sm font-medium text-secondary mb-2">Tenant Name</label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                    className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-blue-500 outline-none"
                     placeholder="Enter tenant name"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Tenant Code</label>
+                  <label className="block text-sm font-medium text-secondary mb-2">Tenant Code</label>
                   <input
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                    className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-blue-500 outline-none"
                     placeholder="Enter tenant code"
                     required
                   />
@@ -183,22 +183,22 @@ const SuperadminTenantsPage: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
+                  <label className="block text-sm font-medium text-secondary mb-2">Email</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                    className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-blue-500 outline-none"
                     placeholder="Enter email"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Type</label>
+                  <label className="block text-sm font-medium text-secondary mb-2">Type</label>
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value as 'school' | 'corporate' })}
-                    className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-blue-500 outline-none"
+                    className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:border-blue-500 outline-none"
                   >
                     <option value="school">School</option>
                     <option value="corporate">Corporate</option>
@@ -216,7 +216,7 @@ const SuperadminTenantsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 px-4 py-2 border border-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors font-medium"
+                  className="flex-1 px-4 py-2 border border-strong text-secondary hover:text-primary rounded-lg transition-colors font-medium"
                 >
                   Cancel
                 </button>
@@ -226,7 +226,7 @@ const SuperadminTenantsPage: React.FC = () => {
 
         {/* Schools Section */}
         <div>
-          <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+          <h3 className="text-2xl font-bold text-primary mb-4 flex items-center gap-2">
             <span className="w-1 h-8 bg-green-500 rounded-full" />
             Schools ({schools.length})
           </h3>
@@ -243,15 +243,15 @@ const SuperadminTenantsPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
-              <p className="text-slate-400">No schools found</p>
+            <div className="p-6 text-center rounded-lg bg-sunken border border-dashed border-subtle">
+              <p className="text-secondary">No schools found</p>
             </div>
           )}
         </div>
 
         {/* Corporates Section */}
         <div>
-          <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+          <h3 className="text-2xl font-bold text-primary mb-4 flex items-center gap-2">
             <span className="w-1 h-8 bg-indigo-500 rounded-full" />
             Corporates ({corporates.length})
           </h3>
@@ -268,8 +268,8 @@ const SuperadminTenantsPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="p-6 text-center rounded-lg bg-slate-800/30 border border-dashed border-slate-700">
-              <p className="text-slate-400">No corporates found</p>
+            <div className="p-6 text-center rounded-lg bg-sunken border border-dashed border-subtle">
+              <p className="text-secondary">No corporates found</p>
             </div>
           )}
         </div>

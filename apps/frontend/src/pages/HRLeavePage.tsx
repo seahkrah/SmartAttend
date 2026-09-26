@@ -128,29 +128,29 @@ const HRLeavePage: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Leave management</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-primary">Leave management</h1>
+        <p className="mt-1 text-sm text-secondary">
           Approvals, absence cover and the company's leave policy.
         </p>
       </div>
 
       {error && <ErrorAlert title="Could not load leave" message={error} onDismiss={() => setError(null)} />}
 
-      <div className="flex gap-1 border-b border-slate-800">
+      <div className="flex gap-1 border-b border-subtle">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`inline-flex items-center gap-2 border-b-2 px-4 py-2 text-sm transition ${
               tab === t.id
-                ? 'border-brand-500 text-slate-100'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-brand-500 text-primary'
+                : 'border-transparent text-secondary hover:text-primary'
             }`}
           >
             {t.icon}
             {t.label}
             {t.count !== undefined && t.count > 0 && (
-              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">
+              <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
                 {t.count}
               </span>
             )}
@@ -160,8 +160,8 @@ const HRLeavePage: React.FC = () => {
 
       {tab === 'queue' && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-            <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+          <div className="rounded-xl border border-subtle bg-card">
+            <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
               Awaiting a decision
             </div>
             {pending.length === 0 ? (
@@ -173,24 +173,24 @@ const HRLeavePage: React.FC = () => {
                 />
               </div>
             ) : (
-              <ul className="divide-y divide-slate-800">
+              <ul className="divide-y divide-subtle">
                 {pending.map((r) => (
                   <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <div>
-                      <div className="text-sm font-medium text-slate-100">
+                      <div className="text-sm font-medium text-primary">
                         {r.first_name} {r.last_name}
-                        <span className="ml-2 text-xs text-slate-500">{r.employee_number}</span>
+                        <span className="ml-2 text-xs text-muted">{r.employee_number}</span>
                       </div>
-                      <div className="text-sm text-slate-400">
+                      <div className="text-sm text-secondary">
                         {r.type_name} · {r.start_date} → {r.end_date} · {r.total_days} day(s)
                       </div>
-                      {r.reason && <div className="mt-1 text-xs text-slate-500">{r.reason}</div>}
+                      {r.reason && <div className="mt-1 text-xs text-muted">{r.reason}</div>}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => void decide(r, 'approved')}
                         disabled={busy}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-success-600/20 px-3 py-1.5 text-sm text-success-300 hover:bg-success-600/30 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-success-600/20 px-3 py-1.5 text-sm text-success-700 dark:text-success-300 hover:bg-success-600/30 disabled:opacity-50"
                       >
                         <Check className="h-4 w-4" />
                         Approve
@@ -198,7 +198,7 @@ const HRLeavePage: React.FC = () => {
                       <button
                         onClick={() => void decide(r, 'rejected')}
                         disabled={busy}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-danger-600/20 px-3 py-1.5 text-sm text-danger-300 hover:bg-danger-600/30 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-danger-600/20 px-3 py-1.5 text-sm text-danger-700 dark:text-danger-400 hover:bg-danger-600/30 disabled:opacity-50"
                       >
                         <X className="h-4 w-4" />
                         Reject
@@ -211,22 +211,22 @@ const HRLeavePage: React.FC = () => {
           </div>
 
           {decided.length > 0 && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-              <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <div className="rounded-xl border border-subtle bg-card">
+              <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
                 Recently decided
               </div>
               <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-800">
+                <tbody className="divide-y divide-subtle">
                   {decided.slice(0, 20).map((r) => (
                     <tr key={r.id}>
-                      <td className="px-5 py-2 text-slate-200">
+                      <td className="px-5 py-2 text-primary">
                         {r.first_name} {r.last_name}
                       </td>
-                      <td className="px-5 py-2 text-slate-400">{r.type_name}</td>
-                      <td className="px-5 py-2 text-slate-400">
+                      <td className="px-5 py-2 text-secondary">{r.type_name}</td>
+                      <td className="px-5 py-2 text-secondary">
                         {r.start_date} → {r.end_date}
                       </td>
-                      <td className="px-5 py-2 text-slate-400">{r.status}</td>
+                      <td className="px-5 py-2 text-secondary">{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -237,25 +237,25 @@ const HRLeavePage: React.FC = () => {
       )}
 
       {tab === 'calendar' && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60">
-          <div className="flex flex-wrap items-center gap-3 border-b border-slate-800 px-5 py-3">
-            <label className="text-sm text-slate-400">
+        <div className="rounded-xl border border-subtle bg-card">
+          <div className="flex flex-wrap items-center gap-3 border-b border-subtle px-5 py-3">
+            <label className="text-sm text-secondary">
               From
               <input
                 type="date"
                 value={range.from}
                 onChange={(e) => setRange({ ...range, from: e.target.value })}
-                className="ml-2 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
+                className="ml-2 rounded-lg border border-subtle bg-card px-2 py-1 text-primary"
               />
             </label>
-            <label className="text-sm text-slate-400">
+            <label className="text-sm text-secondary">
               To
               <input
                 type="date"
                 value={range.to}
                 min={range.from}
                 onChange={(e) => setRange({ ...range, to: e.target.value })}
-                className="ml-2 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
+                className="ml-2 rounded-lg border border-subtle bg-card px-2 py-1 text-primary"
               />
             </label>
           </div>
@@ -269,8 +269,8 @@ const HRLeavePage: React.FC = () => {
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-                <tr className="border-b border-slate-800">
+              <thead className="text-left text-xs uppercase tracking-wider text-muted">
+                <tr className="border-b border-subtle">
                   <th className="px-5 py-2">Date</th>
                   <th className="px-5 py-2">Who</th>
                   <th className="px-5 py-2">Type</th>
@@ -278,18 +278,18 @@ const HRLeavePage: React.FC = () => {
                   <th className="px-5 py-2">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-subtle">
                 {calendar.map((day, i) => (
                   <tr key={`${day.employee_id}-${day.leave_date}-${i}`}>
-                    <td className="px-5 py-2 text-slate-300">{day.leave_date}</td>
-                    <td className="px-5 py-2 text-slate-200">
+                    <td className="px-5 py-2 text-secondary">{day.leave_date}</td>
+                    <td className="px-5 py-2 text-primary">
                       {day.first_name} {day.last_name}
                     </td>
-                    <td className="px-5 py-2 text-slate-400">{day.type_name}</td>
-                    <td className="px-5 py-2 text-slate-400">
+                    <td className="px-5 py-2 text-secondary">{day.type_name}</td>
+                    <td className="px-5 py-2 text-secondary">
                       {Number(day.portion) === 0.5 ? 'Half day' : 'Full day'}
                     </td>
-                    <td className="px-5 py-2 text-slate-400">{day.status}</td>
+                    <td className="px-5 py-2 text-secondary">{day.status}</td>
                   </tr>
                 ))}
               </tbody>
@@ -316,10 +316,10 @@ const HRLeavePage: React.FC = () => {
               message="Define the kinds of leave your company grants, and how many days each carries."
             />
           ) : (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60">
+            <div className="rounded-xl border border-subtle bg-card">
               <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-                  <tr className="border-b border-slate-800">
+                <thead className="text-left text-xs uppercase tracking-wider text-muted">
+                  <tr className="border-b border-subtle">
                     <th className="px-5 py-2">Type</th>
                     <th className="px-5 py-2">Days / year</th>
                     <th className="px-5 py-2">Notice</th>
@@ -327,19 +327,19 @@ const HRLeavePage: React.FC = () => {
                     <th className="px-5 py-2">Active</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
+                <tbody className="divide-y divide-subtle">
                   {types.map((t) => (
                     <tr key={t.id}>
                       <td className="px-5 py-2">
-                        <div className="text-slate-200">{t.name}</div>
-                        <div className="text-xs text-slate-500">{t.code}</div>
+                        <div className="text-primary">{t.name}</div>
+                        <div className="text-xs text-muted">{t.code}</div>
                       </td>
-                      <td className="px-5 py-2 text-slate-300">
+                      <td className="px-5 py-2 text-secondary">
                         {Number(t.days_per_year) > 0 ? t.days_per_year : 'Uncapped'}
                       </td>
-                      <td className="px-5 py-2 text-slate-400">{t.min_notice_days} day(s)</td>
-                      <td className="px-5 py-2 text-slate-400">{t.is_paid ? 'Yes' : 'No'}</td>
-                      <td className="px-5 py-2 text-slate-400">{t.is_active ? 'Yes' : 'No'}</td>
+                      <td className="px-5 py-2 text-secondary">{t.min_notice_days} day(s)</td>
+                      <td className="px-5 py-2 text-secondary">{t.is_paid ? 'Yes' : 'No'}</td>
+                      <td className="px-5 py-2 text-secondary">{t.is_active ? 'Yes' : 'No'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -353,51 +353,51 @@ const HRLeavePage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <form
             onSubmit={createType}
-            className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6"
+            className="w-full max-w-md rounded-xl border border-subtle bg-card p-6"
           >
-            <h2 className="mb-4 text-lg font-semibold text-slate-100">New leave type</h2>
+            <h2 className="mb-4 text-lg font-semibold text-primary">New leave type</h2>
             <div className="grid gap-3">
               <div className="grid grid-cols-2 gap-3">
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-secondary">
                   Code
                   <input
                     value={typeForm.code}
                     onChange={(e) => setTypeForm({ ...typeForm, code: e.target.value })}
                     required
-                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                    className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                   />
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-secondary">
                   Days per year
                   <input
                     type="number"
                     min={0}
                     value={typeForm.daysPerYear}
                     onChange={(e) => setTypeForm({ ...typeForm, daysPerYear: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                    className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                   />
                 </label>
               </div>
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Name
                 <input
                   value={typeForm.name}
                   onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })}
                   required
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-secondary">
                 Minimum notice (days)
                 <input
                   type="number"
                   min={0}
                   value={typeForm.minNoticeDays}
                   onChange={(e) => setTypeForm({ ...typeForm, minNoticeDays: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200"
+                  className="mt-1 w-full rounded-lg border border-subtle bg-card px-3 py-2 text-primary"
                 />
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-300">
+              <label className="flex items-center gap-2 text-sm text-secondary">
                 <input
                   type="checkbox"
                   checked={typeForm.isPaid}
@@ -405,7 +405,7 @@ const HRLeavePage: React.FC = () => {
                 />
                 Paid leave
               </label>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted">
                 Zero days per year means uncapped — unpaid leave, typically.
               </p>
             </div>
@@ -413,7 +413,7 @@ const HRLeavePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTypeForm(false)}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300"
+                className="rounded-lg border border-subtle px-4 py-2 text-sm text-secondary"
               >
                 Cancel
               </button>

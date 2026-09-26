@@ -52,7 +52,7 @@ export const SetPasswordPage: React.FC<{ mode: 'activate' | 'reset' }> = ({ mode
     return (
       <AuthShell subtitle={title}>
         <div className="space-y-4">
-          <p className="text-slate-200">This page needs the link from your email. Open the link again, or ask for a new one.</p>
+          <p className="text-primary">This page needs the link from your email. Open the link again, or ask for a new one.</p>
           <Link to={mode === 'activate' ? '/login' : '/forgot-password'} className="btn-primary w-full justify-center inline-flex">
             {mode === 'activate' ? 'Back to sign in' : 'Request a new link'}
           </Link>
@@ -65,7 +65,7 @@ export const SetPasswordPage: React.FC<{ mode: 'activate' | 'reset' }> = ({ mode
     return (
       <AuthShell subtitle={title}>
         <div className="space-y-4">
-          <p className="text-slate-200" role="status">{done}</p>
+          <p className="text-primary" role="status">{done}</p>
           <Link to="/login" className="btn-primary w-full justify-center inline-flex">Sign in</Link>
         </div>
       </AuthShell>
@@ -82,7 +82,7 @@ export const SetPasswordPage: React.FC<{ mode: 'activate' | 'reset' }> = ({ mode
         <PasswordRules />
         <FormProblems error={error} problems={problems} />
         {mode === 'reset' && (
-          <p className="text-xs text-slate-400">Changing your password signs you out on every device.</p>
+          <p className="text-xs text-secondary">Changing your password signs you out on every device.</p>
         )}
         <button type="submit" disabled={busy || !password || !confirm}
           className="btn-primary w-full justify-center inline-flex items-center gap-2 disabled:opacity-50">

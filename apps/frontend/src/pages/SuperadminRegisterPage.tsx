@@ -80,13 +80,13 @@ export const SuperadminRegisterPage: React.FC = () => {
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-white mb-4">
+          <h1 className="text-3xl font-bold text-primary mb-4">
             Superadmin Account Created!
           </h1>
-          <p className="text-slate-400 mb-8">
+          <p className="text-secondary mb-8">
             Your superadmin account has been successfully created.
           </p>
-          <p className="text-slate-500 text-sm mb-6">
+          <p className="text-muted text-sm mb-6">
             Redirecting to login in a few seconds...
           </p>
 
@@ -118,7 +118,7 @@ export const SuperadminRegisterPage: React.FC = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <JjeloTechLogo size="lg" showText={true} />
-          <p className="text-slate-400 mt-4">Create Superadmin Account</p>
+          <p className="text-secondary mt-4">Create Superadmin Account</p>
         </div>
 
         {/* Form Card */}
@@ -126,7 +126,7 @@ export const SuperadminRegisterPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Full Name Input */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-secondary mb-2">
                 <User className="inline w-4 h-4 mr-2" />
                 Full Name
               </label>
@@ -143,7 +143,7 @@ export const SuperadminRegisterPage: React.FC = () => {
 
             {/* Email Input */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-secondary mb-2">
                 <Mail className="inline w-4 h-4 mr-2" />
                 Email Address
               </label>
@@ -185,7 +185,7 @@ export const SuperadminRegisterPage: React.FC = () => {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm"
+                className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 dark:text-red-300 text-sm"
               >
                 {error}
               </motion.div>
@@ -204,16 +204,16 @@ export const SuperadminRegisterPage: React.FC = () => {
 
           {/* Info Box */}
           <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <p className="text-blue-300 text-sm">
+            <p className="text-blue-700 dark:text-blue-300 text-sm">
               <span className="font-semibold">⚠️ Important:</span> This creates a superadmin account with full platform access. Use with caution.
             </p>
           </div>
         </div>
 
         {/* Back to Login Link */}
-        <div className="text-center text-slate-400">
+        <div className="text-center text-secondary">
           Already have an account?{' '}
-          <a href="/login" className="text-primary-400 hover:text-primary-300 font-semibold">
+          <a href="/login" className="text-primary-700 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold">
             Sign in here
           </a>
         </div>

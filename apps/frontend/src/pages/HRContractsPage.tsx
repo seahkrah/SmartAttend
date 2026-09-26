@@ -34,10 +34,10 @@ type Tab = ContractStatus | 'all';
 const TODAY = new Date().toISOString().slice(0, 10);
 
 const STATUS_STYLE: Record<ContractStatus, string> = {
-  draft: 'bg-slate-700/40 text-slate-300',
-  active: 'bg-success-600/20 text-success-300',
-  ended: 'bg-slate-800 text-slate-500',
-  cancelled: 'bg-slate-800 text-slate-500',
+  draft: 'bg-sunken text-secondary',
+  active: 'bg-success-600/20 text-success-700 dark:text-success-300',
+  ended: 'bg-sunken text-muted',
+  cancelled: 'bg-sunken text-muted',
 };
 
 interface Props {
@@ -203,11 +203,11 @@ const HRContractsPage: React.FC<Props> = ({ canEnd = false }) => {
     { id: 'all', label: 'All' },
   ];
 
-  const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600';
-  const label = 'mb-1 block text-xs uppercase tracking-wider text-slate-500';
+  const field = 'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
+  const label = 'mb-1 block text-xs uppercase tracking-wider text-muted';
   const primary = 'inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-500 disabled:opacity-50';
-  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50';
-  const card = 'rounded-xl border border-slate-800 bg-slate-900/60';
+  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-sm text-secondary hover:bg-sunken disabled:opacity-50';
+  const card = 'rounded-xl border border-subtle bg-card';
 
   // A fixed term needs an end date; the form says so rather than letting the
   // API refuse it after the fact.
@@ -216,8 +216,8 @@ const HRContractsPage: React.FC<Props> = ({ canEnd = false }) => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Roles &amp; contracts</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-primary">Roles &amp; contracts</h1>
+        <p className="mt-1 text-sm text-secondary">
           What each person is engaged to do, for how many hours, and until when.
         </p>
       </div>
@@ -225,20 +225,20 @@ const HRContractsPage: React.FC<Props> = ({ canEnd = false }) => {
       {error && <ErrorAlert title="Could not load contracts" message={error} onDismiss={() => setError(null)} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 border-b border-slate-800">
+        <div className="flex gap-1 border-b border-subtle">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`inline-flex items-center gap-2 border-b-2 px-4 py-2 text-sm transition ${
                 tab === t.id
-                  ? 'border-brand-500 text-slate-100'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-brand-500 text-primary'
+                  : 'border-transparent text-secondary hover:text-primary'
               }`}
             >
               {t.label}
               {t.count !== undefined && t.count > 0 && (
-                <span className="rounded-full bg-slate-700/40 px-2 py-0.5 text-xs text-slate-300">
+                <span className="rounded-full bg-sunken px-2 py-0.5 text-xs text-secondary">
                   {t.count}
                 </span>
               )}
@@ -252,8 +252,8 @@ const HRContractsPage: React.FC<Props> = ({ canEnd = false }) => {
 
       {showForm && (
         <div className={card}>
-          <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
-            <span className="text-sm font-semibold text-slate-200">
+          <div className="flex items-center justify-between border-b border-subtle px-5 py-3">
+            <span className="text-sm font-semibold text-primary">
               {editing ? `Revising ${editing.reference}` : 'New contract'}
             </span>
             <button className={ghost} onClick={() => { setShowForm(false); setEditing(null); }}>
@@ -338,7 +338,7 @@ const HRContractsPage: React.FC<Props> = ({ canEnd = false }) => {
               } onClick={() => void save()}>
                 {editing ? 'Save the draft' : 'Draft it'}
               </button>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted">
                 A contract is drafted first and takes effect when it is activated. After that
                 its terms are fixed — different terms are a new contract.
               </span>
@@ -357,26 +357,26 @@ const HRContractsPage: React.FC<Props> = ({ canEnd = false }) => {
             />
           </div>
         ) : (
-          <ul className="divide-y divide-slate-800">
+          <ul className="divide-y divide-subtle">
             {shown.map((c) => (
               <li key={c.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-slate-100">
+                    <span className="text-sm font-medium text-primary">
                       {c.first_name} {c.last_name}
                     </span>
-                    <span className="text-xs text-slate-500">{c.employee_number}</span>
+                    <span className="text-xs text-muted">{c.employee_number}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[c.status]}`}>
                       {c.status}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-sm text-slate-300">
+                  <div className="mt-0.5 text-sm text-secondary">
                     {c.job_title}
-                    <span className="ml-2 text-xs text-slate-500">
+                    <span className="ml-2 text-xs text-muted">
                       {CONTRACT_TYPE_LABEL[c.contract_type]} · {c.reference}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs text-muted">
                     {isoDay(c.start_date)} → {c.end_date ? isoDay(c.end_date) : 'open-ended'}
                     {' · '}{formatHours(c.weekly_hours)} h over {formatHours(c.working_days)} days
                     {' · '}{c.notice_period_days} days' notice
@@ -384,7 +384,7 @@ const HRContractsPage: React.FC<Props> = ({ canEnd = false }) => {
                     {c.manager_first_name && ` · reports to ${c.manager_first_name} ${c.manager_last_name}`}
                   </div>
                   {c.status === 'ended' && c.end_reason && (
-                    <div className="mt-1 text-xs text-slate-500">Ended: {c.end_reason}</div>
+                    <div className="mt-1 text-xs text-muted">Ended: {c.end_reason}</div>
                   )}
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">

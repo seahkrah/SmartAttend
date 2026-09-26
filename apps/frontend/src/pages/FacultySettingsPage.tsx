@@ -112,57 +112,57 @@ export const FacultySettingsPage: React.FC = () => {
     <>
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-white">Settings</h1>
-          <p className="text-slate-400 mt-1">Manage your profile and security settings.</p>
+          <h1 className="text-3xl font-bold text-primary">Settings</h1>
+          <p className="text-secondary mt-1">Manage your profile and security settings.</p>
         </div>
 
         {/* ═════════════════════════════════════ */}
         {/* PERSONAL INFORMATION                 */}
         {/* ═════════════════════════════════════ */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700">
-          <div className="px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <div className="bg-sunken rounded-xl border border-subtle">
+          <div className="px-6 py-4 border-b border-subtle">
+            <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
               👤 Personal Information
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Update your name and contact details.</p>
+            <p className="text-xs text-secondary mt-1">Update your name and contact details.</p>
           </div>
 
           {profileLoading ? (
             <div className="p-6 flex items-center justify-center">
               <div className="w-6 h-6 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <span className="ml-2 text-slate-400 text-sm">Loading profile...</span>
+              <span className="ml-2 text-secondary text-sm">Loading profile...</span>
             </div>
           ) : (
             <form onSubmit={handleProfileSave} className="p-6 space-y-5">
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Email</label>
+                <label className="block text-xs text-secondary mb-1.5">Email</label>
                 <input
                   type="email"
                   value={email}
                   disabled
-                  className="w-full bg-slate-900/50 border border-slate-700 text-slate-500 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+                  className="w-full bg-card border border-subtle text-muted rounded-lg px-3 py-2 text-sm cursor-not-allowed"
                 />
-                <p className="text-xs text-slate-500 mt-1">Email cannot be changed. Contact admin if needed.</p>
+                <p className="text-xs text-muted mt-1">Email cannot be changed. Contact admin if needed.</p>
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Full Name</label>
+                <label className="block text-xs text-secondary mb-1.5">Full Name</label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full bg-card border border-strong text-primary rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Phone</label>
+                <label className="block text-xs text-secondary mb-1.5">Phone</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+1 234 567 890"
-                  className="w-full bg-slate-900 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full bg-card border border-strong text-primary rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                 />
               </div>
 
@@ -170,7 +170,7 @@ export const FacultySettingsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={profileSaving}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-sunken disabled:text-muted text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   {profileSaving ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -182,29 +182,29 @@ export const FacultySettingsPage: React.FC = () => {
         {/* ═════════════════════════════════════ */}
         {/* CHANGE PASSWORD                      */}
         {/* ═════════════════════════════════════ */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700">
-          <div className="px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <div className="bg-sunken rounded-xl border border-subtle">
+          <div className="px-6 py-4 border-b border-subtle">
+            <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
               🔒 Change Password
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Update your login password. Must be at least 10 characters. Other devices will be signed out.</p>
+            <p className="text-xs text-secondary mt-1">Update your login password. Must be at least 10 characters. Other devices will be signed out.</p>
           </div>
 
           <form onSubmit={handlePasswordChange} className="p-6 space-y-5">
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">Current Password</label>
+              <label className="block text-xs text-secondary mb-1.5">Current Password</label>
               <div className="relative">
                 <input
                   type={showCurrentPw ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter current password"
-                  className="w-full bg-slate-900 border border-slate-600 text-white rounded-lg px-3 py-2 pr-10 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full bg-card border border-strong text-primary rounded-lg px-3 py-2 pr-10 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPw(!showCurrentPw)}
-                  className="absolute right-3 top-2 text-slate-500 hover:text-white text-xs"
+                  className="absolute right-3 top-2 text-muted hover:text-primary text-xs"
                 >
                   {showCurrentPw ? 'Hide' : 'Show'}
                 </button>
@@ -212,39 +212,39 @@ export const FacultySettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">New Password</label>
+              <label className="block text-xs text-secondary mb-1.5">New Password</label>
               <div className="relative">
                 <input
                   type={showNewPw ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password (min 10 characters)"
-                  className="w-full bg-slate-900 border border-slate-600 text-white rounded-lg px-3 py-2 pr-10 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  className="w-full bg-card border border-strong text-primary rounded-lg px-3 py-2 pr-10 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPw(!showNewPw)}
-                  className="absolute right-3 top-2 text-slate-500 hover:text-white text-xs"
+                  className="absolute right-3 top-2 text-muted hover:text-primary text-xs"
                 >
                   {showNewPw ? 'Hide' : 'Show'}
                 </button>
               </div>
               {newPassword && newPassword.length < 10 && (
-                <p className="text-xs text-amber-400 mt-1">Must be at least 10 characters</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Must be at least 10 characters</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">Confirm New Password</label>
+              <label className="block text-xs text-secondary mb-1.5">Confirm New Password</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter new password"
-                className="w-full bg-slate-900 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                className="w-full bg-card border border-strong text-primary rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
               />
               {confirmPassword && confirmPassword !== newPassword && (
-                <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+                <p className="text-xs text-red-700 dark:text-red-400 mt-1">Passwords do not match</p>
               )}
             </div>
 
@@ -252,7 +252,7 @@ export const FacultySettingsPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-sunken disabled:text-muted text-white text-sm font-medium rounded-lg transition-colors"
               >
                 {passwordSaving ? 'Changing...' : 'Change Password'}
               </button>
@@ -263,12 +263,12 @@ export const FacultySettingsPage: React.FC = () => {
         {/* ═════════════════════════════════════ */}
         {/* NOTIFICATIONS                        */}
         {/* ═════════════════════════════════════ */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700">
-          <div className="px-6 py-4 border-b border-slate-700">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <div className="bg-sunken rounded-xl border border-subtle">
+          <div className="px-6 py-4 border-b border-subtle">
+            <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
               🔔 Notifications
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-secondary mt-1">
               Choose what you hear about, and where.
             </p>
           </div>

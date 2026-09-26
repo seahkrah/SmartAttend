@@ -43,11 +43,11 @@ function mondayOf(d: Date): Date {
 }
 
 const STATUS_STYLE: Record<TimesheetStatus, string> = {
-  draft: 'bg-slate-700/40 text-slate-300',
-  submitted: 'bg-amber-500/20 text-amber-300',
-  approved: 'bg-brand-500/20 text-brand-300',
-  rejected: 'bg-rose-600/20 text-rose-300',
-  exported: 'bg-success-600/20 text-success-300',
+  draft: 'bg-sunken text-secondary',
+  submitted: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+  approved: 'bg-brand-500/20 text-brand-700 dark:text-brand-300',
+  rejected: 'bg-rose-600/20 text-rose-700 dark:text-rose-300',
+  exported: 'bg-success-600/20 text-success-700 dark:text-success-300',
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -257,11 +257,11 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
 
   if (loading) return <LoadingOverlay message="Loading timesheets…" />;
 
-  const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600';
-  const label = 'mb-1 block text-xs uppercase tracking-wider text-slate-500';
+  const field = 'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
+  const label = 'mb-1 block text-xs uppercase tracking-wider text-muted';
   const primary = 'inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-500 disabled:opacity-50';
-  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50';
-  const card = 'rounded-xl border border-slate-800 bg-slate-900/60';
+  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-sm text-secondary hover:bg-sunken disabled:opacity-50';
+  const card = 'rounded-xl border border-subtle bg-card';
 
   const t = open?.timesheet;
   const mine = t ? submittedHere.has(t.id) : false;
@@ -269,8 +269,8 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Timesheets</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-primary">Timesheets</h1>
+        <p className="mt-1 text-sm text-secondary">
           What the check-ins say, what was signed off, and what goes to payroll.
         </p>
       </div>
@@ -278,7 +278,7 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
       {error && <ErrorAlert title="Could not load timesheets" message={error} onDismiss={() => setError(null)} />}
 
       <div className={card}>
-        <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+        <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
           Build a period
         </div>
         <div className="grid gap-3 p-5 sm:grid-cols-4">
@@ -311,8 +311,8 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
         </div>
 
         {preview && (
-          <div className="border-t border-slate-800 p-5">
-            <div className="grid grid-cols-2 gap-px bg-slate-800 sm:grid-cols-5">
+          <div className="border-t border-subtle p-5">
+            <div className="grid grid-cols-2 gap-px bg-sunken sm:grid-cols-5">
               {[
                 ['Contracted', formatHours(preview.contractedHours)],
                 ['Rostered', formatHours(preview.rosteredHours)],
@@ -320,20 +320,20 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
                 ['Approved', formatHours(preview.approvedHours)],
                 ['Overtime', formatHours(preview.overtimeHours)],
               ].map(([k, v]) => (
-                <div key={k} className="bg-slate-900/60 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wider text-slate-500">{k}</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-100">{v} h</div>
+                <div key={k} className="bg-card px-4 py-3">
+                  <div className="text-xs uppercase tracking-wider text-muted">{k}</div>
+                  <div className="mt-1 text-lg font-semibold text-primary">{v} h</div>
                 </div>
               ))}
             </div>
-            <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+            <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted">
               {preview.contract ? (
                 <span>
                   Measured against {preview.contract.reference} —
                   {' '}{preview.contract.weeklyHours} h over {preview.contract.workingDays} days
                 </span>
               ) : (
-                <span className="text-amber-400">
+                <span className="text-amber-700 dark:text-amber-400">
                   No contract in force for this period, so nothing to measure overtime against.
                 </span>
               )}
@@ -341,7 +341,7 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
                 <span>{preview.leaveDays} day(s) of approved leave reduced the contracted hours</span>
               )}
               {Number(preview.flaggedHours) > 0 && (
-                <span className="text-amber-400">
+                <span className="text-amber-700 dark:text-amber-400">
                   {formatHours(preview.flaggedHours)} h of flagged check-ins were not counted
                 </span>
               )}
@@ -352,7 +352,7 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className={`${card} lg:col-span-1`}>
-          <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+          <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
             Timesheets
           </div>
           {sheets.length === 0 ? (
@@ -364,28 +364,28 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
               />
             </div>
           ) : (
-            <ul className="max-h-[36rem] divide-y divide-slate-800 overflow-y-auto">
+            <ul className="max-h-[36rem] divide-y divide-subtle overflow-y-auto">
               {sheets.map((s) => (
                 <li key={s.id}>
                   <button
                     onClick={() => void openSheet(s.id)}
                     className={`w-full px-5 py-3 text-left transition ${
-                      t?.id === s.id ? 'bg-slate-800/60' : 'hover:bg-slate-800/30'
+                      t?.id === s.id ? 'bg-sunken' : 'hover:bg-sunken'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm text-slate-100">
+                      <span className="text-sm text-primary">
                         {s.first_name} {s.last_name}
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[s.status]}`}>
                         {TIMESHEET_STATUS_LABEL[s.status]}
                       </span>
                     </div>
-                    <div className="mt-0.5 text-xs text-slate-500">
+                    <div className="mt-0.5 text-xs text-muted">
                       {isoDay(s.period_start)} → {isoDay(s.period_end)}
                       {' · '}{formatHours(s.approved_hours)} h
                       {Number(s.overtime_hours) > 0 && (
-                        <span className="text-amber-400">
+                        <span className="text-amber-700 dark:text-amber-400">
                           {' '}(+{formatHours(s.overtime_hours)} OT)
                         </span>
                       )}
@@ -408,15 +408,15 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
             </div>
           ) : (
             <div className={card}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-subtle px-5 py-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-100">
+                  <div className="text-sm font-semibold text-primary">
                     {open.employee?.first_name} {open.employee?.last_name}
                     <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[t.status]}`}>
                       {TIMESHEET_STATUS_LABEL[t.status]}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted">
                     {isoDay(t.period_start)} → {isoDay(t.period_end)}
                     {open.contract && ` · ${open.contract.reference}, ${formatHours(open.contract.weekly_hours)} h/week`}
                   </div>
@@ -442,18 +442,18 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
               </div>
 
               {t.status === 'submitted' && mine && (
-                <div className="border-b border-slate-800 bg-slate-900/40 px-5 py-3 text-sm text-slate-400">
+                <div className="border-b border-subtle bg-card px-5 py-3 text-sm text-secondary">
                   Waiting for somebody else to decide it. A timesheet is signed off by a second
                   pair of eyes; whoever submitted it cannot approve it.
                 </div>
               )}
               {t.status === 'rejected' && t.decision_note && (
-                <div className="border-b border-slate-800 bg-rose-600/5 px-5 py-3 text-sm text-rose-200">
+                <div className="border-b border-subtle bg-rose-600/5 px-5 py-3 text-sm text-rose-700 dark:text-rose-200">
                   Rejected: {t.decision_note}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-px border-b border-slate-800 bg-slate-800 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-px border-b border-subtle bg-sunken sm:grid-cols-5">
                 {[
                   ['Contracted', formatHours(t.contracted_hours)],
                   ['Rostered', formatHours(t.rostered_hours)],
@@ -461,17 +461,17 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
                   ['Approved', formatHours(t.approved_hours)],
                   ['Overtime', formatHours(t.overtime_hours)],
                 ].map(([k, v]) => (
-                  <div key={k} className="bg-slate-900/60 px-4 py-3">
-                    <div className="text-xs uppercase tracking-wider text-slate-500">{k}</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-100">{v} h</div>
+                  <div key={k} className="bg-card px-4 py-3">
+                    <div className="text-xs uppercase tracking-wider text-muted">{k}</div>
+                    <div className="mt-1 text-lg font-semibold text-primary">{v} h</div>
                   </div>
                 ))}
               </div>
 
               {Number(t.flagged_hours) > 0 && (
-                <div className="flex items-start gap-3 border-b border-slate-800 bg-amber-500/5 px-5 py-3">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                  <div className="text-sm text-amber-200">
+                <div className="flex items-start gap-3 border-b border-subtle bg-amber-500/5 px-5 py-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+                  <div className="text-sm text-amber-700 dark:text-amber-200">
                     {formatHours(t.flagged_hours)} hours came from flagged check-ins and were not
                     counted. Adjust the days concerned if they should be paid.
                   </div>
@@ -480,8 +480,8 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-                    <tr className="border-b border-slate-800">
+                  <thead className="text-left text-xs uppercase tracking-wider text-muted">
+                    <tr className="border-b border-subtle">
                       <th className="px-5 py-3">Day</th>
                       <th className="px-5 py-3 text-right">Rostered</th>
                       <th className="px-5 py-3 text-right">Worked</th>
@@ -490,20 +490,20 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
                       <th className="px-5 py-3" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-subtle">
                     {open.entries.map((e) => {
                       const differs = Number(e.approved_hours) !== Number(e.worked_hours);
                       return (
-                        <tr key={e.id} className="text-slate-300">
+                        <tr key={e.id} className="text-secondary">
                           <td className="px-5 py-2.5">{isoDay(e.work_date)}</td>
                           <td className="px-5 py-2.5 text-right">{formatHours(e.rostered_hours)}</td>
                           <td className="px-5 py-2.5 text-right">{formatHours(e.worked_hours)}</td>
                           <td className={`px-5 py-2.5 text-right ${
-                            differs ? 'font-medium text-amber-300' : 'text-slate-100'
+                            differs ? 'font-medium text-amber-700 dark:text-amber-300' : 'text-primary'
                           }`}>
                             {formatHours(e.approved_hours)}
                           </td>
-                          <td className="px-5 py-2.5 text-xs text-slate-500">
+                          <td className="px-5 py-2.5 text-xs text-muted">
                             {SOURCE_LABEL[e.source] ?? e.source}
                             {Number(e.flagged_hours) > 0
                               && ` · ${formatHours(e.flagged_hours)} h flagged`}
@@ -511,7 +511,7 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
                           </td>
                           <td className="px-5 py-2.5 text-right">
                             {['draft', 'submitted', 'rejected'].includes(t.status) && (
-                              <button className="text-xs text-brand-400 hover:text-brand-300"
+                              <button className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300"
                                 disabled={busy} onClick={() => void adjust(e)}>
                                 Adjust
                               </button>
@@ -522,7 +522,7 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
                     })}
                     {open.entries.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-5 py-6 text-center text-sm text-slate-500">
+                        <td colSpan={6} className="px-5 py-6 text-center text-sm text-muted">
                           Nothing happened in this period — no check-ins, no shifts, no leave.
                         </td>
                       </tr>
@@ -532,16 +532,16 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
               </div>
 
               {t.status === 'approved' && Number(t.overtime_hours) > 0 && (
-                <div className="border-t border-slate-800 p-5">
-                  <div className="mb-3 text-sm font-semibold text-slate-200">Send to payroll</div>
+                <div className="border-t border-subtle p-5">
+                  <div className="mb-3 text-sm font-semibold text-primary">Send to payroll</div>
                   {rate ? (
-                    <p className="mb-3 text-xs text-slate-500">
+                    <p className="mb-3 text-xs text-muted">
                       {formatHours(t.overtime_hours)} hours of overtime at {rate.hourlyRate}
                       {' '}{rate.currency} an hour — the salary over the contracted hours — is
                       {' '}{rate.atMultiplierOne} at plain time.
                     </p>
                   ) : (
-                    <p className="mb-3 text-xs text-amber-400">
+                    <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
                       No hourly rate could be derived: this needs both a contract with hours on
                       it and a compensation record.
                     </p>
@@ -571,7 +571,7 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted">
                       Sending hours to payroll needs a director; it spends money.
                     </p>
                   )}
@@ -579,7 +579,7 @@ const HRTimesheetsPage: React.FC<Props> = ({ canExport = false }) => {
               )}
 
               {t.status === 'exported' && (
-                <div className="flex items-center gap-2 border-t border-slate-800 px-5 py-4 text-sm text-success-300">
+                <div className="flex items-center gap-2 border-t border-subtle px-5 py-4 text-sm text-success-700 dark:text-success-300">
                   <CheckCircle2 className="h-4 w-4" />
                   Staged against the payroll period covering {isoDay(t.period_end)}. It will appear
                   on the next payslip for this employee.

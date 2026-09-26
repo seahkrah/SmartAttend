@@ -66,7 +66,7 @@ const EmployeePayslipsPage: React.FC = () => {
 
   if (loading) return <LoadingOverlay message="Loading your payslips…" />;
 
-  const card = 'rounded-xl border border-slate-800 bg-slate-900/60';
+  const card = 'rounded-xl border border-subtle bg-card';
 
   const earnings = detail?.lines.filter((l) => l.kind === 'earning') ?? [];
   // A zero-amount line explains a prorated basic rather than deducting
@@ -77,8 +77,8 @@ const EmployeePayslipsPage: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">My payslips</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-primary">My payslips</h1>
+        <p className="mt-1 text-sm text-secondary">
           What you were paid, and what it was made up of.
         </p>
       </div>
@@ -96,28 +96,28 @@ const EmployeePayslipsPage: React.FC = () => {
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className={`${card} lg:col-span-1`}>
-            <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
               Periods
             </div>
-            <ul className="divide-y divide-slate-800">
+            <ul className="divide-y divide-subtle">
               {payslips.map((s) => (
                 <li key={s.id}>
                   <button
                     onClick={() => void open(s.id)}
                     className={`w-full px-5 py-3 text-left transition ${
-                      openId === s.id ? 'bg-slate-800/60' : 'hover:bg-slate-800/30'
+                      openId === s.id ? 'bg-sunken' : 'hover:bg-sunken'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-100">{s.period_name}</span>
-                      <span className="text-sm font-medium text-slate-100">
+                      <span className="text-sm text-primary">{s.period_name}</span>
+                      <span className="text-sm font-medium text-primary">
                         {formatMoney(s.net, s.currency)}
                       </span>
                     </div>
-                    <div className="mt-0.5 flex items-center justify-between text-xs text-slate-500">
+                    <div className="mt-0.5 flex items-center justify-between text-xs text-muted">
                       <span>paid {isoDay(s.pay_date)}</span>
                       <span className={
-                        s.run_status === 'paid' ? 'text-success-400' : 'text-amber-400'
+                        s.run_status === 'paid' ? 'text-success-700 dark:text-success-400' : 'text-amber-700 dark:text-amber-400'
                       }>
                         {s.run_status === 'paid' ? 'paid' : 'approved'}
                       </span>
@@ -139,42 +139,42 @@ const EmployeePayslipsPage: React.FC = () => {
               </div>
             ) : (
               <div className={card}>
-                <div className="border-b border-slate-800 px-5 py-4">
-                  <div className="text-sm font-semibold text-slate-100">
+                <div className="border-b border-subtle px-5 py-4">
+                  <div className="text-sm font-semibold text-primary">
                     {detail.run.period_name}
                   </div>
-                  <div className="mt-0.5 text-xs text-slate-500">
+                  <div className="mt-0.5 text-xs text-muted">
                     {isoDay(detail.run.start_date)} → {isoDay(detail.run.end_date)}
                     {' · paid '}{isoDay(detail.run.pay_date)}
                   </div>
                 </div>
 
                 {notes.length > 0 && (
-                  <div className="border-b border-slate-800 bg-slate-900/40 px-5 py-3 text-sm text-slate-400">
+                  <div className="border-b border-subtle bg-card px-5 py-3 text-sm text-secondary">
                     {notes.map((n, i) => <div key={i}>{n.name}</div>)}
                   </div>
                 )}
 
-                <div className="border-b border-slate-800 px-5 py-3 text-xs uppercase tracking-wider text-slate-500">
+                <div className="border-b border-subtle px-5 py-3 text-xs uppercase tracking-wider text-muted">
                   Earnings
                 </div>
-                <ul className="divide-y divide-slate-800">
+                <ul className="divide-y divide-subtle">
                   {earnings.map((l, i) => (
                     <li key={`e-${i}`} className="flex items-center justify-between px-5 py-2.5 text-sm">
-                      <span className="text-slate-200">
+                      <span className="text-primary">
                         {l.name}
                         {!l.is_taxable && (
-                          <span className="ml-2 text-xs text-slate-500">not taxed</span>
+                          <span className="ml-2 text-xs text-muted">not taxed</span>
                         )}
                       </span>
-                      <span className="text-slate-100">
+                      <span className="text-primary">
                         {formatMoney(l.amount, detail.payslip.currency)}
                       </span>
                     </li>
                   ))}
-                  <li className="flex items-center justify-between bg-slate-900/40 px-5 py-2.5 text-sm font-medium">
-                    <span className="text-slate-300">Gross pay</span>
-                    <span className="text-slate-100">
+                  <li className="flex items-center justify-between bg-card px-5 py-2.5 text-sm font-medium">
+                    <span className="text-secondary">Gross pay</span>
+                    <span className="text-primary">
                       {formatMoney(detail.payslip.gross, detail.payslip.currency)}
                     </span>
                   </li>
@@ -182,26 +182,26 @@ const EmployeePayslipsPage: React.FC = () => {
 
                 {deductions.length > 0 && (
                   <>
-                    <div className="border-y border-slate-800 px-5 py-3 text-xs uppercase tracking-wider text-slate-500">
+                    <div className="border-y border-subtle px-5 py-3 text-xs uppercase tracking-wider text-muted">
                       Deductions
                     </div>
-                    <ul className="divide-y divide-slate-800">
+                    <ul className="divide-y divide-subtle">
                       {deductions.map((l, i) => (
                         <li key={`d-${i}`} className="flex items-center justify-between px-5 py-2.5 text-sm">
-                          <span className="text-slate-300">
+                          <span className="text-secondary">
                             {l.name}
                             {l.reduces_taxable && (
-                              <span className="ml-2 text-xs text-slate-500">before tax</span>
+                              <span className="ml-2 text-xs text-muted">before tax</span>
                             )}
                           </span>
-                          <span className="text-rose-300">
+                          <span className="text-rose-700 dark:text-rose-300">
                             −{formatMoney(l.amount, detail.payslip.currency)}
                           </span>
                         </li>
                       ))}
-                      <li className="flex items-center justify-between bg-slate-900/40 px-5 py-2.5 text-sm font-medium">
-                        <span className="text-slate-300">Total deductions</span>
-                        <span className="text-rose-300">
+                      <li className="flex items-center justify-between bg-card px-5 py-2.5 text-sm font-medium">
+                        <span className="text-secondary">Total deductions</span>
+                        <span className="text-rose-700 dark:text-rose-300">
                           −{formatMoney(detail.payslip.total_deductions, detail.payslip.currency)}
                         </span>
                       </li>
@@ -209,15 +209,15 @@ const EmployeePayslipsPage: React.FC = () => {
                   </>
                 )}
 
-                <div className="flex items-center justify-between border-t border-slate-800 px-5 py-4">
-                  <span className="text-sm font-semibold text-slate-200">Net pay</span>
-                  <span className="text-xl font-semibold text-slate-100">
+                <div className="flex items-center justify-between border-t border-subtle px-5 py-4">
+                  <span className="text-sm font-semibold text-primary">Net pay</span>
+                  <span className="text-xl font-semibold text-primary">
                     {formatMoney(detail.payslip.net, detail.payslip.currency)}
                   </span>
                 </div>
 
                 {!detail.run.tax_table_applied && (
-                  <div className="border-t border-slate-800 px-5 py-3 text-xs text-slate-500">
+                  <div className="border-t border-subtle px-5 py-3 text-xs text-muted">
                     No income tax table was in force for this period, so no tax was
                     deducted.
                   </div>

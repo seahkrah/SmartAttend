@@ -100,7 +100,7 @@ const FileUpload: React.FC<Props> = ({
       className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
         dragging
           ? 'border-brand-500 bg-brand-500/5'
-          : 'border-slate-700 hover:border-slate-600'
+          : 'border-subtle hover:border-strong'
       } ${disabled || busy ? 'opacity-60' : ''}`}
     >
       <input
@@ -118,8 +118,8 @@ const FileUpload: React.FC<Props> = ({
 
       {busy ? (
         <div className="space-y-2">
-          <p className="text-sm text-slate-300">Uploading… {progress}%</p>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+          <p className="text-sm text-secondary">Uploading… {progress}%</p>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-sunken">
             <div
               className="h-full bg-brand-500 transition-all"
               style={{ width: `${progress}%` }}
@@ -128,16 +128,16 @@ const FileUpload: React.FC<Props> = ({
         </div>
       ) : (
         <>
-          <Upload className="mx-auto h-6 w-6 text-slate-500" />
+          <Upload className="mx-auto h-6 w-6 text-muted" />
           <label
             htmlFor={`upload-${category}-${ownerId ?? 'new'}`}
             className={`mt-2 block text-sm font-medium ${
-              disabled ? 'text-slate-500' : 'cursor-pointer text-brand-400 hover:text-brand-300'
+              disabled ? 'text-muted' : 'cursor-pointer text-brand-700 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300'
             }`}
           >
             {label}
           </label>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted">
             or drop it here · PDF, images, Word, Excel, text
           </p>
         </>
@@ -168,19 +168,19 @@ export const FileChip: React.FC<{
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+    <div className="flex items-center gap-3 rounded-lg border border-subtle bg-card p-3">
       {isImage
-        ? <ImageIcon className="h-4 w-4 shrink-0 text-sky-400" />
-        : <FileText className="h-4 w-4 shrink-0 text-slate-400" />}
+        ? <ImageIcon className="h-4 w-4 shrink-0 text-sky-700 dark:text-sky-400" />
+        : <FileText className="h-4 w-4 shrink-0 text-secondary" />}
 
       <button
         onClick={() => void download()}
         disabled={busy}
         className="min-w-0 flex-1 text-left disabled:opacity-60"
       >
-        <p className="truncate text-sm text-slate-200 hover:text-brand-300">{file.name}</p>
+        <p className="truncate text-sm text-primary hover:text-brand-700 dark:hover:text-brand-300">{file.name}</p>
         {!compact && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             {formatBytes(file.byteSize)} · {new Date(file.createdAt).toLocaleDateString()}
             {file.uploadedByName ? ` · ${file.uploadedByName}` : ''}
           </p>
@@ -192,18 +192,18 @@ export const FileChip: React.FC<{
       {file.scanStatus === 'infected' ? (
         <span
           title="This file was flagged by a scan"
-          className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-300"
+          className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-xs text-rose-700 dark:text-rose-300"
         >
           <AlertTriangle className="h-3 w-3" /> Flagged
         </span>
       ) : file.scanStatus === 'clean' ? (
-        <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+        <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 className="h-3 w-3" /> Scanned
         </span>
       ) : (
         <span
           title="No virus scanner is configured on this deployment, so this file has not been inspected"
-          className="text-xs text-slate-600"
+          className="text-xs text-muted"
         >
           Not scanned
         </span>
@@ -213,7 +213,7 @@ export const FileChip: React.FC<{
         <button
           onClick={() => onRemove(file)}
           title="Remove this file"
-          className="rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-rose-300"
+          className="rounded-lg p-1 text-muted hover:bg-sunken hover:text-rose-700 dark:hover:text-rose-300"
         >
           <X className="h-4 w-4" />
         </button>

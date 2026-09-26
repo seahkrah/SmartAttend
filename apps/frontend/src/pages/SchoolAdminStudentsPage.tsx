@@ -292,8 +292,8 @@ const SchoolAdminStudentsPage: React.FC = () => {
       <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Student Management</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage students in your school</p>
+          <h1 className="text-2xl font-bold text-primary">Student Management</h1>
+          <p className="text-sm text-secondary mt-1">Manage students in your school</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -310,7 +310,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
           placeholder="Search by name, student ID, or email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400"
+          className="w-full px-4 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary placeholder:text-muted"
         />
       </div>
 
@@ -318,13 +318,13 @@ const SchoolAdminStudentsPage: React.FC = () => {
       {loading ? (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2 text-gray-600">Loading students...</p>
+          <p className="mt-2 text-secondary">Loading students...</p>
         </div>
       ) : filteredStudents.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
+        <div className="bg-card rounded-lg shadow p-12 text-center">
           <div className="text-6xl mb-4">🎓</div>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">No Students Found</h3>
-          <p className="text-gray-500 mb-4">
+          <h3 className="text-xl font-semibold text-secondary mb-2">No Students Found</h3>
+          <p className="text-muted mb-4">
             {searchTerm ? 'Try a different search term' : 'Get started by adding your first student'}
           </p>
           {!searchTerm && (
@@ -337,34 +337,34 @@ const SchoolAdminStudentsPage: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200 table-fixed" style={{ minWidth: '900px' }}>
-            <thead className="bg-gray-50">
+        <div className="bg-card rounded-lg shadow overflow-x-auto">
+          <table className="w-full divide-y divide-subtle table-fixed" style={{ minWidth: '900px' }}>
+            <thead className="bg-sunken">
               <tr>
-                <th className="w-[100px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
-                <th className="w-[180px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="w-[180px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="w-[160px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">College</th>
-                <th className="w-[130px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                <th className="w-[80px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="w-[70px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
-                <th className="w-[160px] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="w-[100px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Student ID</th>
+                <th className="w-[180px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Name</th>
+                <th className="w-[180px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Email</th>
+                <th className="w-[160px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">College</th>
+                <th className="w-[130px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Department</th>
+                <th className="w-[80px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Status</th>
+                <th className="w-[70px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Active</th>
+                <th className="w-[160px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-subtle">
               {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-3 text-sm font-medium text-gray-900 truncate" title={student.student_id}>{student.student_id}</td>
-                  <td className="px-3 py-3 text-sm text-gray-900 truncate" title={[student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')}>
+                <tr key={student.id} className="hover:bg-sunken">
+                  <td className="px-3 py-3 text-sm font-medium text-primary truncate" title={student.student_id}>{student.student_id}</td>
+                  <td className="px-3 py-3 text-sm text-primary truncate" title={[student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')}>
                     {[student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')}
                   </td>
-                  <td className="px-3 py-3 text-sm text-gray-600 truncate" title={student.email}>{student.email}</td>
-                  <td className="px-3 py-3 text-sm text-gray-600 truncate" title={student.college || ''}>{student.college || '-'}</td>
-                  <td className="px-3 py-3 text-sm text-gray-600 truncate" title={student.department || ''}>{student.department || '-'}</td>
-                  <td className="px-3 py-3 text-sm text-gray-600 capitalize">{student.status || '-'}</td>
+                  <td className="px-3 py-3 text-sm text-secondary truncate" title={student.email}>{student.email}</td>
+                  <td className="px-3 py-3 text-sm text-secondary truncate" title={student.college || ''}>{student.college || '-'}</td>
+                  <td className="px-3 py-3 text-sm text-secondary truncate" title={student.department || ''}>{student.department || '-'}</td>
+                  <td className="px-3 py-3 text-sm text-secondary capitalize">{student.status || '-'}</td>
                   <td className="px-3 py-3">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      student.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      student.is_active ? 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-300'
                     }`}>
                       {student.is_active ? 'Active' : 'Suspended'}
                     </span>
@@ -373,7 +373,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openEditModal(student)}
-                        className="px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/15 rounded transition-colors"
                         title="Edit student"
                       >
                         Edit
@@ -382,8 +382,8 @@ const SchoolAdminStudentsPage: React.FC = () => {
                         onClick={() => handleSuspendStudent(student)}
                         className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                           student.is_active
-                            ? 'text-orange-600 hover:bg-orange-50'
-                            : 'text-green-600 hover:bg-green-50'
+                            ? 'text-orange-600 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-500/15'
+                            : 'text-green-600 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-500/15'
                         }`}
                         title={student.is_active ? 'Suspend student' : 'Reactivate student'}
                       >
@@ -391,7 +391,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setConfirmDelete(student)}
-                        className="px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
+                        className="px-2 py-1 text-xs font-medium text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-500/15 rounded transition-colors"
                         title="Delete student"
                       >
                         Delete
@@ -408,7 +408,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
       {/* Add/Edit Modal */}
       {(showAddModal || editingStudent) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-card rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">{editingStudent ? 'Edit Student' : 'Add New Student'}</h2>
             <form onSubmit={editingStudent ? handleUpdateStudent : handleCreateStudent}>
               {/* Photo Upload Section */}
@@ -418,15 +418,15 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     <img
                       src={photoPreview}
                       alt="Student"
-                      className="w-32 h-32 rounded-full object-cover border-4 border-gray-200"
+                      className="w-32 h-32 rounded-full object-cover border-4 border-subtle"
                     />
                   ) : (
-                    <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center border-4 border-gray-200">
-                      <span className="text-4xl text-gray-400">👤</span>
+                    <div className="w-32 h-32 rounded-full bg-sunken flex items-center justify-center border-4 border-subtle">
+                      <span className="text-4xl text-muted">👤</span>
                     </div>
                   )}
                 </div>
-                <label className="mt-3 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 cursor-pointer text-sm font-medium">
+                <label className="mt-3 px-4 py-2 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/15 cursor-pointer text-sm font-medium">
                   {photoPreview ? 'Change Photo' : 'Upload Photo *'}
                   <input
                     type="file"
@@ -435,56 +435,56 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     className="hidden"
                   />
                 </label>
-                <p className="text-xs text-gray-500 mt-2">Max 5MB, JPG/PNG {!editingStudent && '(Required)'}</p>
+                <p className="text-xs text-muted mt-2">Max 5MB, JPG/PNG {!editingStudent && '(Required)'}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Student ID *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Student ID *</label>
                   <input
                     type="text"
                     required
                     value={formData.studentId}
                     onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="e.g., S12345"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">First Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Middle Name</label>
                   <input
                     type="text"
                     value={formData.middleName}
                     onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Last Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Gender</label>
                   <select
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                   >
                     <option value="">Prefer not to say</option>
@@ -494,64 +494,64 @@ const SchoolAdminStudentsPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Email *</label>
                   <input
                     type="email"
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     disabled={!!editingStudent}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-sunken text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Phone</label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="+1234567890"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Address</label>
                   <input
                     type="text"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">College *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">College *</label>
                   <input
                     type="text"
                     value={formData.college}
                     onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="e.g., College of Engineering"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Department *</label>
                   <input
                     type="text"
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                     placeholder="e.g., Computer Science"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">Status *</label>
                   <select
                     required
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-medium appearance-none cursor-pointer"
+                    className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                   >
                     <option value="freshman">Freshman</option>
@@ -562,7 +562,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
                 </div>
               </div>
               {!editingStudent && (
-                <p className="text-sm text-gray-500 mt-4 bg-blue-50 p-3 rounded">
+                <p className="text-sm text-muted mt-4 bg-blue-50 dark:bg-blue-500/15 p-3 rounded">
                   ℹ️ A user account will be automatically created. Student will set password on first login.
                 </p>
               )}
@@ -574,14 +574,14 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     setEditingStudent(null);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-subtle text-secondary rounded-lg hover:bg-sunken"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-raised disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? (
                     <span className="flex items-center justify-center gap-2">
@@ -603,16 +603,16 @@ const SchoolAdminStudentsPage: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Student</h3>
-            <p className="text-sm text-gray-600 mb-4">
+          <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-primary mb-2">Delete Student</h3>
+            <p className="text-sm text-secondary mb-4">
               Are you sure you want to delete <span className="font-semibold">{confirmDelete.first_name} {confirmDelete.last_name}</span> ({confirmDelete.student_id})?
               This action cannot be undone and will also remove their user account.
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-secondary bg-sunken hover:bg-sunken rounded-lg transition-colors"
               >
                 Cancel
               </button>

@@ -35,7 +35,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-card p-6">
       {error && (
         <ErrorAlert
           title="Failed to load analytics"
@@ -57,7 +57,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
         {/* Overview Cards */}
         {overview && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <div className="bg-sunken border border-subtle rounded-lg p-6">
               <div className={HIERARCHY.SECONDARY.className}>Total Members</div>
               <div className="text-3xl font-bold mt-2">{overview.total_members}</div>
               <div className={HIERARCHY.TERTIARY.className}>
@@ -92,7 +92,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
               {patterns.map((pattern, idx) => (
                 <div
                   key={idx}
-                  className="bg-slate-800 border border-slate-700 rounded-lg p-4"
+                  className="bg-sunken border border-subtle rounded-lg p-4"
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -104,7 +104,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
                         {pattern.absences_in_period} absence(s)
                       </div>
                     </div>
-                    <div className="text-sm font-semibold bg-blue-500/20 text-blue-300 px-3 py-1 rounded">
+                    <div className="text-sm font-semibold bg-blue-500/20 text-blue-700 dark:text-blue-300 px-3 py-1 rounded">
                       {pattern.confidence}% confidence
                     </div>
                   </div>
@@ -129,7 +129,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
               {members.slice(0, 10).map((member) => (
                 <div
                   key={member.id}
-                  className="bg-slate-800/50 p-3 rounded border border-slate-700 flex justify-between items-center"
+                  className="bg-sunken p-3 rounded border border-subtle flex justify-between items-center"
                 >
                   <div>
                     <div className={HIERARCHY.PRIMARY.className}>{member.name}</div>

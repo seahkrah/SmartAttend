@@ -66,58 +66,58 @@ const StudentResultsPage: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Results &amp; Transcript</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-primary">Results &amp; Transcript</h1>
+        <p className="mt-1 text-sm text-secondary">
           {user?.fullName ? `${user.fullName} · ` : ''}
           {transcript.student.studentNumber}
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-          <div className="text-xs uppercase tracking-wider text-slate-500">
+        <div className="rounded-xl border border-subtle bg-card p-5">
+          <div className="text-xs uppercase tracking-wider text-muted">
             {transcript.creditWeighted ? 'CGPA' : 'Average grade point'}
           </div>
-          <div className="mt-2 text-3xl font-bold text-slate-100">
+          <div className="mt-2 text-3xl font-bold text-primary">
             {transcript.cgpa ?? '—'}
           </div>
           {!transcript.creditWeighted && transcript.cgpa !== null && (
-            <div className="mt-1 flex items-start gap-1.5 text-xs text-slate-500">
+            <div className="mt-1 flex items-start gap-1.5 text-xs text-muted">
               <Info className="mt-0.5 h-3 w-3 shrink-0" />
               <span>Not credit-weighted — your school has not set course credits.</span>
             </div>
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-          <div className="text-xs uppercase tracking-wider text-slate-500">Credits earned</div>
-          <div className="mt-2 text-3xl font-bold text-slate-100">
+        <div className="rounded-xl border border-subtle bg-card p-5">
+          <div className="text-xs uppercase tracking-wider text-muted">Credits earned</div>
+          <div className="mt-2 text-3xl font-bold text-primary">
             {transcript.creditsEarned}
-            <span className="ml-1 text-base font-normal text-slate-500">
+            <span className="ml-1 text-base font-normal text-muted">
               / {transcript.creditsAttempted}
             </span>
           </div>
           {transcript.programme?.credits_required && (
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-1 text-xs text-muted">
               {transcript.programme.credits_required} required to graduate
             </div>
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-          <div className="text-xs uppercase tracking-wider text-slate-500">Programme</div>
+        <div className="rounded-xl border border-subtle bg-card p-5">
+          <div className="text-xs uppercase tracking-wider text-muted">Programme</div>
           {transcript.programme ? (
             <>
-              <div className="mt-2 text-base font-semibold text-slate-100">
+              <div className="mt-2 text-base font-semibold text-primary">
                 {transcript.programme.name}
               </div>
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 text-xs text-muted">
                 Year {transcript.programme.current_study_year}
                 {transcript.programme.award ? ` · ${transcript.programme.award}` : ''}
               </div>
             </>
           ) : (
-            <div className="mt-2 text-sm text-slate-500">Not enrolled on a programme</div>
+            <div className="mt-2 text-sm text-muted">Not enrolled on a programme</div>
           )}
         </div>
       </div>
@@ -130,14 +130,14 @@ const StudentResultsPage: React.FC = () => {
         />
       ) : (
         [...byYear.entries()].map(([year, entries]) => (
-          <div key={year} className="rounded-xl border border-slate-800 bg-slate-900/60">
-            <div className="flex items-center gap-2 border-b border-slate-800 px-5 py-3">
-              <GraduationCap className="h-4 w-4 text-slate-500" />
-              <h2 className="text-sm font-semibold text-slate-300">{year}</h2>
+          <div key={year} className="rounded-xl border border-subtle bg-card">
+            <div className="flex items-center gap-2 border-b border-subtle px-5 py-3">
+              <GraduationCap className="h-4 w-4 text-muted" />
+              <h2 className="text-sm font-semibold text-secondary">{year}</h2>
             </div>
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-                <tr className="border-b border-slate-800">
+              <thead className="text-left text-xs uppercase tracking-wider text-muted">
+                <tr className="border-b border-subtle">
                   <th className="px-5 py-2">Course</th>
                   <th className="px-5 py-2">Term</th>
                   <th className="px-5 py-2">Score</th>
@@ -145,27 +145,27 @@ const StudentResultsPage: React.FC = () => {
                   <th className="px-5 py-2">Credits</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-subtle">
                 {entries.map((entry) => (
                   <tr key={`${entry.course_code}-${entry.semester_name ?? ''}`}>
                     <td className="px-5 py-2">
-                      <div className="text-slate-200">{entry.course_name}</div>
-                      <div className="text-xs text-slate-500">{entry.course_code}</div>
+                      <div className="text-primary">{entry.course_name}</div>
+                      <div className="text-xs text-muted">{entry.course_code}</div>
                     </td>
-                    <td className="px-5 py-2 text-slate-400">{entry.semester_name ?? '—'}</td>
-                    <td className="px-5 py-2 text-slate-300">{entry.total_score}%</td>
+                    <td className="px-5 py-2 text-secondary">{entry.semester_name ?? '—'}</td>
+                    <td className="px-5 py-2 text-secondary">{entry.total_score}%</td>
                     <td className="px-5 py-2">
                       <span
                         className={`rounded px-2 py-0.5 text-xs font-semibold ${
                           entry.is_pass
-                            ? 'bg-success-500/15 text-success-300'
-                            : 'bg-danger-500/15 text-danger-300'
+                            ? 'bg-success-500/15 text-success-700 dark:text-success-300'
+                            : 'bg-danger-500/15 text-danger-700 dark:text-danger-400'
                         }`}
                       >
                         {entry.letter}
                       </span>
                     </td>
-                    <td className="px-5 py-2 text-slate-400">{entry.credits || '—'}</td>
+                    <td className="px-5 py-2 text-secondary">{entry.credits || '—'}</td>
                   </tr>
                 ))}
               </tbody>

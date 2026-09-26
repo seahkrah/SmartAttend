@@ -98,7 +98,7 @@ const NotificationBell: React.FC = () => {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-        className="relative rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+        className="relative rounded-lg p-2 text-secondary transition-colors hover:bg-sunken hover:text-primary"
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
@@ -109,14 +109,14 @@ const NotificationBell: React.FC = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-96 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <p className="text-sm font-semibold text-slate-100">Notifications</p>
+        <div className="absolute right-0 z-50 mt-2 w-96 overflow-hidden rounded-xl border border-subtle bg-card shadow-2xl">
+          <div className="flex items-center justify-between border-b border-subtle px-4 py-3">
+            <p className="text-sm font-semibold text-primary">Notifications</p>
             {unread > 0 && (
               <button
                 onClick={() => void markAll()}
                 disabled={loading}
-                className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-xs text-secondary hover:text-primary disabled:opacity-50"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
                 Mark all read
@@ -126,16 +126,16 @@ const NotificationBell: React.FC = () => {
 
           <div className="max-h-96 overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-slate-500">
+              <p className="px-4 py-10 text-center text-sm text-muted">
                 Nothing yet.
               </p>
             ) : (
-              <ul className="divide-y divide-slate-800">
+              <ul className="divide-y divide-subtle">
                 {items.map((item) => (
                   <li key={item.id}>
                     <button
                       onClick={() => void markRead(item)}
-                      className={`flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-800/60 ${
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-sunken ${
                         item.read_at ? 'opacity-60' : ''
                       }`}
                     >
@@ -145,17 +145,17 @@ const NotificationBell: React.FC = () => {
                         }`}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-slate-200">
+                        <span className="block truncate text-sm font-medium text-primary">
                           {item.subject}
                         </span>
-                        <span className="mt-0.5 block text-xs text-slate-400 line-clamp-2">
+                        <span className="mt-0.5 block text-xs text-secondary line-clamp-2">
                           {item.body}
                         </span>
-                        <span className="mt-1 block text-[11px] text-slate-500">
+                        <span className="mt-1 block text-[11px] text-muted">
                           {new Date(item.created_at).toLocaleString()} · {item.category}
                         </span>
                       </span>
-                      {item.read_at && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-600" />}
+                      {item.read_at && <Check className="mt-1 h-3.5 w-3.5 shrink-0 text-muted" />}
                     </button>
                   </li>
                 ))}
@@ -163,10 +163,10 @@ const NotificationBell: React.FC = () => {
             )}
           </div>
 
-          <div className="border-t border-slate-800 px-4 py-2">
+          <div className="border-t border-subtle px-4 py-2">
             <button
               onClick={() => { setOpen(false); navigate('/settings'); }}
-              className="text-xs text-slate-400 hover:text-slate-200"
+              className="text-xs text-secondary hover:text-primary"
             >
               Notification settings
             </button>

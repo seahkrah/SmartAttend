@@ -143,7 +143,7 @@ const SuperadminIncidentsPage: React.FC = () => {
                 <tr key={r.id} className="border-b border-subtle">
                   <td className="py-2 pr-4 text-muted">{r.incident_number}</td>
                   <td className="py-2 pr-4">
-                    <Link className="text-brand-600 hover:underline" to={`/superadmin/incident/${r.id}`}>{r.title}</Link>
+                    <Link className="text-brand-600 dark:text-brand-300 hover:underline" to={`/superadmin/incident/${r.id}`}>{r.title}</Link>
                     <div className="text-xs text-muted">{r.incident_type}</div>
                   </td>
                   <td className="py-2 pr-4 text-secondary">{r.affected_tenant_name ?? 'Platform-wide'}</td>
@@ -161,7 +161,7 @@ const SuperadminIncidentsPage: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="new-incident">
           <form className="card w-full max-w-lg space-y-3" onSubmit={submit}>
             <h2 id="new-incident" className="font-semibold text-primary">Report an incident</h2>
-            {formError && <p role="alert" className="text-sm text-danger-600">{formError}</p>}
+            {formError && <p role="alert" className="text-sm text-danger-600 dark:text-danger-400">{formError}</p>}
             <label className="block text-sm text-secondary">Title
               <input className="input-field w-full mt-1" required value={form.title}
                      onChange={(e) => setForm({ ...form, title: e.target.value })} />

@@ -64,10 +64,10 @@ const STATUS_COLORS: Record<Status, string> = {
 };
 
 const STATUS_INACTIVE: Record<Status, string> = {
-  present: 'bg-slate-700 hover:bg-green-600/40 text-slate-300',
-  absent: 'bg-slate-700 hover:bg-red-600/40 text-slate-300',
-  late: 'bg-slate-700 hover:bg-amber-600/40 text-slate-300',
-  excused: 'bg-slate-700 hover:bg-blue-600/40 text-slate-300',
+  present: 'bg-sunken hover:bg-green-600/40 text-secondary',
+  absent: 'bg-sunken hover:bg-red-600/40 text-secondary',
+  late: 'bg-sunken hover:bg-amber-600/40 text-secondary',
+  excused: 'bg-sunken hover:bg-blue-600/40 text-secondary',
 };
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -302,19 +302,19 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
     return (
       <>
       <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-white mb-2">Take Attendance</h1>
-          <p className="text-slate-400 mb-8">Select a class schedule to begin marking attendance.</p>
+          <h1 className="text-3xl font-bold text-primary mb-2">Take Attendance</h1>
+          <p className="text-secondary mb-8">Select a class schedule to begin marking attendance.</p>
 
           {loadingSchedules ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span className="ml-3 text-slate-400">Loading schedules...</span>
+              <span className="ml-3 text-secondary">Loading schedules...</span>
             </div>
           ) : !schedules || schedules.length === 0 ? (
             <div className="text-center py-20">
               <div className="text-5xl mb-4">📭</div>
-              <p className="text-xl text-slate-400">No schedules assigned</p>
-              <p className="text-sm text-slate-500 mt-2">Contact your admin to assign class schedules.</p>
+              <p className="text-xl text-secondary">No schedules assigned</p>
+              <p className="text-sm text-muted mt-2">Contact your admin to assign class schedules.</p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -322,48 +322,48 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
                 <button
                   key={schedule.id}
                   onClick={() => handleSelectSchedule(schedule)}
-                  className="p-5 rounded-lg border border-slate-700 bg-slate-800 hover:border-blue-500 hover:bg-slate-750 transition-all text-left group"
+                  className="p-5 rounded-lg border border-subtle bg-sunken hover:border-blue-500 hover:bg-raised transition-all text-left group"
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-blue-400 transition-colors">
+                      <h3 className="text-lg font-semibold text-primary group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
                         {schedule.course_name}
                       </h3>
-                      <p className="text-sm text-slate-400 mt-0.5">{schedule.course_code}</p>
+                      <p className="text-sm text-secondary mt-0.5">{schedule.course_code}</p>
                     </div>
                     {schedule.section && (
-                      <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">
+                      <span className="text-xs bg-sunken text-secondary px-2 py-1 rounded">
                         Sec {schedule.section}
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-4 space-y-1.5 text-sm text-slate-400">
+                  <div className="mt-4 space-y-1.5 text-sm text-secondary">
                     {schedule.days_of_week && (
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-500">Days:</span>
-                        <span className="text-slate-300">{schedule.days_of_week}</span>
+                        <span className="text-muted">Days:</span>
+                        <span className="text-secondary">{schedule.days_of_week}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500">Time:</span>
-                      <span className="text-slate-300">
+                      <span className="text-muted">Time:</span>
+                      <span className="text-secondary">
                         {schedule.start_time?.slice(0, 5)} – {schedule.end_time?.slice(0, 5)}
                       </span>
                     </div>
                     {schedule.room_name && (
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-500">Room:</span>
-                        <span className="text-slate-300">{schedule.room_name}</span>
+                        <span className="text-muted">Room:</span>
+                        <span className="text-secondary">{schedule.room_name}</span>
                       </div>
                     )}
                   </div>
 
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm text-slate-400">
+                    <span className="text-sm text-secondary">
                       {schedule.student_count} student{parseInt(schedule.student_count) !== 1 ? 's' : ''} enrolled
                     </span>
-                    <span className="text-xs text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-xs text-blue-700 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
                       Take Attendance →
                     </span>
                   </div>
@@ -387,15 +387,15 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
           <div>
             <button
               onClick={handleBack}
-              className="text-sm text-slate-400 hover:text-white mb-2 flex items-center gap-1 transition-colors"
+              className="text-sm text-secondary hover:text-primary mb-2 flex items-center gap-1 transition-colors"
             >
               ← Back to Schedules
             </button>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-2xl font-bold text-primary">
               {selectedSchedule.course_name}
               {selectedSchedule.section ? ` — Section ${selectedSchedule.section}` : ''}
             </h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-secondary mt-1">
               {selectedSchedule.course_code}
               {selectedSchedule.days_of_week ? ` • ${selectedSchedule.days_of_week}` : ''}
               {' • '}
@@ -406,28 +406,28 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
 
           {/* Date picker */}
           <div className="flex items-center gap-3">
-            <label className="text-sm text-slate-400">Date:</label>
+            <label className="text-sm text-secondary">Date:</label>
             <input
               type="date"
               value={attendanceDate}
               onChange={(e) => handleDateChange(e.target.value)}
-              className="bg-slate-800 border border-slate-600 text-white rounded px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              className="bg-sunken border border-strong text-primary rounded px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>
 
         {/* ── Toolbar ── */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="text-sm text-slate-400 mr-2">Quick Actions:</span>
+          <span className="text-sm text-secondary mr-2">Quick Actions:</span>
           <button
             onClick={() => handleMarkAll('present')}
-            className="px-3 py-1.5 bg-green-700/30 border border-green-600/50 text-green-400 rounded text-xs font-medium hover:bg-green-700/50 transition-colors"
+            className="px-3 py-1.5 bg-green-700/30 border border-green-600/50 text-green-700 dark:text-green-400 rounded text-xs font-medium hover:bg-green-700/50 transition-colors"
           >
             Mark All Present
           </button>
           <button
             onClick={() => handleMarkAll('absent')}
-            className="px-3 py-1.5 bg-red-700/30 border border-red-600/50 text-red-400 rounded text-xs font-medium hover:bg-red-700/50 transition-colors"
+            className="px-3 py-1.5 bg-red-700/30 border border-red-600/50 text-red-700 dark:text-red-400 rounded text-xs font-medium hover:bg-red-700/50 transition-colors"
           >
             Mark All Absent
           </button>
@@ -436,7 +436,7 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
             onClick={() => setShowFaceScan(true)}
             disabled={faceEnrolledCount === 0}
             title={faceEnrolledCount === 0 ? 'No student in this class has an enrolled face' : undefined}
-            className="px-3 py-1.5 bg-purple-700/30 border border-purple-600/50 text-purple-400 rounded text-xs font-medium hover:bg-purple-700/50 transition-colors flex items-center gap-1"
+            className="px-3 py-1.5 bg-purple-700/30 border border-purple-600/50 text-purple-700 dark:text-purple-400 rounded text-xs font-medium hover:bg-purple-700/50 transition-colors flex items-center gap-1"
           >
             📷 Face Scan {faceEnrolledCount > 0 && <span className="bg-purple-600/40 px-1 rounded">{faceEnrolledCount}</span>}
           </button>
@@ -449,7 +449,7 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
               showHistory
                 ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                : 'bg-sunken text-secondary hover:bg-raised'
             }`}
           >
             {showHistory ? 'Hide History' : 'View History'}
@@ -462,7 +462,7 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
             className={`px-5 py-1.5 rounded text-sm font-medium transition-colors ${
               markedCount > 0
                 ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                : 'bg-sunken text-muted cursor-not-allowed'
             }`}
           >
             {submitting ? 'Saving...' : hasUnsavedChanges ? 'Save Attendance' : 'Saved ✓'}
@@ -471,36 +471,36 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
 
         {/* ── Summary Bar ── */}
         <div className="grid grid-cols-5 gap-3 mb-6">
-          <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 text-center">
-            <div className="text-xl font-bold text-white">{students.length}</div>
-            <div className="text-xs text-slate-400">Total</div>
+          <div className="bg-sunken rounded-lg p-3 border border-subtle text-center">
+            <div className="text-xl font-bold text-primary">{students.length}</div>
+            <div className="text-xs text-secondary">Total</div>
           </div>
-          <div className="bg-slate-800 rounded-lg p-3 border border-green-800/50 text-center">
-            <div className="text-xl font-bold text-green-400">{presentCount}</div>
-            <div className="text-xs text-slate-400">Present</div>
+          <div className="bg-sunken rounded-lg p-3 border border-green-200 dark:border-green-800/50 text-center">
+            <div className="text-xl font-bold text-green-700 dark:text-green-400">{presentCount}</div>
+            <div className="text-xs text-secondary">Present</div>
           </div>
-          <div className="bg-slate-800 rounded-lg p-3 border border-red-800/50 text-center">
-            <div className="text-xl font-bold text-red-400">{absentCount}</div>
-            <div className="text-xs text-slate-400">Absent</div>
+          <div className="bg-sunken rounded-lg p-3 border border-red-200 dark:border-red-800/50 text-center">
+            <div className="text-xl font-bold text-red-700 dark:text-red-400">{absentCount}</div>
+            <div className="text-xs text-secondary">Absent</div>
           </div>
-          <div className="bg-slate-800 rounded-lg p-3 border border-amber-800/50 text-center">
-            <div className="text-xl font-bold text-amber-400">{lateCount}</div>
-            <div className="text-xs text-slate-400">Late</div>
+          <div className="bg-sunken rounded-lg p-3 border border-amber-200 dark:border-amber-800/50 text-center">
+            <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{lateCount}</div>
+            <div className="text-xs text-secondary">Late</div>
           </div>
-          <div className="bg-slate-800 rounded-lg p-3 border border-blue-800/50 text-center">
-            <div className="text-xl font-bold text-blue-400">{excusedCount}</div>
-            <div className="text-xs text-slate-400">Excused</div>
+          <div className="bg-sunken rounded-lg p-3 border border-blue-200 dark:border-blue-800/50 text-center">
+            <div className="text-xl font-bold text-blue-700 dark:text-blue-400">{excusedCount}</div>
+            <div className="text-xs text-secondary">Excused</div>
           </div>
         </div>
 
         {/* ── Progress Bar ── */}
         {students.length > 0 && (
           <div className="mb-6">
-            <div className="flex justify-between text-xs text-slate-400 mb-1.5">
+            <div className="flex justify-between text-xs text-secondary mb-1.5">
               <span>{markedCount} of {students.length} marked</span>
               <span>{unmarkedCount > 0 ? `${unmarkedCount} remaining` : 'All marked'}</span>
             </div>
-            <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden flex">
+            <div className="w-full bg-sunken rounded-full h-2 overflow-hidden flex">
               {presentCount > 0 && (
                 <div className="h-full bg-green-500 transition-all" style={{ width: `${(presentCount / students.length) * 100}%` }} />
               )}
@@ -521,27 +521,27 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
         {loadingStudents ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-slate-400">Loading students...</span>
+            <span className="ml-3 text-secondary">Loading students...</span>
           </div>
         ) : students.length === 0 ? (
-          <div className="text-center py-16 bg-slate-800 rounded-lg border border-slate-700">
+          <div className="text-center py-16 bg-sunken rounded-lg border border-subtle">
             <div className="text-4xl mb-3">📋</div>
-            <p className="text-lg text-slate-400">No students enrolled</p>
-            <p className="text-sm text-slate-500 mt-1">Enroll students via the admin enrollment page first.</p>
+            <p className="text-lg text-secondary">No students enrolled</p>
+            <p className="text-sm text-muted mt-1">Enroll students via the admin enrollment page first.</p>
           </div>
         ) : (
-          <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div className="bg-sunken rounded-lg border border-subtle overflow-hidden">
             <table className="w-full">
-              <thead className="bg-slate-700/60">
+              <thead className="bg-sunken">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider w-10">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">Student</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider w-20">Face</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider w-10">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider">Student</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-secondary uppercase tracking-wider">ID</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-secondary uppercase tracking-wider w-20">Face</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-secondary uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-subtle">
                 {students.map((student, idx) => {
                   const currentStatus = localStatuses[student.student_id] || null;
                   const isSaved = student.attendance_status === currentStatus;
@@ -551,31 +551,31 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
                       key={student.student_id}
                       className={`transition-colors ${
                         currentStatus
-                          ? 'bg-slate-800'
-                          : 'bg-slate-800/50 hover:bg-slate-700/30'
+                          ? 'bg-sunken'
+                          : 'bg-sunken hover:bg-sunken'
                       }`}
                     >
-                      <td className="px-4 py-3 text-sm text-slate-500">{idx + 1}</td>
+                      <td className="px-4 py-3 text-sm text-muted">{idx + 1}</td>
                       <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-slate-200">
+                        <div className="text-sm font-medium text-primary">
                           {student.first_name} {student.last_name}
                         </div>
-                        <div className="text-xs text-slate-500">{student.email}</div>
+                        <div className="text-xs text-muted">{student.email}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-400 font-mono">
+                      <td className="px-4 py-3 text-sm text-secondary font-mono">
                         {student.student_code || '—'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {faceMatches[student.student_id] ? (
-                          <span className="inline-flex items-center gap-0.5 text-green-400 text-xs font-medium" title="Face matched; saved with the next save">
+                          <span className="inline-flex items-center gap-0.5 text-green-700 dark:text-green-400 text-xs font-medium" title="Face matched; saved with the next save">
                             ✅
                           </span>
                         ) : student.has_face_enrolled ? (
-                          <span className="text-purple-400 text-xs" title="Face enrolled">📷</span>
+                          <span className="text-purple-700 dark:text-purple-400 text-xs" title="Face enrolled">📷</span>
                         ) : (
                           <button
                             onClick={() => setEnrollingStudentId(student.student_id)}
-                            className="text-xs text-slate-500 hover:text-purple-400 transition-colors"
+                            className="text-xs text-muted hover:text-purple-700 dark:hover:text-purple-400 transition-colors"
                             title="Enroll face"
                           >
                             + Face
@@ -613,13 +613,13 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
 
         {/* ── History Panel ── */}
         {showHistory && history.length > 0 && (
-          <div className="mt-6 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-            <div className="bg-slate-700/60 px-4 py-3 border-b border-slate-600">
-              <h3 className="text-sm font-semibold text-slate-300">Attendance History</h3>
+          <div className="mt-6 bg-sunken rounded-lg border border-subtle overflow-hidden">
+            <div className="bg-sunken px-4 py-3 border-b border-strong">
+              <h3 className="text-sm font-semibold text-secondary">Attendance History</h3>
             </div>
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-700 text-xs text-slate-400 uppercase">
+                <tr className="border-b border-subtle text-xs text-secondary uppercase">
                   <th className="px-4 py-2 text-left">Date</th>
                   <th className="px-4 py-2 text-center">Present</th>
                   <th className="px-4 py-2 text-center">Absent</th>
@@ -628,14 +628,14 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
                   <th className="px-4 py-2 text-center">Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-subtle">
                 {history.map((h) => (
                   <tr
                     key={h.attendance_date}
-                    className="hover:bg-slate-700/30 cursor-pointer transition-colors"
+                    className="hover:bg-sunken cursor-pointer transition-colors"
                     onClick={() => handleDateChange(h.attendance_date)}
                   >
-                    <td className="px-4 py-2 text-sm text-slate-300">
+                    <td className="px-4 py-2 text-sm text-secondary">
                       {new Date(h.attendance_date).toLocaleDateString('en-US', {
                         weekday: 'short',
                         month: 'short',
@@ -643,11 +643,11 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
                         year: 'numeric',
                       })}
                     </td>
-                    <td className="px-4 py-2 text-center text-sm text-green-400">{h.present_count}</td>
-                    <td className="px-4 py-2 text-center text-sm text-red-400">{h.absent_count}</td>
-                    <td className="px-4 py-2 text-center text-sm text-amber-400">{h.late_count}</td>
-                    <td className="px-4 py-2 text-center text-sm text-blue-400">{h.excused_count}</td>
-                    <td className="px-4 py-2 text-center text-sm text-slate-300">{h.total_marked}</td>
+                    <td className="px-4 py-2 text-center text-sm text-green-700 dark:text-green-400">{h.present_count}</td>
+                    <td className="px-4 py-2 text-center text-sm text-red-700 dark:text-red-400">{h.absent_count}</td>
+                    <td className="px-4 py-2 text-center text-sm text-amber-700 dark:text-amber-400">{h.late_count}</td>
+                    <td className="px-4 py-2 text-center text-sm text-blue-700 dark:text-blue-400">{h.excused_count}</td>
+                    <td className="px-4 py-2 text-center text-sm text-secondary">{h.total_marked}</td>
                   </tr>
                 ))}
               </tbody>
@@ -656,8 +656,8 @@ export const FacultyAttendanceWorkflowPage: React.FC = () => {
         )}
 
         {showHistory && history.length === 0 && (
-          <div className="mt-6 text-center py-8 bg-slate-800 rounded-lg border border-slate-700">
-            <p className="text-slate-400 text-sm">No attendance history yet for this schedule.</p>
+          <div className="mt-6 text-center py-8 bg-sunken rounded-lg border border-subtle">
+            <p className="text-secondary text-sm">No attendance history yet for this schedule.</p>
           </div>
         )}
 

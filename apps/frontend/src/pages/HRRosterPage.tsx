@@ -228,18 +228,18 @@ const HRRosterPage: React.FC = () => {
   const unpublished = shifts.filter((s) => s.status === 'scheduled').length;
   const coverageByDay = new Map(coverage.map((d) => [d.work_date, d]));
 
-  const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600';
-  const label = 'mb-1 block text-xs uppercase tracking-wider text-slate-500';
+  const field = 'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
+  const label = 'mb-1 block text-xs uppercase tracking-wider text-muted';
   const primary = 'inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-500 disabled:opacity-50';
-  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50';
-  const card = 'rounded-xl border border-slate-800 bg-slate-900/60';
+  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-sm text-secondary hover:bg-sunken disabled:opacity-50';
+  const card = 'rounded-xl border border-subtle bg-card';
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Shifts &amp; rosters</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <h1 className="text-2xl font-semibold text-primary">Shifts &amp; rosters</h1>
+          <p className="mt-1 text-sm text-secondary">
             Who is working when. Published shifts are what people plan around.
           </p>
         </div>
@@ -269,13 +269,13 @@ const HRRosterPage: React.FC = () => {
         <button className={ghost} onClick={() => setAnchor(new Date(anchor.getTime() - 14 * DAY_MS))}>
           <ChevronLeft className="h-4 w-4" /> Previous
         </button>
-        <span className="text-sm text-slate-300">{from} → {to}</span>
+        <span className="text-sm text-secondary">{from} → {to}</span>
         <button className={ghost} onClick={() => setAnchor(new Date(anchor.getTime() + 14 * DAY_MS))}>
           Next <ChevronRight className="h-4 w-4" />
         </button>
         <button className={ghost} onClick={() => setAnchor(mondayOf(new Date()))}>This fortnight</button>
         {unpublished > 0 && (
-          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">
+          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
             {unpublished} not yet published
           </span>
         )}
@@ -283,10 +283,10 @@ const HRRosterPage: React.FC = () => {
 
       {showPatterns && (
         <div className={card}>
-          <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+          <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
             Shift patterns
           </div>
-          <div className="grid gap-3 border-b border-slate-800 p-5 sm:grid-cols-6">
+          <div className="grid gap-3 border-b border-subtle p-5 sm:grid-cols-6">
             <div>
               <label className={label}>Code</label>
               <input className={field} placeholder="EARLY" value={patternForm.code}
@@ -322,30 +322,30 @@ const HRRosterPage: React.FC = () => {
                 onClick={() => void savePattern()}>
                 Add
               </button>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted">
                 An end time at or before the start is a night shift; its hours wrap past midnight.
               </span>
             </div>
           </div>
           {patterns.length === 0 ? (
-            <div className="px-5 py-4 text-sm text-slate-500">No patterns yet.</div>
+            <div className="px-5 py-4 text-sm text-muted">No patterns yet.</div>
           ) : (
-            <ul className="divide-y divide-slate-800">
+            <ul className="divide-y divide-subtle">
               {patterns.map((p) => (
                 <li key={p.id} className="flex items-center justify-between px-5 py-3 text-sm">
                   <div className="flex items-center gap-3">
                     <span className="h-3 w-3 rounded-full"
                       style={{ background: p.colour ?? '#475569' }} />
-                    <span className="text-slate-100">{p.name}</span>
-                    <span className="text-xs text-slate-600">{p.code}</span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-primary">{p.name}</span>
+                    <span className="text-xs text-muted">{p.code}</span>
+                    <span className="text-xs text-muted">
                       {shortTime(p.start_time)}–{shortTime(p.end_time)}
                       {p.break_minutes > 0 && ` · ${p.break_minutes} min break`}
                       {' · '}{formatHours(p.paid_hours)} h paid
                       {p.crosses_midnight && ' · overnight'}
                     </span>
                   </div>
-                  <button className="text-xs text-rose-400 hover:text-rose-300"
+                  <button className="text-xs text-rose-700 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300"
                     disabled={busy} onClick={() => void deletePattern(p)}>
                     Delete
                   </button>
@@ -358,8 +358,8 @@ const HRRosterPage: React.FC = () => {
 
       {showAssign && (
         <div className={card}>
-          <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
-            <span className="text-sm font-semibold text-slate-200">Roster somebody</span>
+          <div className="flex items-center justify-between border-b border-subtle px-5 py-3">
+            <span className="text-sm font-semibold text-primary">Roster somebody</span>
             <button className={ghost} onClick={() => setShowAssign(false)}>
               <X className="h-4 w-4" /> Close
             </button>
@@ -424,8 +424,8 @@ const HRRosterPage: React.FC = () => {
                         })}
                         className={`rounded-lg border px-3 py-1.5 text-sm transition ${
                           assign.weekdays.includes(i)
-                            ? 'border-brand-500 bg-brand-600/20 text-brand-200'
-                            : 'border-slate-700 text-slate-400 hover:bg-slate-800'
+                            ? 'border-brand-500 bg-brand-600/20 text-brand-700 dark:text-brand-200'
+                            : 'border-subtle text-secondary hover:bg-sunken'
                         }`}
                       >
                         {d}
@@ -441,7 +441,7 @@ const HRRosterPage: React.FC = () => {
                 onClick={() => void doAssign()}>
                 Roster
               </button>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted">
                 Days where the person is already on an overlapping shift are reported rather
                 than skipped quietly.
               </span>
@@ -452,11 +452,11 @@ const HRRosterPage: React.FC = () => {
 
       {clashes.length > 0 && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
             <AlertTriangle className="h-4 w-4" />
             {clashes.length} day(s) were left alone
           </div>
-          <ul className="mt-2 space-y-1 text-sm text-amber-200/80">
+          <ul className="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-200/80">
             {clashes.map((c) => <li key={c.workDate}>{c.workDate} — {c.reason}</li>)}
           </ul>
         </div>
@@ -474,17 +474,17 @@ const HRRosterPage: React.FC = () => {
         ) : (
           <table className="w-full min-w-[56rem] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wider text-slate-500">
-                <th className="sticky left-0 bg-slate-900/60 px-4 py-3">Person</th>
+              <tr className="border-b border-subtle text-left text-xs uppercase tracking-wider text-muted">
+                <th className="sticky left-0 bg-card px-4 py-3">Person</th>
                 {days.map((d) => {
                   const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
                   const cov = coverageByDay.get(d);
                   return (
                     <th key={d} className={`px-2 py-3 text-center font-normal ${
-                      wd === 0 || wd === 6 ? 'bg-slate-900/40' : ''
+                      wd === 0 || wd === 6 ? 'bg-card' : ''
                     }`}>
-                      <div className="text-slate-400">{d.slice(8)}/{d.slice(5, 7)}</div>
-                      <div className="text-[10px] text-slate-600">
+                      <div className="text-secondary">{d.slice(8)}/{d.slice(5, 7)}</div>
+                      <div className="text-[10px] text-muted">
                         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][wd]}
                         {cov ? ` · ${cov.people}` : ''}
                       </div>
@@ -494,19 +494,19 @@ const HRRosterPage: React.FC = () => {
                 <th className="px-3 py-3 text-right">Hours</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-subtle">
               {rows.map(([id, row]) => (
                 <tr key={id}>
-                  <td className="sticky left-0 bg-slate-900/60 px-4 py-2">
-                    <div className="text-slate-100">{row.name}</div>
-                    <div className="text-xs text-slate-600">{row.number}</div>
+                  <td className="sticky left-0 bg-card px-4 py-2">
+                    <div className="text-primary">{row.name}</div>
+                    <div className="text-xs text-muted">{row.number}</div>
                   </td>
                   {days.map((d) => {
                     const cell = row.days.get(d) ?? [];
                     const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
                     return (
                       <td key={d} className={`px-1.5 py-2 align-top ${
-                        wd === 0 || wd === 6 ? 'bg-slate-900/40' : ''
+                        wd === 0 || wd === 6 ? 'bg-card' : ''
                       }`}>
                         {cell.map((s) => (
                           <button
@@ -516,10 +516,10 @@ const HRRosterPage: React.FC = () => {
                               + (s.status === 'cancelled' ? ` (cancelled: ${s.cancel_reason})` : '')}
                             className={`mb-1 block w-full rounded px-1 py-0.5 text-[11px] leading-tight transition ${
                               s.status === 'cancelled'
-                                ? 'bg-slate-800 text-slate-600 line-through'
+                                ? 'bg-sunken text-muted line-through'
                                 : s.status === 'published'
                                   ? 'text-slate-900 hover:opacity-80'
-                                  : 'border border-dashed border-slate-600 text-slate-300 hover:bg-slate-800'
+                                  : 'border border-dashed border-strong text-secondary hover:bg-sunken'
                             }`}
                             style={s.status === 'published'
                               ? { background: s.colour ?? '#64748b' }
@@ -531,7 +531,7 @@ const HRRosterPage: React.FC = () => {
                       </td>
                     );
                   })}
-                  <td className="px-3 py-2 text-right text-slate-300">
+                  <td className="px-3 py-2 text-right text-secondary">
                     {formatHours(sumHours(
                       [...row.days.values()].flat()
                         .filter((s) => s.status !== 'cancelled')
@@ -545,7 +545,7 @@ const HRRosterPage: React.FC = () => {
         )}
       </div>
 
-      <p className="text-xs text-slate-600">
+      <p className="text-xs text-muted">
         A solid block is published; a dashed outline is still being planned and nobody has been
         told about it. Clicking a shift cancels it — a published shift cannot be retimed,
         because people have arranged their lives around it.

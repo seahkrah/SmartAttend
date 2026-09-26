@@ -67,11 +67,11 @@ function monthOf(d: Date) {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  draft: 'bg-slate-700/40 text-slate-300',
-  calculated: 'bg-amber-500/20 text-amber-300',
-  approved: 'bg-brand-500/20 text-brand-300',
-  paid: 'bg-success-600/20 text-success-300',
-  cancelled: 'bg-slate-800 text-slate-500',
+  draft: 'bg-sunken text-secondary',
+  calculated: 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+  approved: 'bg-brand-500/20 text-brand-700 dark:text-brand-300',
+  paid: 'bg-success-600/20 text-success-700 dark:text-success-300',
+  cancelled: 'bg-sunken text-muted',
 };
 
 const HRPayrollPage: React.FC = () => {
@@ -476,17 +476,17 @@ const HRPayrollPage: React.FC = () => {
     { id: 'tax', label: 'Tax', icon: <Percent className="h-4 w-4" /> },
   ];
 
-  const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600';
-  const label = 'mb-1 block text-xs uppercase tracking-wider text-slate-500';
+  const field = 'w-full rounded-lg border border-subtle bg-card px-3 py-2 text-sm text-primary placeholder:text-muted';
+  const label = 'mb-1 block text-xs uppercase tracking-wider text-muted';
   const primary = 'inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-500 disabled:opacity-50';
-  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50';
-  const card = 'rounded-xl border border-slate-800 bg-slate-900/60';
+  const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-sm text-secondary hover:bg-sunken disabled:opacity-50';
+  const card = 'rounded-xl border border-subtle bg-card';
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-100">Payroll</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-primary">Payroll</h1>
+        <p className="mt-1 text-sm text-secondary">
           Compensation, deductions, tax and the runs that turn them into payslips.
         </p>
       </div>
@@ -495,10 +495,10 @@ const HRPayrollPage: React.FC = () => {
 
       {!taxConfigured && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-          <div className="text-sm text-amber-200">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
+          <div className="text-sm text-amber-700 dark:text-amber-200">
             <div className="font-medium">No tax table is configured.</div>
-            <div className="mt-1 text-amber-200/80">
+            <div className="mt-1 text-amber-700 dark:text-amber-200/80">
               Runs will charge no tax, and each payslip will record that there was no
               table to apply. No default is shipped: rates and bands differ by country
               and change yearly, and a default would be wrong almost everywhere.
@@ -507,15 +507,15 @@ const HRPayrollPage: React.FC = () => {
         </div>
       )}
 
-      <div className="flex gap-1 border-b border-slate-800">
+      <div className="flex gap-1 border-b border-subtle">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`inline-flex items-center gap-2 border-b-2 px-4 py-2 text-sm transition ${
               tab === t.id
-                ? 'border-brand-500 text-slate-100'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-brand-500 text-primary'
+                : 'border-transparent text-secondary hover:text-primary'
             }`}
           >
             {t.icon}
@@ -528,8 +528,8 @@ const HRPayrollPage: React.FC = () => {
       {tab === 'runs' && (
         <div className="space-y-6">
           <div className={card}>
-            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
-              <span className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <div className="flex items-center justify-between border-b border-subtle px-5 py-3">
+              <span className="text-sm font-semibold uppercase tracking-wider text-secondary">
                 Pay periods
               </span>
               <button className={ghost} onClick={() => { setPeriodForm(monthOf(TODAY)); setShowPeriodForm(true); }}>
@@ -538,7 +538,7 @@ const HRPayrollPage: React.FC = () => {
             </div>
 
             {showPeriodForm && (
-              <div className="grid gap-3 border-b border-slate-800 p-5 sm:grid-cols-5">
+              <div className="grid gap-3 border-b border-subtle p-5 sm:grid-cols-5">
                 <div>
                   <label className={label}>Code</label>
                   <input className={field} value={periodForm.code}
@@ -580,21 +580,21 @@ const HRPayrollPage: React.FC = () => {
                 />
               </div>
             ) : (
-              <ul className="divide-y divide-slate-800">
+              <ul className="divide-y divide-subtle">
                 {periods.map((p) => (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <div>
-                      <div className="text-sm font-medium text-slate-100">
+                      <div className="text-sm font-medium text-primary">
                         {p.name}
-                        <span className="ml-2 text-xs text-slate-500">{p.code}</span>
+                        <span className="ml-2 text-xs text-muted">{p.code}</span>
                       </div>
-                      <div className="text-sm text-slate-400">
+                      <div className="text-sm text-secondary">
                         {isoDay(p.start_date)} → {isoDay(p.end_date)} · paid {isoDay(p.pay_date)}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`rounded-full px-2 py-0.5 text-xs ${
-                        p.status === 'closed' ? 'bg-slate-800 text-slate-500' : 'bg-slate-700/40 text-slate-300'
+                        p.status === 'closed' ? 'bg-sunken text-muted' : 'bg-sunken text-secondary'
                       }`}>
                         {p.status}
                       </span>
@@ -615,7 +615,7 @@ const HRPayrollPage: React.FC = () => {
           </div>
 
           {periodsWithoutRun.length > 0 && liveRuns.length === 0 && (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted">
               Nothing has been run yet. Start a run on a period above; it is calculated as
               a draft first, so the figures can be checked before anybody is told them.
             </p>
@@ -623,16 +623,16 @@ const HRPayrollPage: React.FC = () => {
 
           {openRun && (
             <div className={card}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-subtle px-5 py-3">
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                  <span className="text-sm font-semibold uppercase tracking-wider text-secondary">
                     {openRun.period_name ?? 'Run'}
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLE[openRun.status]}`}>
                     {RUN_STATUS_LABEL[openRun.status]}
                   </span>
                   {!openRun.tax_table_applied && openRun.status !== 'draft' && (
-                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">
+                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-300">
                       no tax table applied
                     </span>
                   )}
@@ -666,13 +666,13 @@ const HRPayrollPage: React.FC = () => {
               </div>
 
               {openRun.status === 'calculated' && calculatedHere.has(openRun.id) && (
-                <div className="border-b border-slate-800 bg-slate-900/40 px-5 py-3 text-sm text-slate-400">
+                <div className="border-b border-subtle bg-card px-5 py-3 text-sm text-secondary">
                   This run is waiting for approval by somebody else. A run is signed off by
                   a second pair of eyes; whoever calculated it cannot approve it.
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-px border-b border-slate-800 bg-slate-800 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-px border-b border-subtle bg-sunken sm:grid-cols-5">
                 {[
                   ['Employees', String(openRun.employee_count)],
                   ['Gross', formatMoney(openRun.gross_total, openRun.currency)],
@@ -680,20 +680,20 @@ const HRPayrollPage: React.FC = () => {
                   ['Deductions', formatMoney(openRun.deduction_total, openRun.currency)],
                   ['Net', formatMoney(openRun.net_total, openRun.currency)],
                 ].map(([k, v]) => (
-                  <div key={k} className="bg-slate-900/60 px-5 py-4">
-                    <div className="text-xs uppercase tracking-wider text-slate-500">{k}</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-100">{v}</div>
+                  <div key={k} className="bg-card px-5 py-4">
+                    <div className="text-xs uppercase tracking-wider text-muted">{k}</div>
+                    <div className="mt-1 text-lg font-semibold text-primary">{v}</div>
                   </div>
                 ))}
               </div>
 
               {skipped.length > 0 && (
-                <div className="border-b border-slate-800 bg-amber-500/5 px-5 py-4">
-                  <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+                <div className="border-b border-subtle bg-amber-500/5 px-5 py-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
                     <AlertTriangle className="h-4 w-4" />
                     {skipped.length} employee(s) were not included
                   </div>
-                  <ul className="mt-2 space-y-1 text-sm text-amber-200/80">
+                  <ul className="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-200/80">
                     {skipped.map((s) => (
                       <li key={s.employeeId}>{s.name} — {s.reason}</li>
                     ))}
@@ -712,8 +712,8 @@ const HRPayrollPage: React.FC = () => {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="text-left text-xs uppercase tracking-wider text-slate-500">
-                      <tr className="border-b border-slate-800">
+                    <thead className="text-left text-xs uppercase tracking-wider text-muted">
+                      <tr className="border-b border-subtle">
                         <th className="px-5 py-3">Employee</th>
                         <th className="px-5 py-3 text-right">Basic</th>
                         <th className="px-5 py-3 text-right">Gross</th>
@@ -723,12 +723,12 @@ const HRPayrollPage: React.FC = () => {
                         <th className="px-5 py-3" />
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
+                    <tbody className="divide-y divide-subtle">
                       {payslips.map((s) => (
-                        <tr key={s.id} className="text-slate-300">
+                        <tr key={s.id} className="text-secondary">
                           <td className="px-5 py-3">
-                            <div className="text-slate-100">{s.first_name} {s.last_name}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-primary">{s.first_name} {s.last_name}</div>
+                            <div className="text-xs text-muted">
                               {s.employee_number}
                               {Number(s.unpaid_days) > 0 && ` · ${s.unpaid_days} unpaid day(s)`}
                             </div>
@@ -737,12 +737,12 @@ const HRPayrollPage: React.FC = () => {
                           <td className="px-5 py-3 text-right">{formatMoney(s.gross, s.currency)}</td>
                           <td className="px-5 py-3 text-right">{formatMoney(s.tax, s.currency)}</td>
                           <td className="px-5 py-3 text-right">{formatMoney(s.total_deductions, s.currency)}</td>
-                          <td className="px-5 py-3 text-right font-medium text-slate-100">
+                          <td className="px-5 py-3 text-right font-medium text-primary">
                             {formatMoney(s.net, s.currency)}
                           </td>
                           <td className="px-5 py-3 text-right">
                             <button
-                              className="text-xs text-brand-400 hover:text-brand-300"
+                              className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300"
                               disabled={busy}
                               onClick={() => void showBreakdown(openRun, s, `${s.first_name} ${s.last_name}`)}
                             >
@@ -760,10 +760,10 @@ const HRPayrollPage: React.FC = () => {
 
           {breakdown && (
             <div className={card}>
-              <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
-                <span className="text-sm font-semibold text-slate-200">
+              <div className="flex items-center justify-between border-b border-subtle px-5 py-3">
+                <span className="text-sm font-semibold text-primary">
                   {breakdown.employee} — breakdown
-                  <span className="ml-2 text-xs font-normal text-slate-500">
+                  <span className="ml-2 text-xs font-normal text-muted">
                     {breakdown.live
                       ? 'as it would be paid today'
                       : 'as issued'}
@@ -771,30 +771,30 @@ const HRPayrollPage: React.FC = () => {
                 </span>
                 <button className={ghost} onClick={() => setBreakdown(null)}>Close</button>
               </div>
-              <ul className="divide-y divide-slate-800">
+              <ul className="divide-y divide-subtle">
                 {breakdown.lines.map((l, i) => (
                   <li key={`${l.code}-${i}`} className="flex items-center justify-between px-5 py-2.5 text-sm">
                     <div>
-                      <span className={l.kind === 'earning' ? 'text-slate-200' : 'text-slate-400'}>
+                      <span className={l.kind === 'earning' ? 'text-primary' : 'text-secondary'}>
                         {l.name}
                       </span>
-                      <span className="ml-2 text-xs text-slate-600">{l.code}</span>
+                      <span className="ml-2 text-xs text-muted">{l.code}</span>
                       {l.kind === 'earning' && !l.isTaxable && (
-                        <span className="ml-2 text-xs text-slate-500">not taxed</span>
+                        <span className="ml-2 text-xs text-muted">not taxed</span>
                       )}
                       {l.kind === 'deduction' && l.reducesTaxable && (
-                        <span className="ml-2 text-xs text-slate-500">before tax</span>
+                        <span className="ml-2 text-xs text-muted">before tax</span>
                       )}
                     </div>
-                    <span className={l.kind === 'earning' ? 'text-slate-100' : 'text-rose-300'}>
+                    <span className={l.kind === 'earning' ? 'text-primary' : 'text-rose-700 dark:text-rose-300'}>
                       {l.kind === 'deduction' && Number(l.amount) > 0 ? '−' : ''}
                       {formatMoney(l.amount, breakdown.currency)}
                     </span>
                   </li>
                 ))}
-                <li className="flex items-center justify-between bg-slate-900/40 px-5 py-3 text-sm font-semibold">
-                  <span className="text-slate-200">Net pay</span>
-                  <span className="text-slate-100">
+                <li className="flex items-center justify-between bg-card px-5 py-3 text-sm font-semibold">
+                  <span className="text-primary">Net pay</span>
+                  <span className="text-primary">
                     {formatMoney(breakdown.net, breakdown.currency)}
                   </span>
                 </li>
@@ -808,7 +808,7 @@ const HRPayrollPage: React.FC = () => {
       {tab === 'people' && (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className={`${card} lg:col-span-1`}>
-            <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
               Employees
             </div>
             {members.length === 0 ? (
@@ -816,17 +816,17 @@ const HRPayrollPage: React.FC = () => {
                 <EmptyState icon={<Users className="h-8 w-8" />} title="No employees" message="Nobody to pay yet." />
               </div>
             ) : (
-              <ul className="max-h-[32rem] divide-y divide-slate-800 overflow-y-auto">
+              <ul className="max-h-[32rem] divide-y divide-subtle overflow-y-auto">
                 {members.map((m) => (
                   <li key={m.id}>
                     <button
                       onClick={() => void selectEmployee(m.id)}
                       className={`w-full px-5 py-3 text-left text-sm transition ${
-                        selectedEmployee === m.id ? 'bg-slate-800/60 text-slate-100' : 'text-slate-300 hover:bg-slate-800/30'
+                        selectedEmployee === m.id ? 'bg-sunken text-primary' : 'text-secondary hover:bg-sunken'
                       }`}
                     >
                       <div>{m.name}</div>
-                      <div className="text-xs text-slate-500">{m.email}</div>
+                      <div className="text-xs text-muted">{m.email}</div>
                     </button>
                   </li>
                 ))}
@@ -846,12 +846,12 @@ const HRPayrollPage: React.FC = () => {
             ) : (
               <>
                 <div className={card}>
-                  <div className="border-b border-slate-800 px-5 py-3">
-                    <div className="text-sm font-semibold text-slate-200">{empPay.employee.name}</div>
-                    <div className="text-xs text-slate-500">{empPay.employee.employeeNumber}</div>
+                  <div className="border-b border-subtle px-5 py-3">
+                    <div className="text-sm font-semibold text-primary">{empPay.employee.name}</div>
+                    <div className="text-xs text-muted">{empPay.employee.employeeNumber}</div>
                   </div>
 
-                  <div className="grid gap-3 border-b border-slate-800 p-5 sm:grid-cols-4">
+                  <div className="grid gap-3 border-b border-subtle p-5 sm:grid-cols-4">
                     <div>
                       <label className={label}>Basic salary</label>
                       <input className={field} inputMode="decimal" placeholder="0.00"
@@ -882,27 +882,27 @@ const HRPayrollPage: React.FC = () => {
                         onClick={() => void saveCompensation()}>
                         Record
                       </button>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-muted">
                         A raise is a new record, not an edit. What earlier payslips say does not move.
                       </span>
                     </div>
                   </div>
 
-                  <ul className="divide-y divide-slate-800">
+                  <ul className="divide-y divide-subtle">
                     {empPay.compensation.map((c, i) => (
                       <li key={c.id} className="flex items-center justify-between px-5 py-3 text-sm">
                         <div>
-                          <span className="text-slate-100">{formatMoney(c.basic_salary, c.currency)}</span>
-                          <span className="ml-2 text-slate-500">{c.pay_frequency}</span>
+                          <span className="text-primary">{formatMoney(c.basic_salary, c.currency)}</span>
+                          <span className="ml-2 text-muted">{c.pay_frequency}</span>
                           {i === 0 && (
-                            <span className="ml-2 rounded-full bg-success-600/20 px-2 py-0.5 text-xs text-success-300">
+                            <span className="ml-2 rounded-full bg-success-600/20 px-2 py-0.5 text-xs text-success-700 dark:text-success-300">
                               in force
                             </span>
                           )}
                         </div>
-                        <div className="text-slate-400">
+                        <div className="text-secondary">
                           from {isoDay(c.effective_from)}
-                          {c.reason && <span className="ml-2 text-xs text-slate-600">{c.reason}</span>}
+                          {c.reason && <span className="ml-2 text-xs text-muted">{c.reason}</span>}
                         </div>
                       </li>
                     ))}
@@ -910,10 +910,10 @@ const HRPayrollPage: React.FC = () => {
                 </div>
 
                 <div className={card}>
-                  <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+                  <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
                     Recurring components
                   </div>
-                  <div className="grid gap-3 border-b border-slate-800 p-5 sm:grid-cols-4">
+                  <div className="grid gap-3 border-b border-subtle p-5 sm:grid-cols-4">
                     <div>
                       <label className={label}>Component</label>
                       <select className={field} value={assignForm.componentId}
@@ -952,33 +952,33 @@ const HRPayrollPage: React.FC = () => {
                   </div>
 
                   {empPay.components.length === 0 ? (
-                    <div className="px-5 py-4 text-sm text-slate-500">
+                    <div className="px-5 py-4 text-sm text-muted">
                       Nothing beyond the basic salary.
                     </div>
                   ) : (
-                    <ul className="divide-y divide-slate-800">
+                    <ul className="divide-y divide-subtle">
                       {empPay.components.map((a) => (
                         <li key={a.id} className="flex items-center justify-between px-5 py-3 text-sm">
                           <div>
-                            <span className={a.kind === 'earning' ? 'text-slate-100' : 'text-slate-300'}>
+                            <span className={a.kind === 'earning' ? 'text-primary' : 'text-secondary'}>
                               {a.name}
                             </span>
-                            <span className="ml-2 text-xs text-slate-500">
+                            <span className="ml-2 text-xs text-muted">
                               {a.calculation === 'percent_of_basic'
                                 ? `${a.rate === null ? '—' : formatRate(a.rate)}% of basic`
                                 : formatMoney(a.amount, 'USD')}
                             </span>
                             {a.is_statutory && (
-                              <span className="ml-2 rounded-full bg-slate-700/40 px-2 py-0.5 text-xs text-slate-400">
+                              <span className="ml-2 rounded-full bg-sunken px-2 py-0.5 text-xs text-secondary">
                                 statutory
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-slate-500">
+                          <div className="flex items-center gap-3 text-xs text-muted">
                             <span>
                               {isoDay(a.effective_from)} → {a.effective_to ? isoDay(a.effective_to) : 'open'}
                             </span>
-                            <button className="text-rose-400 hover:text-rose-300"
+                            <button className="text-rose-700 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300"
                               disabled={busy} onClick={() => void endAssignment(a.id)}>
                               End
                             </button>
@@ -997,8 +997,8 @@ const HRPayrollPage: React.FC = () => {
       {/* ------------------------------------------------------- structure */}
       {tab === 'structure' && (
         <div className={card}>
-          <div className="flex items-center justify-between border-b border-slate-800 px-5 py-3">
-            <span className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+          <div className="flex items-center justify-between border-b border-subtle px-5 py-3">
+            <span className="text-sm font-semibold uppercase tracking-wider text-secondary">
               Pay components
             </span>
             <button className={ghost} onClick={() => setShowComponentForm((v) => !v)}>
@@ -1007,7 +1007,7 @@ const HRPayrollPage: React.FC = () => {
           </div>
 
           {showComponentForm && (
-            <div className="grid gap-3 border-b border-slate-800 p-5 sm:grid-cols-3">
+            <div className="grid gap-3 border-b border-subtle p-5 sm:grid-cols-3">
               <div>
                 <label className={label}>Code</label>
                 <input className={field} placeholder="HOUSING" value={componentForm.code}
@@ -1051,7 +1051,7 @@ const HRPayrollPage: React.FC = () => {
                     onChange={(e) => setComponentForm({ ...componentForm, defaultRate: e.target.value })} />
                 </div>
               )}
-              <div className="flex items-end gap-4 text-sm text-slate-300">
+              <div className="flex items-end gap-4 text-sm text-secondary">
                 {componentForm.kind === 'earning' ? (
                   <label className="inline-flex items-center gap-2">
                     <input type="checkbox" checked={componentForm.isTaxable}
@@ -1090,15 +1090,15 @@ const HRPayrollPage: React.FC = () => {
               />
             </div>
           ) : (
-            <ul className="divide-y divide-slate-800">
+            <ul className="divide-y divide-subtle">
               {components.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                   <div>
-                    <span className={c.is_active ? 'text-slate-100' : 'text-slate-500 line-through'}>
+                    <span className={c.is_active ? 'text-primary' : 'text-muted line-through'}>
                       {c.name}
                     </span>
-                    <span className="ml-2 text-xs text-slate-600">{c.code}</span>
-                    <div className="mt-0.5 text-xs text-slate-500">
+                    <span className="ml-2 text-xs text-muted">{c.code}</span>
+                    <div className="mt-0.5 text-xs text-muted">
                       {c.kind === 'earning' ? 'Earning' : 'Deduction'}
                       {' · '}
                       {c.calculation === 'percent_of_basic'
@@ -1124,7 +1124,7 @@ const HRPayrollPage: React.FC = () => {
       {tab === 'tax' && (
         <div className="space-y-6">
           <div className={card}>
-            <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
               Bands in force
             </div>
             {brackets.length === 0 ? (
@@ -1136,16 +1136,16 @@ const HRPayrollPage: React.FC = () => {
                 />
               </div>
             ) : (
-              <ul className="divide-y divide-slate-800">
+              <ul className="divide-y divide-subtle">
                 {brackets.map((b) => (
                   <li key={b.id} className="flex items-center justify-between px-5 py-3 text-sm">
-                    <span className="text-slate-300">
+                    <span className="text-secondary">
                       {formatMoney(b.lower_bound, '')}
                       {' → '}
                       {b.upper_bound === null ? 'and above' : formatMoney(b.upper_bound, '')}
                     </span>
-                    <span className="text-slate-100">
-                      {formatRate(b.rate)}% <span className="ml-2 text-xs text-slate-600">from {isoDay(b.effective_from)}</span>
+                    <span className="text-primary">
+                      {formatRate(b.rate)}% <span className="ml-2 text-xs text-muted">from {isoDay(b.effective_from)}</span>
                     </span>
                   </li>
                 ))}
@@ -1154,11 +1154,11 @@ const HRPayrollPage: React.FC = () => {
           </div>
 
           <div className={card}>
-            <div className="border-b border-slate-800 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <div className="border-b border-subtle px-5 py-3 text-sm font-semibold uppercase tracking-wider text-secondary">
               Set a table
             </div>
             <div className="space-y-3 p-5">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted">
                 A whole table at a time. The bands have to start at zero, meet exactly, and
                 end open — a gap between two bands would leave part of everybody's income
                 silently untaxed. Bounds are annual; the run applies them to an annualised

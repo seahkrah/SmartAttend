@@ -41,7 +41,7 @@ const FloatingIcon: React.FC<FloatingIconProps> = ({ Icon, delay, duration, x, y
       whileHover={{ scale: 1.2 }}
     >
       <div className="bg-gradient-to-br from-primary-500/30 to-secondary-600/30 p-4 rounded-full backdrop-blur-sm border border-primary-500/40 hover:border-primary-400/60 transition-colors">
-        <Icon className="w-6 h-6 text-primary-300 drop-shadow-lg" />
+        <Icon className="w-6 h-6 text-primary-700 dark:text-primary-300 drop-shadow-lg" />
       </div>
     </motion.div>
   );

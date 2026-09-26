@@ -81,12 +81,12 @@ export const CorporateAdminDashboardPage: React.FC = () => {
   const StatCard: React.FC<{
     label: string; value: string | number; icon: React.ReactNode; color: string
   }> = ({ label, value, icon, color }) => (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-colors">
+    <div className="bg-sunken border border-subtle rounded-xl p-6 hover:border-strong transition-colors">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
       </div>
-      <p className="text-3xl font-bold text-white mb-1">{value}</p>
-      <p className="text-sm text-slate-400">{label}</p>
+      <p className="text-3xl font-bold text-primary mb-1">{value}</p>
+      <p className="text-sm text-secondary">{label}</p>
     </div>
   )
 
@@ -95,14 +95,14 @@ export const CorporateAdminDashboardPage: React.FC = () => {
   }> = ({ label, description, icon, onClick, color }) => (
     <button
       onClick={onClick}
-      className="flex items-center gap-4 p-4 bg-slate-800/30 border border-slate-700 rounded-xl hover:bg-slate-800/50 hover:border-slate-600 transition-all group text-left w-full"
+      className="flex items-center gap-4 p-4 bg-sunken border border-subtle rounded-xl hover:bg-sunken hover:border-strong transition-all group text-left w-full"
     >
       <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
       <div className="flex-1">
-        <p className="font-medium text-white">{label}</p>
-        <p className="text-sm text-slate-400">{description}</p>
+        <p className="font-medium text-primary">{label}</p>
+        <p className="text-sm text-secondary">{description}</p>
       </div>
-      <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-white group-hover:translate-x-1 transition-all" />
+      <ArrowRight className="w-5 h-5 text-muted group-hover:text-primary group-hover:translate-x-1 transition-all" />
     </button>
   )
 
@@ -122,16 +122,16 @@ export const CorporateAdminDashboardPage: React.FC = () => {
         {/* Welcome Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">
+            <h1 className="text-3xl font-bold text-primary">
               {data?.entity?.name || 'Welcome back!'}
             </h1>
-            <p className="text-slate-400 mt-1">
+            <p className="text-secondary mt-1">
               Here's your organization's overview for today
             </p>
           </div>
           <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-lg">
-            <Building2 className="w-5 h-5 text-indigo-400" />
-            <span className="text-indigo-400 font-medium">
+            <Building2 className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
+            <span className="text-indigo-700 dark:text-indigo-400 font-medium">
               {data?.entity?.code || 'Corporate'}
             </span>
           </div>
@@ -142,25 +142,25 @@ export const CorporateAdminDashboardPage: React.FC = () => {
           <StatCard
             label="Total Employees"
             value={stats.totalEmployees || stats.totalUsers}
-            icon={<Users className="w-6 h-6 text-white" />}
+            icon={<Users className="w-6 h-6 text-primary" />}
             color="bg-indigo-500"
           />
           <StatCard
             label="Departments"
             value={stats.departments}
-            icon={<FolderTree className="w-6 h-6 text-white" />}
+            icon={<FolderTree className="w-6 h-6 text-primary" />}
             color="bg-teal-500"
           />
           <StatCard
             label="Pending Approvals"
             value={stats.pendingApprovals}
-            icon={<ClipboardCheck className="w-6 h-6 text-white" />}
+            icon={<ClipboardCheck className="w-6 h-6 text-primary" />}
             color="bg-orange-500"
           />
           <StatCard
             label="Attendance Rate"
             value={`${stats.attendanceRate}%`}
-            icon={<TrendingUp className="w-6 h-6 text-white" />}
+            icon={<TrendingUp className="w-6 h-6 text-primary" />}
             color="bg-violet-500"
           />
         </div>
@@ -168,34 +168,34 @@ export const CorporateAdminDashboardPage: React.FC = () => {
         {/* Quick Actions & Recent Check-ins */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Quick Actions */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
+          <div className="bg-card border border-subtle rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-primary mb-4">Quick Actions</h3>
             <div className="space-y-3">
               <QuickAction
                 label="Manage Employees"
                 description={`${stats.totalEmployees || stats.activeUsers} employee(s) in your organization`}
-                icon={<Users className="w-5 h-5 text-white" />}
+                icon={<Users className="w-5 h-5 text-primary" />}
                 color="bg-indigo-500"
                 onClick={() => navigate('/admin/corporate/employees')}
               />
               <QuickAction
                 label="Departments"
                 description={`${stats.departments} department(s) configured`}
-                icon={<FolderTree className="w-5 h-5 text-white" />}
+                icon={<FolderTree className="w-5 h-5 text-primary" />}
                 color="bg-teal-500"
                 onClick={() => navigate('/admin/corporate/departments')}
               />
               <QuickAction
                 label="View Attendance"
                 description="See today's check-in/check-out records"
-                icon={<ClipboardCheck className="w-5 h-5 text-white" />}
+                icon={<ClipboardCheck className="w-5 h-5 text-primary" />}
                 color="bg-violet-500"
                 onClick={() => navigate('/admin/corporate/attendance')}
               />
               <QuickAction
                 label="Reports & Analytics"
                 description="Attendance trends and department breakdown"
-                icon={<BarChart3 className="w-5 h-5 text-white" />}
+                icon={<BarChart3 className="w-5 h-5 text-primary" />}
                 color="bg-green-500"
                 onClick={() => navigate('/admin/corporate/reports')}
               />
@@ -203,39 +203,39 @@ export const CorporateAdminDashboardPage: React.FC = () => {
           </div>
 
           {/* Recent Check-ins */}
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Recent Check-ins</h3>
+          <div className="bg-card border border-subtle rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-primary mb-4">Recent Check-ins</h3>
             <div className="space-y-3">
               {(data?.recentCheckins?.length ?? 0) > 0 ? (
                 data!.recentCheckins.map((c) => (
-                  <div key={c.id} className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg">
+                  <div key={c.id} className="flex items-center gap-3 p-3 bg-sunken rounded-lg">
                     <div className={`p-2 rounded-lg ${c.check_out_time ? 'bg-teal-500/20' : 'bg-indigo-500/20'}`}>
                       {c.check_out_time
-                        ? <CheckCircle2 className="w-4 h-4 text-teal-400" />
-                        : <Clock className="w-4 h-4 text-indigo-400" />}
+                        ? <CheckCircle2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                        : <Clock className="w-4 h-4 text-indigo-700 dark:text-indigo-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{c.first_name} {c.last_name}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-sm text-primary truncate">{c.first_name} {c.last_name}</p>
+                      <p className="text-xs text-muted">
                         {c.emp_code} {c.department_name ? `· ${c.department_name}` : ''}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-secondary">
                         {new Date(c.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-slate-500" />
-                        <span className="text-xs text-slate-500">{c.check_in_type}</span>
+                        <MapPin className="w-3 h-3 text-muted" />
+                        <span className="text-xs text-muted">{c.check_in_type}</span>
                       </div>
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="text-center py-8">
-                  <Clock className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                  <p className="text-slate-400">No check-ins recorded yet</p>
-                  <p className="text-xs text-slate-500 mt-1">Employee check-ins will appear here</p>
+                  <Clock className="w-12 h-12 text-muted mx-auto mb-3" />
+                  <p className="text-secondary">No check-ins recorded yet</p>
+                  <p className="text-xs text-muted mt-1">Employee check-ins will appear here</p>
                 </div>
               )}
             </div>
@@ -243,39 +243,39 @@ export const CorporateAdminDashboardPage: React.FC = () => {
         </div>
 
         {/* Today's Summary */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Today's Summary</h3>
+        <div className="bg-card border border-subtle rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-primary mb-4">Today's Summary</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-4 p-4 bg-teal-500/10 border border-teal-500/20 rounded-lg">
-              <CheckCircle2 className="w-8 h-8 text-teal-400" />
+              <CheckCircle2 className="w-8 h-8 text-teal-700 dark:text-teal-400" />
               <div>
-                <p className="text-2xl font-bold text-white">{stats.todayCheckins}</p>
-                <p className="text-sm text-slate-400">Checked In</p>
+                <p className="text-2xl font-bold text-primary">{stats.todayCheckins}</p>
+                <p className="text-sm text-secondary">Checked In</p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-              <Clock className="w-8 h-8 text-indigo-400" />
+              <Clock className="w-8 h-8 text-indigo-700 dark:text-indigo-400" />
               <div>
-                <p className="text-2xl font-bold text-white">{stats.completedCheckouts}</p>
-                <p className="text-sm text-slate-400">Checked Out</p>
+                <p className="text-2xl font-bold text-primary">{stats.completedCheckouts}</p>
+                <p className="text-sm text-secondary">Checked Out</p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-              <AlertTriangle className="w-8 h-8 text-orange-400" />
+              <AlertTriangle className="w-8 h-8 text-orange-700 dark:text-orange-400" />
               <div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-primary">
                   {(stats.activeEmployees || stats.activeUsers) - stats.todayCheckins}
                 </p>
-                <p className="text-sm text-slate-400">Absent Today</p>
+                <p className="text-sm text-secondary">Absent Today</p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <XCircle className="w-8 h-8 text-red-400" />
+              <XCircle className="w-8 h-8 text-red-700 dark:text-red-400" />
               <div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-primary">
                   {(stats.totalEmployees || stats.totalUsers) - (stats.activeEmployees || stats.activeUsers)}
                 </p>
-                <p className="text-sm text-slate-400">Inactive</p>
+                <p className="text-sm text-secondary">Inactive</p>
               </div>
             </div>
           </div>

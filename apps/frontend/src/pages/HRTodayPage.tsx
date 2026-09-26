@@ -127,7 +127,7 @@ export const HRTodayPage: React.FC = () => {
       </div>
 
       {(s.flagged ?? 0) > 0 && (
-        <p className="text-sm text-amber-600">
+        <p className="text-sm text-amber-600 dark:text-amber-300">
           {s.flagged} of today's check-ins are flagged for review and do not count towards hours until resolved.
         </p>
       )}
@@ -172,7 +172,7 @@ export const HRTodayPage: React.FC = () => {
                     </td>
                     <td className="py-2 pr-4 text-secondary">
                       {time(p.firstCheckIn)}
-                      {p.faceMatched && <ScanFace className="w-3.5 h-3.5 inline ml-1 text-success-600" aria-label="face matched" />}
+                      {p.faceMatched && <ScanFace className="w-3.5 h-3.5 inline ml-1 text-success-600 dark:text-success-300" aria-label="face matched" />}
                       {p.checkInType === 'field' && <span className="text-muted"> · field{p.site ? `, ${p.site}` : ''}</span>}
                     </td>
                     <td className="py-2 pr-4 text-secondary">{time(p.checkedOutAt)}</td>

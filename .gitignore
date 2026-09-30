@@ -96,6 +96,13 @@ server.log
 .env.test.local
 .env.*.private
 .env.*.secret
+# Hand-made copies of a real .env (e.g. .env.smartattend-backup)
+.env.*backup
+.env.*bak
+
+# Leftovers of the retired Django rebuild (branch feat/jjelotech-mvp):
+# caches, a virtualenv, a build and a .env. Its source lives only on that branch.
+/jjelotech/
 
 # =============================================================================
 # IDE & EDITOR ARTIFACTS

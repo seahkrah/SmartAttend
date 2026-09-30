@@ -53,6 +53,8 @@ in two places:
 - sign-in lockout
 - invitations and password resets by single-use link; nobody chooses or sees
   another person's password
+- two-factor sign-in with an authenticator app and recovery codes, required
+  for administrators and superadmins in production
 
 See [docs/security/authentication.md](docs/security/authentication.md).
 
@@ -120,7 +122,14 @@ Run these before pushing; CI runs the same.
 
 ## Not done yet
 
-- No second factor (TOTP or WebAuthn) and no single sign-on.
+The plan for what comes next, towards a pilot school in Monrovia, is
+[docs/roadmap.md](docs/roadmap.md). Why this codebase and not the Django
+rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/2026-09-30-keep-express-platform.md).
+
+- No K–12 structure (grade levels, classes), no second currency (LRD), no
+  offline mode, no printed receipts. These come first in the roadmap.
+- No passkeys (WebAuthn) and no single sign-on. Two-factor is
+  authenticator-app codes.
 - Tokens are held in `localStorage`, not `httpOnly` cookies.
 - Email and SMS delivery depend on each tenant configuring a provider. Until
   then messages are recorded as *simulated*, never as sent.

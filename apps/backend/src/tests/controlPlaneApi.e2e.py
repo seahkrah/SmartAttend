@@ -92,7 +92,7 @@ check("health names what it does not measure",
 print("-- provisioning --")
 co, r = call("POST", "/tenants", SU,
              {"name": f"Control Plane School {RUN}", "code": f"SA2E-S{RUN}", "kind": "school",
-              "email": f"cp.{RUN}@sa2e.test"})
+              "email": f"cp.{RUN}@sa2e.test", "school_type": "university", "school_stages": ["undergraduate"]})
 check("provision a school", co == 201, f"({co} {r})")
 school = r.get('tenant', {}).get('id') or r.get('entity', {}).get('id')
 
@@ -101,8 +101,12 @@ co, r = call("POST", "/tenants", SU,
 check("provision a company", co == 201, f"({co} {r})")
 company = r.get('tenant', {}).get('id') or r.get('entity', {}).get('id')
 
-co, r = call("POST", "/tenants", SU, {"name": "Dup", "code": f"SA2E-S{RUN}", "kind": "school"})
+co, r = call("POST", "/tenants", SU, {"name": "Dup", "code": f"SA2E-S{RUN}", "kind": "school",
+                                     "school_type": "college", "school_stages": ["diploma"]})
 check("a duplicate code is refused", co == 409, f"({co} {r})")
+
+co, r = call("POST", "/tenants", SU, {"name": "Untyped", "code": f"SA2E-U{RUN}", "kind": "school"})
+check("a school without a type is refused", co == 400 and r.get('code') == 'INVALID_SCHOOL_TYPE', f"({co} {r})")
 
 co, r = call("POST", "/tenants", SU, {"name": "No code"})
 check("a tenant without a code is refused", co == 400, f"({co} {r})")
@@ -239,7 +243,8 @@ co, r = call("DELETE", f"/tenants/{A['tenantId']}", SU)
 check("a populated school cannot be deleted either", co == 409, f"({co} {r})")
 
 co, r = call("POST", "/tenants", SU,
-             {"name": f"Empty {RUN}", "code": f"SA2E-E{RUN}", "kind": "school"})
+             {"name": f"Empty {RUN}", "code": f"SA2E-E{RUN}", "kind": "school",
+              "school_type": "college", "school_stages": ["associate"]})
 empty = r.get('tenant', {}).get('id') or r.get('entity', {}).get('id')
 co, r = call("DELETE", f"/tenants/{empty}", SU)
 check("an empty tenant can be deleted", co == 200, f"({co} {r})")

@@ -91,6 +91,7 @@ const EmployeeWorkPage = lazy(() => import('./pages/EmployeeWorkPage'));
 const EmployeeSelfServiceAttendancePage = lazy(() => import('./pages/EmployeeSelfServiceAttendancePage'));
 const EmployeePayslipsPage = lazy(() => import('./pages/EmployeePayslipsPage'));
 const SchoolAdminRoomsPage = lazy(() => import('./pages/SchoolAdminRoomsPage'));
+const SchoolAdminGradeLevelsPage = lazy(() => import('./pages/SchoolAdminGradeLevelsPage'));
 const SchoolAdminSchedulesPage = lazy(() => import('./pages/SchoolAdminSchedulesPage'));
 const SchoolAdminEnrollmentPage = lazy(() => import('./pages/SchoolAdminEnrollmentPage'));
 const SchoolAdminAttendancePage = lazy(() => import('./pages/SchoolAdminAttendancePage'));
@@ -214,6 +215,7 @@ export default function App() {
                     <Route path="/notifications" element={<AdminNotificationsPage />} />
                     <Route path="/incidents" element={<TenantIncidentsPage />} />
                     <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
+                    <Route path="/grades" element={<SchoolAdminGradeLevelsPage />} />
                     <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                     <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
                     <Route path="/attendance" element={<SchoolAdminAttendancePage />} />

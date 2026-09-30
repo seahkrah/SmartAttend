@@ -22,11 +22,15 @@ Stages are in order; each ends with the full check suite green.
 
 The pilot cannot start without these.
 
-1. **K–12 academic structure.** Grade levels (nursery to 12th grade),
-   classes/streams within a level, class teachers, subjects per level.
-   Coexists with the tertiary model; a tenant chooses which it is.
-   Attendance, enrolment and fees key off class and level.
-   **Bulk roll-forward:** promote a whole school to the next year.
+1. **K–12 academic structure.**
+   - [x] School type (grade school, vocational, college, university) and
+         levels offered, chosen when the school is created; tools and menus
+         follow the type; grades generated from the levels (2026-09-30).
+   - [ ] Classes/sections within a grade, class teachers, subjects per grade.
+   - [ ] Students placed in a class; attendance, enrolment and fees key off
+         class and grade.
+   - [ ] Term report cards.
+   - [ ] **Bulk roll-forward:** promote a whole school to the next year.
 2. **Two currencies.** LRD and USD on fee items, invoices and payments; a
    payment in one currency against an invoice in the other records the rate
    used. Statements show both.

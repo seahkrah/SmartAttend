@@ -62,6 +62,9 @@ SUITES=(
   accessRequestsApi
   # Turns two-factor on and off for one account, and trips its lockout.
   mfaApi
+  # Creates grade schools with a principal each, and briefly adds a level
+  # to school A.
+  schoolTypesApi
 )
 
 fail=0

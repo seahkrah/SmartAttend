@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, LogOut, Menu, Search, ShieldCheck } from 'lucide-react';
 import { JjeloTechMark, JjeloTechWordmark, BRAND_NAME } from '../BrandLogo';
 import { useAuthStore } from '../../store/authStore';
-import { activeItem, navFor, type NavItem, type Platform } from '../../navigation/navConfig';
+import { activeItem, adaptNav, audienceFor, navFor, type NavItem, type Platform } from '../../navigation/navConfig';
+import { useSchoolStructureStore } from '../../store/schoolStructureStore';
 import { LoadingState } from '../states/PageStates';
 
 /**
@@ -152,7 +153,17 @@ export const AppShell: React.FC<AppShellProps> = ({
   // manager and a corporate administrator are both on the corporate platform
   // and reach different pages.
   const nav = navFor(user?.role, user?.platform as Platform | undefined);
-  const groups = nav?.groups ?? [];
+
+  // At a school, the menu also depends on what kind of school it is: a grade
+  // school is not offered programmes, and calls its courses subjects.
+  const audience = audienceFor(user?.role, user?.platform as Platform | undefined);
+  const adaptsToSchool = audience === 'schoolAdmin' || audience === 'faculty' || audience === 'student';
+  const { structure, forUser, load: loadStructure } = useSchoolStructureStore();
+  React.useEffect(() => {
+    if (adaptsToSchool && user?.id) void loadStructure(user.id);
+  }, [adaptsToSchool, user?.id, loadStructure]);
+  const shape = forUser === user?.id ? structure : null;
+  const groups = adaptsToSchool ? adaptNav(nav?.groups ?? [], shape) : nav?.groups ?? [];
   const home = nav?.home ?? '/dashboard';
   const showSwitcher = nav?.showPlatformSwitcher !== false;
 

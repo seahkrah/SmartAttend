@@ -83,6 +83,26 @@ export interface NavItem {
   status: NavStatus;
   /** Key for a live count shown on the right, e.g. a pending-approvals badge. */
   countKey?: string;
+  /**
+   * The school-type tool this page belongs to. A school whose type does not
+   * use it is not shown the entry: a grade school has no programmes.
+   */
+  requires?: SchoolFeature;
+  /**
+   * The label in the words of the school's type, e.g. '{teachers}' reads
+   * "Teachers" at a grade school and "Faculty" at a university. See
+   * `adaptNav`.
+   */
+  relabel?: string;
+}
+
+/** Tools a school type switches on; mirrors the API's SchoolFeatures. */
+export type SchoolFeature = 'gradeLevels' | 'departments' | 'programmes' | 'credits';
+
+/** What GET /academics/structure says about the signed-in person's school. */
+export interface SchoolShape {
+  features: Record<SchoolFeature, boolean>;
+  labels: { teachers: string; teacher: string; subjects: string; programmes: string };
 }
 
 export interface NavGroup {
@@ -126,7 +146,7 @@ const schoolAdminNav: AudienceNav = {
         { label: 'Users', to: '/admin/school/users', icon: Users, status: 'ready' },
         { label: 'Students', to: '/admin/school/students', icon: GraduationCap, status: 'ready', countKey: 'students' },
         { label: 'Guardians', to: '/admin/school/guardians', icon: HeartHandshake, status: 'ready' },
-        { label: 'Faculty', to: '/admin/school/faculty', icon: UserCog, status: 'ready', countKey: 'faculty' },
+        { label: 'Faculty', to: '/admin/school/faculty', icon: UserCog, status: 'ready', countKey: 'faculty', relabel: '{teachers}' },
       ],
     },
     {
@@ -134,9 +154,10 @@ const schoolAdminNav: AudienceNav = {
       items: [
         // No page has ever existed for this; the school's departments are
         // modelled in the database but nothing reads them yet.
-        { label: 'Departments', to: '/admin/school/departments', icon: Landmark, status: 'ready' },
-        { label: 'Programmes', to: '/admin/school/programmes', icon: Layers, status: 'ready' },
-        { label: 'Courses', to: '/admin/school/courses', icon: BookOpen, status: 'ready' },
+        { label: 'Grade levels', to: '/admin/school/grades', icon: Layers, status: 'ready', requires: 'gradeLevels' },
+        { label: 'Departments', to: '/admin/school/departments', icon: Landmark, status: 'ready', requires: 'departments' },
+        { label: 'Programmes', to: '/admin/school/programmes', icon: Layers, status: 'ready', requires: 'programmes', relabel: '{programmes}' },
+        { label: 'Courses', to: '/admin/school/courses', icon: BookOpen, status: 'ready', relabel: '{subjects}' },
       ],
     },
     {
@@ -190,7 +211,7 @@ const facultyNav: AudienceNav = {
     {
       label: 'Teaching',
       items: [
-        { label: 'My courses', to: '/faculty/courses', icon: BookOpen, status: 'ready' },
+        { label: 'My courses', to: '/faculty/courses', icon: BookOpen, status: 'ready', relabel: 'My {subjects}' },
         { label: 'Students', to: '/faculty/students', icon: GraduationCap, status: 'ready' },
         { label: 'Enrollment', to: '/faculty/enrollment', icon: UserPlus, status: 'ready' },
         { label: 'Gradebook', to: '/faculty/gradebook', icon: FileText, status: 'ready' },
@@ -225,7 +246,7 @@ const studentNav: AudienceNav = {
     {
       label: 'Studies',
       items: [
-        { label: 'My courses', to: '/student/courses', icon: BookOpen, status: 'ready' },
+        { label: 'My courses', to: '/student/courses', icon: BookOpen, status: 'ready', relabel: 'My {subjects}' },
         { label: 'Schedule', to: '/student/schedule', icon: CalendarDays, status: 'ready' },
         { label: 'Results', to: '/student/results', icon: FileText, status: 'ready' },
         { label: 'Attendance', to: '/student/attendance', icon: ClipboardList, status: 'ready' },
@@ -527,6 +548,38 @@ export function navFor(
 ): AudienceNav | null {
   const audience = audienceFor(role, platform);
   return audience ? NAVS[audience] : null;
+}
+
+/**
+ * The navigation as a particular school sees it.
+ *
+ * Entries for tools its type does not use are dropped, and labels are put in
+ * its words. Until the school's shape is known (or if it cannot be loaded)
+ * the navigation is returned unchanged, which is what every school saw
+ * before types existed.
+ */
+export function adaptNav(groups: NavGroup[], shape: SchoolShape | null): NavGroup[] {
+  if (!shape) return groups;
+  const words: Record<string, string> = shape.labels;
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .filter((item) => !item.requires || shape.features[item.requires])
+        .map((item) =>
+          item.relabel
+            ? {
+                ...item,
+                // A word opening the label keeps its capital; one inside it is
+                // lower-cased: "Subjects", but "My subjects".
+                label: item.relabel.replace(/\{(\w+)\}/g, (_m, key: string, at: number) =>
+                  at === 0 ? words[key] ?? key : (words[key] ?? key).toLowerCase()
+                ),
+              }
+            : item
+        ),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 /**

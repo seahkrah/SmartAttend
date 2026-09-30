@@ -127,6 +127,7 @@ async function main() {
   await query(`DELETE FROM courses WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM semesters WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM academic_years WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
+  await query(`DELETE FROM grade_levels WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM school_departments WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   // Enquiries left by accessRequestsApi; they belong to no tenant.
   await query(`DELETE FROM access_requests WHERE email LIKE '%@harbour-academy.example'`)

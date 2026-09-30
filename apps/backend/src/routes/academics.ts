@@ -9,6 +9,7 @@ import {
   type ResolvedTenantContext,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
+import { getSchoolStructure, requireSchoolFeature } from '../services/schoolTypes.js'
 
 /**
  * SMS — the academic structure a school is built on.
@@ -80,6 +81,31 @@ function toInt(v: unknown, fallback: number | null = null): number | null {
   const n = parseInt(String(v), 10)
   return Number.isInteger(n) ? n : fallback
 }
+
+// ===========================================================================
+// What kind of school this is
+// ===========================================================================
+
+/**
+ * The school's type, the levels it offers, the tools that follow and, for a
+ * grade school, its grades. The web app builds its menus from this.
+ */
+router.get('/structure', async (req: TenantRequest, res: Response) => {
+  try {
+    const structure = await getSchoolStructure(ctxOf(req).tenantId)
+    if (!structure) return notFound(res, 'School')
+    return res.json(structure)
+  } catch (e) {
+    return fail(res, 'load the school structure', e)
+  }
+})
+
+// Programmes, curricula and a student's programme are how colleges and
+// universities are organised. A grade school has none.
+router.use(
+  ['/programmes', '/students/:studentId/programme', '/student-programmes'],
+  requireSchoolFeature('programmes'),
+)
 
 // ===========================================================================
 // Academic years

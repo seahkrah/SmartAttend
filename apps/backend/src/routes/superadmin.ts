@@ -7,6 +7,9 @@ import { extractAuditContext, logAuditEntry, getAuditLogs } from '../services/au
 import { getClientIp } from '../utils/getClientIp.js'
 import { clearMfa } from '../auth/mfaService.js'
 import { revokeUserSessions } from '../auth/sessions.js'
+import {
+  SCHOOL_TYPE_CATALOGUE, SCHOOL_TYPES, SchoolStructureError, applySchoolStructure, validateStructure,
+} from '../services/schoolTypes.js'
 
 /**
  * The control plane.
@@ -327,6 +330,11 @@ router.get('/entities', async (_req: Request, res: Response) => {
 // Tenants
 // ===========================================================================
 
+/** The school types a school can be created as, their levels and tools. */
+router.get('/school-types', (_req: Request, res: Response) => {
+  return res.json({ types: SCHOOL_TYPES.map((t) => SCHOOL_TYPE_CATALOGUE[t]) })
+})
+
 router.get('/tenants', async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === 'string' ? req.query.status : null
@@ -334,6 +342,7 @@ router.get('/tenants', async (req: Request, res: Response) => {
 
     const r = await query(
       `SELECT t.id, t.name, t.code, t.kind, t.status, t.is_active, t.created_at,
+              t.school_type, t.school_stages,
               p.name AS platform_name,
               (SELECT COUNT(*)::int FROM user_tenant_memberships m WHERE m.tenant_id = t.id) AS user_count,
               CASE WHEN t.kind = 'school'
@@ -400,6 +409,7 @@ router.get('/tenants/:tenantId', async (req: Request, res: Response) => {
  * company behind it.
  */
 router.post('/tenants', async (req: Request, res: Response) => {
+  const client = await getConnection()
   try {
     const b = req.body ?? {}
     const kind = b.kind === 'corporate' ? 'corporate' : 'school'
@@ -409,6 +419,10 @@ router.post('/tenants', async (req: Request, res: Response) => {
         { result: 'FAILURE', error: 'name and code are required' })
       return res.status(400).json({ error: 'name and code are required' })
     }
+
+    // A school is created as a type, offering chosen levels; the tools it is
+    // given follow from them. See services/schoolTypes.ts.
+    const structure = kind === 'school' ? validateStructure(b.school_type, b.school_stages) : null
 
     const table = kind === 'school' ? 'school_entities' : 'corporate_entities'
     const clash = await query(
@@ -421,33 +435,42 @@ router.post('/tenants', async (req: Request, res: Response) => {
       return res.status(409).json({ error: 'That code is already in use' })
     }
 
+    await client.query('BEGIN')
     const created = kind === 'school'
-      ? await query(
+      ? await client.query(
           `INSERT INTO school_entities (name, code, email, phone, address, is_active, lifecycle_state)
            VALUES ($1,$2,$3,$4,$5,TRUE,'active') RETURNING id, name, code`,
           [b.name, b.code, b.email || null, b.phone || null, b.address || null]
         )
-      : await query(
+      : await client.query(
           `INSERT INTO corporate_entities (name, code, email, phone, industry, headquarters_address, is_active)
            VALUES ($1,$2,$3,$4,$5,$6,TRUE) RETURNING id, name, code`,
           [b.name, b.code, b.email || null, b.phone || null, b.industry || null, b.address || null]
         )
 
     const entityId = created.rows[0].id
+    if (structure) await applySchoolStructure(client, entityId, structure.type, structure.stages)
+    await client.query('COMMIT')
     const tenant = await query(`SELECT * FROM tenants WHERE id = $1`, [entityId])
 
     await audit(req, 'TENANT_CREATE', 'GLOBAL', { result: 'SUCCESS' },
       { type: 'tenant', id: entityId }, { afterState: created.rows[0] }, b.justification)
-    await logAction(req, 'TENANT_CREATE', 'tenant', entityId, { name: b.name, kind })
+    await logAction(req, 'TENANT_CREATE', 'tenant', entityId, { name: b.name, kind, ...structure })
 
     return res.status(201).json({
       tenant: tenant.rows[0] ?? created.rows[0],
       entity: created.rows[0],
     })
   } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined)
     await audit(req, 'TENANT_CREATE', 'GLOBAL',
       { result: 'FAILURE', error: String((e as Error).message) })
+    if (e instanceof SchoolStructureError) {
+      return res.status(e.status).json({ error: e.message, code: e.code })
+    }
     return fail(res, 'create that tenant', e)
+  } finally {
+    client.release()
   }
 })
 
@@ -463,20 +486,44 @@ router.patch('/tenants/:tenantId', async (req: Request, res: Response) => {
     const kind = before.rows[0].kind
     const table = kind === 'school' ? 'school_entities' : 'corporate_entities'
 
+    // Type and levels are changed together: the levels only mean something
+    // within a type. Leaving both out leaves them as they are.
+    const changesStructure = b.school_type !== undefined || b.school_stages !== undefined
+    if (changesStructure && kind !== 'school') {
+      return res.status(400).json({ error: 'Only a school has a school type', code: 'NOT_A_SCHOOL' })
+    }
+    const structure = changesStructure
+      ? validateStructure(b.school_type ?? before.rows[0].school_type, b.school_stages)
+      : null
+
     // The entity is the record of truth; the trigger carries the change into
     // tenants. Status is not settable here — that is the lifecycle route,
     // which requires a justification.
-    const updated = await query(
-      `UPDATE ${table}
-          SET name = COALESCE($2, name),
-              email = COALESCE($3, email),
-              phone = COALESCE($4, phone),
-              updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-        RETURNING *`,
-      [tenantId, b.name || null, b.email ?? null, b.phone ?? null]
-    )
-    if (updated.rowCount === 0) return notFound(res, 'Tenant')
+    const client = await getConnection()
+    try {
+      await client.query('BEGIN')
+      const updated = await client.query(
+        `UPDATE ${table}
+            SET name = COALESCE($2, name),
+                email = COALESCE($3, email),
+                phone = COALESCE($4, phone),
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+          RETURNING *`,
+        [tenantId, b.name || null, b.email ?? null, b.phone ?? null]
+      )
+      if (updated.rowCount === 0) {
+        await client.query('ROLLBACK')
+        return notFound(res, 'Tenant')
+      }
+      if (structure) await applySchoolStructure(client, tenantId, structure.type, structure.stages)
+      await client.query('COMMIT')
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw e
+    } finally {
+      client.release()
+    }
 
     const after = await query(`SELECT * FROM tenants WHERE id = $1`, [tenantId])
 
@@ -490,6 +537,9 @@ router.patch('/tenants/:tenantId', async (req: Request, res: Response) => {
     await audit(req, 'TENANT_UPDATE', 'TENANT',
       { result: 'FAILURE', error: String((e as Error).message) },
       { type: 'tenant', id: req.params.tenantId })
+    if (e instanceof SchoolStructureError) {
+      return res.status(e.status).json({ error: e.message, code: e.code })
+    }
     return fail(res, 'update that tenant', e)
   }
 })
@@ -677,6 +727,9 @@ router.delete('/tenants/:tenantId', async (req: Request, res: Response) => {
     }
 
     const table = before.rows[0].kind === 'school' ? 'school_entities' : 'corporate_entities'
+    // Grades are generated from the school's levels, not entered, so they do
+    // not count as data it holds.
+    await query(`DELETE FROM grade_levels WHERE tenant_id = $1`, [tenantId])
     await query(`DELETE FROM ${table} WHERE id = $1`, [tenantId])
 
     await audit(req, 'TENANT_DELETE', 'GLOBAL', { result: 'SUCCESS' },

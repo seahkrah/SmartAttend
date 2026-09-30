@@ -5,6 +5,95 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Pilot round, step 1: school types and levels (2026-09-30)
+
+### Why
+
+Every school was modelled as a university: programmes, years of study,
+credits, lecturers. The pilot is a private school in Monrovia that runs
+nursery to 12th grade, and the next may be a vocational institute. Offering
+them a university's tools offers tools that do not describe them.
+
+### What changed
+
+- **A school is created as a type**, offering chosen **levels**:
+
+  | Type | Levels | Tools |
+  |---|---|---|
+  | Grade school | Nursery / Kindergarten, Elementary, Junior high, Senior high | grades; no departments, programmes or credits |
+  | Vocational | Certificate, Diploma | departments, "trades" |
+  | College | Certificate, Diploma, Associate, Bachelor | departments, programmes, credits |
+  | University | Undergraduate, Masters, Doctorate | as before |
+
+  The catalogue is one module, `services/schoolTypes.ts`. The superadmin
+  reads it to create a school, and a school's own people read their
+  structure from `GET /api/academics/structure`.
+- **A grade school's levels generate its grades** as rows in `grade_levels`
+  (migration 067): Elementary gives Grades 1 to 6. They are rows, not a label,
+  because classes, enrolment, attendance and fees will hang off them.
+- **The menu follows the type.** A grade school is not offered Departments or
+  Programmes; it gets a Grade levels page, and the menu says "Teachers" and
+  "Subjects" where a university's says "Faculty" and "Courses".
+- **The API enforces it:** a grade school asking for programmes gets
+  `403 NOT_FOR_SCHOOL_TYPE`.
+- **Decisions and their reasons:**
+  - **Levels can be added at any time.** A school running grades 1 to 6 this
+    year adds junior high next year and gets empty grades 7 to 9. The grades
+    it has keep their ids, so nothing that points at them moves.
+  - **A level can be removed only while nothing is placed in its grades.** The
+    foreign keys that will point at `grade_levels` refuse it, and the API
+    answers `409 STAGE_IN_USE`.
+  - **The type is fixed once the school has a student.** Records are shaped by
+    it (classes and report cards against programmes and credits), so changing
+    it would strand them. While the school is empty the type can change.
+  - **Schools created before types exist became universities** offering
+    undergraduate study: the model they were built on, so nothing they had
+    changes or disappears. A school row with no type recorded is read as one.
+  - The database checks the type's name and that only a school has one; the
+    catalogue of levels stays in code, where the grades it generates are.
+
+### Found in passing, and fixed
+
+The superadmin's tenant screen could not do what it showed:
+
+- It never sent a `code`, which the API requires, so **creating a tenant from
+  the web app always failed**.
+- It sent `type` where the API reads `kind`, so a company would have been
+  created as a school.
+- Its Entities and Tenants tabs read `schools` and `corporates` from an
+  endpoint that answers `entities`, so they were **always empty**.
+- Suspend, Disable and Activate sent `{action}` to an endpoint that ignores it
+  and then reported success. The real route, `/lifecycle`, needs a
+  justification.
+
+The tenant tab is now `components/superadmin/TenantsPanel.tsx`, built on
+`GET /superadmin/tenants`, with the type and levels picker, suspend, archive
+and reactivate with a recorded justification, and delete. An unrouted copy,
+`SuperadminTenantsPage.tsx`, was removed.
+
+### Verified
+
+- 11 unit tests for the catalogue, validation and grade generation.
+- A new e2e suite, `schoolTypesApi` (46 checks), in `run-all-e2e.sh`:
+  creation and refusals, what a grade school's principal is given and refused,
+  growing from 1–6 to 1–9 with grade ids kept, type change while empty, the
+  lock once there are students, company and database refusals, and deleting an
+  empty grade school.
+  - Its first full run found that the type lock compared against the stored
+    value, which is NULL for a school created directly in the database, so a
+    populated pre-types school could be turned into a grade school. The lock
+    now compares against the resolved type (NULL reads as university).
+- `controlPlaneApi` now creates its schools with a type, and checks that a
+  school without one is refused.
+
+### Not done yet
+
+This is the structure. What a grade school does with it comes next: classes
+(sections) within a grade, placing students in a class, the class register,
+subjects per grade, term report cards and promotion at year end.
+
+---
+
 ## Foundation round, step 4: two-factor sign-in (2026-09-26)
 
 ### Why

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Trash2, Plus, X, Users, Mail, CheckCircle, AlertCircle, Building2, Edit3, PauseCircle, Ban, Play, Shield, AlertTriangle, Info, XCircle } from 'lucide-react'
+import { Trash2, X, Users, Mail, CheckCircle, AlertCircle, Building2, Edit3, PauseCircle, Ban, Play, Shield, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { apiClient } from '../services/api'
+import { TenantsPanel } from '../components/superadmin/TenantsPanel'
 
 interface Entity {
   id: string
@@ -8,20 +9,10 @@ interface Entity {
   code: string
   email: string
   is_active: boolean
+  kind?: 'school' | 'corporate'
+  /** Students at a school, employees at a company. */
   user_count: number
   pending_approvals: number
-}
-
-interface Tenant {
-  id: string
-  name: string
-  code: string
-  email: string
-  address?: string
-  is_active: boolean
-  status: 'active' | 'suspended' | 'disabled'
-  user_count: number
-  type: 'school' | 'corporate'
 }
 
 interface User {
@@ -134,12 +125,6 @@ const SuperadminManagementPage: React.FC = () => {
   const [schools, setSchools] = useState<Entity[]>([])
   const [corporates, setCorporates] = useState<Entity[]>([])
   
-  // Tenants state
-  const [tenants, setTenants] = useState<Tenant[]>([])
-  const [showTenantForm, setShowTenantForm] = useState(false)
-  const [tenantFormData, setTenantFormData] = useState({ name: '', email: '', type: 'school', address: '' })
-  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
-  const [editFormData, setEditFormData] = useState({ name: '', email: '', address: '' })
   
   // Users state
   const [allUsers, setAllUsers] = useState<User[]>([])
@@ -177,7 +162,6 @@ const SuperadminManagementPage: React.FC = () => {
       setLoading(true)
       await Promise.all([
         loadEntities(),
-        loadTenants(),
         loadUsers()
       ])
     } catch (error) {
@@ -190,29 +174,17 @@ const SuperadminManagementPage: React.FC = () => {
   const loadEntities = async () => {
     try {
       const response = await apiClient.get('/superadmin/entities')
-      if (response.data) {
-        setSchools(response.data.schools || [])
-        setCorporates(response.data.corporates || [])
-      }
+      const all: any[] = Array.isArray(response.data?.entities) ? response.data.entities : []
+      const asEntity = (e: any): Entity => ({
+        ...e,
+        user_count: Number(e.members) || 0,
+        pending_approvals: Number(e.pending_approvals) || 0,
+      })
+      setSchools(all.filter((e) => e.kind === 'school').map(asEntity))
+      setCorporates(all.filter((e) => e.kind === 'corporate').map(asEntity))
     } catch (error: any) {
       console.error('Error loading entities:', error)
       addToast('error', 'Failed to load entities', error.response?.data?.error || error.message)
-    }
-  }
-
-  const loadTenants = async () => {
-    try {
-      const response = await apiClient.get('/superadmin/entities')
-      if (response.data) {
-        const allTenants: Tenant[] = [
-          ...(response.data.schools?.map((s: any) => ({ ...s, type: 'school' as const, status: s.status || (s.is_active ? 'active' : 'disabled'), user_count: Number(s.user_count) || 0 })) || []),
-          ...(response.data.corporates?.map((c: any) => ({ ...c, type: 'corporate' as const, status: c.status || (c.is_active ? 'active' : 'disabled'), user_count: Number(c.user_count) || 0 })) || []),
-        ]
-        setTenants(allTenants)
-      }
-    } catch (error: any) {
-      console.error('Error loading tenants:', error)
-      addToast('error', 'Failed to load tenants', error.response?.data?.error || error.message)
     }
   }
 
@@ -227,93 +199,6 @@ const SuperadminManagementPage: React.FC = () => {
       console.error('Error loading users:', error)
       setAllUsers([])
     }
-  }
-
-  const handleAddTenant = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const response = await apiClient.post('/superadmin/tenants', tenantFormData)
-      const newCode = response.data?.tenant?.code || ''
-      setTenantFormData({ name: '', email: '', type: 'school', address: '' })
-      setShowTenantForm(false)
-      addToast('success', 'Tenant created successfully', `Code: ${newCode}`)
-      await loadTenants()
-      await loadEntities()
-    } catch (error: any) {
-      const msg = error.response?.data?.error || 'Failed to create tenant'
-      addToast('error', 'Tenant creation failed', msg)
-    }
-  }
-
-  const handleDeleteTenant = (id: string, name: string) => {
-    showConfirm({
-      title: 'Delete Tenant',
-      message: `Are you sure you want to permanently delete "${name}"? This action cannot be undone. All associated data will be removed.`,
-      confirmLabel: 'Delete Permanently',
-      confirmColor: 'bg-red-600 hover:bg-red-700',
-      onConfirm: async () => {
-        try {
-          await apiClient.delete(`/superadmin/tenants/${id}`)
-          addToast('success', 'Tenant deleted', `"${name}" has been permanently removed.`)
-          await loadTenants()
-          await loadEntities()
-        } catch (error: any) {
-          const msg = error.response?.data?.error || 'Failed to delete tenant'
-          addToast('error', 'Delete failed', msg)
-        }
-      }
-    })
-  }
-
-  const handleTenantAction = (id: string, action: 'activate' | 'suspend' | 'disable', name: string) => {
-    const labels = {
-      activate: { verb: 'Activate', past: 'activated', color: 'bg-green-600 hover:bg-green-700' },
-      suspend:  { verb: 'Suspend',  past: 'suspended', color: 'bg-yellow-600 hover:bg-yellow-700' },
-      disable:  { verb: 'Disable',  past: 'disabled',  color: 'bg-orange-600 hover:bg-orange-700' },
-    }
-    const label = labels[action]
-    const descriptions = {
-      activate: `This will restore full access for "${name}". All users will be able to log in and use the platform.`,
-      suspend:  `This will temporarily restrict access for "${name}". Users will not be able to log in until the tenant is re-activated. This is reversible.`,
-      disable:  `This will deactivate "${name}". All access will be blocked. The tenant will need to be manually re-activated by a superadmin.`,
-    }
-    showConfirm({
-      title: `${label.verb} Tenant`,
-      message: descriptions[action],
-      confirmLabel: label.verb,
-      confirmColor: label.color,
-      onConfirm: async () => {
-        try {
-          await apiClient.patch(`/superadmin/tenants/${id}`, { action })
-          addToast('success', `Tenant ${label.past}`, `"${name}" has been ${label.past}.`)
-          await loadTenants()
-          await loadEntities()
-        } catch (error: any) {
-          const msg = error.response?.data?.error || `Failed to ${action} tenant`
-          addToast('error', `${label.verb} failed`, msg)
-        }
-      }
-    })
-  }
-
-  const handleEditTenant = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingTenant) return
-    try {
-      await apiClient.patch(`/superadmin/tenants/${editingTenant.id}`, { action: 'edit', ...editFormData })
-      addToast('success', 'Tenant updated', `"${editFormData.name}" has been updated.`)
-      setEditingTenant(null)
-      await loadTenants()
-      await loadEntities()
-    } catch (error: any) {
-      const msg = error.response?.data?.error || 'Failed to update tenant'
-      addToast('error', 'Update failed', msg)
-    }
-  }
-
-  const openEditForm = (tenant: Tenant) => {
-    setEditingTenant(tenant)
-    setEditFormData({ name: tenant.name, email: tenant.email, address: tenant.address || '' })
   }
 
   // ===========================
@@ -412,7 +297,7 @@ const SuperadminManagementPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Users className="w-4 h-4 text-muted" />
-          <p className="text-secondary">{entity.user_count} users</p>
+          <p className="text-secondary">{entity.user_count} {entity.kind === 'corporate' ? 'employees' : 'students'}</p>
         </div>
       </div>
 
@@ -432,95 +317,6 @@ const SuperadminManagementPage: React.FC = () => {
       </div>
     </div>
   )
-
-  const statusConfig = {
-    active:    { label: 'Active',    color: 'bg-green-500/20 text-green-700 dark:text-green-400',  icon: <CheckCircle className="w-3.5 h-3.5" /> },
-    suspended: { label: 'Suspended', color: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400', icon: <PauseCircle className="w-3.5 h-3.5" /> },
-    disabled:  { label: 'Disabled',  color: 'bg-red-500/20 text-red-700 dark:text-red-400',      icon: <Ban className="w-3.5 h-3.5" /> },
-  }
-
-  const TenantRow = ({ tenant }: { tenant: Tenant }) => {
-    const status = tenant.status || (tenant.is_active ? 'active' : 'disabled')
-    const cfg = statusConfig[status] || statusConfig.active
-
-    return (
-      <div className="p-4 rounded-lg bg-sunken border border-subtle hover:border-strong transition-colors">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h4 className="text-primary font-bold text-lg">{tenant.name}</h4>
-            <p className="text-secondary text-xs font-mono mt-0.5">{tenant.code}</p>
-          </div>
-          <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.color}`}>
-            {cfg.icon} {cfg.label}
-          </span>
-        </div>
-
-        <div className="space-y-1.5 mb-3">
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="w-4 h-4 text-muted" />
-            <p className="text-secondary truncate">{tenant.email}</p>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Users className="w-4 h-4 text-muted" />
-            <p className="text-secondary">{tenant.user_count} users</p>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Building2 className="w-4 h-4 text-muted" />
-            <p className="text-secondary">{tenant.type === 'school' ? '🏫 School' : '🏢 Corporate'}</p>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="pt-3 border-t border-subtle flex flex-wrap gap-2">
-          <button
-            onClick={() => openEditForm(tenant)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 transition-colors"
-            title="Edit tenant details"
-          >
-            <Edit3 className="w-3.5 h-3.5" /> Edit
-          </button>
-
-          {status !== 'active' && (
-            <button
-              onClick={() => handleTenantAction(tenant.id, 'activate', tenant.name)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 hover:bg-green-500/20 text-green-700 dark:text-green-400 transition-colors"
-              title="Activate — restore full access"
-            >
-              <Play className="w-3.5 h-3.5" /> Activate
-            </button>
-          )}
-
-          {status !== 'suspended' && status === 'active' && (
-            <button
-              onClick={() => handleTenantAction(tenant.id, 'suspend', tenant.name)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 transition-colors"
-              title="Suspend — temporarily restrict access (reversible)"
-            >
-              <PauseCircle className="w-3.5 h-3.5" /> Suspend
-            </button>
-          )}
-
-          {status !== 'disabled' && (
-            <button
-              onClick={() => handleTenantAction(tenant.id, 'disable', tenant.name)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400 transition-colors"
-              title="Disable — deactivate tenant (requires manual re-activation)"
-            >
-              <Ban className="w-3.5 h-3.5" /> Disable
-            </button>
-          )}
-
-          <button
-            onClick={() => handleDeleteTenant(tenant.id, tenant.name)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors"
-            title="Delete — permanently remove this tenant"
-          >
-            <Trash2 className="w-3.5 h-3.5" /> Delete
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   const UserRow = ({ user }: { user: User }) => {
     const statusColor = 
@@ -745,176 +541,7 @@ const SuperadminManagementPage: React.FC = () => {
         )}
 
         {/* TENANTS TAB */}
-        {activeTab === 'tenants' && (
-          <div className="space-y-6">
-            {/* Add Tenant Button */}
-            <button
-              onClick={() => setShowTenantForm(!showTenantForm)}
-              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all shadow-lg"
-            >
-              {showTenantForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-              {showTenantForm ? 'Cancel' : 'Create New Tenant'}
-            </button>
-
-            {/* Add Tenant Form */}
-            {showTenantForm && (
-              <form
-                onSubmit={handleAddTenant}
-                className="p-6 rounded-xl bg-sunken border border-subtle space-y-4"
-              >
-                <div>
-                  <label className="block text-sm font-medium text-secondary mb-2">Tenant Name</label>
-                  <input
-                    type="text"
-                    value={tenantFormData.name}
-                    onChange={(e) => setTenantFormData({ ...tenantFormData, name: e.target.value })}
-                    className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-green-500 outline-none"
-                    placeholder="Enter tenant name"
-                    required
-                  />
-                </div>
-
-                <div className="p-3 rounded-lg bg-card border border-dashed border-subtle">
-                  <p className="text-xs text-muted flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5" />
-                    <span><strong className="text-secondary">Code</strong> will be auto-generated: <code className="text-green-700 dark:text-green-400">{tenantFormData.type === 'school' ? 'SAS-XXX-SP' : 'SAS-XXX-CP'}</code></span>
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-secondary mb-2">Email</label>
-                    <input
-                      type="email"
-                      value={tenantFormData.email}
-                      onChange={(e) => setTenantFormData({ ...tenantFormData, email: e.target.value })}
-                      className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-green-500 outline-none"
-                      placeholder="Enter email"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-secondary mb-2">Type</label>
-                    <select
-                      value={tenantFormData.type}
-                      onChange={(e) => setTenantFormData({ ...tenantFormData, type: e.target.value as 'school' | 'corporate' })}
-                      className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary focus:border-green-500 outline-none"
-                    >
-                      <option value="school">School</option>
-                      <option value="corporate">Corporate</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-secondary mb-2">Address</label>
-                  <textarea
-                    value={tenantFormData.address}
-                    onChange={(e) => setTenantFormData({ ...tenantFormData, address: e.target.value })}
-                    className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-green-500 outline-none resize-none"
-                    placeholder="Enter institution address"
-                    rows={3}
-                    required
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
-                  >
-                    Create Tenant
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowTenantForm(false)}
-                    className="flex-1 px-4 py-2 border border-strong text-secondary hover:text-primary rounded-lg transition-colors font-medium"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Edit Tenant Modal */}
-            {editingTenant && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <form
-                  onSubmit={handleEditTenant}
-                  className="w-full max-w-lg p-6 rounded-xl bg-sunken border border-subtle space-y-4 shadow-2xl"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold text-primary">Edit Tenant</h3>
-                    <button type="button" onClick={() => setEditingTenant(null)} className="text-secondary hover:text-primary">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted font-mono">{editingTenant.code} · {editingTenant.type === 'school' ? '🏫 School' : '🏢 Corporate'}</p>
-
-                  <div>
-                    <label className="block text-sm font-medium text-secondary mb-2">Tenant Name</label>
-                    <input
-                      type="text"
-                      value={editFormData.name}
-                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                      className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-blue-500 outline-none"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-secondary mb-2">Email</label>
-                    <input
-                      type="email"
-                      value={editFormData.email}
-                      onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                      className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-blue-500 outline-none"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-secondary mb-2">Address</label>
-                    <textarea
-                      value={editFormData.address}
-                      onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                      className="w-full px-4 py-2 bg-card border border-subtle rounded-lg text-primary placeholder:text-muted focus:border-blue-500 outline-none resize-none"
-                      rows={3}
-                      required
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-                      Save Changes
-                    </button>
-                    <button type="button" onClick={() => setEditingTenant(null)} className="flex-1 px-4 py-2 border border-strong text-secondary hover:text-primary rounded-lg font-medium transition-colors">
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Status Legend */}
-            <div className="flex flex-wrap gap-4 text-xs text-muted">
-              <span className="flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5 text-green-700 dark:text-green-400" /> Active — Full access</span>
-              <span className="flex items-center gap-1"><PauseCircle className="w-3.5 h-3.5 text-yellow-700 dark:text-yellow-400" /> Suspended — Temporary restriction</span>
-              <span className="flex items-center gap-1"><Ban className="w-3.5 h-3.5 text-red-700 dark:text-red-400" /> Disabled — Deactivated</span>
-            </div>
-
-            {/* Tenants Grid */}
-            {tenants.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tenants.map((tenant) => (
-                  <TenantRow key={tenant.id} tenant={tenant} />
-                ))}
-              </div>
-            ) : (
-              <div className="p-12 text-center rounded-xl bg-sunken border border-dashed border-subtle">
-                <p className="text-secondary text-lg">No tenants yet</p>
-                <p className="text-muted text-sm mt-2">Create a new tenant to get started</p>
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === 'tenants' && <TenantsPanel notify={addToast} />}
 
         {/* USERS TAB */}
         {activeTab === 'users' && (

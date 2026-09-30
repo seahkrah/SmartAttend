@@ -57,6 +57,7 @@ const HRAnalyticsPanelPage = lazy(() => import('./pages/HRAnalyticsPanelPage').t
 const FacultyDashboardPage = lazy(() => import('./pages/FacultyDashboardPage'));
 const FacultyStudentsPage = lazy(() => import('./pages/FacultyStudentsPage'));
 const FacultyCoursesPage = lazy(() => import('./pages/FacultyCoursesPage'));
+const FacultyClassesPage = lazy(() => import('./pages/FacultyClassesPage'));
 const FacultyEnrollmentPage = lazy(() => import('./pages/FacultyEnrollmentPage'));
 const FacultySchedulesPage = lazy(() => import('./pages/FacultySchedulesPage'));
 const FacultyReportsPage = lazy(() => import('./pages/FacultyReportsPage'));
@@ -92,6 +93,8 @@ const EmployeeSelfServiceAttendancePage = lazy(() => import('./pages/EmployeeSel
 const EmployeePayslipsPage = lazy(() => import('./pages/EmployeePayslipsPage'));
 const SchoolAdminRoomsPage = lazy(() => import('./pages/SchoolAdminRoomsPage'));
 const SchoolAdminGradeLevelsPage = lazy(() => import('./pages/SchoolAdminGradeLevelsPage'));
+const SchoolAdminClassesPage = lazy(() => import('./pages/SchoolAdminClassesPage'));
+const SchoolAdminSubjectsPage = lazy(() => import('./pages/SchoolAdminSubjectsPage'));
 const SchoolAdminSchedulesPage = lazy(() => import('./pages/SchoolAdminSchedulesPage'));
 const SchoolAdminEnrollmentPage = lazy(() => import('./pages/SchoolAdminEnrollmentPage'));
 const SchoolAdminAttendancePage = lazy(() => import('./pages/SchoolAdminAttendancePage'));
@@ -216,6 +219,8 @@ export default function App() {
                     <Route path="/incidents" element={<TenantIncidentsPage />} />
                     <Route path="/rooms" element={<SchoolAdminRoomsPage />} />
                     <Route path="/grades" element={<SchoolAdminGradeLevelsPage />} />
+                    <Route path="/classes" element={<SchoolAdminClassesPage />} />
+                    <Route path="/subjects" element={<SchoolAdminSubjectsPage />} />
                     <Route path="/schedules" element={<SchoolAdminSchedulesPage />} />
                     <Route path="/enrollment" element={<SchoolAdminEnrollmentPage />} />
                     <Route path="/attendance" element={<SchoolAdminAttendancePage />} />
@@ -287,6 +292,7 @@ export default function App() {
                     <Route path="/" element={<FacultyDashboardPage />} />
                     <Route path="/students" element={<FacultyStudentsPage />} />
                     <Route path="/courses" element={<FacultyCoursesPage />} />
+                    <Route path="/classes" element={<FacultyClassesPage />} />
                     <Route path="/enrollment" element={<FacultyEnrollmentPage />} />
                     <Route path="/attendance" element={<DarkSurface><FacultyAttendanceWorkflowPage /></DarkSurface>} />
                     <Route path="/schedules" element={<FacultySchedulesPage />} />

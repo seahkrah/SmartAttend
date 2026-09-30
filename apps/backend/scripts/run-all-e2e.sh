@@ -65,6 +65,8 @@ SUITES=(
   # Creates grade schools with a principal each, and briefly adds a level
   # to school A.
   schoolTypesApi
+  # Creates two grade schools with classes, subjects and children.
+  gradeSchoolApi
 )
 
 fail=0

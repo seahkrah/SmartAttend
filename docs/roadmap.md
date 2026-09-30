@@ -26,8 +26,9 @@ The pilot cannot start without these.
    - [x] School type (grade school, vocational, college, university) and
          levels offered, chosen when the school is created; tools and menus
          follow the type; grades generated from the levels (2026-09-30).
-   - [ ] Classes/sections within a grade, class teachers, subjects per grade.
-   - [ ] Students placed in a class; attendance, enrolment and fees key off
+   - [x] Classes/sections within a grade, class teachers, subjects per grade;
+         registering a child (no email needed) into a class (2026-09-30).
+   - [ ] The class register (daily attendance by class); fees keyed off
          class and grade.
    - [ ] Term report cards.
    - [ ] **Bulk roll-forward:** promote a whole school to the next year.

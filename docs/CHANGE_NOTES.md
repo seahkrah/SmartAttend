@@ -5,6 +5,74 @@ brief, with the reasoning behind each, so they can be reviewed. Newest phase fir
 
 ---
 
+## Pilot round, step 2: a grade school's classes, subjects and children (2026-09-30)
+
+### Why
+
+Step 1 gave a grade school its grades. A grade is not where a child sits: a
+school with sixty children in Grade 4 runs 4A and 4B, each with a class
+teacher, and the register, the report card and the fee bill are all a
+class's. And the school could not register a child at all: every student
+needed a college, a department, a photo and an email address.
+
+### What changed
+
+- **Classes** (migration 068, `school_classes`): a class of one grade in one
+  academic year ("Grade 4A"), with a class teacher and an optional capacity.
+  One name per grade per year.
+- **Placements** (`class_placements`): which class a student sits in for a
+  year, at most one. Placing a child who is in another class that year moves
+  them; it does not give them two. A trigger keeps the placement's year equal
+  to its class's.
+- **Subjects** (`subjects`, `grade_subjects`): what the school teaches, and a
+  grid of which grades take each.
+- **Registering a child.** The Students page, at a grade school, asks for a
+  name, a class and, optionally, an email and a photo: no college or
+  department. A child with no email:
+  - gets an account on an address under the reserved `.invalid` domain
+    (RFC 2606), where mail can never be delivered;
+  - is sent no invitation and cannot sign in; their guardians are the
+    contacts.
+  
+  A real address can be added later, for example in senior high. Accounts
+  were kept rather than made optional because every query that reads a
+  student joins to one, and optional accounts would have silently dropped
+  students from them.
+- **Academic years can be created in the web app.** The API always could,
+  but no page did; the Classes page now does, since classes need a year.
+- **Pages:** Classes (per year, grade by grade: create, class teacher,
+  capacity, add and move children, remove), Subjects (the grade grid), and a
+  teacher's My classes.
+- **Menus.** A grade school no longer sees the course-and-timetable pages
+  (Courses, Schedules, Enrollment, Attendance, Results, Admissions, and a
+  teacher's courses, gradebook and attendance): they are built on courses,
+  which a grade school does not have. Its register and report cards come next.
+- **The API** at `/api/grade-school` answers only a grade school
+  (`403 NOT_FOR_SCHOOL_TYPE` otherwise). Teachers read; administrators write.
+- **Rules:**
+  - a class with students cannot be removed;
+  - a level whose grades have classes or subjects cannot be removed
+    (`409 STAGE_IN_USE`);
+  - a subject a grade takes cannot be deleted, only made inactive;
+  - capacity is kept both when placing and when registering, and cannot be
+    set below a class's size.
+
+### Verified
+
+- A new e2e suite, `gradeSchoolApi` (62 checks), in `run-all-e2e.sh`:
+  - two grade schools, a teacher and a university;
+  - classes, registration with and without email, moving, capacity and
+    removal;
+  - subjects and the class teacher's view;
+  - cross-school refusals in the API and in the database.
+
+### Not done yet
+
+The class register (daily attendance by class), subject marks and term report
+cards, and promotion at year end.
+
+---
+
 ## Pilot round, step 1: school types and levels (2026-09-30)
 
 ### Why

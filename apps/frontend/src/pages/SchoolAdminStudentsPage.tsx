@@ -4,6 +4,16 @@ import { apiClient } from '../services/api';
 import { InvitationDialog, type InvitationResult } from '../components/accounts/InvitationDialog';
 import { useToastStore } from '../components/Toast';
 import { getErrorMessage, showSuccess } from '../utils/errorHandler';
+import { useAuthStore } from '../store/authStore';
+import { useSchoolStructureStore } from '../store/schoolStructureStore';
+import { gradeSchoolService, type SchoolClass } from '../services/gradeSchoolService';
+
+/**
+ * A grade-school child registered without an email is given an address on
+ * the reserved .invalid domain by the server; it is not an address anybody
+ * should see.
+ */
+const realEmail = (email: string | undefined) => (email && !email.endsWith('.invalid') ? email : '');
 
 interface Student {
   id: string;
@@ -22,6 +32,7 @@ interface Student {
   is_active: boolean;
   profile_photo_url?: string;
   gender?: string;
+  current_class?: string | null;
 }
 
 const SchoolAdminStudentsPage: React.FC = () => {
@@ -40,6 +51,18 @@ const SchoolAdminStudentsPage: React.FC = () => {
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
   const { addToast } = useToastStore();
 
+  // A grade school registers children into a grade and class, not a college
+  // and department, and most of them have no email address.
+  const userId = useAuthStore((st) => st.user?.id);
+  const { structure, forUser, load: loadStructure } = useSchoolStructureStore();
+  const gradeSchool = forUser === userId && structure?.type === 'grade_school';
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  useEffect(() => { if (userId) void loadStructure(userId); }, [userId, loadStructure]);
+  useEffect(() => {
+    if (!gradeSchool) return;
+    gradeSchoolService.listClasses().then((r) => setClasses(r.classes)).catch(() => setClasses([]));
+  }, [gradeSchool]);
+
   // Form state
   const [formData, setFormData] = useState({
     studentId: '',
@@ -53,9 +76,17 @@ const SchoolAdminStudentsPage: React.FC = () => {
     department: '',
     status: 'freshman',
     gender: '',
-    profilePhoto: '' as string
+    profilePhoto: '' as string,
+    classId: '',
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // The form starts before the school's type is known, with a university's
+  // year of study as its status; a grade school's statuses are different.
+  useEffect(() => {
+    if (!gradeSchool) return;
+    setFormData((f) => (['freshman', 'sophomore', 'junior', 'senior'].includes(f.status) ? { ...f, status: 'active' } : f));
+  }, [gradeSchool]);
 
   // A new search starts from the first page; typing is debounced so each
   // keystroke is not a request.
@@ -99,30 +130,38 @@ const SchoolAdminStudentsPage: React.FC = () => {
       setSubmitting(false);
       return;
     }
-    if (!formData.email.trim()) {
+    if (!gradeSchool && !formData.email.trim()) {
       addToast({ type: 'error', title: 'Missing Field', message: 'Email is required' });
       setSubmitting(false);
       return;
     }
-    if (!formData.college.trim()) {
+    if (!gradeSchool && !formData.college.trim()) {
       addToast({ type: 'error', title: 'Missing Field', message: 'College is required' });
       setSubmitting(false);
       return;
     }
-    if (!formData.department.trim()) {
+    if (!gradeSchool && !formData.department.trim()) {
       addToast({ type: 'error', title: 'Missing Field', message: 'Department is required' });
       setSubmitting(false);
       return;
     }
-    if (!formData.profilePhoto) {
+    if (!gradeSchool && !formData.profilePhoto) {
       addToast({ type: 'error', title: 'Missing Field', message: 'Student photo is required' });
       setSubmitting(false);
       return;
     }
     
     try {
-      const res = await apiClient.post('/auth/admin/school/students', formData);
-      setInvite({ userId: res.data.userId, name: `${formData.firstName} ${formData.lastName}`, invitation: res.data.invitation ?? null });
+      const { classId, college, department, ...rest } = formData;
+      const body = gradeSchool
+        ? { ...rest, email: rest.email.trim() || undefined, classId: classId || undefined }
+        : { ...rest, college, department };
+      const res = await apiClient.post('/auth/admin/school/students', body);
+      if (gradeSchool && !rest.email.trim()) {
+        showSuccess(res.data.message ?? 'Student registered');
+      } else {
+        setInvite({ userId: res.data.userId, name: `${formData.firstName} ${formData.lastName}`, invitation: res.data.invitation ?? null });
+      }
       setShowAddModal(false);
       resetForm();
       fetchStudents();
@@ -155,17 +194,17 @@ const SchoolAdminStudentsPage: React.FC = () => {
       setSubmitting(false);
       return;
     }
-    if (!formData.email.trim()) {
+    if (!gradeSchool && !formData.email.trim()) {
       addToast({ type: 'error', title: 'Missing Field', message: 'Email is required' });
       setSubmitting(false);
       return;
     }
-    if (!formData.college.trim()) {
+    if (!gradeSchool && !formData.college.trim()) {
       addToast({ type: 'error', title: 'Missing Field', message: 'College is required' });
       setSubmitting(false);
       return;
     }
-    if (!formData.department.trim()) {
+    if (!gradeSchool && !formData.department.trim()) {
       addToast({ type: 'error', title: 'Missing Field', message: 'Department is required' });
       setSubmitting(false);
       return;
@@ -198,9 +237,10 @@ const SchoolAdminStudentsPage: React.FC = () => {
       address: '',
       college: '',
       department: '',
-      status: 'freshman',
+      status: gradeSchool ? 'active' : 'freshman',
       gender: '',
-      profilePhoto: ''
+      profilePhoto: '',
+      classId: '',
     });
     setPhotoPreview(null);
   };
@@ -266,14 +306,15 @@ const SchoolAdminStudentsPage: React.FC = () => {
       firstName: student.first_name,
       middleName: student.middle_name || '',
       lastName: student.last_name,
-      email: student.email,
+      email: realEmail(student.email),
       phone: student.phone || '',
       address: student.address || '',
       college: student.college || '',
       department: student.department || '',
-      status: student.status || 'freshman',
+      status: student.status || (gradeSchool ? 'active' : 'freshman'),
       gender: student.gender || '',
-      profilePhoto: ''
+      profilePhoto: '',
+      classId: '',
     });
     setPhotoPreview(student.profile_photo_url || null);
     setEditingStudent(student);
@@ -349,8 +390,14 @@ const SchoolAdminStudentsPage: React.FC = () => {
                 <th className="w-[100px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Student ID</th>
                 <th className="w-[180px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Name</th>
                 <th className="w-[180px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Email</th>
-                <th className="w-[160px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">College</th>
-                <th className="w-[130px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Department</th>
+                {gradeSchool ? (
+                  <th className="w-[120px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Class</th>
+                ) : (
+                  <>
+                    <th className="w-[160px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">College</th>
+                    <th className="w-[130px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Department</th>
+                  </>
+                )}
                 <th className="w-[80px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Status</th>
                 <th className="w-[70px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Active</th>
                 <th className="w-[160px] px-3 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
@@ -363,9 +410,15 @@ const SchoolAdminStudentsPage: React.FC = () => {
                   <td className="px-3 py-3 text-sm text-primary truncate" title={[student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')}>
                     {[student.first_name, student.middle_name, student.last_name].filter(Boolean).join(' ')}
                   </td>
-                  <td className="px-3 py-3 text-sm text-secondary truncate" title={student.email}>{student.email}</td>
-                  <td className="px-3 py-3 text-sm text-secondary truncate" title={student.college || ''}>{student.college || '-'}</td>
-                  <td className="px-3 py-3 text-sm text-secondary truncate" title={student.department || ''}>{student.department || '-'}</td>
+                  <td className="px-3 py-3 text-sm text-secondary truncate" title={realEmail(student.email)}>{realEmail(student.email) || '-'}</td>
+                  {gradeSchool ? (
+                    <td className="px-3 py-3 text-sm text-secondary truncate">{student.current_class || 'Not placed'}</td>
+                  ) : (
+                    <>
+                      <td className="px-3 py-3 text-sm text-secondary truncate" title={student.college || ''}>{student.college || '-'}</td>
+                      <td className="px-3 py-3 text-sm text-secondary truncate" title={student.department || ''}>{student.department || '-'}</td>
+                    </>
+                  )}
                   <td className="px-3 py-3 text-sm text-secondary capitalize">{student.status || '-'}</td>
                   <td className="px-3 py-3">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -444,7 +497,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
                   )}
                 </div>
                 <label className="mt-3 px-4 py-2 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/15 cursor-pointer text-sm font-medium">
-                  {photoPreview ? 'Change Photo' : 'Upload Photo *'}
+                  {photoPreview ? 'Change Photo' : gradeSchool ? 'Upload Photo' : 'Upload Photo *'}
                   <input
                     type="file"
                     accept="image/*"
@@ -452,7 +505,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     className="hidden"
                   />
                 </label>
-                <p className="text-xs text-muted mt-2">Max 5MB, JPG/PNG {!editingStudent && '(Required)'}</p>
+                <p className="text-xs text-muted mt-2">Max 5MB, JPG/PNG {!editingStudent && !gradeSchool && '(Required)'}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -511,10 +564,10 @@ const SchoolAdminStudentsPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-secondary mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-secondary mb-1">{gradeSchool ? 'Email (if they have one)' : 'Email *'}</label>
                   <input
                     type="email"
-                    required
+                    required={!gradeSchool}
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     disabled={!!editingStudent}
@@ -540,6 +593,29 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-primary"
                   />
                 </div>
+                {gradeSchool ? (
+                  !editingStudent && (
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-secondary mb-1">Class this year</label>
+                      <select
+                        value={formData.classId}
+                        onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
+                        className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary"
+                      >
+                        <option value="">Place later</option>
+                        {classes.map((c) => (
+                          <option key={c.id} value={c.id} disabled={!!c.capacity && c.student_count >= c.capacity}>
+                            {c.display_name}{c.capacity ? ` (${c.student_count}/${c.capacity})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {classes.length === 0 && (
+                        <p className="text-xs text-muted mt-1">No classes for the current year yet; create them on the Classes page.</p>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <>
                 <div>
                   <label className="block text-sm font-medium text-secondary mb-1">College *</label>
                   <input
@@ -562,6 +638,8 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     required
                   />
                 </div>
+                  </>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-secondary mb-1">Status *</label>
                   <select
@@ -571,16 +649,28 @@ const SchoolAdminStudentsPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-card text-primary font-medium appearance-none cursor-pointer"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
                   >
-                    <option value="freshman">Freshman</option>
-                    <option value="sophomore">Sophomore</option>
-                    <option value="junior">Junior</option>
-                    <option value="senior">Senior</option>
+                    {gradeSchool ? (
+                      <>
+                        <option value="active">Attending</option>
+                        <option value="withdrawn">Withdrawn</option>
+                        <option value="graduated">Graduated</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="freshman">Freshman</option>
+                        <option value="sophomore">Sophomore</option>
+                        <option value="junior">Junior</option>
+                        <option value="senior">Senior</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
               {!editingStudent && (
                 <p className="text-sm text-muted mt-4 bg-blue-50 dark:bg-blue-500/15 p-3 rounded">
-                  ℹ️ A user account will be automatically created. Student will set password on first login.
+                  {gradeSchool
+                    ? 'A student with an email is invited to set a password; one without is registered and cannot sign in. Their guardians are their contacts.'
+                    : 'ℹ️ A user account will be automatically created. Student will set password on first login.'}
                 </p>
               )}
               <div className="mt-6 flex gap-3">

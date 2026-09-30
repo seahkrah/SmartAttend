@@ -97,7 +97,7 @@ export interface NavItem {
 }
 
 /** Tools a school type switches on; mirrors the API's SchoolFeatures. */
-export type SchoolFeature = 'gradeLevels' | 'departments' | 'programmes' | 'credits';
+export type SchoolFeature = 'gradeLevels' | 'departments' | 'programmes' | 'credits' | 'classes' | 'courses';
 
 /** What GET /academics/structure says about the signed-in person's school. */
 export interface SchoolShape {
@@ -155,20 +155,22 @@ const schoolAdminNav: AudienceNav = {
         // No page has ever existed for this; the school's departments are
         // modelled in the database but nothing reads them yet.
         { label: 'Grade levels', to: '/admin/school/grades', icon: Layers, status: 'ready', requires: 'gradeLevels' },
+        { label: 'Classes', to: '/admin/school/classes', icon: Users, status: 'ready', requires: 'classes' },
+        { label: 'Subjects', to: '/admin/school/subjects', icon: BookOpen, status: 'ready', requires: 'classes' },
         { label: 'Departments', to: '/admin/school/departments', icon: Landmark, status: 'ready', requires: 'departments' },
         { label: 'Programmes', to: '/admin/school/programmes', icon: Layers, status: 'ready', requires: 'programmes', relabel: '{programmes}' },
-        { label: 'Courses', to: '/admin/school/courses', icon: BookOpen, status: 'ready', relabel: '{subjects}' },
+        { label: 'Courses', to: '/admin/school/courses', icon: BookOpen, status: 'ready', requires: 'courses', relabel: '{subjects}' },
       ],
     },
     {
       label: 'Operations',
       items: [
         { label: 'Rooms', to: '/admin/school/rooms', icon: DoorOpen, status: 'ready' },
-        { label: 'Schedules', to: '/admin/school/schedules', icon: CalendarDays, status: 'ready' },
-        { label: 'Enrollment', to: '/admin/school/enrollment', icon: UserPlus, status: 'ready' },
-        { label: 'Attendance', to: '/admin/school/attendance', icon: ClipboardList, status: 'ready' },
+        { label: 'Schedules', to: '/admin/school/schedules', icon: CalendarDays, status: 'ready', requires: 'courses' },
+        { label: 'Enrollment', to: '/admin/school/enrollment', icon: UserPlus, status: 'ready', requires: 'courses' },
+        { label: 'Attendance', to: '/admin/school/attendance', icon: ClipboardList, status: 'ready', requires: 'courses' },
         { label: 'Face matching', to: '/admin/school/face-matching', icon: ScanFace, status: 'ready' },
-        { label: 'Admissions', to: '/admin/school/admissions', icon: ClipboardCheck, status: 'ready' },
+        { label: 'Admissions', to: '/admin/school/admissions', icon: ClipboardCheck, status: 'ready', requires: 'programmes' },
       ],
     },
     {
@@ -182,7 +184,7 @@ const schoolAdminNav: AudienceNav = {
       items: [
         // Grading schemes and publication belong to the registrar; lecturers
         // enter marks from their own gradebook, which exists.
-        { label: 'Results & transcripts', to: '/admin/school/results', icon: FileText, status: 'ready' },
+        { label: 'Results & transcripts', to: '/admin/school/results', icon: FileText, status: 'ready', requires: 'courses' },
       ],
     },
     {
@@ -211,17 +213,18 @@ const facultyNav: AudienceNav = {
     {
       label: 'Teaching',
       items: [
-        { label: 'My courses', to: '/faculty/courses', icon: BookOpen, status: 'ready', relabel: 'My {subjects}' },
-        { label: 'Students', to: '/faculty/students', icon: GraduationCap, status: 'ready' },
-        { label: 'Enrollment', to: '/faculty/enrollment', icon: UserPlus, status: 'ready' },
-        { label: 'Gradebook', to: '/faculty/gradebook', icon: FileText, status: 'ready' },
+        { label: 'My classes', to: '/faculty/classes', icon: Users, status: 'ready', requires: 'classes' },
+        { label: 'My courses', to: '/faculty/courses', icon: BookOpen, status: 'ready', requires: 'courses', relabel: 'My {subjects}' },
+        { label: 'Students', to: '/faculty/students', icon: GraduationCap, status: 'ready', requires: 'courses' },
+        { label: 'Enrollment', to: '/faculty/enrollment', icon: UserPlus, status: 'ready', requires: 'courses' },
+        { label: 'Gradebook', to: '/faculty/gradebook', icon: FileText, status: 'ready', requires: 'courses' },
       ],
     },
     {
       label: 'Operations',
       items: [
-        { label: 'Schedules', to: '/faculty/schedules', icon: CalendarDays, status: 'ready' },
-        { label: 'Attendance', to: '/faculty/attendance', icon: ClipboardList, status: 'ready' },
+        { label: 'Schedules', to: '/faculty/schedules', icon: CalendarDays, status: 'ready', requires: 'courses' },
+        { label: 'Attendance', to: '/faculty/attendance', icon: ClipboardList, status: 'ready', requires: 'courses' },
       ],
     },
     {
@@ -246,10 +249,10 @@ const studentNav: AudienceNav = {
     {
       label: 'Studies',
       items: [
-        { label: 'My courses', to: '/student/courses', icon: BookOpen, status: 'ready', relabel: 'My {subjects}' },
-        { label: 'Schedule', to: '/student/schedule', icon: CalendarDays, status: 'ready' },
-        { label: 'Results', to: '/student/results', icon: FileText, status: 'ready' },
-        { label: 'Attendance', to: '/student/attendance', icon: ClipboardList, status: 'ready' },
+        { label: 'My courses', to: '/student/courses', icon: BookOpen, status: 'ready', requires: 'courses', relabel: 'My {subjects}' },
+        { label: 'Schedule', to: '/student/schedule', icon: CalendarDays, status: 'ready', requires: 'courses' },
+        { label: 'Results', to: '/student/results', icon: FileText, status: 'ready', requires: 'courses' },
+        { label: 'Attendance', to: '/student/attendance', icon: ClipboardList, status: 'ready', requires: 'courses' },
       ],
     },
     {

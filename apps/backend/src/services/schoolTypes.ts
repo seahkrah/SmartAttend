@@ -30,6 +30,10 @@ export interface SchoolFeatures {
   programmes: boolean
   /** Credit-weighted results and a CGPA on the transcript. */
   credits: boolean
+  /** Classes (sections) within a grade, each with a class teacher. */
+  classes: boolean
+  /** Courses taught in terms by lecturers, as a college or university runs them. */
+  courses: boolean
 }
 
 /** Words a type uses for the same things. */
@@ -86,7 +90,7 @@ export const SCHOOL_TYPE_CATALOGUE: Record<SchoolType, SchoolTypeDef> = {
       { key: 'junior_high', label: 'Junior high', grades: grades(7, 9) },
       { key: 'senior_high', label: 'Senior high', grades: grades(10, 12) },
     ],
-    features: { gradeLevels: true, departments: false, programmes: false, credits: false },
+    features: { gradeLevels: true, departments: false, programmes: false, credits: false, classes: true, courses: false },
     labels: { teachers: 'Teachers', teacher: 'Teacher', subjects: 'Subjects', programmes: 'Programmes' },
   },
   vocational: {
@@ -97,7 +101,7 @@ export const SCHOOL_TYPE_CATALOGUE: Record<SchoolType, SchoolTypeDef> = {
       { key: 'certificate', label: 'Certificate' },
       { key: 'diploma', label: 'Diploma' },
     ],
-    features: { gradeLevels: false, departments: true, programmes: true, credits: false },
+    features: { gradeLevels: false, departments: true, programmes: true, credits: false, classes: false, courses: true },
     labels: { teachers: 'Instructors', teacher: 'Instructor', subjects: 'Modules', programmes: 'Trades' },
   },
   college: {
@@ -110,7 +114,7 @@ export const SCHOOL_TYPE_CATALOGUE: Record<SchoolType, SchoolTypeDef> = {
       { key: 'associate', label: 'Associate degree' },
       { key: 'bachelor', label: 'Bachelor degree' },
     ],
-    features: { gradeLevels: false, departments: true, programmes: true, credits: true },
+    features: { gradeLevels: false, departments: true, programmes: true, credits: true, classes: false, courses: true },
     labels: { teachers: 'Lecturers', teacher: 'Lecturer', subjects: 'Courses', programmes: 'Programmes' },
   },
   university: {
@@ -122,7 +126,7 @@ export const SCHOOL_TYPE_CATALOGUE: Record<SchoolType, SchoolTypeDef> = {
       { key: 'masters', label: 'Masters' },
       { key: 'doctorate', label: 'Doctorate' },
     ],
-    features: { gradeLevels: false, departments: true, programmes: true, credits: true },
+    features: { gradeLevels: false, departments: true, programmes: true, credits: true, classes: false, courses: true },
     labels: { teachers: 'Faculty', teacher: 'Lecturer', subjects: 'Courses', programmes: 'Programmes' },
   },
 }
@@ -237,7 +241,7 @@ export async function applySchoolStructure(
     if ((e as { code?: string }).code === '23503') {
       await client.query(`ROLLBACK TO SAVEPOINT grade_levels_prune`)
       throw new SchoolStructureError(
-        'A level cannot be removed while classes or students are placed in its grades', 409, 'STAGE_IN_USE')
+        'A level cannot be removed while its grades have classes or subjects', 409, 'STAGE_IN_USE')
     }
     throw e
   }

@@ -40,6 +40,7 @@ import facultyWorkflowRoutes from './routes/facultyWorkflow.js'
 import studentRoutes from './routes/student.js'
 // SMS academic core: years, terms, programmes, curriculum, student programmes.
 import academicsRoutes from './routes/academics.js'
+import gradeSchoolRoutes from './routes/gradeSchool.js'
 // SMS gradebook: schemes, assessments, marks, results, transcripts.
 import gradebookRoutes from './routes/gradebook.js'
 // SMS admissions: intakes, applicants, applications, decisions, enrolment.
@@ -163,6 +164,7 @@ app.use('/api/faculty', facultyWorkflowRoutes)
 app.use('/api/faculty', facultyRoutes)
 app.use('/api/student', studentRoutes)
 app.use('/api/academics', academicsRoutes)
+app.use('/api/grade-school', gradeSchoolRoutes)
 app.use('/api/gradebook', gradebookRoutes)
 app.use('/api/admissions', admissionsRoutes)
 app.use('/api/fees', feesRoutes)

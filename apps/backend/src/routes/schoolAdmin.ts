@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { Router, Response } from 'express'
@@ -743,7 +744,12 @@ router.get('/admin/school/students', async (req: TenantRequest, res: Response) =
                    OR (s.first_name || ' ' || s.last_name) ILIKE '%' || $2 || '%')`
     const columns = summary
       ? `s.id, s.student_id, s.first_name, s.middle_name, s.last_name, s.email, s.status`
-      : `s.*, u.email AS account_email, u.full_name, u.is_active, sd.name AS department_name`
+      : `s.*, u.email AS account_email, u.full_name, u.is_active, sd.name AS department_name,
+         (SELECT g.name || c.name FROM class_placements p
+            JOIN school_classes c ON c.id = p.class_id
+            JOIN grade_levels g ON g.id = c.grade_level_id
+            JOIN academic_years y ON y.id = p.academic_year_id AND y.is_current
+           WHERE p.student_id = s.id) AS current_class`
     const params: unknown[] = [ctx.tenantId, search]
     let limit = ''
     if (paged) {
@@ -778,14 +784,42 @@ router.post('/admin/school/students', async (req: TenantRequest, res: Response) 
   try {
     const ctx = ctxOf(req)
     const {
-      studentId, firstName, middleName, lastName, email, phone, address,
-      college, department, status, gender, profilePhoto, enrollmentYear,
+      studentId, firstName, middleName, lastName, phone, address,
+      college, department, status, gender, profilePhoto, enrollmentYear, classId,
     } = req.body
+    let { email } = req.body
+
+    // A grade school registers children, most of whom have no email address
+    // and will never sign in; their guardians are the contacts. Such a child
+    // is given an address on the reserved .invalid domain (RFC 2606), where
+    // mail cannot be delivered, and no invitation. A real address can be
+    // added later.
+    const typeRow = await query(`SELECT school_type FROM tenants WHERE id = $1`, [ctx.tenantId])
+    const gradeSchool = typeRow.rows[0]?.school_type === 'grade_school'
+    const noEmail = gradeSchool && !(typeof email === 'string' && email.trim())
+    if (noEmail) email = `student-${randomUUID()}@students.invalid`
 
     if (!studentId || !firstName || !lastName || !email) {
-      return res
-        .status(400)
-        .json({ error: 'studentId, firstName, lastName and email are required' })
+      return res.status(400).json({
+        error: gradeSchool
+          ? 'studentId, firstName and lastName are required'
+          : 'studentId, firstName, lastName and email are required',
+      })
+    }
+
+    // A grade school places the child in a class as it registers them.
+    let cls: any = null
+    if (classId !== undefined && classId !== null && classId !== '') {
+      if (!gradeSchool) return res.status(400).json({ error: 'Only a grade school places students in classes' })
+      if (badId(res, String(classId), 'Class')) return
+      cls = await ownedRow('school_classes', ctx, String(classId))
+      if (!cls) return notFound(res, 'Class')
+      if (cls.capacity) {
+        const n = await query(`SELECT COUNT(*)::int AS n FROM class_placements WHERE class_id = $1`, [cls.id])
+        if (n.rows[0].n >= cls.capacity) {
+          return res.status(409).json({ error: `That class is full (${cls.capacity})` })
+        }
+      }
     }
 
     const roleId = await schoolRoleId(ctx, 'student')
@@ -816,7 +850,8 @@ router.post('/admin/school/students', async (req: TenantRequest, res: Response) 
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
       [
         user.rows[0].id, studentId, firstName, middleName || null, lastName, email,
-        phone || null, address || null, college || '', departmentId, status || 'freshman',
+        phone || null, address || null, college || '', departmentId,
+        status || (gradeSchool ? 'active' : 'freshman'),
         gender || null, profilePhoto || null,
         Number.isInteger(enrollmentYear) ? enrollmentYear : new Date().getFullYear(),
         ctx.platformId, ctx.tenantId,
@@ -828,16 +863,26 @@ router.post('/admin/school/students', async (req: TenantRequest, res: Response) 
        VALUES ($1, $2, 'active')`,
       [user.rows[0].id, ctx.tenantId]
     )
-    const invitation = await sendInvitation(client, {
-      userId: user.rows[0].id, tenantId: ctx.tenantId, invitedBy: ctx.userId,
-    })
+    if (cls) {
+      await client.query(
+        `INSERT INTO class_placements (tenant_id, student_id, class_id, academic_year_id, placed_by)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [ctx.tenantId, student.rows[0].id, cls.id, cls.academic_year_id, ctx.userId]
+      )
+    }
+    const invitation = noEmail
+      ? null
+      : await sendInvitation(client, { userId: user.rows[0].id, tenantId: ctx.tenantId, invitedBy: ctx.userId })
 
     await client.query('COMMIT')
     return res.status(201).json({
-      message: 'Student created and invited to set their password.',
+      message: noEmail
+        ? 'Student registered. They have no email address, so no sign-in invitation was sent.'
+        : 'Student created and invited to set their password.',
       studentId: student.rows[0].id,
       userId: user.rows[0].id,
       invitation,
+      classId: cls?.id ?? null,
     })
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})

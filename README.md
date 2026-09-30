@@ -22,6 +22,9 @@ in two places:
 - a type chosen when the school is created (grade school, vocational,
   college or university) and the levels it offers; each school is given the
   tools of its type, and a grade school's levels generate its grades
+- for a grade school: classes within each grade per year with a class
+  teacher, subjects by grade, and children registered into a class without
+  needing an email address
 - students, lecturers, departments and courses
 - academic years, terms, programmes and schedules
 - attendance by session and by lecturer register
@@ -129,8 +132,8 @@ The plan for what comes next, towards a pilot school in Monrovia, is
 [docs/roadmap.md](docs/roadmap.md). Why this codebase and not the Django
 rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/2026-09-30-keep-express-platform.md).
 
-- A grade school has its grades but not yet classes, a class register,
-  report cards or promotion. There is no second currency (LRD), no offline
+- A grade school has grades, classes and subjects but not yet a class
+  register, report cards or promotion. There is no second currency (LRD), no offline
   mode and no printed receipt. These come first in the roadmap.
 - No passkeys (WebAuthn) and no single sign-on. Two-factor is
   authenticator-app codes.

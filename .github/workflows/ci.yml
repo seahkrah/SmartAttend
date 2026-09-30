@@ -1,0 +1,210 @@
+# Continuous integration.
+#
+# The repository had no automated validation, and it showed: a router-level
+# gate that broke POST /api/auth/login survived a full suite run, and 200-odd
+# SQL statements naming columns that do not exist had accumulated unnoticed.
+# Every check below exists because something it catches was already wrong.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  types-and-build:
+    name: Types and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install shared types
+        working-directory: packages/types
+        run: npm ci || npm install
+
+      - name: Build shared types
+        working-directory: packages/types
+        run: npm run build
+
+      - name: Install backend
+        working-directory: apps/backend
+        run: npm ci || npm install
+
+      - name: Typecheck backend
+        working-directory: apps/backend
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Install frontend
+        working-directory: apps/frontend
+        run: npm ci || npm install
+
+      # `vite build` does not typecheck, so a clean build says nothing about
+      # type safety. This is the check that does.
+      - name: Typecheck frontend
+        working-directory: apps/frontend
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build frontend
+        working-directory: apps/frontend
+        run: npx vite build
+
+  database-and-api:
+    name: Migrations, SQL and API
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jjelo
+          POSTGRES_PASSWORD: jjelo
+          POSTGRES_DB: jjelotech_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_ci
+      JWT_SECRET: ci-only-not-a-real-secret
+      # A throwaway key: CI templates are of synthetic test faces and are discarded.
+      BIOMETRIC_TEMPLATE_KEY: 3c1e0b7a9f5d2e8c4a6b1d0f7e9c2a5b8d3f6e1c0a9b7d5e2f4c6a8b0d1e3f5a
+      PORT: '5000'
+      # Uploaded documents land here rather than in the checkout, so a build
+      # that writes files does not leave them in the working tree.
+      FILE_STORAGE_ROOT: /tmp/ci-file-storage
+      FILE_STORAGE_BACKEND: local
+      # Every suite calls from one address; the account endpoints' production
+      # limit (30 per 15 minutes) would throttle the suites themselves. The
+      # limiter's behaviour is covered by a unit test.
+      RATE_LIMIT_ACCOUNT_PER_15MIN: '1000'
+      RATE_LIMIT_LOGIN_PER_MINUTE: '1000'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install shared types
+        working-directory: packages/types
+        run: (npm ci || npm install) && npm run build
+
+      - name: Install backend
+        working-directory: apps/backend
+        run: npm ci || npm install
+
+      # Migrations must apply to an empty database, in order, without manual
+      # intervention. If they do not, nothing below is meaningful.
+      - name: Apply migrations
+        working-directory: apps/backend
+        run: npx tsx src/db/migrate.ts
+
+      - name: Migrations are idempotent
+        working-directory: apps/backend
+        run: npx tsx src/db/migrate.ts
+
+      # Hands every literal SQL statement to PostgreSQL's parser. Catches a
+      # query naming a column that does not exist before a user does.
+      # Both of these carried continue-on-error until the count reached zero.
+      # A gate that cannot fail is not a gate: CI reported green for months
+      # while 104 unit tests failed and 154 statements named columns that do
+      # not exist. They are real now, and a regression in either fails the
+      # build.
+      - name: Validate SQL against the live schema
+        working-directory: apps/backend
+        run: node scripts/validate-sql.mjs
+
+      - name: Unit tests
+        working-directory: apps/backend
+        run: npm test -- --run
+
+      - name: Start API
+        working-directory: apps/backend
+        run: |
+          nohup npx tsx src/server.ts > /tmp/api.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:5000/api/health >/dev/null && exit 0
+            sleep 1
+          done
+          echo "API did not become healthy"; cat /tmp/api.log; exit 1
+
+      # Tenant isolation, platform isolation, authentication and role
+      # enforcement, end to end against a real database.
+      - name: End-to-end suites
+        working-directory: apps/backend
+        run: bash scripts/run-all-e2e.sh
+
+      - name: API log on failure
+        if: failure()
+        run: cat /tmp/api.log || true
+
+  images:
+    name: Container images
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jjelo
+          POSTGRES_PASSWORD: jjelo
+          POSTGRES_DB: jjelotech_images
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the API image
+        run: docker build -f apps/backend/Dockerfile -t jjelotech-api:ci .
+
+      - name: Build the web image
+        run: docker build -f apps/frontend/Dockerfile --build-arg VITE_API_BASE_URL=https://api.example.org/api -t jjelotech-web:ci .
+
+      # The image, not the checkout: migrations from an empty database, then a
+      # production-mode server that must report ready.
+      - name: Migrate and start the API image
+        run: |
+          cat > /tmp/api.env <<ENV
+          NODE_ENV=production
+          PORT=5000
+          DATABASE_URL=postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_images
+          DATABASE_SSL=off
+          JWT_SECRET=$(openssl rand -base64 48)
+          PUBLIC_APP_URL=https://app.example.org
+          CORS_ORIGINS=https://app.example.org
+          ENV
+          docker run --rm --network host --env-file /tmp/api.env jjelotech-api:ci node dist/db/migrate.js
+          docker run -d --name api --network host --env-file /tmp/api.env jjelotech-api:ci
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:5000/api/health/ready && exit 0
+            sleep 1
+          done
+          docker logs api; exit 1
+
+      - name: The web image serves the app with its security policy
+        run: |
+          docker run -d --name web -p 8080:8080 -e API_ORIGIN=https://api.example.org jjelotech-web:ci
+          sleep 3
+          curl -sf http://127.0.0.1:8080/ > /dev/null
+          curl -sfI http://127.0.0.1:8080/some/client/route | grep -q "200"
+          curl -sI http://127.0.0.1:8080/ | grep -qi "content-security-policy: .*connect-src 'self' https://api.example.org"

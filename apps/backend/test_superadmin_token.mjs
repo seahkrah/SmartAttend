@@ -25,7 +25,7 @@ async function testSuperadminToken() {
       SELECT u.id, u.email, u.full_name, u.platform_id, u.role_id, r.name as role_name
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
-      WHERE u.email = 'newadmin@smartattend.local'
+      WHERE u.email = 'newadmin@jjelotech.local'
     `);
     
     if (userResult.rows.length === 0) {

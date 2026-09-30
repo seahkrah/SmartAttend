@@ -76,44 +76,44 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg border border-slate-700 shadow-xl w-full max-w-md mx-4">
+      <div className="bg-sunken rounded-lg border border-subtle shadow-xl w-full max-w-md mx-4">
         {/* Header */}
         <div className={`flex items-center gap-3 p-6 border-b ${
-          danger ? 'border-red-500/30 bg-red-500/5' : 'border-slate-700'
+          danger ? 'border-red-500/30 bg-red-500/5' : 'border-subtle'
         }`}>
           {danger && <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />}
-          <h2 className="text-lg font-bold text-white">{title}</h2>
+          <h2 className="text-lg font-bold text-primary">{title}</h2>
         </div>
 
         {/* Message */}
         <div className="p-6 space-y-4">
-          <p className="text-slate-300 leading-relaxed">{message}</p>
+          <p className="text-secondary leading-relaxed">{message}</p>
 
           {/* Optional Reason Field */}
           {requiresReason && (
             <div>
-              <label className="block text-sm text-slate-400 mb-2">
+              <label className="block text-sm text-secondary mb-2">
                 Reason (required)
               </label>
               <textarea
                 value={reason}
                 onChange={e => setReason(e.target.value)}
                 placeholder="Explain why you are taking this action..."
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm"
+                className="w-full px-3 py-2 bg-sunken border border-strong rounded text-primary placeholder:text-muted text-sm"
                 rows={3}
                 disabled={isLoading}
               />
-              <p className="text-xs text-slate-500 mt-1">This will be recorded in audit logs.</p>
+              <p className="text-xs text-muted mt-1">This will be recorded in audit logs.</p>
             </div>
           )}
         </div>
 
         {/* Footer - Buttons */}
-        <div className="flex gap-2 p-6 border-t border-slate-700 bg-slate-900/50">
+        <div className="flex gap-2 p-6 border-t border-subtle bg-card">
           <button
             onClick={handleCancel}
             disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-600/80 text-white rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 bg-raised hover:bg-raised text-primary rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             autoFocus // Safe default: focus Cancel button
           >
             <X className="w-4 h-4" />
@@ -145,7 +145,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
 
         {/* Helper Text */}
         <div className="px-6 pb-4">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             {danger ? '⚠️ This action cannot be undone' : 'Take your time to review the information above'}
           </p>
         </div>

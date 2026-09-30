@@ -1,5 +1,5 @@
 -- ===========================
--- SMARTATTEND REFACTORED SCHEMA
+-- JJELOTECH REFACTORED SCHEMA
 -- ===========================
 
 -- Drop old tables (for fresh migration)

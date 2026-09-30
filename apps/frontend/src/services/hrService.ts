@@ -90,19 +90,32 @@ class HRService {
 
   /**
    * List Members with Attendance
+   *
+   * The endpoint pages with `page` and `page_size` and returns the rows under
+   * `data`. This sent `limit`/`offset` and read `members`, so every caller got
+   * undefined rows and silently the first page whatever it asked for. Both are
+   * now what the API speaks.
    */
   async listMembers(
-    limit = 50,
-    offset = 0,
+    page = 1,
+    pageSize = 50,
     filters?: { department?: string; status?: string; search?: string }
   ): Promise<{
     members: MemberAttendanceSummary[];
+    page: number;
+    pageSize: number;
     total: number;
   }> {
     const response = await axiosClient.get('/hr/members', {
-      params: { limit, offset, ...filters }
+      params: { page, page_size: pageSize, ...filters }
     });
-    return response.data;
+    const body = response.data ?? {};
+    return {
+      members: Array.isArray(body.data) ? body.data : [],
+      page: body.page ?? page,
+      pageSize: body.page_size ?? pageSize,
+      total: body.total ?? 0,
+    };
   }
 
   /**

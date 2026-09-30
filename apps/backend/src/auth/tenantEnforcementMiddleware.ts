@@ -1,9 +1,22 @@
 /**
- * PHASE 4, STEP 4.1: TENANT ENFORCEMENT MIDDLEWARE
- * 
- * Express middleware that enforces tenant boundaries on every request
- * Resolves tenant context and makes it available to route handlers
- * Prevents any request from operating outside tenant boundaries
+ * Tenant boundary helpers.
+ *
+ * enforceTenantBoundaries is no longer mounted. It read as though it
+ * guaranteed isolation and did not: createTenantContext set tenantId from the
+ * JWT's platformId, so the "tenant" it attached was the platform, shared by
+ * every institution — and nothing in the request path ever read the result.
+ * It was also mounted at the app level while the routers behind it
+ * authenticated per route, so req.user was undefined when it ran and it
+ * skipped silently. A guard that cannot fire, attached to a value that is
+ * wrong, is worse than no guard: it makes the mount points look protected.
+ *
+ * Isolation is now established by resolveTenantContext at each router, which
+ * derives the tenant from the authenticated identity and the server's own
+ * membership records.
+ *
+ * The helpers below are kept because they are referenced by the integration
+ * pattern documents, and they have been corrected so that anything still
+ * calling them gets a right answer or an error rather than a wrong one.
  */
 
 import { Request, Response, NextFunction } from 'express'
@@ -247,10 +260,14 @@ export async function verifyTenantOwnsResource(
     throw new Error(`${resourceName} not found`)
   }
 
-  // Check tenant ownership
-  const resourceTenantId = resource.platform_id || resource.tenant_id
-  
-  if (resourceTenantId !== tenant.tenantId) {
+  // Ownership is tenant_id and only tenant_id.
+  //
+  // This used to fall back to resource.platform_id, which is the same value
+  // for every institution on a platform — so for any row carrying one, the
+  // check passed regardless of which tenant owned it.
+  const resourceTenantId = resource.tenant_id
+
+  if (!resourceTenantId || resourceTenantId !== tenant.tenantId) {
     console.warn(
       `[SECURITY] Tenant boundary violation detected: User ${tenant.userId} attempted to access ${resourceName} owned by tenant ${resourceTenantId}`
     )

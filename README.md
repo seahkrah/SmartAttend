@@ -1,212 +1,153 @@
-# JJELOTECH - Monorepo
+<p align="center"><img src="apps/frontend/public/logos/favicon.svg" alt="" width="96" /></p>
 
-A modern attendance tracking system with a React frontend, Express backend, and PostgreSQL database.
+# JJELOTECH SYSTEMS
 
-## Project Structure
+*Engineering the Dawn of Enterprise Systems.*
 
-```
-smartattend/
-├── apps/
-│   ├── frontend/          # React 18 + Vite + TypeScript
-│   │   └── src/
-│   │       ├── pages/     # Landing, Login, Register, Dashboard
-│   │       ├── components/# Reusable UI components & animations
-│   │       ├── services/  # API client & dashboard service
-│   │       └── store/     # Zustand auth state management
-│   ├── backend/           # Express + TypeScript (31 endpoints)
-│   │   └── src/
-│   │       ├── routes/    # API routes (auth, school, corporate, attendance)
-│   │       ├── auth/      # JWT auth & middleware
-│   │       ├── db/        # PostgreSQL connection & migrations
-│   │       └── types/     # Database type definitions
-│   └── 
-├── packages/
-│   └── types/             # Shared TypeScript interfaces for entire monorepo
-│       ├── src/
-│       │   ├── auth.ts        # Auth types (User, AuthResponse, etc.)
-│       │   ├── attendance.ts  # Attendance types
-│       │   ├── school.ts      # School platform types
-│       │   ├── corporate.ts   # Corporate platform types
-│       │   ├── common.ts      # Common API types
-│       │   └── index.ts       # Main exports
-│       └── dist/              # Compiled types (auto-generated)
-└── docs/                  # Documentation files
+A School Management System (SMS) and an Employee Management System (EMS) on
+one multi-tenant platform: a React front end, an Express/TypeScript API and
+PostgreSQL 16.
 
-```
+Every school and every company is a **tenant**. Tenant isolation is enforced
+in two places:
 
-## Technology Stack
+- **The API** derives the tenant from the signed-in identity, never from the
+  client. An id from another tenant answers 404.
+- **The database** requires `tenant_id` on tenant-owned tables and uses
+  triggers to refuse references that cross tenants.
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React 18, TypeScript, Vite 5, Tailwind CSS 3 |
-| **UI/UX** | Framer Motion (animations), Lucide React (icons) |
-| **State** | Zustand 4.4.0, React Router v6 |
-| **HTTP** | Axios 1.6.0 with interceptors |
-| **Backend** | Express.js, TypeScript, PostgreSQL 16 |
-| **Auth** | JWT (24hr access, 7d refresh), bcryptjs |
-| **Shared Types** | TypeScript interfaces in `@smartattend/types` |
+## What is in it
 
-## Quick Start
+**School (SMS)**
+- students, lecturers, departments and courses
+- academic years, terms, programmes and schedules
+- attendance by session and by lecturer register
+- gradebook: assessments, marks, published results, transcripts with CGPA
+- admissions: intakes, applications, decisions, enrolment
+- fees: structures, invoices, payments, statements, clearance
+- guardians: parents, carers and sponsors linked per child with per-area
+  access, absence and fee alerts, and a read-only parent portal
+  ([docs/features/guardians.md](docs/features/guardians.md))
 
-### Prerequisites
-- Node.js 18+
-- PostgreSQL 16+
-- npm or yarn
+**Employer (EMS)**
+- employees and departments
+- self-service check-in and check-out
+- today's attendance for HR
+- leave
+- rosters, shift patterns and timesheets
+- payroll: components, tax bands, runs, payslips
 
-### Installation
+**Both**
+- notifications with a real outbox (email, SMS, push and in-app), templates
+  and delivery log
+- document storage
+- immutable audit trail
+- incidents with a lifecycle
+- operational metrics
+- an optional face-matching check
+- a superadmin control plane: tenant lifecycle, administrators, incidents,
+  diagnostics
+
+**Accounts**
+- server-side sessions that logout and deactivation end immediately
+- sign-in lockout
+- invitations and password resets by single-use link; nobody chooses or sees
+  another person's password
+- two-factor sign-in with an authenticator app and recovery codes, required
+  for administrators and superadmins in production
+
+See [docs/security/authentication.md](docs/security/authentication.md).
+
+**Face matching** runs server-side dlib ResNet embeddings with a liveness
+challenge. It requires consent, and templates are encrypted at rest. See
+[docs/features/face-matching.md](docs/features/face-matching.md) for what it
+proves and what it does not.
+
+## Running it locally
+
+The quick way, from a fresh checkout (it installs everything, writes the config
+with generated secrets, sets up the database, loads demo data and starts the
+app; it starts PostgreSQL in Docker if you have no database):
 
 ```bash
-# Install dependencies for all packages
-npm install
+scripts/setup-local.sh                                          # macOS / Linux
+powershell -ExecutionPolicy Bypass -File scripts\setup-local.ps1  # Windows
+```
 
-# In apps/frontend
-cd apps/frontend && npm install
+Afterwards, `scripts/start-local.sh` (or `scripts\start-local.ps1`) starts it
+again.
 
-# In apps/backend
+Face matching runs on native TensorFlow. Linux and macOS download it prebuilt.
+On Windows it's compiled during setup, which needs Visual Studio 2019 or later
+with the "Desktop development with C++" workload, plus Python 3. Without them,
+setup still completes and everything except face matching works; face checks
+answer 503 until you install the tools and run `npm run tfjs-native` in
+`apps/backend`. To check the engine on any machine, run
+`npm run verify-face-engine`. The steps it performs, by hand:
+
+Needs Node 20 and PostgreSQL 16.
+
+```bash
+# Shared types
+cd packages/types && npm install && npm run build
+
+# API
 cd apps/backend && npm install
+cp .env.example .env            # set DATABASE_URL and JWT_SECRET at least
+npx tsx src/db/migrate.ts       # applies every migration, in order; safe to re-run
+SUPERADMIN_EMAIL=you@example.org SUPERADMIN_NAME="Your Name" npm run setup-superadmin
+npm run dev                     # http://localhost:5000
 
-# Build types package (if needed)
-cd packages/types && npm run build
+# Web app
+cd apps/frontend && npm install
+VITE_API_BASE_URL=http://localhost:5000/api npm run dev   # http://localhost:5173
 ```
 
-### Development
+As superadmin, create a tenant and appoint its administrator. The
+administrator gets an invitation link (or you hand it to them). From there
+they add their own people.
 
-**Terminal 1 - Frontend (port 5174)**
-```bash
-cd apps/frontend
-npm run dev
-```
+## Checks
 
-**Terminal 2 - Backend (port 5000)**
-```bash
-cd apps/backend
-npm run dev
-```
+Run these before pushing; CI runs the same.
 
-### Build for Production
+| Check | Command |
+|---|---|
+| API types | `cd apps/backend && npx tsc --noEmit -p .` |
+| Every literal SQL statement parsed against the live schema | `node scripts/validate-sql.mjs` (needs `DATABASE_URL`) |
+| Unit tests (includes the real face models on fixtures) | `npm test` |
+| End-to-end API suites against a running API: seeds two schools and two companies, then runs 25 suites | `bash scripts/run-all-e2e.sh` |
+| Web app: types, every menu link routed, every API call matched to a server route, build | `cd apps/frontend && npm run build` |
+| Container images build, migrate an empty database and report ready (CI job `images`) | see `.github/workflows/ci.yml` |
 
-```bash
-# Build frontend
-cd apps/frontend && npm run build
+## Not done yet
 
-# Build backend
-cd apps/backend && npm run build
+The plan for what comes next, towards a pilot school in Monrovia, is
+[docs/roadmap.md](docs/roadmap.md). Why this codebase and not the Django
+rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/2026-09-30-keep-express-platform.md).
 
-# Run backend
-cd apps/backend && npm start
-```
+- No K–12 structure (grade levels, classes), no second currency (LRD), no
+  offline mode, no printed receipts. These come first in the roadmap.
+- No passkeys (WebAuthn) and no single sign-on. Two-factor is
+  authenticator-app codes.
+- Tokens are held in `localStorage`, not `httpOnly` cookies.
+- Email and SMS delivery depend on each tenant configuring a provider. Until
+  then messages are recorded as *simulated*, never as sent.
+- Not built:
+  - timetabling
+  - assignments
+  - online payment providers
+  - recruitment
+  - performance reviews
+  - expenses
+  - country payroll rules (payroll computes from configured components and
+    tax bands; it ships no country's statutory rules)
+- Deployment is a single-machine Docker Compose stack with scripted, verified
+  backups ([docs/operations/deployment.md](docs/operations/deployment.md)).
+  There is no metrics exporter or alerting, no staging environment and no load
+  test yet, and running several API replicas needs a shared rate-limit store.
+- `docs/archive/` holds earlier phase reports. They are history, not
+  documentation, and several describe features that were not real.
 
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Create account (school or corporate)
-- `POST /api/auth/login` - Login with email & password
-- `POST /api/auth/refresh` - Refresh access token
-- `GET /api/auth/me` - Current user (protected)
-- `POST /api/auth/logout` - Logout
-
-### School Platform
-- `GET /api/school/students` - List students
-- `GET /api/school/students/{id}` - Student details
-- `POST /api/school/students` - Create student
-- `PUT /api/school/students/{id}` - Update student
-- `GET /api/school/faculty` - List faculty
-- And 6+ more endpoints...
-
-### Corporate Platform
-- `GET /api/corporate/employees` - List employees
-- `POST /api/corporate/employees` - Create employee
-- `POST /api/corporate/checkins` - Record check-in
-- And 9+ more endpoints...
-
-### Attendance
-- `GET /api/attendance` - All attendance records
-- `POST /api/attendance/mark` - Mark attendance
-- `GET /api/attendance/stats/{userId}` - User statistics
-- `GET /api/attendance/report` - Generate report
-
-See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for complete endpoint reference.
-
-## Shared Types
-
-The `packages/types` package provides TypeScript interfaces used across frontend and backend:
-
-```typescript
-// Frontend usage
-import { User, AuthResponse, AttendanceStats } from '@smartattend/types';
-
-// Api Service
-class ApiClient {
-  async login(email: string, password: string): Promise<AuthResponse> { }
-  async getAttendanceStats(userId: string): Promise<AttendanceStats> { }
-}
-
-// Auth Store
-const useAuthStore = create<AuthState>((set) => ({
-  user: null as User | null,
-  // ...
-}));
-```
-
-## Features
-
-✅ **Authentication**
-- Platform selection (school/corporate)
-- Email & password login/register
-- JWT token management with auto-refresh
-- Secure password hashing
-
-✅ **UI/UX**
-- Modern Tailwind CSS design
-- Smooth Framer Motion animations
-- Responsive layouts
-- Real-time data loading states
-- Error handling with user feedback
-
-✅ **Dashboard**
-- Real attendance statistics
-- Attendance trends
-- User profile management
-- Attendance history
-
-✅ **Backend**
-- 31 REST API endpoints
-- PostgreSQL with connection pooling
-- Comprehensive error handling
-- Request/response validation
-- Audit logging
-
-## Current Status
-
-| Component | Status | Build |
-|-----------|--------|-------|
-| Frontend | ✅ Complete | 111.42 kB (gzipped) |
-| Backend | ✅ Complete | All endpoints working |
-| Types Package | ✅ Complete | 24 files compiled |
-| E2E Integration | ✅ API connected | Real data flow |
-| Favicon | ✅ Visible | platform-logo.png |
-| Animations | ✅ Working | 7+ components |
-
-## Development Notes
-
-- Frontend uses Axios with automatic token refresh interceptor
-- Dashboard has graceful fallback to mock data if API unavailable
-- All TypeScript code type-safe with zero implicit any
-- CORS enabled for local development
-- Database migrations auto-run on startup
-
-## Documentation
-
-- [Backend Status](BACKEND_STATUS.md) - Backend implementation details
-- [API Documentation](API_DOCUMENTATION.md) - Complete API reference
-- [Schema](SCHEMA_REFACTOR_SUMMARY.md) - Database schema details
-- [Deployment Guide](DEPLOYMENT_GUIDE.md) - Production deployment
-
-## Future Enhancements
-
-- [ ] Real-time notifications (WebSockets)
-- [ ] Employee/Student management pages
-- [ ] Advanced attendance reports
-- [ ] Mobile app (React Native)
-- [ ] Biometric attendance
-- [ ] Analytics dashboard
+**Security notice:** credentials were once committed to this repository. See
+[SECURITY_CREDENTIAL_ROTATION.md](SECURITY_CREDENTIAL_ROTATION.md).

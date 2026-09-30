@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react';
 import { useAttendanceStore } from '../store/attendanceStore';
-import { ErrorAlert } from '../components/ErrorDisplay';
+import { ErrorAlert, EmptyState } from '../components/ErrorDisplay';
 import { LoadingOverlay } from '../components/LoadingStates';
 import { HIERARCHY, STATUS_COLORS, getAttendanceStatus } from '../utils/visualHierarchy';
 
@@ -35,7 +35,7 @@ export const StudentEmployeeViewPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-card p-6">
       {error && (
         <ErrorAlert
           title="Failed to load attendance"
@@ -48,8 +48,8 @@ export const StudentEmployeeViewPage: React.FC = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Profile Card */}
         {profile && (
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-            <div className={HIERARCHY.PRIMARY.className}>{profile.full_name}</div>
+          <div className="bg-sunken border border-subtle rounded-lg p-6">
+            <div className={HIERARCHY.PRIMARY.className}>{profile.name}</div>
             <div className={HIERARCHY.SECONDARY.className}>{profile.email}</div>
             <div className={`mt-2 ${HIERARCHY.TERTIARY.className}`}>ID: {profile.id}</div>
           </div>
@@ -57,9 +57,9 @@ export const StudentEmployeeViewPage: React.FC = () => {
 
         {/* Overall Attendance Metric */}
         {metrics && (
-          <div className={`p-6 rounded-lg border-2 ${STATUS_COLORS[getAttendanceStatus(metrics.overall_percentage)]}`}>
+          <div className={`p-6 rounded-lg border-2 ${STATUS_COLORS[getAttendanceStatus(metrics.attendance_percent)]}`}>
             <div className={HIERARCHY.PRIMARY.className}>Overall Attendance</div>
-            <div className="text-4xl font-bold mt-2">{metrics.overall_percentage}%</div>
+            <div className="text-4xl font-bold mt-2">{metrics.attendance_percent}%</div>
             <div className={HIERARCHY.SECONDARY.className}>
               {metrics.present} Present • {metrics.absent} Absent • {metrics.late} Late
             </div>
@@ -74,8 +74,8 @@ export const StudentEmployeeViewPage: React.FC = () => {
               {courses.map((course) => (
                 <div
                   key={course.course_id}
-                  className={`p-4 rounded-lg border border-slate-700 bg-slate-800/50 ${
-                    STATUS_COLORS[getAttendanceStatus(course.percentage)]
+                  className={`p-4 rounded-lg border border-subtle bg-sunken ${
+                    STATUS_COLORS[getAttendanceStatus(course.attendance_percent)]
                   }`}
                 >
                   <div className="flex justify-between items-start">
@@ -87,7 +87,7 @@ export const StudentEmployeeViewPage: React.FC = () => {
                         {course.present} Present • {course.absent} Absent
                       </div>
                     </div>
-                    <div className="text-2xl font-bold">{course.percentage}%</div>
+                    <div className="text-2xl font-bold">{course.attendance_percent}%</div>
                   </div>
                 </div>
               ))}
@@ -96,7 +96,7 @@ export const StudentEmployeeViewPage: React.FC = () => {
         )}
 
         {courses.length === 0 && !isLoading && (
-          <ErrorDisplay.EmptyState
+          <EmptyState
             title="No enrollment found"
             message="You are not enrolled in any courses yet"
           />

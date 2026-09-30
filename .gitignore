@@ -1,5 +1,5 @@
 # =============================================================================
-# ROOT .gitignore — SmartAttend Platform
+# ROOT .gitignore — JjeloTech Platform
 # =============================================================================
 # Enforces strict repository hygiene: only source code, configs, and lockfiles
 # System must be 100% reproducible from lockfiles, manifests, and Docker config
@@ -96,6 +96,13 @@ server.log
 .env.test.local
 .env.*.private
 .env.*.secret
+# Hand-made copies of a real .env (e.g. .env.smartattend-backup)
+.env.*backup
+.env.*bak
+
+# Leftovers of the retired Django rebuild (branch feat/jjelotech-mvp):
+# caches, a virtualenv, a build and a .env. Its source lives only on that branch.
+/jjelotech/
 
 # =============================================================================
 # IDE & EDITOR ARTIFACTS
@@ -197,3 +204,17 @@ docker-compose.override.yml
 !Dockerfile
 !docker-compose.yml
 !.dockerignore
+
+# ── Credentials (never commit) ─────────────────────────────────────────────
+# Plaintext account passwords were committed to this repository once; see
+# SECURITY_CREDENTIAL_ROTATION.md. These patterns stop it happening again.
+*credentials*.txt
+*passwords*.txt
+*Passwords*.txt
+rotated-credentials-*.txt
+.e2e-fixtures/
+
+# Locally stored documents. FILE_STORAGE_ROOT points elsewhere in a real
+# deployment; this is where it lands by default in development.
+.file-storage/
+apps/backend/.file-storage/

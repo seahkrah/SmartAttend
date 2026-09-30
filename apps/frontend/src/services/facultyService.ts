@@ -204,13 +204,16 @@ class FacultyService {
   }
 
   /**
-   * Submit Facial Recognition Match
+   * Record a student present in a course register on the strength of a face
+   * match from /api/biometrics/identify. The server checks the match is
+   * recent, this lecturer's, and for this student; a number the browser
+   * computed is not accepted.
    */
   async submitFacialMatch(
     courseId: string,
     date: string,
     studentId: string,
-    confidence: number
+    faceMatchId: string
   ): Promise<{
     success: boolean;
   }> {
@@ -218,7 +221,7 @@ class FacultyService {
       course_id: courseId,
       date,
       student_id: studentId,
-      confidence
+      face_match_id: faceMatchId
     });
     return response.data;
   }

@@ -1,25 +1,23 @@
 import React from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
-import { SmartAttendLogo } from '../components/BrandLogo';
+import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuthStore } from '../store/authStore';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { MfaCodeStep } from '../components/auth/MfaCodeStep';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [platform, setPlatform] = React.useState<'school' | 'corporate'>('school');
   const [platformMismatch, setPlatformMismatch] = React.useState<string | null>(null);
+  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState('');
   const navigate = useNavigate();
   const { login, isLoading, error, clearError } = useAuthStore();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPlatformMismatch(null);
-    try {
-      await login(email, password, platform);
-      
-      // Route based on role after login
+  // Route based on role after login
+  const goHome = () => {
       setTimeout(() => {
         const currentUser = useAuthStore.getState().user;
         
@@ -46,10 +44,25 @@ export const LoginPage: React.FC = () => {
           navigate('/hr');
         } else if (currentUser?.role === 'student' || currentUser?.role === 'employee') {
           navigate('/student');
+        } else if (currentUser?.role === 'guardian') {
+          navigate('/guardian');
         } else {
           navigate('/dashboard');
         }
       }, 0);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPlatformMismatch(null);
+    setNotice('');
+    try {
+      const step = await login(email, password, platform);
+      if (step.mfaToken) {
+        setMfaToken(step.mfaToken);
+        return;
+      }
+      goHome();
     } catch (err: any) {
       // Check for platform mismatch error
       const responseData = err?.response?.data;
@@ -74,20 +87,32 @@ export const LoginPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <SmartAttendLogo size="lg" showText={true} />
-          <p className="text-slate-400 mt-4">Welcome back to your attendance hub</p>
+          <JjeloTechLogo size="lg" tagline className="justify-center text-primary" />
+          <p className="text-secondary mt-4">Sign in to your school or organisation</p>
         </div>
 
         {/* Form Card */}
         <div className="card mb-6">
+          {mfaToken ? (
+            <MfaCodeStep
+              mfaToken={mfaToken}
+              onDone={goHome}
+              onRestart={(reason) => { setMfaToken(null); setPassword(''); setNotice(reason ?? ''); }}
+            />
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
+            {notice && (
+              <div role="status" className="p-3 bg-amber-500/15 border border-amber-500/50 rounded-lg text-amber-700 dark:text-amber-300 text-sm">
+                {notice}
+              </div>
+            )}
             {/* Platform Selection */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Platform Type
+              <label className="block text-sm font-medium text-secondary mb-2">
+                Sign in to
               </label>
               <div className="flex gap-3">
-                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'school' ? '#5d7fff' : undefined }}>
+                <label className="flex-1 flex items-center gap-2 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-sunken transition" style={{ borderColor: platform === 'school' ? '#5d7fff' : undefined }}>
                   <input
                     type="radio"
                     value="school"
@@ -95,9 +120,9 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">School</span>
+                  <span className="text-secondary">School <span className="block text-muted text-xs">SMS</span></span>
                 </label>
-                <label className="flex-1 flex items-center gap-2 p-3 border border-slate-700 rounded-lg cursor-pointer hover:bg-slate-800/50 transition" style={{ borderColor: platform === 'corporate' ? '#5d7fff' : undefined }}>
+                <label className="flex-1 flex items-center gap-2 p-3 border border-subtle rounded-lg cursor-pointer hover:bg-sunken transition" style={{ borderColor: platform === 'corporate' ? '#5d7fff' : undefined }}>
                   <input
                     type="radio"
                     value="corporate"
@@ -105,14 +130,14 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setPlatform(e.target.value as 'school' | 'corporate')}
                     className="w-4 h-4"
                   />
-                  <span className="text-slate-300">Corporate</span>
+                  <span className="text-secondary">Employer <span className="block text-muted text-xs">EMS</span></span>
                 </label>
               </div>
             </div>
 
             {/* Email Input */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-secondary mb-2">
                 <Mail className="inline w-4 h-4 mr-2" />
                 Email Address
               </label>
@@ -139,7 +164,7 @@ export const LoginPage: React.FC = () => {
 
             {/* Error Message */}
             {error && !platformMismatch && (
-              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 dark:text-red-300 text-sm">
                 {error}
               </div>
             )}
@@ -147,11 +172,11 @@ export const LoginPage: React.FC = () => {
             {/* Platform Mismatch Warning */}
             {platformMismatch && (
               <div className="p-4 bg-amber-500/15 border border-amber-500/50 rounded-lg">
-                <p className="text-amber-300 text-sm font-medium mb-2">
+                <p className="text-amber-700 dark:text-amber-300 text-sm font-medium mb-2">
                   ⚠️ Wrong platform selected
                 </p>
-                <p className="text-amber-200/80 text-sm mb-3">
-                  Your account is registered under the <strong className="text-amber-100">{platformMismatch === 'school' ? 'School' : 'Corporate'}</strong> platform. Please switch to continue.
+                <p className="text-amber-700 dark:text-amber-200/80 text-sm mb-3">
+                  Your account is registered under the <strong className="text-amber-100">{platformMismatch === 'school' ? 'School' : 'Employer'}</strong> platform. Please switch to continue.
                 </p>
                 <button
                   type="button"
@@ -160,22 +185,17 @@ export const LoginPage: React.FC = () => {
                     setPlatformMismatch(null);
                     clearError();
                   }}
-                  className="w-full py-2 px-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-200 text-sm font-medium transition-colors"
+                  className="w-full py-2 px-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-amber-700 dark:text-amber-200 text-sm font-medium transition-colors"
                 >
-                  Switch to {platformMismatch === 'school' ? 'School' : 'Corporate'} and retry
+                  Switch to {platformMismatch === 'school' ? 'School' : 'Employer'} and retry
                 </button>
               </div>
             )}
 
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center text-slate-300 hover:text-slate-200 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 mr-2 rounded border-slate-600 bg-slate-900" />
-                Remember me
-              </label>
-              <a href="#" className="text-primary-400 hover:text-primary-300 font-medium">
+            <div className="flex justify-end text-sm">
+              <Link to={`/forgot-password?platform=${platform}`} className="text-primary-700 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
             {/* Submit Button */}
@@ -188,14 +208,18 @@ export const LoginPage: React.FC = () => {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+          )}
         </div>
 
         {/* Sign Up Link */}
-        <div className="text-center text-slate-400">
-          Don't have an account?{' '}
-          <a href="/register" className="text-primary-400 hover:text-primary-300 font-semibold">
-            Sign up here
-          </a>
+        <div className="text-center text-secondary text-sm space-y-1">
+          <p>No account? Your school or employer sends you an invitation.</p>
+          <p>
+            New organisation?{' '}
+            <a href="/register" className="text-primary-700 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold">
+              Request access
+            </a>
+          </p>
         </div>
       </div>
     </div>

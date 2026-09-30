@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react';
 import { useHRStore } from '../store/hrStore';
-import { ErrorAlert } from '../components/ErrorDisplay';
+import { ErrorAlert, EmptyState } from '../components/ErrorDisplay';
 import { LoadingOverlay } from '../components/LoadingStates';
 import { HIERARCHY, STATUS_COLORS } from '../utils/visualHierarchy';
 
@@ -35,7 +35,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen bg-card p-6">
       {error && (
         <ErrorAlert
           title="Failed to load analytics"
@@ -57,17 +57,17 @@ export const HRAnalyticsPanelPage: React.FC = () => {
         {/* Overview Cards */}
         {overview && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <div className="bg-sunken border border-subtle rounded-lg p-6">
               <div className={HIERARCHY.SECONDARY.className}>Total Members</div>
               <div className="text-3xl font-bold mt-2">{overview.total_members}</div>
               <div className={HIERARCHY.TERTIARY.className}>
-                {overview.active_members} active
+                {overview.above_80_percent} above 80%
               </div>
             </div>
 
             <div className={`rounded-lg p-6 border-2 ${STATUS_COLORS.EXCELLENT}`}>
               <div className={HIERARCHY.SECONDARY.className}>Overall Attendance</div>
-              <div className="text-3xl font-bold mt-2">{overview.avg_attendance}%</div>
+              <div className="text-3xl font-bold mt-2">{overview.average_attendance}%</div>
             </div>
 
             <div className={`rounded-lg p-6 border-2 ${STATUS_COLORS.AT_RISK}`}>
@@ -78,8 +78,8 @@ export const HRAnalyticsPanelPage: React.FC = () => {
 
             <div className={`rounded-lg p-6 border-2 ${STATUS_COLORS.CRITICAL}`}>
               <div className={HIERARCHY.SECONDARY.className}>Critical</div>
-              <div className="text-3xl font-bold mt-2">{overview.critical_count}</div>
-              <div className={HIERARCHY.TERTIARY.className}>Below 40%</div>
+              <div className="text-3xl font-bold mt-2">{overview.chronic_absentees}</div>
+              <div className={HIERARCHY.TERTIARY.className}>Chronic absentees</div>
             </div>
           </div>
         )}
@@ -92,18 +92,19 @@ export const HRAnalyticsPanelPage: React.FC = () => {
               {patterns.map((pattern, idx) => (
                 <div
                   key={idx}
-                  className="bg-slate-800 border border-slate-700 rounded-lg p-4"
+                  className="bg-sunken border border-subtle rounded-lg p-4"
                 >
                   <div className="flex justify-between items-start">
                     <div>
                       <div className={HIERARCHY.PRIMARY.className}>
-                        {pattern.pattern_type}
+                        {pattern.member_name}
                       </div>
                       <div className={HIERARCHY.SECONDARY.className}>
-                        {pattern.affected_count} member(s)
+                        {pattern.pattern.replace(/_/g, ' ').toLowerCase()} ·{' '}
+                        {pattern.absences_in_period} absence(s)
                       </div>
                     </div>
-                    <div className="text-sm font-semibold bg-blue-500/20 text-blue-300 px-3 py-1 rounded">
+                    <div className="text-sm font-semibold bg-blue-500/20 text-blue-700 dark:text-blue-300 px-3 py-1 rounded">
                       {pattern.confidence}% confidence
                     </div>
                   </div>
@@ -114,7 +115,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
         )}
 
         {patterns.length === 0 && !isLoading && (
-          <ErrorDisplay.EmptyState
+          <EmptyState
             title="No patterns detected"
             message="Attendance is tracking normally across the organization"
           />
@@ -128,7 +129,7 @@ export const HRAnalyticsPanelPage: React.FC = () => {
               {members.slice(0, 10).map((member) => (
                 <div
                   key={member.id}
-                  className="bg-slate-800/50 p-3 rounded border border-slate-700 flex justify-between items-center"
+                  className="bg-sunken p-3 rounded border border-subtle flex justify-between items-center"
                 >
                   <div>
                     <div className={HIERARCHY.PRIMARY.className}>{member.name}</div>

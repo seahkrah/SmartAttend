@@ -119,7 +119,9 @@ export interface PlatformHealthStatus {
   last_hour_failure_rate: number;
   last_24h_failure_rate: number;
   last_hour_avg_latency_ms: number;
-  health_status: 'healthy' | 'degraded' | 'critical';
+  /** Metric rows in the last 24 hours; with none, health is 'no_data', not 'healthy'. */
+  samples_24h: number;
+  health_status: 'healthy' | 'degraded' | 'critical' | 'no_data';
   last_updated: Date;
 }
 
@@ -158,6 +160,12 @@ export async function recordAPILatency(metric: APILatencyMetric): Promise<Metric
   `;
 
   const metricType: MetricType = metric.status_code >= 200 && metric.status_code < 300 ? 'api_success' : 'api_latency';
+
+  // One row per request adds up; nothing reads more than 30 days back.
+  if (Math.random() < 0.001) {
+    pool.query(`DELETE FROM platform_metrics WHERE created_at < NOW() - INTERVAL '30 days'`)
+      .catch((e) => console.error('[metrics] retention sweep failed:', e.message));
+  }
 
   const result: QueryResult<MetricRecord> = await pool.query(query, [
     metric.tenant_id,
@@ -430,17 +438,36 @@ export async function getVerificationMismatches(
   return result.rows;
 }
 
+/**
+ * The tenant's health, computed from its metrics when asked. It used to be
+ * maintained by a trigger on every metric insert, which failed on every
+ * insert (see migration 060).
+ */
 export async function getPlatformHealthStatus(tenantId: string): Promise<PlatformHealthStatus | null> {
-
   const query = `
-    SELECT 
-      last_hour_failure_rate,
-      last_24h_failure_rate,
-      last_hour_avg_latency_ms,
-      health_status,
-      last_updated
-    FROM platform_health_status
-    WHERE tenant_id = $1;
+    WITH recent AS (
+      SELECT metric_type::TEXT AS kind, metric_category::TEXT AS category, response_time_ms, created_at
+        FROM platform_metrics
+       WHERE tenant_id = $1 AND created_at >= NOW() - INTERVAL '24 hours'
+    ),
+    figures AS (
+      SELECT
+        COALESCE(ROUND(COUNT(*) FILTER (WHERE kind LIKE '%failure%' AND created_at >= NOW() - INTERVAL '1 hour')::NUMERIC * 100
+          / NULLIF(COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 hour'), 0), 2), 0) AS last_hour_failure_rate,
+        COALESCE(ROUND(COUNT(*) FILTER (WHERE kind LIKE '%failure%')::NUMERIC * 100 / NULLIF(COUNT(*), 0), 2), 0) AS last_24h_failure_rate,
+        COALESCE(ROUND(AVG(response_time_ms) FILTER (WHERE category = 'api_request'
+          AND created_at >= NOW() - INTERVAL '1 hour'), 2), 0) AS last_hour_avg_latency_ms,
+        COUNT(*)::INTEGER AS samples_24h
+      FROM recent
+    )
+    SELECT $1::uuid AS tenant_id, last_hour_failure_rate, last_24h_failure_rate, last_hour_avg_latency_ms,
+           samples_24h,
+           CASE WHEN samples_24h = 0 THEN 'no_data'
+                WHEN last_hour_failure_rate > 15 OR last_hour_avg_latency_ms > 10000 THEN 'critical'
+                WHEN last_hour_failure_rate > 5 OR last_hour_avg_latency_ms > 5000 THEN 'degraded'
+                ELSE 'healthy' END AS health_status,
+           CURRENT_TIMESTAMP AS last_updated
+      FROM figures;
   `;
 
   const result: QueryResult<PlatformHealthStatus> = await pool.query(query, [tenantId]);
@@ -456,52 +483,35 @@ export async function getPlatformHealthStatus(tenantId: string): Promise<Platfor
 export async function getEarlyWarningSignals(
   tenantId: string
 ): Promise<EarlyWarningSignals> {
+  // This queried two views that do not exist (open_incidents,
+  // overdue_incidents) and a column incidents do not have, so it only ever
+  // answered 500; and it matched security events on users.platform_id = the
+  // tenant id, a platform compared with a tenant, which matches nothing (or,
+  // were ids ever to collide, another tenant's users). Security events are now
+  // attributed through the affected user's membership of this tenant.
   const query = `
     SELECT
-      -- Open critical incidents for this tenant
-      COALESCE((
-        SELECT COUNT(*)::INTEGER
-        FROM open_incidents oi
-        JOIN incidents i ON oi.id = i.id
-        WHERE i.created_from_tenant_id = $1
-          AND oi.severity = 'CRITICAL'
-      ), 0)                                                       AS open_critical_incidents,
-
-      -- Overdue incidents (> 1 hour without ACK) for this tenant
-      COALESCE((
-        SELECT COUNT(*)::INTEGER
-        FROM overdue_incidents oi
-        JOIN incidents i ON oi.id = i.id
-        WHERE i.created_from_tenant_id = $1
-          AND oi.hours_since_creation >= 1
-      ), 0)                                                       AS overdue_incidents_1h,
-
-      -- Incident escalations in the last 24 hours for this tenant
-      COALESCE((
-        SELECT COUNT(*)::INTEGER
-        FROM incident_escalations ie
-        JOIN incidents i ON ie.incident_id = i.id
-        WHERE i.created_from_tenant_id = $1
-          AND ie.escalated_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
-      ), 0)                                                       AS incident_escalations_24h,
-
-      -- Open privilege escalation events whose affected users belong to this tenant
-      COALESCE((
-        SELECT COUNT(*)::INTEGER
-        FROM privilege_escalation_events pee
-        JOIN users u ON pee.affected_user_id = u.id
-        WHERE u.platform_id = $1
-          AND pee.status = 'OPEN'
-      ), 0)                                                       AS privilege_escalations_open,
-
-      -- Role boundary violations in the last 24 hours for this tenant
-      COALESCE((
-        SELECT COUNT(*)::INTEGER
-        FROM role_boundary_violations rbv
-        JOIN users u ON rbv.user_id = u.id
-        WHERE u.platform_id = $1
-          AND rbv.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
-      ), 0)                                                       AS role_violations_24h
+      (SELECT COUNT(*)::INTEGER FROM incidents i
+        WHERE i.affected_tenant_id = $1
+          AND UPPER(i.severity::TEXT) = 'CRITICAL'
+          AND UPPER(i.status::TEXT) NOT IN ('RESOLVED', 'CLOSED'))                      AS open_critical_incidents,
+      (SELECT COUNT(*)::INTEGER FROM incidents i
+        WHERE i.affected_tenant_id = $1
+          AND i.acknowledged_at IS NULL
+          AND UPPER(i.status::TEXT) NOT IN ('RESOLVED', 'CLOSED')
+          AND i.created_at < CURRENT_TIMESTAMP - INTERVAL '1 hour')                      AS overdue_incidents_1h,
+      (SELECT COUNT(*)::INTEGER FROM incident_escalations ie
+         JOIN incidents i ON i.id = ie.incident_id
+        WHERE i.affected_tenant_id = $1
+          AND ie.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours')                  AS incident_escalations_24h,
+      (SELECT COUNT(*)::INTEGER FROM privilege_escalation_events pee
+        WHERE pee.status = 'OPEN'
+          AND EXISTS (SELECT 1 FROM user_tenant_memberships m
+                       WHERE m.user_id = pee.affected_user_id AND m.tenant_id = $1))   AS privilege_escalations_open,
+      (SELECT COUNT(*)::INTEGER FROM role_boundary_violations rbv
+        WHERE rbv.created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+          AND EXISTS (SELECT 1 FROM user_tenant_memberships m
+                       WHERE m.user_id = rbv.user_id AND m.tenant_id = $1))            AS role_violations_24h
   `;
 
   const result: QueryResult<EarlyWarningSignals> = await pool.query(query, [tenantId]);
@@ -526,10 +536,10 @@ export async function getMetricsSummaryByCategory(
     SELECT 
       (m.metric_category)::TEXT as category,
       COUNT(*)::INTEGER as total_count,
-      COUNT(CASE WHEN m.metric_type LIKE '%success%' THEN 1 END)::INTEGER as success_count,
-      COUNT(CASE WHEN m.metric_type LIKE '%failure%' THEN 1 END)::INTEGER as failure_count,
-      ROUND(CAST(COUNT(CASE WHEN m.metric_type LIKE '%success%' THEN 1 END) AS NUMERIC) * 100 / NULLIF(COUNT(*), 0), 2)::NUMERIC as success_rate,
-      ROUND(CAST(COUNT(CASE WHEN m.metric_type LIKE '%failure%' THEN 1 END) AS NUMERIC) * 100 / NULLIF(COUNT(*), 0), 2)::NUMERIC as failure_rate
+      COUNT(CASE WHEN m.metric_type::TEXT LIKE '%success%' THEN 1 END)::INTEGER as success_count,
+      COUNT(CASE WHEN m.metric_type::TEXT LIKE '%failure%' THEN 1 END)::INTEGER as failure_count,
+      ROUND(CAST(COUNT(CASE WHEN m.metric_type::TEXT LIKE '%success%' THEN 1 END) AS NUMERIC) * 100 / NULLIF(COUNT(*), 0), 2)::NUMERIC as success_rate,
+      ROUND(CAST(COUNT(CASE WHEN m.metric_type::TEXT LIKE '%failure%' THEN 1 END) AS NUMERIC) * 100 / NULLIF(COUNT(*), 0), 2)::NUMERIC as failure_rate
     FROM platform_metrics m
     WHERE m.tenant_id = $1
       AND m.created_at >= NOW() - ($2 || ' hours')::INTERVAL
@@ -640,7 +650,9 @@ export async function getMostProblematicAttendanceRecords(
       AND m.created_at >= NOW() - ($3 || ' hours')::INTERVAL
       AND m.attendance_record_id IS NOT NULL
     GROUP BY m.attendance_record_id, m.student_or_employee_id, m.platform_type
-    ORDER BY (failure_count + mismatch_count + clock_drift_count) DESC
+    -- An output alias cannot appear inside an expression in ORDER BY, so
+    -- this raised "column failure_count does not exist" on every call.
+    ORDER BY COUNT(*) FILTER (WHERE m.metric_type IN ('attendance_failure', 'verification_mismatch', 'clock_drift')) DESC
     LIMIT $2;
   `;
 

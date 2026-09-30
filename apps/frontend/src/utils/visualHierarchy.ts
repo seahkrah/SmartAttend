@@ -23,19 +23,19 @@
 
 export const HIERARCHY = {
   PRIMARY: {
-    className: 'text-white font-semibold text-lg',
+    className: 'text-primary font-semibold text-lg',
     description: 'Main data point (attendance %, user name, status)'
   },
   SECONDARY: {
-    className: 'text-slate-200 text-sm',
+    className: 'text-primary text-sm',
     description: 'Supporting context (course, date, email)'
   },
   TERTIARY: {
-    className: 'text-slate-400 text-xs',
+    className: 'text-secondary text-xs',
     description: 'Metadata only (ID, created date)'
   },
   MUTED: {
-    className: 'text-slate-500 text-xs',
+    className: 'text-muted text-xs',
     description: 'Least important (hints, counts, suggestions)'
   }
 };
@@ -45,11 +45,11 @@ export const HIERARCHY = {
 // ============================================================================
 
 export const STATUS_COLORS = {
-  EXCELLENT: 'bg-green-500/20 border-green-500/30 text-green-300',
-  GOOD: 'bg-blue-500/20 border-blue-500/30 text-blue-300',
-  AT_RISK: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-300',
-  CRITICAL: 'bg-red-500/20 border-red-500/30 text-red-300',
-  NEUTRAL: 'bg-slate-500/20 border-slate-500/30 text-slate-300',
+  EXCELLENT: 'bg-green-500/20 border-green-500/30 text-green-700 dark:text-green-300',
+  GOOD: 'bg-blue-500/20 border-blue-500/30 text-blue-700 dark:text-blue-300',
+  AT_RISK: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-700 dark:text-yellow-300',
+  CRITICAL: 'bg-red-500/20 border-red-500/30 text-red-700 dark:text-red-300',
+  NEUTRAL: 'bg-raised border-strong text-secondary',
 };
 
 /**
@@ -86,16 +86,16 @@ export function getRoleColor(role: string): keyof typeof STATUS_COLORS {
  */
 export const READ_ONLY_STYLES = {
   // Data that user can view but not edit
-  container: 'bg-slate-900/50 border border-slate-700',
-  text: 'text-slate-300',
-  label: 'text-slate-400 text-xs'
+  container: 'bg-card border border-subtle',
+  text: 'text-secondary',
+  label: 'text-secondary text-xs'
 };
 
 export const ACTIONABLE_STYLES = {
   // Data that user can interact with
-  container: 'bg-slate-800 border border-slate-600 hover:border-slate-500 transition-colors',
-  text: 'text-white',
-  label: 'text-slate-300 text-xs'
+  container: 'bg-sunken border border-strong hover:border-strong transition-colors',
+  text: 'text-primary',
+  label: 'text-secondary text-xs'
 };
 
 // ============================================================================
@@ -284,8 +284,8 @@ export const TABLE_PATTERN = {
  */
 export const FORM_PATTERN = {
   requiredIndicator: '*',
-  requiredLabelStyle: 'text-white font-semibold',
-  optionalLabelStyle: 'text-slate-400',
+  requiredLabelStyle: 'text-primary font-semibold',
+  optionalLabelStyle: 'text-secondary',
   helperText: {
     required: 'always below',
     optional: 'on focus'

@@ -1,6 +1,6 @@
 import pg from 'pg';
 
-const connectionString = 'postgresql://smartattend_user:smartattend_password@localhost:5432/smartattend_db';
+const connectionString = 'postgresql://jjelotech_user:jjelotech_password@localhost:5432/jjelotech_db';
 const pool = new pg.Pool({ connectionString });
 
 async function checkMigrations() {

@@ -12,7 +12,7 @@
 -- Timeline: Append-only enforcement at database level
 -- Status: All constraints are append-only; no mutations allowed
 
-BEGIN;
+-- (transaction handled by the migration runner)
 
 -- ===========================
 -- A. IMMUTABILITY: superadmin_audit_log
@@ -35,6 +35,8 @@ ALTER TABLE superadmin_audit_log
 RENAME COLUMN timestamp TO created_at;
 
 -- Add immutability constraints
+ALTER TABLE superadmin_audit_log DROP CONSTRAINT IF EXISTS superadmin_audit_log_immutable_check;
+
 ALTER TABLE superadmin_audit_log
 ADD CONSTRAINT superadmin_audit_log_immutable_check CHECK (true);
 
@@ -132,8 +134,13 @@ EXECUTE FUNCTION prevent_audit_access_log_delete();
 -- - TENANT scopes have tenant_admin or superadmin as actor
 -- - USER scopes can have any role
 
+-- CHECK was missing: "ADD CONSTRAINT <name> (" is a syntax error, so this
+-- constraint never existed and the scope/actor rule was never enforced.
+-- Dropped first because ADD CONSTRAINT is not idempotent.
+ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS check_audit_scope_actor;
+
 ALTER TABLE audit_logs
-ADD CONSTRAINT check_audit_scope_actor (
+ADD CONSTRAINT check_audit_scope_actor CHECK (
   CASE
     WHEN action_scope = 'GLOBAL' THEN actor_role = 'superadmin'
     WHEN action_scope = 'TENANT' THEN actor_role IN ('superadmin', 'tenant_admin')
@@ -142,8 +149,10 @@ ADD CONSTRAINT check_audit_scope_actor (
   END
 );
 
+ALTER TABLE superadmin_audit_log DROP CONSTRAINT IF EXISTS check_superadmin_audit_scope_actor;
+
 ALTER TABLE superadmin_audit_log
-ADD CONSTRAINT check_superadmin_audit_scope_actor (
+ADD CONSTRAINT check_superadmin_audit_scope_actor CHECK (
   CASE
     WHEN action_scope = 'GLOBAL' THEN actor_role = 'superadmin'
     WHEN action_scope = 'TENANT' THEN actor_role IN ('superadmin', 'tenant_admin')
@@ -168,13 +177,13 @@ $$ LANGUAGE plpgsql;
 
 -- Add check constraint for state validation
 ALTER TABLE audit_logs
-ADD CONSTRAINT check_audit_state_valid (
+ADD CONSTRAINT check_audit_state_valid CHECK (
   validate_audit_state_structure(before_state) AND
   validate_audit_state_structure(after_state)
 );
 
 ALTER TABLE superadmin_audit_log
-ADD CONSTRAINT check_superadmin_audit_state_valid (
+ADD CONSTRAINT check_superadmin_audit_state_valid CHECK (
   validate_audit_state_structure(before_state) AND
   validate_audit_state_structure(after_state)
 );
@@ -225,7 +234,7 @@ SELECT
   pg_typeof(null),
   NOW() as detected_at
 FROM pg_tables
-WHERE tablename IN ('audit_logs', 'superadmin_audit_log', 'audit_access_log')
+WHERE tablename IN ('audit_logs', 'superadmin_audit_log', 'audit_access_log');
 -- This view helps ops teams watch for any unauthorized mutation attempts
 
 -- View: Superadmin audit log access patterns
@@ -305,4 +314,3 @@ VALUES (uuid_generate_v4(), 'user', 'TEST', 'GLOBAL', NOW());
 
 */
 
-COMMIT;

@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "declaration": false, "declarationMap": false },
+  "exclude": ["node_modules", "dist", "src/tests", "src/**/*.test.ts",
+              "src/routes/TENANT_INTEGRATION_PATTERNS.ts", "src/routes/ROLE_ESCALATION_PATTERNS.ts"]
+}

@@ -36,16 +36,16 @@ CREATE INDEX IF NOT EXISTS idx_root_cause_confidence ON incident_root_cause_anal
 CREATE INDEX IF NOT EXISTS idx_root_cause_assigned ON incident_root_cause_analyses(assigned_at DESC);
 
 -- Incident Timeline Events Table (for detailed lifecycle tracking)
-CREATE TABLE IF NOT EXISTS incident_timeline_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
-  event_type VARCHAR(100) NOT NULL,
-  old_value JSONB,
-  new_value JSONB,
-  description TEXT,
-  performed_by_user_id UUID REFERENCES users(id),
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+-- incident_timeline_events is already created by 008_incident_management_system.sql. CREATE TABLE IF NOT
+-- EXISTS would skip this definition silently and leave the columns below
+-- missing, so add them to the existing table instead.
+ALTER TABLE incident_timeline_events ADD COLUMN IF NOT EXISTS incident_id UUID REFERENCES incidents(id) ON DELETE CASCADE;
+ALTER TABLE incident_timeline_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(100);
+ALTER TABLE incident_timeline_events ADD COLUMN IF NOT EXISTS old_value JSONB;
+ALTER TABLE incident_timeline_events ADD COLUMN IF NOT EXISTS new_value JSONB;
+ALTER TABLE incident_timeline_events ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE incident_timeline_events ADD COLUMN IF NOT EXISTS performed_by_user_id UUID REFERENCES users(id);
+ALTER TABLE incident_timeline_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE INDEX IF NOT EXISTS idx_timeline_incident ON incident_timeline_events(incident_id);
 CREATE INDEX IF NOT EXISTS idx_timeline_event_type ON incident_timeline_events(event_type);

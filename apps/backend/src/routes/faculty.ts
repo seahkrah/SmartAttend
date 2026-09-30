@@ -1,6 +1,14 @@
-import express, { Request, Response } from 'express'
-import { query } from '../db/connection.js'
+import express, { Response } from 'express'
+import pool, { query } from '../db/connection.js'
+import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 import { authenticateToken, requireRole } from '../auth/middleware.js'
+import {
+  resolveTenantContext,
+  requireTenant,
+  requirePlatform,
+  type ResolvedTenantContext,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
 
 const router = express.Router()
 
@@ -9,19 +17,67 @@ const router = express.Router()
 // Routes for faculty-role users: courses, schedules, attendance
 // ===========================
 
-// Helper: resolve faculty ID from user ID
-async function resolveFacultyId(userId: string): Promise<string | null> {
-  const result = await query('SELECT id FROM faculty WHERE user_id = $1 LIMIT 1', [userId])
+/**
+ * Every route below is tenant-owned, so the context is resolved once for the
+ * router rather than per handler.
+ *
+ * Before this, the router authenticated but never established a tenant, and
+ * /enrollment/available scoped its student list on users.platform_id — the
+ * platform, not the school. A lecturer at one university could therefore list
+ * and enrol students from every other university in the deployment.
+ */
+router.use(authenticateToken, resolveTenantContext, requireTenant, requirePlatform('school'))
+
+type Ctx = ResolvedTenantContext & { tenantId: string }
+
+function ctxOf(req: TenantRequest): Ctx {
+  return req.ctx as Ctx
+}
+
+/**
+ * The caller's faculty record in the tenant they are acting in.
+ *
+ * Scoped, so a user holding faculty records at two schools resolves the one
+ * belonging to the active tenant rather than whichever row comes back first.
+ */
+async function resolveFacultyId(ctx: Ctx): Promise<string | null> {
+  const result = await query(
+    'SELECT id FROM faculty WHERE user_id = $1 AND tenant_id = $2 LIMIT 1',
+    [ctx.userId, ctx.tenantId]
+  )
   return result.rows.length > 0 ? result.rows[0].id : null
 }
 
-// Helper: verify faculty owns a schedule
-async function verifyScheduleOwnership(scheduleId: string, facultyId: string): Promise<boolean> {
+/**
+ * Confirms a schedule is both in this tenant and taught by this lecturer.
+ *
+ * The tenant predicate is redundant while faculty ids are tenant-unique, and
+ * is kept anyway: it is the predicate that must hold, and it should not depend
+ * on a property of another table to be true.
+ */
+async function verifyScheduleOwnership(
+  scheduleId: string,
+  facultyId: string,
+  ctx: Ctx
+): Promise<boolean> {
+  if (!UUID.test(scheduleId)) return false
   const result = await query(
-    'SELECT id FROM class_schedules WHERE id = $1 AND faculty_id = $2',
-    [scheduleId, facultyId]
+    'SELECT id FROM class_schedules WHERE id = $1 AND faculty_id = $2 AND tenant_id = $3',
+    [scheduleId, facultyId, ctx.tenantId]
   )
   return result.rows.length > 0
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Confirms a student belongs to the caller's tenant before acting on them. */
+async function studentInTenant(studentId: string, ctx: Ctx): Promise<boolean> {
+  if (!UUID.test(studentId)) return false
+  const r = await query('SELECT 1 FROM students WHERE id = $1 AND tenant_id = $2', [
+    studentId,
+    ctx.tenantId,
+  ])
+  return r.rows.length > 0
 }
 
 // ===========================
@@ -32,88 +88,95 @@ async function verifyScheduleOwnership(scheduleId: string, facultyId: string): P
  * GET /faculty/dashboard
  * Aggregated stats for the faculty sidebar and dashboard page
  */
-router.get('/dashboard', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/dashboard', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.json({
       total_students: 0, total_courses: 0, total_schedules: 0,
       today_classes: [], attendance_rate: 0, recent_sessions: 0, course_breakdown: []
     })
 
+    // The six figures are independent, so they are fetched together rather
+    // than one after another.
+
     // Total distinct students across all schedules
-    const studentsResult = await query(
+    const studentsResultP = query(
       `SELECT COUNT(DISTINCT ss.student_id) as total
-       FROM student_schedules ss
+       FROM student_courses ss
        JOIN class_schedules cs ON ss.schedule_id = cs.id
-       WHERE cs.faculty_id = $1 AND ss.status = 'enrolled'`,
-      [facultyId]
+       WHERE cs.faculty_id = $1 AND ss.status = 'enrolled' AND cs.tenant_id = $2`,
+      [facultyId, ctx.tenantId]
     )
-    const total_students = parseInt(studentsResult.rows[0]?.total || '0')
 
     // Total courses & schedules
-    const schedulesResult = await query(
+    const schedulesResultP = query(
       `SELECT COUNT(*) as schedule_count, COUNT(DISTINCT course_id) as course_count
-       FROM class_schedules WHERE faculty_id = $1`,
-      [facultyId]
+       FROM class_schedules WHERE faculty_id = $1 AND tenant_id = $2`,
+      [facultyId, ctx.tenantId]
     )
-    const total_courses = parseInt(schedulesResult.rows[0]?.course_count || '0')
-    const total_schedules = parseInt(schedulesResult.rows[0]?.schedule_count || '0')
 
     // Today's classes (match day_of_week: 0=Sun..6=Sat)
     const today = new Date()
     const dayOfWeek = today.getDay() // JS: 0=Sun
-    const todayClasses = await query(
+    const todayClassesP = query(
       `SELECT cs.id, c.name as course_name, c.code as course_code,
               r.room_number as room_name, cs.start_time, cs.end_time, cs.section,
-              (SELECT COUNT(*) FROM student_schedules ss WHERE ss.schedule_id = cs.id AND ss.status = 'enrolled') as student_count
+              (SELECT COUNT(*) FROM student_courses ss WHERE ss.schedule_id = cs.id AND ss.status = 'enrolled') as student_count
        FROM class_schedules cs
        JOIN courses c ON cs.course_id = c.id
        LEFT JOIN rooms r ON cs.room_id = r.id
        WHERE cs.faculty_id = $1
+         AND cs.tenant_id = $3
          AND (cs.days_of_week LIKE '%' || $2 || '%')
        ORDER BY cs.start_time`,
-      [facultyId, String(dayOfWeek)]
+      [facultyId, String(dayOfWeek), ctx.tenantId]
     )
 
     // Overall attendance rate (from all time)
-    const rateResult = await query(
+    const rateResultP = query(
       `SELECT
          COUNT(*) as total,
          COUNT(*) FILTER (WHERE sa.status IN ('present','late')) as attended
        FROM school_attendance sa
        JOIN class_schedules cs ON sa.schedule_id = cs.id
-       WHERE cs.faculty_id = $1`,
-      [facultyId]
+       WHERE cs.faculty_id = $1 AND cs.tenant_id = $2`,
+      [facultyId, ctx.tenantId]
     )
-    const rateTotal = parseInt(rateResult.rows[0]?.total || '0')
-    const rateAttended = parseInt(rateResult.rows[0]?.attended || '0')
-    const attendance_rate = rateTotal > 0 ? Math.round((rateAttended / rateTotal) * 100) : 0
 
     // Recent sessions count (last 7 days)
-    const recentResult = await query(
+    const recentResultP = query(
       `SELECT COUNT(DISTINCT attendance_date) as cnt
        FROM school_attendance sa
        JOIN class_schedules cs ON sa.schedule_id = cs.id
-       WHERE cs.faculty_id = $1 AND sa.attendance_date >= CURRENT_DATE - INTERVAL '7 days'`,
-      [facultyId]
+       WHERE cs.faculty_id = $1 AND cs.tenant_id = $2
+         AND sa.attendance_date >= CURRENT_DATE - INTERVAL '7 days'`,
+      [facultyId, ctx.tenantId]
     )
-    const recent_sessions = parseInt(recentResult.rows[0]?.cnt || '0')
 
     // Course breakdown: per-course student count
-    const breakdownResult = await query(
+    const breakdownResultP = query(
       `SELECT c.code as course_code, c.name as course_name,
               COUNT(DISTINCT ss.student_id) as student_count
        FROM class_schedules cs
        JOIN courses c ON cs.course_id = c.id
-       JOIN student_schedules ss ON ss.schedule_id = cs.id AND ss.status = 'enrolled'
-       WHERE cs.faculty_id = $1
+       JOIN student_courses ss ON ss.schedule_id = cs.id AND ss.status = 'enrolled'
+       WHERE cs.faculty_id = $1 AND cs.tenant_id = $2
        GROUP BY c.id, c.code, c.name
        ORDER BY c.name`,
-      [facultyId]
+      [facultyId, ctx.tenantId]
     )
+
+    const [studentsResult, schedulesResult, todayClasses, rateResult, recentResult, breakdownResult] =
+      await Promise.all([studentsResultP, schedulesResultP, todayClassesP, rateResultP, recentResultP, breakdownResultP])
+    const total_students = parseInt(studentsResult.rows[0]?.total || '0')
+    const total_courses = parseInt(schedulesResult.rows[0]?.course_count || '0')
+    const total_schedules = parseInt(schedulesResult.rows[0]?.schedule_count || '0')
+    const rateTotal = parseInt(rateResult.rows[0]?.total || '0')
+    const rateAttended = parseInt(rateResult.rows[0]?.attended || '0')
+    const attendance_rate = rateTotal > 0 ? Math.round((rateAttended / rateTotal) * 100) : 0
+    const recent_sessions = parseInt(recentResult.rows[0]?.cnt || '0')
 
     return res.json({
       total_students,
@@ -142,38 +205,52 @@ router.get('/dashboard', authenticateToken, requireRole('faculty'), async (req: 
  * GET /faculty/students
  * Returns all students enrolled in faculty's schedules with attendance stats
  */
-router.get('/students', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/students', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.json([])
 
+    // Attendance is counted per student and schedule before it meets the
+    // roster. Joining every mark to every row and then COUNT(DISTINCT date)
+    // sorted the whole attendance history (spilling to disk at a few thousand
+    // students); the unique (schedule, student, date) constraint already
+    // makes each mark one day, so a plain count is the same answer.
     const result = await query(
-      `SELECT
+      `WITH mine AS (
+         SELECT cs.id, cs.section, c.code, c.name
+           FROM class_schedules cs
+           JOIN courses c ON c.id = cs.course_id AND c.tenant_id = cs.tenant_id
+          WHERE cs.faculty_id = $1 AND cs.tenant_id = $2
+       ), att AS (
+         SELECT sa.student_id, sa.schedule_id,
+                COUNT(*) AS total_classes,
+                COUNT(*) FILTER (WHERE sa.status = 'present') AS present_count,
+                COUNT(*) FILTER (WHERE sa.status = 'absent') AS absent_count
+           FROM school_attendance sa
+          WHERE sa.tenant_id = $2 AND sa.schedule_id IN (SELECT id FROM mine)
+          GROUP BY sa.student_id, sa.schedule_id
+       )
+       SELECT
          s.id as student_id,
          s.student_id as student_code,
          s.first_name,
          s.last_name,
          s.email,
-         c.code as course_code,
-         c.name as course_name,
-         cs.section as schedule_section,
-         COUNT(DISTINCT sa_all.attendance_date) as total_classes,
-         COUNT(DISTINCT sa_all.attendance_date) FILTER (WHERE sa_all.status = 'present') as present_count,
-         COUNT(DISTINCT sa_all.attendance_date) FILTER (WHERE sa_all.status = 'absent') as absent_count
-       FROM student_schedules ss
-       JOIN class_schedules cs ON ss.schedule_id = cs.id
-       JOIN courses c ON cs.course_id = c.id
-       JOIN students s ON ss.student_id = s.id
-       LEFT JOIN school_attendance sa_all
-         ON sa_all.student_id = s.id AND sa_all.schedule_id = cs.id
-       WHERE cs.faculty_id = $1 AND ss.status = 'enrolled'
-       GROUP BY s.id, s.student_id, s.first_name, s.last_name, s.email,
-                c.code, c.name, cs.section
-       ORDER BY s.last_name, s.first_name, c.code`,
-      [facultyId]
+         mine.code as course_code,
+         mine.name as course_name,
+         mine.section as schedule_section,
+         COALESCE(att.total_classes, 0) as total_classes,
+         COALESCE(att.present_count, 0) as present_count,
+         COALESCE(att.absent_count, 0) as absent_count
+       FROM student_courses ss
+       JOIN mine ON mine.id = ss.schedule_id
+       JOIN students s ON s.id = ss.student_id AND s.tenant_id = ss.tenant_id
+       LEFT JOIN att ON att.student_id = s.id AND att.schedule_id = mine.id
+       WHERE ss.status = 'enrolled' AND ss.tenant_id = $2
+       ORDER BY s.last_name, s.first_name, mine.code`,
+      [facultyId, ctx.tenantId]
     )
 
     return res.json(result.rows)
@@ -191,27 +268,26 @@ router.get('/students', authenticateToken, requireRole('faculty'), async (req: R
  * GET /faculty/enrollment/enrolled?schedule_id=X
  * Students currently enrolled in a specific schedule
  */
-router.get('/enrollment/enrolled', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/enrollment/enrolled', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
+    const ctx = ctxOf(req)
     const scheduleId = req.query.schedule_id as string
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
     if (!scheduleId) return res.status(400).json({ error: 'schedule_id required' })
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const owns = await verifyScheduleOwnership(scheduleId, facultyId)
+    const owns = await verifyScheduleOwnership(scheduleId, facultyId, ctx)
     if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
 
     const result = await query(
       `SELECT s.id as student_id, s.student_id as student_code,
               s.first_name, s.last_name, s.email, ss.enrolled_at
-       FROM student_schedules ss
+       FROM student_courses ss
        JOIN students s ON ss.student_id = s.id
-       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled'
+       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled' AND ss.tenant_id = $2
        ORDER BY s.last_name, s.first_name`,
-      [scheduleId]
+      [scheduleId, ctx.tenantId]
     )
 
     return res.json(result.rows)
@@ -225,37 +301,31 @@ router.get('/enrollment/enrolled', authenticateToken, requireRole('faculty'), as
  * GET /faculty/enrollment/available?schedule_id=X
  * Students in the same platform/tenant who are NOT in this schedule
  */
-router.get('/enrollment/available', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/enrollment/available', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
+    const ctx = ctxOf(req)
     const scheduleId = req.query.schedule_id as string
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
     if (!scheduleId) return res.status(400).json({ error: 'schedule_id required' })
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const owns = await verifyScheduleOwnership(scheduleId, facultyId)
+    const owns = await verifyScheduleOwnership(scheduleId, facultyId, ctx)
     if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
 
-    // Get the platform_id from the faculty user to scope students
-    const platformResult = await query(
-      `SELECT u.platform_id FROM users u WHERE u.id = $1`,
-      [userId]
-    )
-    const platformId = platformResult.rows[0]?.platform_id
-
+    // Scoped to the tenant, not the platform. The previous predicate was
+    // users.platform_id, which is the same value for every school, so this
+    // list offered a lecturer every student in the deployment to enrol.
     const result = await query(
       `SELECT s.id, s.student_id, s.first_name, s.last_name, s.email
        FROM students s
-       JOIN users u ON s.user_id = u.id
-       WHERE u.platform_id = $1
+       WHERE s.tenant_id = $1
          AND s.id NOT IN (
-           SELECT ss.student_id FROM student_schedules ss
-           WHERE ss.schedule_id = $2 AND ss.status = 'enrolled'
+           SELECT sc.student_id FROM student_courses sc
+           WHERE sc.schedule_id = $2 AND sc.status = 'enrolled'
          )
        ORDER BY s.last_name, s.first_name`,
-      [platformId, scheduleId]
+      [ctx.tenantId, scheduleId]
     )
 
     return res.json(result.rows)
@@ -270,37 +340,44 @@ router.get('/enrollment/available', authenticateToken, requireRole('faculty'), a
  * Enroll a student into a faculty-owned schedule
  * Body: { schedule_id, student_id }
  */
-router.post('/enrollment/add', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.post('/enrollment/add', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
     const { schedule_id, student_id } = req.body
     if (!schedule_id || !student_id) {
       return res.status(400).json({ error: 'schedule_id and student_id required' })
     }
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const owns = await verifyScheduleOwnership(schedule_id, facultyId)
+    const owns = await verifyScheduleOwnership(schedule_id, facultyId, ctx)
     if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
+
+    // The schedule being ours does not make the student ours. Without this,
+    // a student id from another school enrols a stranger into this class.
+    if (!(await studentInTenant(student_id, ctx))) {
+      return res.status(404).json({ error: 'Student not found' })
+    }
 
     // Check not already enrolled
     const existing = await query(
-      `SELECT id FROM student_schedules WHERE schedule_id = $1 AND student_id = $2 AND status = 'enrolled'`,
-      [schedule_id, student_id]
+      `SELECT id FROM student_courses
+        WHERE schedule_id = $1 AND student_id = $2 AND status = 'enrolled' AND tenant_id = $3`,
+      [schedule_id, student_id, ctx.tenantId]
     )
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'Student already enrolled in this schedule' })
     }
 
+    // Ownership of the new row is taken from the resolved context.
     await query(
-      `INSERT INTO student_schedules (schedule_id, student_id, status, enrolled_at)
-       VALUES ($1, $2, 'enrolled', NOW())
+      `INSERT INTO student_courses (schedule_id, student_id, status, enrolled_at, tenant_id)
+       VALUES ($1, $2, 'enrolled', NOW(), $3)
        ON CONFLICT (schedule_id, student_id)
        DO UPDATE SET status = 'enrolled', enrolled_at = NOW()`,
-      [schedule_id, student_id]
+      [schedule_id, student_id, ctx.tenantId]
     )
 
     return res.json({ success: true })
@@ -315,25 +392,24 @@ router.post('/enrollment/add', authenticateToken, requireRole('faculty'), async 
  * Remove (unenroll) a student from a faculty-owned schedule
  * Body: { schedule_id, student_id }
  */
-router.post('/enrollment/remove', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.post('/enrollment/remove', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
     const { schedule_id, student_id } = req.body
     if (!schedule_id || !student_id) {
       return res.status(400).json({ error: 'schedule_id and student_id required' })
     }
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const owns = await verifyScheduleOwnership(schedule_id, facultyId)
+    const owns = await verifyScheduleOwnership(schedule_id, facultyId, ctx)
     if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
 
     await query(
-      `DELETE FROM student_schedules WHERE schedule_id = $1 AND student_id = $2`,
-      [schedule_id, student_id]
+      `DELETE FROM student_courses WHERE schedule_id = $1 AND student_id = $2 AND tenant_id = $3`,
+      [schedule_id, student_id, ctx.tenantId]
     )
 
     return res.json({ success: true })
@@ -351,12 +427,11 @@ router.post('/enrollment/remove', authenticateToken, requireRole('faculty'), asy
  * GET /faculty/reports?course_id=X&schedule_id=X&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
  * Returns per-student attendance breakdown for report generation
  */
-router.get('/reports', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/reports', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.json([])
 
     const courseId = req.query.course_id as string | undefined
@@ -365,9 +440,13 @@ router.get('/reports', authenticateToken, requireRole('faculty'), async (req: Re
     const dateTo = req.query.date_to as string | undefined
 
     // Build dynamic WHERE clauses
-    const conditions: string[] = ['cs.faculty_id = $1', 'ss.status = \'enrolled\'']
-    const params: any[] = [facultyId]
-    let paramIdx = 2
+    const conditions: string[] = [
+      'cs.tenant_id = $1',
+      'cs.faculty_id = $2',
+      "ss.status = 'enrolled'",
+    ]
+    const params: any[] = [ctx.tenantId, facultyId]
+    let paramIdx = 3
 
     if (scheduleId && scheduleId !== 'all') {
       conditions.push(`cs.id = $${paramIdx}`)
@@ -394,25 +473,53 @@ router.get('/reports', authenticateToken, requireRole('faculty'), async (req: Re
 
     const dateFilter = dateConditions.length > 0 ? ` AND ${dateConditions.join(' AND ')}` : ''
 
+    // Same counts as before — sessions are distinct days across the
+    // lecturer's classes, and a day counts as present/absent/… if any class
+    // that day was — but reached by collapsing to one row per student and
+    // day first (a hash aggregate) instead of COUNT(DISTINCT) over the joined
+    // history, which sorted every attendance row and spilled to disk.
+    const scheduleConditions = conditions.filter((c) => c.startsWith('cs.'))
     const sql = `
+      WITH mine AS (
+        SELECT cs.id FROM class_schedules cs WHERE ${scheduleConditions.join(' AND ')}
+      ), roster AS (
+        SELECT DISTINCT ss.student_id
+          FROM student_courses ss
+         WHERE ss.schedule_id IN (SELECT id FROM mine) AND ss.status = 'enrolled' AND ss.tenant_id = $1
+      ), days AS (
+        SELECT sa.student_id, sa.attendance_date,
+               bool_or(sa.status = 'present') AS present,
+               bool_or(sa.status = 'absent')  AS absent,
+               bool_or(sa.status = 'late')    AS late,
+               bool_or(sa.status = 'excused') AS excused
+          FROM student_courses ss
+          JOIN school_attendance sa
+            ON sa.student_id = ss.student_id AND sa.schedule_id = ss.schedule_id AND sa.tenant_id = ss.tenant_id
+         WHERE ss.schedule_id IN (SELECT id FROM mine) AND ss.status = 'enrolled' AND ss.tenant_id = $1${dateFilter}
+         GROUP BY sa.student_id, sa.attendance_date
+      ), counts AS (
+        SELECT student_id,
+               COUNT(*) AS total_sessions,
+               COUNT(*) FILTER (WHERE present) AS present,
+               COUNT(*) FILTER (WHERE absent)  AS absent,
+               COUNT(*) FILTER (WHERE late)    AS late,
+               COUNT(*) FILTER (WHERE excused) AS excused
+          FROM days GROUP BY student_id
+      )
       SELECT
         s.id as student_id,
         s.student_id as student_code,
         s.first_name,
         s.last_name,
         s.email,
-        COUNT(DISTINCT sa.attendance_date) as total_sessions,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'present') as present,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'absent') as absent,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'late') as late,
-        COUNT(DISTINCT sa.attendance_date) FILTER (WHERE sa.status = 'excused') as excused
-      FROM student_schedules ss
-      JOIN class_schedules cs ON ss.schedule_id = cs.id
-      JOIN students s ON ss.student_id = s.id
-      LEFT JOIN school_attendance sa
-        ON sa.student_id = s.id AND sa.schedule_id = cs.id${dateFilter}
-      WHERE ${conditions.join(' AND ')}
-      GROUP BY s.id, s.student_id, s.first_name, s.last_name, s.email
+        COALESCE(c.total_sessions, 0) as total_sessions,
+        COALESCE(c.present, 0) as present,
+        COALESCE(c.absent, 0) as absent,
+        COALESCE(c.late, 0) as late,
+        COALESCE(c.excused, 0) as excused
+      FROM roster r
+      JOIN students s ON s.id = r.student_id AND s.tenant_id = $1
+      LEFT JOIN counts c ON c.student_id = r.student_id
       ORDER BY s.last_name, s.first_name
     `
 
@@ -448,21 +555,20 @@ router.get('/reports', authenticateToken, requireRole('faculty'), async (req: Re
  * GET /faculty/courses
  * Returns courses assigned to the logged-in faculty member
  */
-router.get('/courses', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/courses', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.json([])
 
     const coursesResult = await query(
       `SELECT DISTINCT c.id, c.name, c.code, c.description, c.credits
        FROM courses c
        JOIN class_schedules cs ON cs.course_id = c.id
-       WHERE cs.faculty_id = $1
+       WHERE cs.faculty_id = $1 AND cs.tenant_id = $2
        ORDER BY c.name`,
-      [facultyId]
+      [facultyId, ctx.tenantId]
     )
 
     return res.json(coursesResult.rows)
@@ -473,32 +579,36 @@ router.get('/courses', authenticateToken, requireRole('faculty'), async (req: Re
 
 /**
  * GET /faculty/courses/:courseId/roster
- * Returns student roster for a specific course (uses student_schedules)
+ * Returns student roster for a specific course (uses student_courses)
  */
-router.get('/courses/:courseId/roster', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/courses/:courseId/roster', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
+    const ctx = ctxOf(req)
     const { courseId } = req.params
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const courseResult = await query('SELECT id, name, code FROM courses WHERE id = $1', [courseId])
+    if (!UUID.test(courseId)) return res.status(404).json({ error: 'Course not found' })
+    const courseResult = await query(
+      'SELECT id, name, code FROM courses WHERE id = $1 AND tenant_id = $2',
+      [courseId, ctx.tenantId]
+    )
     if (courseResult.rows.length === 0) return res.status(404).json({ error: 'Course not found' })
 
-    // Get students enrolled via student_schedules -> class_schedules
+    // Get students enrolled via student_courses -> class_schedules
     const studentsResult = await query(
       `SELECT DISTINCT s.id,
               CONCAT(s.first_name, ' ', COALESCE(s.middle_name || ' ', ''), s.last_name) as name,
               s.email,
               ss.id as enrollment_id
-       FROM student_schedules ss
+       FROM student_courses ss
        JOIN class_schedules cs ON ss.schedule_id = cs.id
        JOIN students s ON ss.student_id = s.id
        WHERE cs.course_id = $1 AND cs.faculty_id = $2 AND ss.status = 'enrolled'
+         AND cs.tenant_id = $3
        ORDER BY name`,
-      [courseId, facultyId]
+      [courseId, facultyId, ctx.tenantId]
     )
 
     return res.json({
@@ -516,19 +626,19 @@ router.get('/courses/:courseId/roster', authenticateToken, requireRole('faculty'
  * GET /faculty/courses/:courseId/attendance-summary
  * Returns per-student attendance summary for a course
  */
-router.get('/courses/:courseId/attendance-summary', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/courses/:courseId/attendance-summary', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
+    const ctx = ctxOf(req)
     const { courseId } = req.params
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
     // Get all schedules for this course + faculty
+    if (!UUID.test(courseId)) return res.json([])
     const schedules = await query(
-      'SELECT id FROM class_schedules WHERE course_id = $1 AND faculty_id = $2',
-      [courseId, facultyId]
+      'SELECT id FROM class_schedules WHERE course_id = $1 AND faculty_id = $2 AND tenant_id = $3',
+      [courseId, facultyId, ctx.tenantId]
     )
     if (schedules.rows.length === 0) return res.json([])
 
@@ -543,13 +653,13 @@ router.get('/courses/:courseId/attendance-summary', authenticateToken, requireRo
         COUNT(*) FILTER (WHERE sa.status = 'absent') as absent,
         COUNT(*) FILTER (WHERE sa.status = 'late') as late,
         COUNT(*) FILTER (WHERE sa.status = 'excused') as excused
-       FROM student_schedules ss
+       FROM student_courses ss
        JOIN students s ON ss.student_id = s.id
        LEFT JOIN school_attendance sa ON sa.student_id = s.id AND sa.schedule_id = ANY($1)
-       WHERE ss.schedule_id = ANY($1) AND ss.status = 'enrolled'
+       WHERE ss.schedule_id = ANY($1) AND ss.status = 'enrolled' AND ss.tenant_id = $2
        GROUP BY s.id, s.first_name, s.middle_name, s.last_name
        ORDER BY s.last_name, s.first_name`,
-      [scheduleIds]
+      [scheduleIds, ctx.tenantId]
     )
 
     const summary = summaryResult.rows.map((row: any) => ({
@@ -573,12 +683,11 @@ router.get('/courses/:courseId/attendance-summary', authenticateToken, requireRo
  * GET /faculty/schedules
  * Returns all class schedules assigned to this faculty with course/room/enrollment info
  */
-router.get('/schedules', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/schedules', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.json([])
 
     const schedulesResult = await query(
@@ -593,13 +702,13 @@ router.get('/schedules', authenticateToken, requireRole('faculty'), async (req: 
         cs.start_time,
         cs.end_time,
         cs.section,
-        (SELECT COUNT(*) FROM student_schedules ss WHERE ss.schedule_id = cs.id AND ss.status = 'enrolled') as student_count
+        (SELECT COUNT(*) FROM student_courses ss WHERE ss.schedule_id = cs.id AND ss.status = 'enrolled') as student_count
        FROM class_schedules cs
        JOIN courses c ON cs.course_id = c.id
        LEFT JOIN rooms r ON cs.room_id = r.id
-       WHERE cs.faculty_id = $1
+       WHERE cs.faculty_id = $1 AND cs.tenant_id = $2
        ORDER BY c.name, cs.section`,
-      [facultyId]
+      [facultyId, ctx.tenantId]
     )
 
     return res.json(schedulesResult.rows)
@@ -612,17 +721,16 @@ router.get('/schedules', authenticateToken, requireRole('faculty'), async (req: 
  * GET /faculty/schedules/:scheduleId/students?date=YYYY-MM-DD
  * Returns enrolled students with their attendance status for a given date
  */
-router.get('/schedules/:scheduleId/students', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/schedules/:scheduleId/students', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
+    const ctx = ctxOf(req)
     const { scheduleId } = req.params
     const date = (req.query.date as string) || new Date().toISOString().split('T')[0]
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const owns = await verifyScheduleOwnership(scheduleId, facultyId)
+    const owns = await verifyScheduleOwnership(scheduleId, facultyId, ctx)
     if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
 
     // Enrolled students LEFT JOIN attendance for this date
@@ -637,15 +745,17 @@ router.get('/schedules/:scheduleId/students', authenticateToken, requireRole('fa
         sa.remarks,
         sa.marked_at,
         sa.face_verified,
-        CASE WHEN sfe.id IS NOT NULL THEN true ELSE false END as has_face_enrolled
-       FROM student_schedules ss
-       JOIN students s ON ss.student_id = s.id
+        (ft.id IS NOT NULL) AS has_face_enrolled
+       FROM student_courses ss
+       JOIN students s ON ss.student_id = s.id AND s.tenant_id = ss.tenant_id
        LEFT JOIN school_attendance sa
          ON sa.schedule_id = $1 AND sa.student_id = s.id AND sa.attendance_date = $2
-       LEFT JOIN student_face_embeddings sfe ON sfe.student_id = s.id AND sfe.is_verified = true
-       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled'
+            AND sa.tenant_id = ss.tenant_id
+       LEFT JOIN face_templates ft
+         ON ft.subject_type = 'student' AND ft.subject_id = s.id AND ft.tenant_id = $3
+       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled' AND ss.tenant_id = $3
        ORDER BY s.last_name, s.first_name`,
-      [scheduleId, date]
+      [scheduleId, date, ctx.tenantId]
     )
 
     return res.json({
@@ -665,22 +775,21 @@ router.get('/schedules/:scheduleId/students', authenticateToken, requireRole('fa
 /**
  * POST /faculty/attendance/mark
  * Mark/update attendance for students in a schedule on a given date.
- * Body: { schedule_id, date, entries: [{ student_id, status, remarks? }] }
+ * Body: { schedule_id, date, entries: [{ student_id, status, remarks?, face_match_id? }] }
  */
-router.post('/attendance/mark', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.post('/attendance/mark', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+    const ctx = ctxOf(req)
 
     const { schedule_id, date, entries } = req.body
     if (!schedule_id || !date || !Array.isArray(entries) || entries.length === 0) {
       return res.status(400).json({ error: 'Required: schedule_id, date, entries[]' })
     }
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const owns = await verifyScheduleOwnership(schedule_id, facultyId)
+    const owns = await verifyScheduleOwnership(schedule_id, facultyId, ctx)
     if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
 
     // Validate status values
@@ -697,9 +806,10 @@ router.post('/attendance/mark', authenticateToken, requireRole('faculty'), async
     // Validate all students are enrolled
     const studentIds = entries.map((e: any) => e.student_id)
     const enrolledCheck = await query(
-      `SELECT student_id FROM student_schedules
-       WHERE schedule_id = $1 AND student_id = ANY($2) AND status = 'enrolled'`,
-      [schedule_id, studentIds]
+      `SELECT student_id FROM student_courses
+       WHERE schedule_id = $1 AND student_id = ANY($2) AND status = 'enrolled'
+         AND tenant_id = $3`,
+      [schedule_id, studentIds, ctx.tenantId]
     )
     const enrolledIds = new Set(enrolledCheck.rows.map((r: any) => r.student_id))
     const notEnrolled = studentIds.filter((id: string) => !enrolledIds.has(id))
@@ -707,18 +817,45 @@ router.post('/attendance/mark', authenticateToken, requireRole('faculty'), async
       return res.status(400).json({ error: `Students not enrolled: ${notEnrolled.length} student(s)` })
     }
 
-    // Upsert attendance records
+    // Upsert attendance records, all or none. A face check is recorded only
+    // when the entry cites a match the server made for this student in this
+    // class (face_match_id); a face_verified flag in the body is not evidence
+    // and is ignored.
     let markedCount = 0
-    for (const entry of entries) {
-      const faceVerified = entry.face_verified === true
-      await query(
-        `INSERT INTO school_attendance (schedule_id, student_id, marked_by_id, attendance_date, status, remarks, face_verified, marked_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-         ON CONFLICT (schedule_id, student_id, attendance_date)
-         DO UPDATE SET status = $5, remarks = $6, face_verified = $7, marked_by_id = $3, marked_at = NOW()`,
-        [schedule_id, entry.student_id, facultyId, date, entry.status.toLowerCase(), entry.remarks || null, faceVerified]
-      )
-      markedCount++
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (const entry of entries) {
+        let matchId: string | null = null
+        if (entry.face_match_id) {
+          matchId = await assertUsableMatch(client, ctx as any, entry.face_match_id, {
+            action: 'identified',
+            subject: { type: 'student', id: entry.student_id },
+            scheduleId: schedule_id,
+          })
+        }
+        await client.query(
+          `INSERT INTO school_attendance (schedule_id, student_id, marked_by_id, attendance_date, status, remarks,
+                                          face_verified, face_match_event_id, verification_method, marked_at, tenant_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
+           ON CONFLICT (schedule_id, student_id, attendance_date)
+           DO UPDATE SET status = $5, remarks = $6, face_verified = $7, face_match_event_id = $8,
+                         verification_method = $9, marked_by_id = $3, marked_at = NOW()`,
+          [schedule_id, entry.student_id, facultyId, date, entry.status.toLowerCase(), entry.remarks || null,
+           matchId !== null, matchId, matchId ? 'FACE_MATCH' : 'MANUAL', ctx.tenantId]
+        )
+        markedCount++
+      }
+      await client.query('COMMIT')
+    } catch (e: any) {
+      await client.query('ROLLBACK').catch(() => {})
+      if (e instanceof BiometricError) return res.status(e.status).json({ error: e.message, code: e.code })
+      if (e.code === '23505') {
+        return res.status(409).json({ error: 'A face match can back only one attendance record', code: 'match_used' })
+      }
+      throw e
+    } finally {
+      client.release()
     }
 
     return res.json({ success: true, marked_count: markedCount })
@@ -731,17 +868,16 @@ router.post('/attendance/mark', authenticateToken, requireRole('faculty'), async
  * GET /faculty/attendance/history?schedule_id=X
  * Returns attendance dates with tallies for a schedule (last 30 sessions)
  */
-router.get('/attendance/history', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
+router.get('/attendance/history', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
-    const userId = req.user?.userId
+    const ctx = ctxOf(req)
     const scheduleId = req.query.schedule_id as string
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
     if (!scheduleId) return res.status(400).json({ error: 'schedule_id required' })
 
-    const facultyId = await resolveFacultyId(userId)
+    const facultyId = await resolveFacultyId(ctx)
     if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
 
-    const owns = await verifyScheduleOwnership(scheduleId, facultyId)
+    const owns = await verifyScheduleOwnership(scheduleId, facultyId, ctx)
     if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
 
     const historyResult = await query(
@@ -753,11 +889,11 @@ router.get('/attendance/history', authenticateToken, requireRole('faculty'), asy
         COUNT(*) FILTER (WHERE status = 'late') as late_count,
         COUNT(*) FILTER (WHERE status = 'excused') as excused_count
        FROM school_attendance
-       WHERE schedule_id = $1
+       WHERE schedule_id = $1 AND tenant_id = $2
        GROUP BY attendance_date
        ORDER BY attendance_date DESC
        LIMIT 30`,
-      [scheduleId]
+      [scheduleId, ctx.tenantId]
     )
 
     return res.json(historyResult.rows)
@@ -767,204 +903,14 @@ router.get('/attendance/history', authenticateToken, requireRole('faculty'), asy
 })
 
 // ===========================
-// FACE RECOGNITION
+// FACE RECOGNITION — moved
 // ===========================
-
-/**
- * GET /faculty/face-status?schedule_id=X
- * Returns which students in a schedule have enrolled face embeddings
- */
-router.get('/face-status', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.userId
-    const scheduleId = req.query.schedule_id as string
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
-    if (!scheduleId) return res.status(400).json({ error: 'schedule_id required' })
-
-    const facultyId = await resolveFacultyId(userId)
-    if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
-
-    const owns = await verifyScheduleOwnership(scheduleId, facultyId)
-    if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
-
-    // Get enrolled students with face enrollment status
-    const result = await query(
-      `SELECT
-        s.id as student_id,
-        s.student_id as student_code,
-        s.first_name,
-        s.last_name,
-        CASE WHEN sfe.id IS NOT NULL THEN true ELSE false END as has_face
-       FROM student_schedules ss
-       JOIN students s ON ss.student_id = s.id
-       LEFT JOIN student_face_embeddings sfe ON sfe.student_id = s.id AND sfe.is_verified = true
-       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled'
-       ORDER BY s.last_name, s.first_name`,
-      [scheduleId]
-    )
-
-    return res.json(result.rows)
-  } catch (error: any) {
-    console.error('[faculty/face-status] Error:', error)
-    return res.status(500).json({ error: 'Failed to fetch face status' })
-  }
-})
-
-/**
- * POST /faculty/face-enroll
- * Enroll a student's face embedding for future recognition
- * Body: { student_id, embedding (number[128]), liveness_score? }
- */
-router.post('/face-enroll', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
-
-    const { student_id, embedding, liveness_score } = req.body
-    if (!student_id || !embedding || !Array.isArray(embedding)) {
-      return res.status(400).json({ error: 'student_id and embedding[] required' })
-    }
-    if (embedding.length !== 128) {
-      return res.status(400).json({ error: 'Embedding must be 128 dimensions' })
-    }
-
-    const facultyId = await resolveFacultyId(userId)
-    if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
-
-    // Serialize embedding as JSON string for storage/hash
-    const embeddingJson = JSON.stringify(embedding)
-    const crypto = await import('crypto')
-    const embeddingHash = crypto.createHash('sha256').update(embeddingJson).digest('hex')
-
-    // Upsert: replace existing embedding for this student
-    await query(
-      `INSERT INTO student_face_embeddings (student_id, embedding_url, embedding_hash, liveness_score, is_verified, captured_at)
-       VALUES ($1, $2, $3, $4, true, NOW())
-       ON CONFLICT (student_id)
-       DO UPDATE SET embedding_url = $2, embedding_hash = $3, liveness_score = $4, is_verified = true, captured_at = NOW()`,
-      [student_id, embeddingJson, embeddingHash, liveness_score || 0.9]
-    )
-
-    return res.json({ success: true, message: 'Face enrolled successfully' })
-  } catch (error: any) {
-    // If unique constraint doesn't exist on student_id, try without ON CONFLICT
-    if (error.code === '42P10' || error.message?.includes('ON CONFLICT')) {
-      try {
-        const { student_id, embedding, liveness_score } = req.body
-        const embeddingJson = JSON.stringify(embedding)
-        const crypto = await import('crypto')
-        const embeddingHash = crypto.createHash('sha256').update(embeddingJson).digest('hex')
-
-        // Delete existing and insert
-        await query('DELETE FROM student_face_embeddings WHERE student_id = $1', [student_id])
-        await query(
-          `INSERT INTO student_face_embeddings (student_id, embedding_url, embedding_hash, liveness_score, is_verified, captured_at)
-           VALUES ($1, $2, $3, $4, true, NOW())`,
-          [student_id, embeddingJson, embeddingHash, liveness_score || 0.9]
-        )
-        return res.json({ success: true, message: 'Face enrolled successfully' })
-      } catch (innerErr: any) {
-        console.error('[faculty/face-enroll] Fallback error:', innerErr)
-        return res.status(500).json({ error: 'Failed to enroll face' })
-      }
-    }
-    console.error('[faculty/face-enroll] Error:', error)
-    return res.status(500).json({ error: 'Failed to enroll face' })
-  }
-})
-
-/**
- * POST /faculty/attendance/face-scan
- * Scan a captured face against all enrolled students in a schedule.
- * Returns the best matching student (if any).
- * Body: { schedule_id, embedding (number[128]) }
- */
-router.post('/attendance/face-scan', authenticateToken, requireRole('faculty'), async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' })
-
-    const { schedule_id, embedding } = req.body
-    if (!schedule_id || !embedding || !Array.isArray(embedding)) {
-      return res.status(400).json({ error: 'schedule_id and embedding[] required' })
-    }
-
-    const facultyId = await resolveFacultyId(userId)
-    if (!facultyId) return res.status(403).json({ error: 'Not a faculty member' })
-
-    const owns = await verifyScheduleOwnership(schedule_id, facultyId)
-    if (!owns) return res.status(403).json({ error: 'Schedule not assigned to you' })
-
-    // Get all enrolled students with face embeddings for this schedule
-    const result = await query(
-      `SELECT s.id as student_id, s.student_id as student_code,
-              s.first_name, s.last_name,
-              sfe.embedding_url
-       FROM student_schedules ss
-       JOIN students s ON ss.student_id = s.id
-       JOIN student_face_embeddings sfe ON sfe.student_id = s.id AND sfe.is_verified = true
-       WHERE ss.schedule_id = $1 AND ss.status = 'enrolled'`,
-      [schedule_id]
-    )
-
-    if (result.rows.length === 0) {
-      return res.json({ matched: false, message: 'No students with enrolled faces in this schedule' })
-    }
-
-    // Compare against each enrolled face
-    let bestMatch: any = null
-    let bestConfidence = 0
-
-    for (const row of result.rows) {
-      try {
-        const storedEmbedding: number[] = JSON.parse(row.embedding_url)
-        if (!Array.isArray(storedEmbedding) || storedEmbedding.length !== 128) continue
-
-        // Compute Euclidean distance
-        let sum = 0
-        for (let i = 0; i < 128; i++) {
-          const diff = embedding[i] - storedEmbedding[i]
-          sum += diff * diff
-        }
-        const distance = Math.sqrt(sum)
-
-        // Convert to confidence (0-100)
-        const confidence = Math.max(0, Math.round(100 - (distance / 3) * 100))
-
-        if (confidence > bestConfidence) {
-          bestConfidence = confidence
-          bestMatch = {
-            student_id: row.student_id,
-            student_code: row.student_code,
-            first_name: row.first_name,
-            last_name: row.last_name,
-            confidence,
-            distance: Math.round(distance * 1000) / 1000,
-          }
-        }
-      } catch {
-        // Skip malformed embeddings
-      }
-    }
-
-    const MATCH_THRESHOLD = 60 // 60% confidence threshold
-
-    if (bestMatch && bestMatch.confidence >= MATCH_THRESHOLD) {
-      return res.json({
-        matched: true,
-        student: bestMatch,
-      })
-    }
-
-    return res.json({
-      matched: false,
-      message: 'No matching face found',
-      best_confidence: bestConfidence,
-    })
-  } catch (error: any) {
-    console.error('[faculty/attendance/face-scan] Error:', error)
-    return res.status(500).json({ error: 'Failed to scan face' })
-  }
-})
+//
+// Face enrolment and the in-class face scan now live at /api/biometrics.
+// The three routes that were here took a list of numbers from the browser
+// and treated it as a face; the browser computed it by averaging the colour
+// of 128 patches of the camera image, and any caller could send any numbers.
+// A lecturer now asks /api/biometrics/identify who is in front of the camera,
+// and cites the match it returns when saving attendance (face_match_id).
 
 export default router

@@ -1,0 +1,31 @@
+# Serves the built web app. Every path that is not a file is the app itself
+# (client-side routing); hashed assets are cached for a year.
+#
+# API_ORIGIN (e.g. https://api.example.org) is substituted when the container
+# starts. The content security policy allows scripts only from this origin,
+# which is the main defence for the sign-in tokens the app keeps in
+# localStorage.
+server {
+  listen 8080;
+  root /usr/share/nginx/html;
+  server_tokens off;
+
+  set $csp "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ${API_ORIGIN}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable" always;
+    add_header X-Content-Type-Options nosniff always;
+    try_files $uri =404;
+  }
+
+  location / {
+    add_header Cache-Control "no-cache" always;
+    add_header Content-Security-Policy $csp always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header X-Frame-Options DENY always;
+    add_header Permissions-Policy "camera=(self), geolocation=(self), microphone=()" always;
+    try_files $uri /index.html;
+  }
+}

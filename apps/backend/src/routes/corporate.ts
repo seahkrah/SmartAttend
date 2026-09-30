@@ -1,21 +1,74 @@
 import express, { Request, Response } from 'express'
-import bcrypt from 'bcryptjs'
+import { sendInvitation, unusablePasswordHash, resetAccessByAdmin, AccountTokenError } from '../auth/accountTokens.js'
+import { logAudit } from '../services/domainAuditService.js'
+import { getClientIp } from '../utils/getClientIp.js'
 import { authenticateToken } from '../auth/middleware.js'
-import { query } from '../db/connection.js'
-import * as queries from '../db/queries.js'
-import type { Employee, WorkAssignment, CorporateCheckin } from '../types/database.js'
-import type { TenantAwareRequest } from '../types/tenantContext.js'
-import { verifyTenantOwnsResource } from '../auth/tenantEnforcementMiddleware.js'
+import pool, { query } from '../db/connection.js'
+import {
+  resolveTenantContext,
+  requireTenant,
+  requirePlatform,
+  requireRoles,
+  type TenantRequest,
+} from '../auth/tenantContextMiddleware.js'
 
 const router = express.Router()
 
-// ── Helper: Get corporate entity for authenticated admin ──
-async function getCorporateEntity(userId: string) {
+/**
+ * Tenant resolution for the whole router.
+ *
+ * These routes previously scoped by req.user.platformId, which is the PLATFORM
+ * ('corporate'), not the tenant — so every employer on the platform saw every
+ * other employer's rows. GET /departments was a confirmed cross-tenant leak.
+ *
+ * Resolving here means req.ctx.tenantId is available to every handler below.
+ * Routes that touch tenant-owned data add requireTenant so the absence of a
+ * tenant is refused rather than silently widening the query.
+ */
+//
+// Every route also needs a tenant and the corporate platform. Without the
+// platform gate a school identity reached these handlers, and although the
+// queries were scoped to its own tenant id and found nothing, "found nothing"
+// is the wrong answer to a caller who has no business on this platform.
+router.use(authenticateToken, resolveTenantContext, requireTenant, requirePlatform('corporate'))
+
+/**
+ * Who may do what.
+ *
+ * Nothing here checked a role before, so an ordinary employee could create,
+ * rename and delete departments, create employee records, change anyone's
+ * department and terminate colleagues.
+ */
+const peopleAdmins = requireRoles('admin', 'hr', 'hr_director')
+const peopleReaders = requireRoles('admin', 'hr', 'hr_director', 'manager')
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The corporate entity the caller administers, which must be the tenant the
+ * caller is signed in to. corporate_entities.id is the tenant id; matching
+ * both means an administrator of one employer who is somehow resolved into
+ * another's context gets nothing rather than the entity they administer.
+ */
+async function getCorporateEntity(req: Request) {
+  const ctx = (req as TenantRequest).ctx
+  if (!req.user || !ctx?.tenantId) return null
   const result = await query(
-    `SELECT * FROM corporate_entities WHERE admin_user_id = $1`,
-    [userId]
+    `SELECT * FROM corporate_entities WHERE admin_user_id = $1 AND id = $2`,
+    [req.user.userId, ctx.tenantId]
   )
   return result.rows[0] || null
+}
+
+/** A referenced department must be this employer's. Null clears it. */
+async function departmentInTenant(departmentId: unknown, tenantId: string): Promise<boolean> {
+  if (departmentId === null || departmentId === undefined || departmentId === '') return true
+  if (!UUID.test(String(departmentId))) return false
+  const r = await query(
+    `SELECT 1 FROM corporate_departments WHERE id = $1 AND tenant_id = $2`,
+    [departmentId, tenantId]
+  )
+  return r.rows.length > 0
 }
 
 // ═══════════════════════════════════════
@@ -24,7 +77,7 @@ async function getCorporateEntity(userId: string) {
 router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
 
     // Total & active employees (via corporate_user_associations)
@@ -52,8 +105,8 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
 
     // Department count
     const deptResult = await query(
-      `SELECT COUNT(*) AS dept_count FROM corporate_departments WHERE platform_id = $1`,
-      [req.user.platformId]
+      `SELECT COUNT(*) AS dept_count FROM corporate_departments WHERE tenant_id = $1`,
+      [entity.id]
     )
 
     // Pending approvals
@@ -124,23 +177,23 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
 // ═══════════════════════════════════════
 // DEPARTMENTS CRUD
 // ═══════════════════════════════════════
-router.get('/departments', authenticateToken, async (req: Request, res: Response) => {
+router.get('/departments', requireTenant, async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const platformId = req.user.platformId
-    if (!platformId) return res.status(403).json({ error: 'No platform assigned' })
+    const tenantId = req.ctx!.tenantId
 
+    // The employee join is bounded by the same tenant, so a headcount cannot
+    // be inflated by another employer's staff sharing a department id.
     const result = await query(
       `SELECT cd.*,
               COUNT(DISTINCT e.id) FILTER (WHERE e.is_currently_employed = true) AS employee_count,
               h.full_name AS head_name
        FROM corporate_departments cd
-       LEFT JOIN employees e ON e.department_id = cd.id
+       LEFT JOIN employees e ON e.department_id = cd.id AND e.tenant_id = $1
        LEFT JOIN users h ON cd.head_id = h.id
-       WHERE cd.platform_id = $1
+       WHERE cd.tenant_id = $1
        GROUP BY cd.id, h.full_name
        ORDER BY cd.name`,
-      [platformId]
+      [tenantId]
     )
     return res.json({ departments: result.rows })
   } catch (err: any) {
@@ -149,26 +202,39 @@ router.get('/departments', authenticateToken, async (req: Request, res: Response
   }
 })
 
-router.post('/departments', authenticateToken, async (req: Request, res: Response) => {
+router.post('/departments', peopleAdmins, async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const platformId = req.user.platformId
-    if (!platformId) return res.status(403).json({ error: 'No platform assigned' })
+    const tenantId = req.ctx!.tenantId
+    const platformId = req.ctx!.platformId
 
     const { name, code, description, head_id } = req.body
     if (!name) return res.status(400).json({ error: 'Department name is required' })
 
-    // Check duplicate name
+    // Uniqueness is per tenant, not per platform: two employers may each have
+    // an "Operations" department.
     const dup = await query(
-      `SELECT id FROM corporate_departments WHERE platform_id = $1 AND LOWER(name) = LOWER($2)`,
-      [platformId, name]
+      `SELECT id FROM corporate_departments WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)`,
+      [tenantId, name]
     )
     if (dup.rows.length > 0) return res.status(409).json({ error: 'Department name already exists' })
 
+    // A head from another tenant would be a cross-tenant reference.
+    if (head_id) {
+      const head = await query(
+        `SELECT 1 FROM user_tenant_memberships
+          WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'`,
+        [head_id, tenantId]
+      )
+      if (head.rows.length === 0) {
+        return res.status(404).json({ error: 'No such user in this tenant' })
+      }
+    }
+
+    // Ownership comes from the resolved context, never from the body.
     const result = await query(
-      `INSERT INTO corporate_departments (name, code, description, head_id, platform_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [name, code || null, description || null, head_id || null, platformId]
+      `INSERT INTO corporate_departments (name, code, description, head_id, platform_id, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [name, code || null, description || null, head_id || null, platformId, tenantId]
     )
     return res.status(201).json(result.rows[0])
   } catch (err: any) {
@@ -177,22 +243,33 @@ router.post('/departments', authenticateToken, async (req: Request, res: Respons
   }
 })
 
-router.put('/departments/:id', authenticateToken, async (req: Request, res: Response) => {
+router.put('/departments/:id', peopleAdmins, async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const platformId = req.user.platformId
-    if (!platformId) return res.status(403).json({ error: 'No platform assigned' })
+    const tenantId = req.ctx!.tenantId
 
     const { id } = req.params
     const { name, code, description, head_id } = req.body
 
+    if (head_id) {
+      const head = await query(
+        `SELECT 1 FROM user_tenant_memberships
+          WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'`,
+        [head_id, tenantId]
+      )
+      if (head.rows.length === 0) {
+        return res.status(404).json({ error: 'No such user in this tenant' })
+      }
+    }
+
+    // tenant_id is not settable here: a department cannot be handed to another
+    // tenant by an ordinary update.
     const result = await query(
       `UPDATE corporate_departments
        SET name = COALESCE($1, name), code = COALESCE($2, code),
            description = COALESCE($3, description), head_id = $4
-       WHERE id = $5 AND platform_id = $6
+       WHERE id = $5 AND tenant_id = $6
        RETURNING *`,
-      [name, code, description, head_id || null, id, platformId]
+      [name, code, description, head_id || null, id, tenantId]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Department not found' })
     return res.json(result.rows[0])
@@ -202,26 +279,26 @@ router.put('/departments/:id', authenticateToken, async (req: Request, res: Resp
   }
 })
 
-router.delete('/departments/:id', authenticateToken, async (req: Request, res: Response) => {
+router.delete('/departments/:id', peopleAdmins, async (req: TenantRequest, res: Response) => {
   try {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const platformId = req.user.platformId
-    if (!platformId) return res.status(403).json({ error: 'No platform assigned' })
+    const tenantId = req.ctx!.tenantId
 
     const { id } = req.params
 
-    // Check if department has employees
+    // Counted inside the tenant. Unscoped, this would let another employer's
+    // headcount block a deletion, and would leak that the department is in use.
     const empCheck = await query(
-      `SELECT COUNT(*) AS count FROM employees WHERE department_id = $1 AND is_currently_employed = true`,
-      [id]
+      `SELECT COUNT(*) AS count FROM employees
+        WHERE department_id = $1 AND tenant_id = $2 AND is_currently_employed = true`,
+      [id, tenantId]
     )
     if (parseInt(empCheck.rows[0].count) > 0) {
       return res.status(400).json({ error: `Cannot delete: ${empCheck.rows[0].count} active employee(s) in this department` })
     }
 
     const result = await query(
-      `DELETE FROM corporate_departments WHERE id = $1 AND platform_id = $2 RETURNING id, name`,
-      [id, platformId]
+      `DELETE FROM corporate_departments WHERE id = $1 AND tenant_id = $2 RETURNING id, name`,
+      [id, tenantId]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Department not found' })
     return res.json({ success: true, message: `Department "${result.rows[0].name}" deleted` })
@@ -237,7 +314,7 @@ router.delete('/departments/:id', authenticateToken, async (req: Request, res: R
 router.get('/admin/employees', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
 
     const departmentId = req.query.departmentId as string
@@ -246,6 +323,7 @@ router.get('/admin/employees', authenticateToken, async (req: Request, res: Resp
 
     let sql = `
       SELECT e.*, u.email AS user_email, u.is_active AS user_active,
+             (u.activated_at IS NULL) AS awaiting_setup,
              cd.name AS department_name
       FROM employees e
       JOIN users u ON e.user_id = u.id
@@ -281,15 +359,25 @@ router.get('/admin/employees', authenticateToken, async (req: Request, res: Resp
 router.post('/admin/employees', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
 
     const { firstName, lastName, email, phone, departmentId, designation, employmentType, dateOfJoining } = req.body
-    if (!firstName || !lastName || !email) {
-      return res.status(400).json({ error: 'First name, last name, and email are required' })
+    // employees.phone is NOT NULL. Without this check a missing phone got as
+    // far as the employee insert and failed there, after the account had
+    // been created, leaving an account with no employee behind it.
+    if (!firstName || !lastName || !email || !phone || !String(phone).trim()) {
+      return res.status(400).json({ error: 'First name, last name, email and phone are required' })
     }
 
     const platformId = req.user.platformId
+    const tenantId = entity.id
+
+    // An unchecked department id attached the new employee to another
+    // employer's department, whose name then showed on this employer's lists.
+    if (!(await departmentInTenant(departmentId, tenantId))) {
+      return res.status(404).json({ error: 'No such department in this organisation' })
+    }
 
     // Check if email already exists on this platform
     const existingUser = await query(
@@ -301,65 +389,86 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
     }
 
     // Employee role ID
-    const employeeRole = await query(`SELECT id FROM roles WHERE name = 'employee' LIMIT 1`)
+    const employeeRole = await query(
+      `SELECT id FROM roles WHERE name = 'employee' AND platform_id = $1`,
+      [platformId]
+    )
     if (employeeRole.rows.length === 0) {
       return res.status(500).json({ error: 'Employee role not found' })
     }
     const roleId = employeeRole.rows[0].id
 
-    // Default password: first letter of first name (uppercase) + last name (lowercase) + "123"
-    const defaultPassword = firstName.charAt(0).toUpperCase() + lastName.toLowerCase() + '123'
-    const passwordHash = await bcrypt.hash(defaultPassword, 10)
+    // The account starts with a password nobody knows; the employee chooses
+    // their own from the invitation. (It used to be first initial + surname +
+    // "123", which anyone who knew a colleague's name could guess.)
+    const passwordHash = await unusablePasswordHash()
     const fullName = `${firstName} ${lastName}`
 
     // Auto-generate employee ID: ENT-CODE-NNN
     const countResult = await query(
-      `SELECT COUNT(*) FROM employees e
-       JOIN users u ON e.user_id = u.id
-       JOIN corporate_user_associations cua ON cua.user_id = u.id
-       WHERE cua.corporate_entity_id = $1`,
-      [entity.id]
+      `SELECT COUNT(*) FROM employees WHERE tenant_id = $1`,
+      [tenantId]
     )
     const nextNum = parseInt(countResult.rows[0].count) + 1
     const employeeIdCode = `${entity.code}-${String(nextNum).padStart(3, '0')}`
 
-    // Create user
-    const userResult = await query(
-      `INSERT INTO users (platform_id, email, full_name, phone, role_id, password_hash, must_reset_password)
-       VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id`,
-      [platformId, email, fullName, phone || null, roleId, passwordHash]
-    )
-    const newUserId = userResult.rows[0].id
+    // The account, its membership and the employee record are one thing; if
+    // any part fails, none of it is kept.
+    const client = await pool.connect()
+    let empResult
+    let invitation
+    try {
+      await client.query('BEGIN')
 
-    // Create corporate_user_associations
-    await query(
-      `INSERT INTO corporate_user_associations (user_id, corporate_entity_id, department_id, status)
-       VALUES ($1, $2, $3, 'active')`,
-      [newUserId, entity.id, departmentId || null]
-    )
+      // Create user
+      const userResult = await client.query(
+        `INSERT INTO users (platform_id, email, full_name, phone, role_id, password_hash, must_reset_password)
+         VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id`,
+        [platformId, email, fullName, phone || null, roleId, passwordHash]
+      )
+      const newUserId = userResult.rows[0].id
 
-    // Create employee record
-    const empResult = await query(
-      `INSERT INTO employees (user_id, employee_id, first_name, last_name, email, phone, department_id, designation, employment_type, date_of_joining)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [
-        newUserId,
-        employeeIdCode,
-        firstName,
-        lastName,
-        email,
-        phone || null,
-        departmentId || null,
-        designation || null,
-        employmentType || 'full_time',
-        dateOfJoining || new Date().toISOString().split('T')[0]
-      ]
-    )
+      // Create corporate_user_associations
+      await client.query(
+        `INSERT INTO corporate_user_associations (user_id, corporate_entity_id, department_id, status)
+         VALUES ($1, $2, $3, 'active')`,
+        [newUserId, entity.id, departmentId || null]
+      )
+
+      // Create employee record. The tenant is written by the server: without
+      // it the row belonged to no employer, and every tenant-scoped feature
+      // (leave, payroll, rosters, the employee's own check-in) could not see it.
+      empResult = await client.query(
+        `INSERT INTO employees (user_id, employee_id, first_name, last_name, email, phone, department_id, designation, employment_type, date_of_joining, tenant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [
+          newUserId,
+          employeeIdCode,
+          firstName,
+          lastName,
+          email,
+          String(phone).trim(),
+          departmentId || null,
+          designation || null,
+          employmentType || 'full_time',
+          dateOfJoining || new Date().toISOString().split('T')[0],
+          tenantId,
+        ]
+      )
+      invitation = await sendInvitation(client, { userId: newUserId, tenantId, invitedBy: req.user.userId })
+
+      await client.query('COMMIT')
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw e
+    } finally {
+      client.release()
+    }
 
     return res.status(201).json({
-      message: 'Employee created successfully',
+      message: 'Employee created and invited to set their password.',
       data: empResult.rows[0],
-      defaultPassword,
+      invitation,
     })
   } catch (err: any) {
     console.error('[Corporate Admin Create Employee]', err.message)
@@ -373,17 +482,14 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
 router.patch('/admin/employees/:employeeId/terminate', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
 
     const { employeeId } = req.params
     const result = await query(
       `UPDATE employees SET is_currently_employed = false
-       WHERE id = $1 AND id IN (
-         SELECT e.id FROM employees e
-         JOIN corporate_user_associations cua ON cua.user_id = e.user_id
-         WHERE cua.corporate_entity_id = $2
-       ) RETURNING *`,
+       WHERE id = $1 AND tenant_id = $2
+       RETURNING *`,
       [employeeId, entity.id]
     )
 
@@ -401,13 +507,109 @@ router.patch('/admin/employees/:employeeId/terminate', authenticateToken, async 
   }
 })
 
+/**
+ * Sends an employee a fresh invitation, cancelling any earlier one. With
+ * `handover: true` the setup link is returned rather than emailed, for an
+ * employer without working email; that is audited. Only for accounts nobody
+ * has signed in to yet.
+ */
+router.post('/admin/employees/:employeeId/invitation', authenticateToken, async (req: Request, res: Response) => {
+  const client = await pool.connect()
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
+    const entity = await getCorporateEntity(req)
+    if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
+
+    const { employeeId } = req.params
+    if (!UUID.test(employeeId)) return res.status(404).json({ error: 'Employee not found' })
+    const emp = await query(
+      `SELECT e.user_id, r.name AS role
+         FROM employees e JOIN users u ON u.id = e.user_id JOIN roles r ON r.id = u.role_id
+        WHERE e.id = $1 AND e.tenant_id = $2`,
+      [employeeId, entity.id]
+    )
+    if (emp.rows.length === 0) return res.status(404).json({ error: 'Employee not found' })
+    if (['admin', 'superadmin'].includes(emp.rows[0].role)) {
+      return res.status(403).json({ error: 'Administrators are invited by the platform operator, not from here' })
+    }
+    const handover = req.body?.handover === true
+
+    await client.query('BEGIN')
+    const invitation = await sendInvitation(client, {
+      userId: emp.rows[0].user_id, tenantId: entity.id, invitedBy: req.user.userId, handover,
+    })
+    // Recorded before the link can be used: no record, no link.
+    await logAudit({
+      actorId: req.user.userId, actorRole: 'admin',
+      actionType: handover ? 'USER_SETUP_LINK_ISSUED' : 'USER_INVITATION_SENT',
+      actionScope: 'TENANT', resourceType: 'user', resourceId: emp.rows[0].user_id, tenantId: entity.id,
+      afterState: { delivery: invitation.delivery }, ipAddress: getClientIp(req),
+    })
+    await client.query('COMMIT')
+
+    return res.json({ invitation })
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {})
+    if (err instanceof AccountTokenError) return res.status(err.status).json({ error: err.message })
+    console.error('[Corporate Admin Invitation]', err.message)
+    return res.status(500).json({ error: 'Failed to send the invitation' })
+  } finally {
+    client.release()
+  }
+})
+
+/** Restores an employee's access; see the school equivalent in schoolAdmin.ts. */
+router.post('/admin/employees/:employeeId/reset-access', authenticateToken, async (req: Request, res: Response) => {
+  const client = await pool.connect()
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
+    const entity = await getCorporateEntity(req)
+    if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
+    const { employeeId } = req.params
+    if (!UUID.test(employeeId)) return res.status(404).json({ error: 'Employee not found' })
+    const emp = await query(
+      `SELECT e.user_id, r.name AS role
+         FROM employees e JOIN users u ON u.id = e.user_id JOIN roles r ON r.id = u.role_id
+        WHERE e.id = $1 AND e.tenant_id = $2`,
+      [employeeId, entity.id]
+    )
+    if (emp.rows.length === 0) return res.status(404).json({ error: 'Employee not found' })
+    if (emp.rows[0].user_id === req.user.userId) {
+      return res.status(400).json({ error: 'Change your own password from your settings' })
+    }
+    if (['admin', 'superadmin'].includes(emp.rows[0].role)) {
+      return res.status(403).json({ error: "An administrator's access is reset by the platform operator" })
+    }
+    const handover = req.body?.handover === true
+
+    await client.query('BEGIN')
+    const result = await resetAccessByAdmin(client, {
+      userId: emp.rows[0].user_id, tenantId: entity.id, actorId: req.user.userId, handover,
+    })
+    await logAudit({
+      actorId: req.user.userId, actorRole: 'admin', actionType: 'USER_ACCESS_RESET',
+      actionScope: 'TENANT', resourceType: 'user', resourceId: emp.rows[0].user_id, tenantId: entity.id,
+      afterState: { delivery: result.delivery }, ipAddress: getClientIp(req),
+    })
+    await client.query('COMMIT')
+    return res.json({ reset: result })
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {})
+    if (err instanceof AccountTokenError) return res.status(err.status).json({ error: err.message })
+    console.error('[Corporate Admin Reset Access]', err.message)
+    return res.status(500).json({ error: 'Failed to reset access' })
+  } finally {
+    client.release()
+  }
+})
+
 // ═══════════════════════════════════════
 // ADMIN: Attendance overview
 // ═══════════════════════════════════════
 router.get('/admin/attendance', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
 
     const dateStr = (req.query.date as string) || new Date().toISOString().split('T')[0]
@@ -458,7 +660,7 @@ router.get('/admin/attendance', authenticateToken, async (req: Request, res: Res
 router.get('/admin/reports', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
 
     const days = parseInt(req.query.days as string) || 30
@@ -534,7 +736,7 @@ router.get('/admin/reports', authenticateToken, async (req: Request, res: Respon
 router.get('/admin/settings', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
     return res.json({ entity })
   } catch (err: any) {
@@ -545,7 +747,7 @@ router.get('/admin/settings', authenticateToken, async (req: Request, res: Respo
 router.put('/admin/settings', authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
-    const entity = await getCorporateEntity(req.user.userId)
+    const entity = await getCorporateEntity(req)
     if (!entity) return res.status(403).json({ error: 'No corporate entity assigned' })
 
     const { name, email, phone, headquarters_address, industry } = req.body
@@ -568,23 +770,25 @@ router.put('/admin/settings', authenticateToken, async (req: Request, res: Respo
 // EMPLOYEES ENDPOINTS
 // ===========================
 
-// GET all employees (tenant-scoped via users.platform_id)
-router.get('/employees', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+// GET all employees, scoped to the caller's tenant.
+//
+// This previously filtered on users.platform_id and called it tenant scoping.
+// platform_id is the platform ('corporate'), so the filter matched every
+// employer on it. employees.tenant_id is the real boundary.
+router.get('/employees', peopleReaders, async (req: TenantRequest, res: Response) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 20
-    const offset = parseInt(req.query.offset as string) || 0
+    const limit = Math.min(200, parseInt(req.query.limit as string) || 20)
+    const offset = Math.max(0, parseInt(req.query.offset as string) || 0)
     const departmentId = req.query.departmentId as string
-    const tenantId = req.tenant?.tenantId
-
-    if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
-    }
+    const tenantId = req.ctx!.tenantId
 
     let sql =
-      'SELECT e.*, u.email as user_email FROM employees e LEFT JOIN users u ON e.user_id = u.id WHERE u.platform_id = $1'
+      'SELECT e.*, u.email as user_email FROM employees e LEFT JOIN users u ON e.user_id = u.id WHERE e.tenant_id = $1'
     const params: any[] = [tenantId]
 
     if (departmentId) {
+      // The department must also be ours, or a foreign id would silently
+      // return an empty list rather than being refused.
       sql += ` AND e.department_id = $${params.length + 1}`
       params.push(departmentId)
     }
@@ -604,27 +808,40 @@ router.get('/employees', authenticateToken, async (req: TenantAwareRequest, res:
   }
 })
 
-// GET single employee (tenant-scoped)
-router.get('/employees/:employeeId', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+// GET single employee, scoped to the caller's tenant.
+//
+// This previously fetched the employee globally and then checked ownership
+// afterwards against the platform context. Filtering after the fetch is the
+// pattern that leaks: the row is already in hand, timing and error shape
+// differ between "absent" and "someone else's", and any later refactor that
+// drops the check reinstates the leak. The tenant predicate belongs in the
+// query, and a row in another tenant reads as 404.
+router.get('/employees/:employeeId', peopleReaders, async (req: TenantRequest, res: Response) => {
   try {
     const { employeeId } = req.params
-    const employee = await queries.getEmployeeById(employeeId)
+    const tenantId = req.ctx!.tenantId
 
-    if (!employee) {
+    const result = await query(
+      `SELECT e.*, u.email AS user_email
+         FROM employees e
+         LEFT JOIN users u ON u.id = e.user_id
+        WHERE e.id = $1 AND e.tenant_id = $2`,
+      [employeeId, tenantId]
+    )
+
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Employee not found' })
     }
 
-    // Enforce tenant ownership via underlying user.platform_id
-    await verifyTenantOwnsResource(req.tenant, employee, 'Employee')
-
-    return res.json({ data: employee })
+    return res.json({ data: result.rows[0] })
   } catch (error: any) {
-    return res.status(500).json({ error: error.message })
+    console.error('[Corporate Employee GET]', error.message)
+    return res.status(500).json({ error: 'Failed to load employee' })
   }
 })
 
 // CREATE employee (tenant-scoped)
-router.post('/employees', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.post('/employees', peopleAdmins, async (req: TenantRequest, res: Response) => {
   try {
     const {
       userId,
@@ -644,9 +861,19 @@ router.post('/employees', authenticateToken, async (req: TenantAwareRequest, res
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    const tenantId = req.tenant?.tenantId
-    if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+    const tenantId = req.ctx!.tenantId!
+
+    // The account and the department are references; each is a way across
+    // the boundary if taken on trust.
+    const member = await query(
+      `SELECT 1 FROM user_tenant_memberships WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'`,
+      [UUID.test(String(userId)) ? userId : null, tenantId]
+    )
+    if (member.rows.length === 0) {
+      return res.status(404).json({ error: 'No such user in this organisation' })
+    }
+    if (!(await departmentInTenant(departmentId, tenantId))) {
+      return res.status(404).json({ error: 'No such department in this organisation' })
     }
 
     // Check if employee already exists in this tenant
@@ -654,7 +881,7 @@ router.post('/employees', authenticateToken, async (req: TenantAwareRequest, res
       `SELECT e.id
        FROM employees e
        JOIN users u ON e.user_id = u.id
-       WHERE e.employee_id = $1 AND u.platform_id = $2`,
+       WHERE e.employee_id = $1 AND e.tenant_id = $2`,
       [employeeId, tenantId]
     )
     if (existing.rows.length > 0) {
@@ -662,8 +889,8 @@ router.post('/employees', authenticateToken, async (req: TenantAwareRequest, res
     }
 
     const result = await query(
-      `INSERT INTO employees (user_id, employee_id, first_name, middle_name, last_name, email, phone, department_id, designation, employment_type, date_of_joining)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO employees (user_id, employee_id, first_name, middle_name, last_name, email, phone, department_id, designation, employment_type, date_of_joining, tenant_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         userId,
@@ -676,7 +903,8 @@ router.post('/employees', authenticateToken, async (req: TenantAwareRequest, res
         departmentId || null,
         designation || null,
         employmentType || 'full_time',
-        dateOfJoining || new Date().toISOString().split('T')[0]
+        dateOfJoining || new Date().toISOString().split('T')[0],
+        tenantId,
       ]
     )
 
@@ -691,7 +919,7 @@ router.post('/employees', authenticateToken, async (req: TenantAwareRequest, res
 })
 
 // UPDATE employee (tenant-scoped)
-router.put('/employees/:employeeId', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.put('/employees/:employeeId', peopleAdmins, async (req: TenantRequest, res: Response) => {
   try {
     const { employeeId } = req.params
     const updates = req.body
@@ -711,17 +939,15 @@ router.put('/employees/:employeeId', authenticateToken, async (req: TenantAwareR
       return res.status(400).json({ error: 'No valid fields to update' })
     }
 
-    const tenantId = req.tenant?.tenantId
-    if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
+    const tenantId = req.ctx!.tenantId!
+    if ('department_id' in updates && !(await departmentInTenant(updates.department_id, tenantId))) {
+      return res.status(404).json({ error: 'No such department in this organisation' })
     }
 
     values.push(employeeId, tenantId)
     const sql = `UPDATE employees SET ${updateParts.join(
       ', '
-    )} WHERE id = $${values.length - 1} AND id IN (
-      SELECT e.id FROM employees e JOIN users u ON e.user_id = u.id WHERE u.platform_id = $${values.length}
-    ) RETURNING *`
+    )} WHERE id = $${values.length - 1} AND tenant_id = $${values.length} RETURNING *`
 
     const result = await query(sql, values)
 
@@ -739,19 +965,14 @@ router.put('/employees/:employeeId', authenticateToken, async (req: TenantAwareR
 })
 
 // TERMINATE employee (tenant-scoped)
-router.patch('/employees/:employeeId/terminate', authenticateToken, async (req: TenantAwareRequest, res: Response) => {
+router.patch('/employees/:employeeId/terminate', peopleAdmins, async (req: TenantRequest, res: Response) => {
   try {
     const { employeeId } = req.params
 
-    const tenantId = req.tenant?.tenantId
-    if (!tenantId) {
-      return res.status(401).json({ error: 'Tenant context required' })
-    }
+    const tenantId = req.ctx!.tenantId!
 
     const result = await query(
-      `UPDATE employees SET is_currently_employed = false WHERE id = $1 AND id IN (
-        SELECT e.id FROM employees e JOIN users u ON e.user_id = u.id WHERE u.platform_id = $2
-      ) RETURNING *`,
+      `UPDATE employees SET is_currently_employed = false WHERE id = $1 AND tenant_id = $2 RETURNING *`,
       [employeeId, tenantId]
     )
 
@@ -769,185 +990,30 @@ router.patch('/employees/:employeeId/terminate', authenticateToken, async (req: 
 })
 
 // ===========================
-// WORK ASSIGNMENTS ENDPOINTS
+// WORK ASSIGNMENTS — removed
 // ===========================
-
-// GET employee active assignments
-router.get('/employees/:employeeId/assignments', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { employeeId } = req.params
-    const assignments = await queries.getActiveAssignments(employeeId)
-    return res.json({ data: assignments })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// CREATE work assignment
-router.post('/assignments', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const {
-      employeeId,
-      assignmentType,
-      assignedDate,
-      projectName,
-      siteLocation,
-      latitude,
-      longitude,
-      endDate,
-      description
-    } = req.body
-
-    if (!employeeId || !assignmentType || !assignedDate) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    if (!['office', 'field', 'remote'].includes(assignmentType)) {
-      return res.status(400).json({ error: 'Invalid assignment type' })
-    }
-
-    const result = await query(
-      `INSERT INTO work_assignments (employee_id, assignment_type, assigned_date, project_name, site_location, latitude, longitude, end_date, description, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
-       RETURNING *`,
-      [employeeId, assignmentType, assignedDate, projectName || null, siteLocation || null, latitude || null, longitude || null, endDate || null, description || null]
-    )
-
-    return res.status(201).json({
-      message: 'Work assignment created',
-      data: result.rows[0]
-    })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// END work assignment
-router.patch('/assignments/:assignmentId/end', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { assignmentId } = req.params
-    const endDate = req.body.endDate || new Date().toISOString().split('T')[0]
-
-    const result = await query(
-      `UPDATE work_assignments SET is_active = false, end_date = $1 WHERE id = $2 RETURNING *`,
-      [endDate, assignmentId]
-    )
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Assignment not found' })
-    }
-
-    return res.json({
-      message: 'Assignment ended',
-      data: result.rows[0]
-    })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
+//
+// Three routes lived here: list an employee's assignments, create one, and
+// end one. None resolved the employee or the assignment inside the caller's
+// tenant and none checked a role, so any signed-in identity could read,
+// create or end another employer's assignments by id. Created rows carried no
+// tenant at all. Nothing in the product called them; rosters and contracts in
+// /api/workforce are where an employee's place and hours are now recorded.
 
 // ===========================
-// CHECK-IN ENDPOINTS
+// CHECK-IN ENDPOINTS — removed
 // ===========================
-
-// RECORD check-in
-router.post('/checkins', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const {
-      employeeId,
-      checkInType,
-      checkInLatitude,
-      checkInLongitude,
-      siteLocation,
-      assignmentId,
-      faceVerified
-    } = req.body
-
-    if (!employeeId || !checkInType) {
-      return res.status(400).json({ error: 'Missing required fields' })
-    }
-
-    if (!['office', 'field'].includes(checkInType)) {
-      return res.status(400).json({ error: 'Invalid check-in type' })
-    }
-
-    const checkin = await queries.recordCheckIn(
-      employeeId,
-      checkInType,
-      checkInLatitude,
-      checkInLongitude,
-      siteLocation,
-      faceVerified || false,
-      assignmentId
-    )
-
-    return res.status(201).json({
-      message: 'Check-in recorded',
-      data: checkin
-    })
-  } catch (error: any) {
-    console.error('Check-in error:', error)
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// RECORD check-out
-router.post('/checkins/:checkinId/checkout', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { checkinId } = req.params
-    const { checkOutLatitude, checkOutLongitude } = req.body
-
-    const checkout = await queries.recordCheckOut(
-      checkinId,
-      checkOutLatitude,
-      checkOutLongitude
-    )
-
-    if (!checkout) {
-      return res.status(404).json({ error: 'Check-in not found' })
-    }
-
-    return res.json({
-      message: 'Check-out recorded',
-      data: checkout
-    })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// GET employee check-ins
-router.get('/employees/:employeeId/checkins', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { employeeId } = req.params
-    const days = parseInt(req.query.days as string) || 30
-
-    const checkins = await queries.getEmployeeCheckIns(employeeId, days)
-    return res.json({ data: checkins })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
-
-// GET today's check-ins for department
-router.get('/checkins/department/:departmentId', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { departmentId } = req.params
-    const today = new Date().toISOString().split('T')[0]
-
-    const result = await query(
-      `SELECT e.employee_id, e.first_name, e.last_name, cc.check_in_time, cc.check_out_time, cc.check_in_type, cc.face_verified
-       FROM employees e
-       LEFT JOIN corporate_checkins cc ON e.id = cc.employee_id AND DATE(cc.check_in_time) = $1
-       WHERE e.department_id = $2 AND e.is_currently_employed = true
-       ORDER BY e.first_name, e.last_name`,
-      [today, departmentId]
-    )
-
-    return res.json({ data: result.rows })
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message })
-  }
-})
+//
+// Four routes lived here: record a check-in, record a check-out, read an
+// employee's check-ins, and read a department's day. None checked a tenant
+// and none checked who was asking. The first took the employee id from the
+// request body and let the caller assert face verification, so any signed-in
+// identity on either platform could write a "face-verified" check-in against
+// any employee of any tenant; the reads returned another tenant's names and
+// hours to anybody who asked. Nothing in the product called them.
+//
+// Self-service check-in now lives at /api/workforce/my/*, which takes the
+// employee from the signed-in identity, the tenant from context and the time
+// from the server, and never lets the client say a face was verified.
 
 export default router

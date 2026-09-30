@@ -157,14 +157,25 @@ export function createTenantContext(
       }
     }
 
-    // Extract tenant ID from JWT
-    const tenantId = req.user.platformId
-    
-    // Validate tenant ID
-    if (!validateTenantId(tenantId)) {
+    // The tenant comes from the server-resolved context, never from the JWT.
+    //
+    // This used to read `req.user.platformId`, which is the platform — one
+    // value shared by every school and every company — and call it the tenant.
+    // Everything built on top of it was therefore wrong in the same direction:
+    // validateTenantParam compared a real tenant id against a platform id and
+    // rejected it, and verifyTenantOwnsResource passed for any tenant whose
+    // row carried that platform. Returning a failure here is correct: a caller
+    // that has not run resolveTenantContext has no tenant, and saying so is
+    // better than handing back a value that looks like one.
+    const resolved = (req as unknown as { ctx?: { tenantId?: string | null } }).ctx
+    const tenantId = resolved?.tenantId
+
+    if (!tenantId || !validateTenantId(tenantId)) {
       return {
         success: false,
-        error: `Invalid tenant ID format: ${tenantId}`
+        error:
+          'No tenant resolved for this request. resolveTenantContext must run before ' +
+          'tenant context is read.'
       }
     }
 

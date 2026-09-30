@@ -19,13 +19,13 @@ const getThresholdColor = (current: number, target: number, threshold?: string) 
   const percentage = (current / target) * 100
 
   if (threshold === 'critical') {
-    return percentage < 50 ? 'text-red-400' : 'text-orange-400'
+    return percentage < 50 ? 'text-red-700 dark:text-red-400' : 'text-orange-700 dark:text-orange-400'
   }
   if (threshold === 'warning') {
-    return percentage < 75 ? 'text-amber-400' : 'text-green-400'
+    return percentage < 75 ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'
   }
 
-  return percentage >= 90 ? 'text-green-400' : percentage >= 70 ? 'text-amber-400' : 'text-red-400'
+  return percentage >= 90 ? 'text-green-700 dark:text-green-400' : percentage >= 70 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400'
 }
 
 const getProgressColor = (current: number, target: number) => {
@@ -48,7 +48,7 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {title && <h3 className="text-lg font-bold text-white">{title}</h3>}
+      {title && <h3 className="text-lg font-bold text-primary">{title}</h3>}
 
       <div className={`grid ${colSpan} gap-4`}>
         {metrics.map((metric, idx) => {
@@ -62,17 +62,17 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: idx * 0.05 }}
-              className="p-4 rounded-lg bg-slate-700/30 border border-slate-700 space-y-3"
+              className="p-4 rounded-lg bg-sunken border border-subtle space-y-3"
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-400">{metric.label}</p>
+                  <p className="text-sm font-medium text-secondary">{metric.label}</p>
                   <p className={`text-2xl font-bold ${statusColor} transition-colors`}>
                     {metric.current}
                     {metric.unit && <span className="text-sm ml-1">{metric.unit}</span>}
                   </p>
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted">
                   Goal: {metric.target}
                   {metric.unit && metric.unit}
                 </p>
@@ -80,7 +80,7 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
 
               {/* Progress Bar */}
               <div className="space-y-2">
-                <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-sunken rounded-full h-2 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${percentage}%` }}
@@ -89,7 +89,7 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({
                   />
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-400">{percentage.toFixed(0)}%</span>
+                  <span className="text-xs text-secondary">{percentage.toFixed(0)}%</span>
                   <span className={`text-xs font-semibold ${statusColor}`}>
                     {percentage >= 90 ? '✓ On Track' : percentage >= 70 ? '⚠ Needs Attention' : '✕ Below Target'}
                   </span>

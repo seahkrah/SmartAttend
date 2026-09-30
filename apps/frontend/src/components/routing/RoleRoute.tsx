@@ -41,7 +41,7 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({
   if (token && !user && isLoading) {
     console.log('[RoleRoute] Loading user data, showing spinner');
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-900">
+      <div className="flex items-center justify-center min-h-screen bg-card">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
       </div>
     );
@@ -85,7 +85,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   if (token && !user && isLoading) {
     console.log('[ProtectedRoute] Waiting for user to load from token');
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-900">
+      <div className="flex items-center justify-center min-h-screen bg-card">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
       </div>
     );
@@ -129,9 +129,12 @@ export const PermissionRoute: React.FC<PermissionRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
+  // permissions is optional on the profile; an account that carries none is
+  // unauthorised rather than a crash.
+  const granted = user.permissions ?? [];
   const hasPermission = Array.isArray(requiredPermission)
-    ? requiredPermission.some((perm) => user.permissions.includes(perm))
-    : user.permissions.includes(requiredPermission);
+    ? requiredPermission.some((perm) => granted.includes(perm))
+    : granted.includes(requiredPermission);
 
   if (!hasPermission) {
     return <Navigate to={fallbackPath} replace />;

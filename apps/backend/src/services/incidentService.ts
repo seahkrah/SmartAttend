@@ -5,6 +5,10 @@
 
 import { query } from '../db/connection.js'
 import {
+  type IncidentVisibility,
+  shiftVisibility,
+} from '../auth/incidentVisibility.js'
+import {
   classifyError,
   shouldCreateIncident,
   type ErrorClassification,
@@ -17,6 +21,14 @@ import {
 
 export interface CreateIncidentInput {
   platformId: string
+  /**
+   * The tenant the incident arose in, where there is one.
+   *
+   * This is what makes an incident visible to that tenant's administrators
+   * and invisible to everyone else's. Left unset for platform-level events,
+   * which only a superadmin sees.
+   */
+  tenantId?: string | null
   errorCode?: string
   errorMessage: string
   errorType?: string
@@ -137,16 +149,19 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
           last_error_at,
           affected_users,
           affected_systems,
-          business_impact
+          business_impact,
+          affected_tenant_id
         ) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, 1, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $11, $12, $13) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'OPEN', $7, 1, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $11, $12, $13, $14) 
        RETURNING id`,
       [
         input.platformId,
         incidentType,
         title,
         input.errorMessage,
-        errorClassification.severity,
+        // The table's vocabulary is upper case; the classifier's is not, so
+        // every automatic incident failed the severity check and was lost.
+        String(errorClassification.severity).toUpperCase(),
         errorClassification.category,
         fingerprintId,
         input.detectedByUserId || null,
@@ -155,6 +170,7 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
         input.affectedUsers || 0,
         input.affectedSystems ? JSON.stringify(input.affectedSystems) : null,
         input.businessImpact || null,
+        input.tenantId ?? null,
       ]
     )
 
@@ -164,7 +180,7 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
     await logError(incidentId, input, errorClassification, fingerprintId)
 
     // Create timeline event
-    await createTimelineEvent(incidentId, 'created', null, 'open', 'Incident automatically created from error')
+    await createTimelineEvent(incidentId, 'created', null, 'OPEN', 'Incident automatically created from error')
 
     console.log(`[INCIDENT] Created incident ${incidentId} for error:`, input.errorMessage)
 
@@ -280,11 +296,11 @@ export async function updateIncident(
 
     if (input.status !== undefined) {
       updates.push(`status = $${paramIndex++}`)
-      values.push(input.status)
+      values.push(String(input.status).toUpperCase())
     }
     if (input.severity !== undefined) {
       updates.push(`severity = $${paramIndex++}`)
-      values.push(input.severity)
+      values.push(String(input.severity).toUpperCase())
     }
     if (input.acknowledgedByUserId !== undefined) {
       updates.push(`acknowledged_by_user_id = $${paramIndex++}`)
@@ -294,7 +310,10 @@ export async function updateIncident(
     if (input.resolvedByUserId !== undefined) {
       updates.push(`resolved_by_user_id = $${paramIndex++}`)
       updates.push(`resolved_at = CURRENT_TIMESTAMP`)
-      updates.push(`status = 'resolved'`)
+      // The status vocabulary is upper case; 'resolved' failed the check
+      // constraint, so this path could never succeed. An explicit status in
+      // the same update would assign the column twice, so it is left to that.
+      if (input.status === undefined) updates.push(`status = 'RESOLVED'`)
       values.push(input.resolvedByUserId)
     }
     if (input.rootCause !== undefined) {
@@ -332,11 +351,19 @@ export async function updateIncident(
 /**
  * Get incident by ID
  */
-export async function getIncident(incidentId: string): Promise<any> {
+export async function getIncident(
+  incidentId: string,
+  visibility: IncidentVisibility
+): Promise<any> {
   try {
-    const result = await query('SELECT * FROM incidents WHERE id = $1', [
-      incidentId,
-    ])
+    if (!visibility.any) return null
+    const scoped = shiftVisibility(visibility, 2)
+    // An incident outside the caller's view reads as absent, so an id cannot
+    // be probed for existence.
+    const result = await query(
+      `SELECT * FROM incidents WHERE id = $1 AND (${scoped.sql})`,
+      [incidentId, ...scoped.params]
+    )
     return result.rows[0] || null
   } catch (error) {
     console.error('Error retrieving incident:', error)
@@ -347,13 +374,15 @@ export async function getIncident(incidentId: string): Promise<any> {
 /**
  * Get open incidents for platform
  */
-export async function getOpenIncidents(platformId: string): Promise<any[]> {
+export async function getOpenIncidents(visibility: IncidentVisibility): Promise<any[]> {
   try {
+    if (!visibility.any) return []
     const result = await query(
       `SELECT * FROM incidents 
-       WHERE platform_id = $1 AND status IN ('open', 'investigating', 'escalated') 
-       ORDER BY severity DESC, created_at DESC`,
-      [platformId]
+       WHERE (${visibility.sql}) AND status IN ('OPEN', 'INVESTIGATING', 'CONTAINED')
+       ORDER BY CASE severity WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END DESC,
+                created_at DESC`,
+      visibility.params
     )
     return result.rows
   } catch (error) {
@@ -365,13 +394,14 @@ export async function getOpenIncidents(platformId: string): Promise<any[]> {
 /**
  * Get critical open incidents
  */
-export async function getCriticalIncidents(platformId: string): Promise<any[]> {
+export async function getCriticalIncidents(visibility: IncidentVisibility): Promise<any[]> {
   try {
+    if (!visibility.any) return []
     const result = await query(
       `SELECT * FROM incidents 
-       WHERE platform_id = $1 AND status IN ('open', 'investigating') AND severity = 'critical'
+       WHERE (${visibility.sql}) AND status IN ('OPEN', 'INVESTIGATING', 'CONTAINED') AND severity = 'CRITICAL'
        ORDER BY created_at DESC`,
-      [platformId]
+      visibility.params
     )
     return result.rows
   } catch (error) {
@@ -383,20 +413,26 @@ export async function getCriticalIncidents(platformId: string): Promise<any[]> {
 /**
  * Get incident statistics for platform
  */
-export async function getIncidentStatistics(platformId: string): Promise<any> {
+export async function getIncidentStatistics(visibility: IncidentVisibility): Promise<any> {
   try {
+    if (!visibility.any) {
+      return {
+        total_incidents: 0, critical_count: 0, high_count: 0, medium_count: 0,
+        open_count: 0, resolved_count: 0, avg_resolution_time_minutes: null,
+      }
+    }
     const result = await query(
       `SELECT 
-         COUNT(*) as total_incidents,
-         SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical_count,
-         SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) as high_count,
-         SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) as medium_count,
-         SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_count,
-         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count,
-         AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60) as avg_resolution_time_minutes
+         COUNT(*)::int as total_incidents,
+         COUNT(*) FILTER (WHERE severity = 'CRITICAL')::int as critical_count,
+         COUNT(*) FILTER (WHERE severity = 'HIGH')::int as high_count,
+         COUNT(*) FILTER (WHERE severity = 'MEDIUM')::int as medium_count,
+         SUM(CASE WHEN status IN ('OPEN', 'INVESTIGATING', 'CONTAINED') THEN 1 ELSE 0 END)::int as open_count,
+         SUM(CASE WHEN status IN ('RESOLVED', 'CLOSED') THEN 1 ELSE 0 END)::int as resolved_count,
+         ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60)::numeric, 1) as avg_resolution_time_minutes
        FROM incidents 
-       WHERE platform_id = $1`,
-      [platformId]
+       WHERE (${visibility.sql})`,
+      visibility.params
     )
     return result.rows[0]
   } catch (error) {

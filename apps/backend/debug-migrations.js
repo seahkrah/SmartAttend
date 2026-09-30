@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const client = new Client({ 
-  connectionString: 'postgresql://postgres:seahkrah@localhost:5432/smartattend' 
+  connectionString: 'postgresql://postgres:seahkrah@localhost:5432/jjelotech' 
 });
 
 await client.connect();
@@ -16,7 +16,7 @@ try {
     '008_5_immutability_triggers.sql'
   ];
   
-  const migrationsDir = 'c:\\smartattend\\apps\\backend\\src\\db\\migrations';
+  const migrationsDir = 'c:\\jjelotech\\apps\\backend\\src\\db\\migrations';
   
   for (const migFile of stageMigrations) {
     console.log(`\n=== Testing ${migFile} ===`);

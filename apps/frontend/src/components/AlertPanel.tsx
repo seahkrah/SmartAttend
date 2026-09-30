@@ -19,35 +19,35 @@ interface AlertPanelProps {
 
 const alertConfig = {
   critical: {
-    bg: 'bg-red-900/20',
+    bg: 'bg-red-50 dark:bg-red-900/20',
     border: 'border-red-600',
     icon: '🔴',
-    text: 'text-red-300',
-    title: 'text-red-200',
+    text: 'text-red-700 dark:text-red-300',
+    title: 'text-red-700 dark:text-red-200',
     action: 'bg-red-600 hover:bg-red-700'
   },
   warning: {
-    bg: 'bg-amber-900/20',
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
     border: 'border-amber-600',
     icon: '🟠',
-    text: 'text-amber-300',
-    title: 'text-amber-200',
+    text: 'text-amber-700 dark:text-amber-300',
+    title: 'text-amber-700 dark:text-amber-200',
     action: 'bg-amber-600 hover:bg-amber-700'
   },
   info: {
-    bg: 'bg-blue-900/20',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
     border: 'border-blue-600',
     icon: '🔵',
-    text: 'text-blue-300',
-    title: 'text-blue-200',
+    text: 'text-blue-700 dark:text-blue-300',
+    title: 'text-blue-700 dark:text-blue-200',
     action: 'bg-blue-600 hover:bg-blue-700'
   },
   success: {
-    bg: 'bg-green-900/20',
+    bg: 'bg-green-50 dark:bg-green-900/20',
     border: 'border-green-600',
     icon: '🟢',
-    text: 'text-green-300',
-    title: 'text-green-200',
+    text: 'text-green-700 dark:text-green-300',
+    title: 'text-green-700 dark:text-green-200',
     action: 'bg-green-600 hover:bg-green-700'
   }
 }
@@ -60,17 +60,17 @@ const AlertPanel: React.FC<AlertPanelProps> = ({ alerts, onDismiss }) => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="p-6 rounded-xl bg-green-900/20 border border-green-600 text-center"
+        className="p-6 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-600 text-center"
       >
-        <p className="text-green-300 font-semibold">✅ All systems operating normally</p>
-        <p className="text-green-400/60 text-sm mt-1">No active alerts</p>
+        <p className="text-green-700 dark:text-green-300 font-semibold">✅ All systems operating normally</p>
+        <p className="text-green-700 dark:text-green-400/60 text-sm mt-1">No active alerts</p>
       </motion.div>
     )
   }
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider px-2">
+      <h3 className="text-sm font-bold text-secondary uppercase tracking-wider px-2">
         🔔 Alerts ({activeAlerts.length})
       </h3>
       {activeAlerts.map((alert, idx) => {
@@ -89,14 +89,14 @@ const AlertPanel: React.FC<AlertPanelProps> = ({ alerts, onDismiss }) => {
                 <div className="flex-1">
                   <p className={`font-semibold ${config.title}`}>{alert.title}</p>
                   <p className={`text-sm ${config.text}`}>{alert.message}</p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     {alert.timestamp.toLocaleTimeString()}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => onDismiss(alert.id)}
-                className="text-slate-400 hover:text-white transition-colors flex-shrink-0"
+                className="text-secondary hover:text-primary transition-colors flex-shrink-0"
               >
                 ✕
               </button>
@@ -105,7 +105,7 @@ const AlertPanel: React.FC<AlertPanelProps> = ({ alerts, onDismiss }) => {
             {alert.actionLabel && alert.onAction && (
               <button
                 onClick={alert.onAction}
-                className={`w-full px-3 py-2 rounded text-sm font-semibold text-white transition-colors ${config.action}`}
+                className={`w-full px-3 py-2 rounded text-sm font-semibold text-primary transition-colors ${config.action}`}
               >
                 {alert.actionLabel}
               </button>

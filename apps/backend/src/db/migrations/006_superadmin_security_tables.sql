@@ -3,20 +3,32 @@
 -- Features: MFA, sessions, IP allowlisting, rate limiting, confirmation tokens
 
 -- Superadmin Sessions Table
-CREATE TABLE IF NOT EXISTS superadmin_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  session_token_hash VARCHAR(255) NOT NULL UNIQUE,
-  ip_address VARCHAR(45),
-  user_agent TEXT,
-  mfa_verified_at TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at TIMESTAMP NOT NULL,
-  last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  is_active BOOLEAN DEFAULT true,
-  terminated_at TIMESTAMP,
-  terminated_reason VARCHAR(255)
-);
+-- superadmin_sessions is created by 006_infrastructure_control_plane.sql,
+-- which runs first. CREATE TABLE IF NOT EXISTS therefore silently skipped this
+-- definition and left the security columns missing, so the indexes below and
+-- superadminSecurityService both failed against the real table.
+-- Reconcile instead of redefining: add what the security layer needs.
+-- superadmin_sessions is already created by 006_infrastructure_control_plane.sql. CREATE TABLE IF NOT
+-- EXISTS would skip this definition silently and leave the columns below
+-- missing, so add them to the existing table instead.
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS session_token_hash VARCHAR(255);
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45);
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS mfa_verified_at TIMESTAMPTZ;
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS terminated_at TIMESTAMPTZ;
+ALTER TABLE superadmin_sessions ADD COLUMN IF NOT EXISTS terminated_reason VARCHAR(255);
+
+-- The infrastructure migration names the owning user superadmin_user_id and
+-- the security layer names it user_id. Keep both populated so neither the
+-- service nor the existing tests break, with user_id backfilled from it.
+UPDATE superadmin_sessions SET user_id = superadmin_user_id WHERE user_id IS NULL;
+
 
 CREATE INDEX IF NOT EXISTS idx_superadmin_sessions_user_active ON superadmin_sessions(user_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_superadmin_sessions_expires ON superadmin_sessions(expires_at);
@@ -133,7 +145,9 @@ FOR EACH ROW
 EXECUTE FUNCTION prevent_security_log_modification();
 
 -- Create indices for faster queries
-CREATE INDEX idx_superadmin_sessions_lookup ON superadmin_sessions(user_id, is_active, expires_at);
-CREATE INDEX idx_mfa_challenges_active ON mfa_challenges(user_id, verified_at) WHERE verified_at IS NULL;
-CREATE INDEX idx_ip_allowlist_check ON ip_allowlist(user_id, ip_address, is_active) WHERE is_active = true;
-CREATE INDEX idx_rate_limits_check ON rate_limits(user_id, action, reset_at) WHERE reset_at > CURRENT_TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_superadmin_sessions_lookup ON superadmin_sessions(user_id, is_active, expires_at);
+CREATE INDEX IF NOT EXISTS idx_mfa_challenges_active ON mfa_challenges(user_id, verified_at) WHERE verified_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_ip_allowlist_check ON ip_allowlist(user_id, ip_address, is_active) WHERE is_active = true;
+-- No WHERE clause: an index predicate must be IMMUTABLE, and CURRENT_TIMESTAMP
+-- is not. A plain index on the same columns serves the same lookups.
+CREATE INDEX IF NOT EXISTS idx_rate_limits_check ON rate_limits(user_id, action, reset_at);

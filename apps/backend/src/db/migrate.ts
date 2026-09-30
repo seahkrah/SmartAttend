@@ -7,6 +7,7 @@
 
 import { query } from '../db/connection.js'
 import pool from '../db/connection.js'
+import { splitStatements } from './splitStatements.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -49,8 +50,12 @@ async function getExecutedMigrations(): Promise<MigrationRecord[]> {
 async function getPendingMigrations(executedMigrations: MigrationRecord[]): Promise<string[]> {
   const migrationsDir = path.join(__dirname, 'migrations')
 
-  // Get all SQL files
-  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
+  // Superseded files are kept in the tree for reference but must never run:
+  // they sort after the migration that replaced them (…_OLD.sql > ….sql), so
+  // executing them re-applies an older schema over the current one.
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter(f => f.endsWith('.sql') && !f.endsWith('_OLD.sql'))
 
   // Filter out already executed
   const executedNames = new Set(executedMigrations.map(m => m.name))
@@ -67,31 +72,35 @@ async function executeMigration(filename: string): Promise<void> {
 
   console.log(`\n📝 Executing migration: ${filename}`)
 
+  const sql = fs.readFileSync(filepath, 'utf-8')
+
+  // Semicolons inside dollar-quoted bodies, strings and comments are not
+  // statement terminators — see splitStatements.
+  const statements = splitStatements(sql)
+
+  // One transaction per migration: a failure half way through must not leave
+  // the schema partly changed but the migration unrecorded, which is what
+  // makes a failed run impossible to retry cleanly.
+  const client = await pool.connect()
   try {
-    // Read migration file
-    const sql = fs.readFileSync(filepath, 'utf-8')
+    await client.query('BEGIN')
 
-    // Split by semicolons and filter empty statements
-    const statements = sql
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-
-    // Execute each statement
     for (const statement of statements) {
-      await query(statement)
+      await client.query(statement)
     }
 
-    // Record migration
-    await query(
-      `INSERT INTO migrations (name) VALUES ($1)`,
-      [filename]
-    )
+    await client.query(`INSERT INTO migrations (name) VALUES ($1)`, [filename])
+    await client.query('COMMIT')
 
-    console.log(`✅ Successfully executed: ${filename}`)
+    console.log(`✅ Successfully executed: ${filename} (${statements.length} statements)`)
   } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {
+      /* the connection may already be unusable */
+    })
     console.error(`❌ Error executing ${filename}:`, error.message)
     throw error
+  } finally {
+    client.release()
   }
 }
 

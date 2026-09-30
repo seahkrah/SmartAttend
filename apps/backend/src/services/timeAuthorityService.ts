@@ -179,7 +179,7 @@ export function extractClientTimestamp(req: Request): Date | null {
  */
 function generateChecksum(data: any): string {
   const json = JSON.stringify(data, Object.keys(data).sort())
-  return crypto.createHash('sha256').update(json).hexdigest()
+  return crypto.createHash('sha256').update(json).digest('hex')
 }
 
 /**
@@ -318,7 +318,8 @@ function classifyDriftCategory(driftSeconds: number): DriftCategory {
 function determineAction(
   driftSeconds: number,
   category: DriftCategory
-): { actionTaken: ActionTaken; isAccepted: boolean; incidentSeverity?: string } {
+): { actionTaken: ActionTaken; isAccepted: boolean
+     incidentSeverity?: 'WARNING' | 'URGENT' | 'CRITICAL' } {
   const absDrift = Math.abs(driftSeconds)
 
   if (category === 'ACCEPTABLE') {
@@ -556,15 +557,19 @@ export async function getTenantClockDriftStats(tenantId: string): Promise<any> {
   try {
     const result = await query(
       `SELECT 
-        COUNT(*) as total_drift_events,
-        COUNT(*) FILTER (WHERE drift_category = 'CRITICAL') as critical_count,
-        COUNT(*) FILTER (WHERE drift_category = 'BLOCKED') as blocked_count,
-        COUNT(*) FILTER (WHERE drift_category = 'WARNING') as warning_count,
-        COUNT(*) FILTER (WHERE drift_category = 'ACCEPTABLE') as acceptable_count,
+        -- ::int because pg returns bigint as a string, and a caller adding
+        -- these together would concatenate them instead.
+        COUNT(*)::int as total_drift_events,
+        COUNT(*) FILTER (WHERE drift_category = 'CRITICAL')::int as critical_count,
+        COUNT(*) FILTER (WHERE drift_category = 'BLOCKED')::int as blocked_count,
+        COUNT(*) FILTER (WHERE drift_category = 'WARNING')::int as warning_count,
+        COUNT(*) FILTER (WHERE drift_category = 'ACCEPTABLE')::int as acceptable_count,
         AVG(ABS(drift_seconds)) as avg_drift_seconds,
         MAX(ABS(drift_seconds)) as max_drift_seconds
-       FROM drift_audit_log 
-       WHERE user_id IN (SELECT id FROM users WHERE tenant_id = $1)`,
+       FROM drift_audit_log
+        -- users has no tenant_id: a user belongs to a tenant through the
+        -- membership view, not through a column on their own row.
+        WHERE user_id IN (SELECT user_id FROM user_tenant_memberships WHERE tenant_id = $1)`,
       [tenantId]
     )
 
@@ -578,10 +583,16 @@ export async function getTenantClockDriftStats(tenantId: string): Promise<any> {
 export async function getCriticalDriftEvents(limit: number = 100): Promise<any[]> {
   try {
     const result = await query(
-      `SELECT * FROM drift_audit_log 
-       WHERE drift_category IN ('BLOCKED', 'CRITICAL')
-       ORDER BY created_at DESC 
-       LIMIT $1`,
+      `SELECT d.*, r.action AS review_action, r.notes AS review_notes,
+              r.reviewed_by, r.created_at AS reviewed_at
+         FROM drift_audit_log d
+         LEFT JOIN LATERAL (
+           SELECT action, notes, reviewed_by, created_at FROM drift_reviews
+            WHERE drift_event_id = d.id ORDER BY created_at DESC LIMIT 1
+         ) r ON TRUE
+        WHERE d.drift_category IN ('BLOCKED', 'CRITICAL')
+        ORDER BY d.created_at DESC
+        LIMIT $1`,
       [limit]
     )
     return result.rows
@@ -650,7 +661,11 @@ export function shouldBlockAttendanceAction(
   const severity = classifyDriftSeverity(driftSeconds)
   const ATTENDANCE_DRIFT_THRESHOLD_SECONDS = 300 // 5 minutes
 
-  if (absDrift > ATTENDANCE_DRIFT_THRESHOLD_SECONDS && actionType?.includes('attendance')) {
+  // Case-insensitive: the obvious action names a caller would pass are
+  // ATTENDANCE_MARK and attendance_checkin, and matching only the lowercase
+  // spelling would let the uppercase one through the drift block silently.
+  if (absDrift > ATTENDANCE_DRIFT_THRESHOLD_SECONDS
+      && actionType?.toLowerCase().includes('attendance')) {
     return {
       shouldBlock: true,
       reason: `Clock drift exceeds threshold: ${absDrift}s (max ${ATTENDANCE_DRIFT_THRESHOLD_SECONDS}s)`,

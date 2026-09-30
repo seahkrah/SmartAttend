@@ -70,7 +70,7 @@ function DataTable<T extends { id: string }>({
 
   return (
     <div className="space-y-4">
-      {title && <h3 className="text-lg font-bold text-white">{title}</h3>}
+      {title && <h3 className="text-lg font-bold text-primary">{title}</h3>}
 
       {/* Search Bar */}
       <div className="relative">
@@ -79,22 +79,22 @@ function DataTable<T extends { id: string }>({
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder={searchPlaceholder}
-          className="w-full px-4 py-2 pl-10 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+          className="w-full px-4 py-2 pl-10 bg-sunken border border-strong rounded-lg text-primary placeholder:text-muted focus:outline-none focus:border-blue-500 transition-colors"
         />
-        <span className="absolute left-3 top-2.5 text-slate-400">🔍</span>
+        <span className="absolute left-3 top-2.5 text-secondary">🔍</span>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-slate-700 bg-slate-800/50">
+      <div className="overflow-x-auto rounded-lg border border-subtle bg-sunken">
         <table className="w-full">
-          <thead className="bg-slate-700/50 border-b border-slate-700">
+          <thead className="bg-sunken border-b border-subtle">
             <tr>
               {columns.map(col => (
                 <th
                   key={String(col.key)}
                   onClick={() => col.sortable && toggleSort(col.key)}
-                  className={`px-4 py-3 text-left text-sm font-semibold text-slate-300 ${
-                    col.sortable ? 'cursor-pointer hover:bg-slate-600/50 transition-colors' : ''
+                  className={`px-4 py-3 text-left text-sm font-semibold text-secondary ${
+                    col.sortable ? 'cursor-pointer hover:bg-raised transition-colors' : ''
                   }`}
                   style={{ width: col.width }}
                 >
@@ -113,7 +113,7 @@ function DataTable<T extends { id: string }>({
           <tbody>
             {filteredData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-secondary">
                   No data found {searchTerm && `for "${searchTerm}"`}
                 </td>
               </tr>
@@ -125,14 +125,14 @@ function DataTable<T extends { id: string }>({
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.02 }}
                   onClick={() => onRowClick?.(row)}
-                  className={`border-t border-slate-700 ${
-                    rowHoverEffect ? 'hover:bg-slate-700/30 transition-colors' : ''
+                  className={`border-t border-subtle ${
+                    rowHoverEffect ? 'hover:bg-sunken transition-colors' : ''
                   } ${onRowClick ? 'cursor-pointer' : ''}`}
                 >
                   {columns.map(col => (
                     <td
                       key={String(col.key)}
-                      className="px-4 py-3 text-sm text-slate-300"
+                      className="px-4 py-3 text-sm text-secondary"
                       style={{ width: col.width }}
                     >
                       {col.render
@@ -148,15 +148,15 @@ function DataTable<T extends { id: string }>({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-slate-400">
+      <div className="flex items-center justify-between text-xs text-secondary">
         <span>
-          Showing <span className="font-semibold text-slate-300">{filteredData.length}</span> of{' '}
-          <span className="font-semibold text-slate-300">{data.length}</span>
+          Showing <span className="font-semibold text-secondary">{filteredData.length}</span> of{' '}
+          <span className="font-semibold text-secondary">{data.length}</span>
         </span>
         {searchTerm && (
           <button
             onClick={() => setSearchTerm('')}
-            className="text-blue-400 hover:text-blue-300 transition-colors"
+            className="text-blue-700 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
           >
             Clear search
           </button>

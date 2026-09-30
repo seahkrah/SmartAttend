@@ -8,13 +8,19 @@ import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 const { Pool } = pkg;
 
-const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  database: 'smartattend',
-  user: 'postgres',
-  password: 'seahkrah',
-});
+// These accounts share a published password. They must never exist in a
+// real deployment.
+if (process.env.NODE_ENV === 'production') {
+  console.error('Refusing to create test users with a shared password in production.');
+  process.exit(1);
+}
+
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is not set. Export it (or source your .env) before running this script.');
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function createTestUsers() {
   try {

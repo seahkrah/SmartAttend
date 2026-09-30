@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS attendance_reason_codes (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create index for lookups
+-- CREATE INDEX IF NOT EXISTS for lookups
 CREATE INDEX IF NOT EXISTS idx_reason_codes_category ON attendance_reason_codes(category);
 
 -- Add sample reason codes (will be inserted via application)
@@ -96,7 +96,10 @@ CREATE INDEX IF NOT EXISTS idx_idempotency_source
 ALTER TABLE IF EXISTS clock_drift_log
 ADD COLUMN IF NOT EXISTS client_device_id VARCHAR(100),
 ADD COLUMN IF NOT EXISTS is_flagged_for_review BOOLEAN DEFAULT FALSE,
-ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) DEFAULT 'pending';
+ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) DEFAULT 'pending',
+-- Needed by attendance_clock_drift_incidents below, which selects it. The
+-- table as created in 006 has no link to the attendance record it concerns.
+ADD COLUMN IF NOT EXISTS attendance_record_id UUID;
 
 CREATE INDEX IF NOT EXISTS idx_drift_flagged 
   ON clock_drift_log(is_flagged_for_review) 
@@ -197,23 +200,27 @@ WHERE ata.status = 'REJECTED'
 ORDER BY ata.attempted_at DESC;
 
 -- View: Duplicate marking patterns
+-- school_attendance has no course_id: it reaches a course through
+-- schedule_id -> class_schedules.course_id. Its timestamp is marked_at, not
+-- created_at. Both were wrong here, so this view never created.
 CREATE OR REPLACE VIEW attendance_duplicate_patterns AS
 SELECT
   sa.student_id,
-  sa.course_id,
+  cs.course_id,
   sa.attendance_date,
   COUNT(sa.id) as mark_count,
   STRING_AGG(sa.id::TEXT, ',') as record_ids,
-  MIN(sa.created_at) as first_mark_time,
-  MAX(sa.created_at) as last_mark_time,
-  EXTRACT(EPOCH FROM (MAX(sa.created_at) - MIN(sa.created_at))) as seconds_between,
+  MIN(sa.marked_at) as first_mark_time,
+  MAX(sa.marked_at) as last_mark_time,
+  EXTRACT(EPOCH FROM (MAX(sa.marked_at) - MIN(sa.marked_at))) as seconds_between,
   CASE 
-    WHEN EXTRACT(EPOCH FROM (MAX(sa.created_at) - MIN(sa.created_at))) <= 120 THEN 'critical'
-    WHEN EXTRACT(EPOCH FROM (MAX(sa.created_at) - MIN(sa.created_at))) <= 600 THEN 'high'
+    WHEN EXTRACT(EPOCH FROM (MAX(sa.marked_at) - MIN(sa.marked_at))) <= 120 THEN 'critical'
+    WHEN EXTRACT(EPOCH FROM (MAX(sa.marked_at) - MIN(sa.marked_at))) <= 600 THEN 'high'
     ELSE 'medium'
   END as severity
 FROM school_attendance sa
-GROUP BY sa.student_id, sa.course_id, sa.attendance_date
+JOIN class_schedules cs ON sa.schedule_id = cs.id
+GROUP BY sa.student_id, cs.course_id, sa.attendance_date
 HAVING COUNT(sa.id) > 1
 ORDER BY seconds_between ASC;
 

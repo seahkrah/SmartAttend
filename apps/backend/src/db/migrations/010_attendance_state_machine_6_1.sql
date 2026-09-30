@@ -22,7 +22,7 @@ ADD COLUMN IF NOT EXISTS state_changed_at TIMESTAMP;
 ALTER TABLE IF EXISTS school_attendance 
 ADD COLUMN IF NOT EXISTS state_audit_notes TEXT;
 
--- Create index for state queries
+-- CREATE INDEX IF NOT EXISTS for state queries
 CREATE INDEX IF NOT EXISTS idx_school_attendance_state ON school_attendance(attendance_state);
 CREATE INDEX IF NOT EXISTS idx_school_attendance_date_state ON school_attendance(attendance_date, attendance_state);
 CREATE INDEX IF NOT EXISTS idx_school_attendance_student_state ON school_attendance(student_id, attendance_state);

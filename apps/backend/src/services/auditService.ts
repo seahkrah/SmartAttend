@@ -72,6 +72,18 @@ export async function logAuditEntry(
   stateCapture?: {
     beforeState?: any
     afterState?: any
+    /**
+     * What actually happened. The entry is written once, after the operation,
+     * carrying its real outcome.
+     *
+     * This used to be hardcoded to SUCCESS, which meant the audit log could
+     * only ever say that everything worked — and a log that cannot record a
+     * failure is not an audit log, it is a press release. The companion
+     * updateAuditEntry() was removed to enforce immutability, which left no
+     * way at all to record a failure until this parameter existed.
+     */
+    result?: 'SUCCESS' | 'FAILURE' | 'DENIED' | 'DRY_RUN'
+    errorMessage?: string | null
   }
 ): Promise<string> {
   const finalContext = { ...context, ...overrides }
@@ -79,10 +91,10 @@ export async function logAuditEntry(
   try {
     const result = await query(
       `INSERT INTO superadmin_audit_log 
-       (actor_id, actor_platform, action_type, action_scope, target_entity_type, target_entity_id, 
-        justification, confirmation_token, ip_address, user_agent, request_id, result, 
-        before_state, after_state, actor_role, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+       (actor_id, actor_platform, action_type, action_scope, target_entity_type, target_entity_id,
+        justification, confirmation_token, ip_address, user_agent, request_id, result,
+        before_state, after_state, actor_role, error_message, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)
        RETURNING id`,
       [
         finalContext.actorId,
@@ -96,10 +108,11 @@ export async function logAuditEntry(
         finalContext.ipAddress || null,
         finalContext.userAgent || null,
         finalContext.requestId,
-        finalContext.dryRun ? 'DRY_RUN' : 'SUCCESS',
+        finalContext.dryRun ? 'DRY_RUN' : (stateCapture?.result ?? 'SUCCESS'),
         stateCapture?.beforeState ? JSON.stringify(stateCapture.beforeState) : null,
         stateCapture?.afterState ? JSON.stringify(stateCapture.afterState) : null,
-        'superadmin'
+        'superadmin',
+        stateCapture?.errorMessage ?? null
       ]
     )
 
@@ -213,7 +226,7 @@ export async function getAuditLogs(
     paramNum++
   }
 
-  q += ` ORDER BY timestamp DESC LIMIT $${paramNum} OFFSET $${paramNum + 1}`
+  q += ` ORDER BY created_at DESC LIMIT $${paramNum} OFFSET $${paramNum + 1}`
   params.push(filters?.limit || 100, filters?.offset || 0)
 
   const result = await query(q, params)

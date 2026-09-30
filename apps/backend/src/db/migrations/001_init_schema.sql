@@ -1,5 +1,5 @@
 -- ===========================
--- SMARTATTEND DATABASE SCHEMA
+-- JJELOTECH DATABASE SCHEMA
 -- ===========================
 
 -- Enable UUID extension

@@ -31,7 +31,7 @@ ALTER TABLE corporate_departments
 ADD CONSTRAINT corp_dept_platform_id_name_unique 
 UNIQUE(platform_id, name);
 
--- Step 6: Create index for tenant queries
-CREATE INDEX idx_corporate_departments_platform_id ON corporate_departments(platform_id);
+-- Step 6: CREATE INDEX IF NOT EXISTS for tenant queries
+CREATE INDEX IF NOT EXISTS idx_corporate_departments_platform_id ON corporate_departments(platform_id);
 
 -- Verification: SELECT COUNT(*) FROM corporate_departments WHERE platform_id IS NULL; -- Expected: 0

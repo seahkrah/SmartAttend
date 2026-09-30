@@ -235,7 +235,10 @@ CREATE TABLE IF NOT EXISTS session_invalidation_log (
 -- ===========================
 
 -- View: All pending incident approvals
-CREATE OR REPLACE VIEW superadmin_all_pending_approvals AS
+-- Renamed from superadmin_all_pending_approvals: this view lists open
+-- incidents, not approvals. Under the old name it clobbered the approvals
+-- view created in 004, which authService.ts queries by requested_at.
+CREATE OR REPLACE VIEW superadmin_open_incidents AS
 SELECT 
   i.id,
   i.incident_number,
@@ -249,8 +252,10 @@ LEFT JOIN incident_affected_entities iae ON i.id = iae.incident_id
 WHERE i.status IN ('OPEN', 'INVESTIGATING')
 GROUP BY i.id, i.incident_number, i.title, i.severity, i.status, i.assigned_superadmin_id;
 
--- View: User statistics for dashboard
-CREATE OR REPLACE VIEW superadmin_user_statistics AS
+-- View: system-wide user totals for the dashboard.
+-- Renamed from superadmin_user_statistics, which 004 defines per-platform and
+-- authService.ts queries by platform_name.
+CREATE OR REPLACE VIEW superadmin_user_totals AS
 SELECT 
   'system' as platform,
   COUNT(DISTINCT u.id) as total_users,

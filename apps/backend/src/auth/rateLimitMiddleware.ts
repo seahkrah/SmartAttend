@@ -111,8 +111,12 @@ export async function checkRateLimitDB(
 
     // Count recent actions of this type by this actor
     const countResult = await query(
+      // The column is created_at; `timestamp` was never a column on this
+      // table, so this count has always thrown and the caller has always
+      // fallen through to its fail-open branch. The rate limit has therefore
+      // never limited anything.
       `SELECT COUNT(*) as recent_count FROM superadmin_audit_log
-       WHERE actor_id = $1 AND action_type = $2 AND timestamp > $3`,
+       WHERE actor_id = $1 AND action_type = $2 AND created_at > $3`,
       [actorId, actionType, windowStart.toISOString()]
     )
 

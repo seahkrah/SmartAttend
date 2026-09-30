@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-const pool = new Pool({ connectionString: 'postgresql://postgres:seahkrah@localhost:5432/smartattend' });
+const pool = new Pool({ connectionString: 'postgresql://postgres:seahkrah@localhost:5432/jjelotech' });
 
 const emails = ['joyneufville@gmail.com', 'anyema@gmail.com'];
 const newPassword = 'Student123!';

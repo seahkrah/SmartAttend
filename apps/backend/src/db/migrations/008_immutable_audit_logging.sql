@@ -6,24 +6,30 @@
 -- A. AUDIT LOGS TABLE
 -- ===========================
 
+-- audit_logs is already created by 001/002 with a different shape
+-- (platform_id, user_id, action, entity_type, old_values, new_values).
+-- CREATE TABLE IF NOT EXISTS therefore skipped this definition silently and
+-- the indexes below failed on the missing columns.
+-- Add the immutable-audit columns to whichever table is present instead.
 CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  actor_role VARCHAR(100),
-  action_type VARCHAR(100),
-  action_scope VARCHAR(50),
-  resource_type VARCHAR(100),
-  resource_id UUID,
-  before_state JSONB,
-  after_state JSONB,
-  justification TEXT,
-  request_id VARCHAR(255),
-  ip_address INET,
-  user_agent VARCHAR(500),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  is_immutable BOOLEAN DEFAULT TRUE,
-  checksum VARCHAR(64)
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4()
 );
+
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_id UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_role VARCHAR(100);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS action_type VARCHAR(100);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS action_scope VARCHAR(50);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_type VARCHAR(100);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_id UUID;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS before_state JSONB;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS after_state JSONB;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS justification TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS request_id VARCHAR(255);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address INET;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent VARCHAR(500);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS is_immutable BOOLEAN DEFAULT TRUE;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS checksum VARCHAR(64);
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type ON audit_logs(action_type);

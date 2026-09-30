@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 
 const client = new Client({
-  connectionString: 'postgresql://postgres:seahkrah@localhost:5432/smartattend'
+  connectionString: 'postgresql://postgres:seahkrah@localhost:5432/jjelotech'
 });
 
 await client.connect();

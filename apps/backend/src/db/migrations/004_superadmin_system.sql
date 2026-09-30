@@ -145,7 +145,7 @@ BEGIN
   -- Check if superadmin user already exists
   SELECT id INTO v_superadmin_user_id 
   FROM users 
-  WHERE email = 'superadmin@smartattend.local' 
+  WHERE email = 'superadmin@jjelotech.local' 
   AND platform_id = v_system_platform_id
   LIMIT 1;
   
@@ -161,10 +161,10 @@ BEGIN
     )
     VALUES (
       v_system_platform_id,
-      'superadmin@smartattend.local',
+      'superadmin@jjelotech.local',
       'System Superadmin',
       v_superadmin_role_id,
-      -- Default password hash (for 'smartattend123' - should be changed in production)
+      -- Default password hash (for 'jjelotech123' - should be changed in production)
       -- This uses bcrypt: $2b$10$... format
       '$2b$10$Z8z7QqKVq8v8Z8z7QqKVq.EvHvHvEvHvEvHvEvHvEvHvEvHvEvHv', 
       true

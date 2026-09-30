@@ -11,9 +11,38 @@
 
 import { query } from '../db/connection.js'
 import { Request } from 'express'
+import type { ResolvedTenantContext, TenantRequest } from './tenantContextMiddleware.js'
 
 export type UserRole = 'superadmin' | 'tenant_admin' | 'user'
 export type AuditScope = 'GLOBAL' | 'TENANT' | 'USER'
+
+/**
+ * Maps a real role name onto the three audit access levels.
+ *
+ * The rules table is keyed on 'tenant_admin', a name no role in this system
+ * actually has. Every administrator therefore looked up an undefined rule and
+ * the access check threw — which failed closed, but meant the audit API was
+ * unusable for anyone but a superadmin.
+ *
+ * Anything unrecognised is a plain user, so a new role does not silently
+ * acquire the ability to read other people's audit trail.
+ */
+const TENANT_ADMIN_ROLES = new Set(['admin', 'hr_director', 'manager', 'it'])
+
+export function auditRoleOf(ctx: ResolvedTenantContext): UserRole {
+  if (ctx.isSuperadmin) return 'superadmin'
+  if (TENANT_ADMIN_ROLES.has(ctx.roleName)) return 'tenant_admin'
+  return 'user'
+}
+
+/** The resolved context, or a refusal if the request never established one. */
+export function contextOf(req: Request): ResolvedTenantContext {
+  const ctx = (req as TenantRequest).ctx
+  if (!ctx) {
+    throw new Error('Access Denied: no resolved identity for this request')
+  }
+  return ctx
+}
 
 /**
  * Access Control Rules
@@ -89,22 +118,25 @@ export function buildAccessControlWhere(
       paramNum++;
     }
   } else if (userRole === 'tenant_admin') {
-    // Tenant admin can only see TENANT and USER scopes
-    whereConditions.push(`action_scope IN ('TENANT', 'USER')`);
-    
-    // Further restrict to own tenant
     if (requestedScope) {
       if (!AUDIT_ACCESS_RULES.tenant_admin.canRead.includes(requestedScope)) {
         throw new Error(`Access Denied: tenant_admin cannot access ${requestedScope} scope`);
       }
+      whereConditions.push(`action_scope = $${paramNum}`);
+      params.push(requestedScope);
+      paramNum++;
     }
+    // No implicit `action_scope IN ('TENANT','USER')` filter. action_scope is
+    // set only by the newer service writers; the database triggers that record
+    // attendance and enrolment changes leave it NULL, so that condition
+    // silently hid most of the trail. Confinement is the tenant predicate
+    // below, which is the thing that actually means "this school's history".
   } else if (userRole === 'user') {
-    // Regular user can only see USER scope
-    whereConditions.push(`action_scope = 'USER'`);
-    
     if (requestedScope && requestedScope !== 'USER') {
       throw new Error(`Access Denied: user cannot access ${requestedScope} scope`);
     }
+    // Likewise: the actor predicate below is what confines a user to their own
+    // entries, and it does not depend on a column half the writers never set.
   }
 
   // Enforce actor filtering (what user the log is about)
@@ -112,8 +144,9 @@ export function buildAccessControlWhere(
     // Superadmin can see all actors
     // No additional filtering unless specifically requested
   } else if (userRole === 'tenant_admin') {
-    // Tenant admin can only see logs from their tenant.
-    // Enforce strict tenant-based filtering using tenant_id.
+    // An administrator sees their own tenant's trail and nothing else. Rows
+    // with no tenant are platform-level events and are excluded, which
+    // `tenant_id = $n` does by itself since NULL never matches.
     if (!tenantId) {
       throw new Error('Tenant ID required for tenant_admin audit access');
     }
@@ -121,8 +154,10 @@ export function buildAccessControlWhere(
     params.push(tenantId);
     paramNum++;
   } else {
-    // Regular user can only see their own logs
-    whereConditions.push(`actor_id = $${paramNum}`);
+    // A regular user sees only entries about themselves. Writers populate
+    // either actor_id or user_id depending on which era of the schema they
+    // were written against, so both are matched.
+    whereConditions.push(`(actor_id = $${paramNum} OR user_id = $${paramNum})`);
     params.push(userId);
     paramNum++;
   }
@@ -150,13 +185,14 @@ export async function logAuditAccess(event: {
   userAgent?: string;
   requestId?: string;
   verificationAttempt?: boolean;
+  tenantId?: string;
 }): Promise<string> {
   try {
     const result = await query(
       `INSERT INTO audit_access_log 
        (actor_id, actor_role, access_type, scope_accessed, filters_applied, results_count,
-        ip_address, user_agent, request_id, verification_attempt, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+        ip_address, user_agent, request_id, verification_attempt, tenant_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
        RETURNING id`,
       [
         event.actorId,
@@ -169,6 +205,7 @@ export async function logAuditAccess(event: {
         event.userAgent || null,
         event.requestId || null,
         event.verificationAttempt || false,
+        event.tenantId || null,
       ]
     );
 
@@ -198,9 +235,9 @@ export async function enforceAuditAccess(
   where: ReturnType<typeof buildAccessControlWhere>;
   accessLogId: string;
 }> {
-  const user = req.user as any;
-  const userRole = user?.role as UserRole || 'user';
-  const userId = user?.userId || 'unknown';
+  const ctx = contextOf(req);
+  const userRole = auditRoleOf(ctx);
+  const userId = ctx.userId;
 
   // Check scope access
   if (!canAccessScope(userRole, requestedScope)) {
@@ -228,7 +265,7 @@ export async function enforceAuditAccess(
   const where = buildAccessControlWhere(
     userRole,
     userId,
-    user?.tenantId,
+    ctx.tenantId ?? undefined,
     requestedScope
   );
 
@@ -242,6 +279,7 @@ export async function enforceAuditAccess(
     ipAddress: req.ip,
     userAgent: req.get('user-agent'),
     requestId: (req as any).requestId,
+    tenantId: ctx.tenantId ?? undefined,
   });
 
   return {
@@ -274,8 +312,8 @@ export async function queryAuditLogsWithAccessControl(
     offset?: number;
   }
 ): Promise<any[]> {
-  const user = req.user as any;
-  const userRole = user?.role as UserRole || 'user';
+  const ctx = contextOf(req);
+  const userRole = auditRoleOf(ctx);
 
   // Enforce access control
   const access = await enforceAuditAccess(req, baseFilters?.actionScope as AuditScope);
@@ -336,7 +374,7 @@ export async function queryAuditLogsWithAccessControl(
   // Log the successful query with result count
   try {
     await logAuditAccess({
-      actorId: user?.userId || 'unknown',
+      actorId: ctx.userId,
       actorRole: userRole,
       accessType: 'READ_AUDIT_LOGS_SUCCESS',
       scopeAccessed: baseFilters?.actionScope as AuditScope,
@@ -345,10 +383,46 @@ export async function queryAuditLogsWithAccessControl(
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
       requestId: (req as any).requestId,
+      tenantId: ctx.tenantId ?? undefined,
     });
   } catch (e) {
     console.warn('[AUDIT] Could not log result count:', e);
   }
 
   return result.rows;
+}
+
+
+/**
+ * The predicate that confines an audit read to what the caller may see.
+ *
+ * Returned as SQL plus bound parameters so callers can splice it into their
+ * own query rather than fetching broadly and discarding afterwards. A
+ * post-filter leaks through counts, pagination and the next refactor that
+ * forgets it.
+ *
+ * `startAt` is the first placeholder number this predicate may use, so it
+ * composes with a query that already binds parameters.
+ */
+export function auditVisibilityPredicate(
+  ctx: ResolvedTenantContext,
+  startAt = 1
+): { sql: string; params: any[] } {
+  const role = auditRoleOf(ctx)
+
+  if (role === 'superadmin') {
+    return { sql: 'TRUE', params: [] }
+  }
+
+  if (role === 'tenant_admin') {
+    if (!ctx.tenantId) {
+      throw new Error('Access Denied: no tenant resolved for this administrator')
+    }
+    return { sql: `tenant_id = $${startAt}`, params: [ctx.tenantId] }
+  }
+
+  return {
+    sql: `(actor_id = $${startAt} OR user_id = $${startAt})`,
+    params: [ctx.userId],
+  }
 }

@@ -1,16 +1,18 @@
 import React from 'react';
 import { LogIn, Lock, Mail } from 'lucide-react';
-import { SmartAttendLogo } from '../components/BrandLogo';
+import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
+import { MfaCodeStep } from '../components/auth/MfaCodeStep';
 
 export const SuperadminLoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const { superadminLogin } = useAuthStore();
 
@@ -32,7 +34,11 @@ export const SuperadminLoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await superadminLogin(email, password);
+      const step = await superadminLogin(email, password);
+      if (step.mfaToken) {
+        setMfaToken(step.mfaToken);
+        return;
+      }
 
       // Clear form
       setEmail('');
@@ -64,16 +70,23 @@ export const SuperadminLoginPage: React.FC = () => {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <SmartAttendLogo size="lg" showText={true} />
-          <p className="text-slate-400 mt-4">Superadmin Portal</p>
+          <JjeloTechLogo size="lg" className="justify-center text-primary" />
+          <p className="text-secondary mt-4">Platform operations</p>
         </div>
 
         {/* Form Card */}
         <div className="card mb-6">
+          {mfaToken ? (
+            <MfaCodeStep
+              mfaToken={mfaToken}
+              onDone={() => navigate('/superadmin')}
+              onRestart={(reason) => { setMfaToken(null); setPassword(''); setError(reason ?? ''); }}
+            />
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Input */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-secondary mb-2">
                 <Mail className="inline w-4 h-4 mr-2" />
                 Email Address
               </label>
@@ -106,7 +119,7 @@ export const SuperadminLoginPage: React.FC = () => {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm"
+                className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-700 dark:text-red-300 text-sm"
               >
                 {error}
               </motion.div>
@@ -122,25 +135,26 @@ export const SuperadminLoginPage: React.FC = () => {
               {isLoading ? 'Signing in...' : 'Sign In as Superadmin'}
             </button>
           </form>
+          )}
 
           {/* Security Notice */}
           <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <p className="text-blue-300 text-sm">
+            <p className="text-blue-700 dark:text-blue-300 text-sm">
               <span className="font-semibold">lock:</span> This is a restricted superadmin portal. All actions are logged and audited.
             </p>
           </div>
         </div>
 
         {/* Links */}
-        <div className="space-y-3 text-center text-slate-400 text-sm">
+        <div className="space-y-3 text-center text-secondary text-sm">
           <div>
             Don't have a superadmin account?{' '}
-            <a href="/register-superadmin" className="text-primary-400 hover:text-primary-300 font-semibold">
+            <a href="/register-superadmin" className="text-primary-700 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold">
               Create one
             </a>
           </div>
           <div>
-            <a href="/login" className="text-slate-500 hover:text-slate-400">
+            <a href="/login" className="text-muted hover:text-secondary">
               Back to regular login
             </a>
           </div>

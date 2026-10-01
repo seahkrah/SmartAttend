@@ -182,6 +182,8 @@ export function sniff(buf: Buffer, declaredType?: string, filename?: string): Sn
  */
 export function safeDownloadName(originalName: string, contentType: string): string {
   const base = String(originalName)
+    // Control characters are exactly what this strips.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .replace(/[\\/:*?"<>|]/g, '_')
     .replace(/\.+$/, '')

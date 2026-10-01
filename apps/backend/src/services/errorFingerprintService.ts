@@ -85,7 +85,7 @@ function normalizErrorMessage(message: string): string {
     // Remove UUIDs and GUIDs
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'UUID')
     // Remove timestamps
-    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[Z\+\-\d:]*/, 'TIMESTAMP')
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[Z+\-\d:]*/, 'TIMESTAMP')
     // Remove numbers (could be IDs, counts, etc.)
     .replace(/\b\d+\b/g, 'NUM')
     // Remove file paths

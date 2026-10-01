@@ -185,8 +185,8 @@ export function intakeAcceptsSubmissions(intake: IntakeRow, on = new Date()): { 
   const day = isoDay(on)
   const opens = isoDay(intake.opens_at)
   const closes = isoDay(intake.closes_at)
-  if (opens && day < opens) return { ok: false, reason: `This intake opens on ${opens}` }
-  if (closes && day > closes) return { ok: false, reason: `This intake closed on ${closes}` }
+  if (opens && day !== null && day < opens) return { ok: false, reason: `This intake opens on ${opens}` }
+  if (closes && day !== null && day > closes) return { ok: false, reason: `This intake closed on ${closes}` }
   return { ok: true }
 }
 
@@ -445,7 +445,7 @@ export async function enrolApplicant(
     `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND platform_id = $2`,
     [applicant.email, ctx.platformId]
   )
-  if (existing.rowCount > 0) {
+  if ((existing.rowCount ?? 0) > 0) {
     throw new AdmissionsError(
       'An account already exists on this email address; resolve the duplicate before enrolling',
       409
@@ -468,7 +468,7 @@ export async function enrolApplicant(
     `SELECT id FROM students WHERE UPPER(student_id) = UPPER($1) AND tenant_id = $2`,
     [studentNumber, ctx.tenantId]
   )
-  if (clash.rowCount > 0) {
+  if ((clash.rowCount ?? 0) > 0) {
     throw new AdmissionsError(`Student number ${studentNumber} is already in use`, 409)
   }
 

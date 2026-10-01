@@ -534,7 +534,7 @@ router.get('/tax-brackets', payrollStaff, async (req: TenantRequest, res: Respon
         ORDER BY effective_from DESC, sequence`,
       [ctx.tenantId]
     )
-    return res.json({ brackets: result.rows, configured: result.rowCount > 0 })
+    return res.json({ brackets: result.rows, configured: (result.rowCount ?? 0) > 0 })
   } catch (e) {
     return fail(res, 'load tax brackets', e)
   }

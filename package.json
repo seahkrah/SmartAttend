@@ -1,5 +1,15 @@
 {
-  "dependencies": {
-    "framer-motion": "^12.29.2"
+  "name": "jjelotech",
+  "private": true,
+  "description": "Workspace-level checks. Each app installs its own dependencies.",
+  "scripts": {
+    "lint": "npm --prefix apps/backend run lint && npm --prefix apps/frontend run lint",
+    "format:check": "prettier --check \"scripts/**/*.{mjs,js,json,yml}\"",
+    "format": "prettier --write \"scripts/**/*.{mjs,js,json,yml}\"",
+    "check:repo": "node scripts/checks/repo-hygiene.mjs && node scripts/checks/migration-lint.mjs",
+    "scorecard": "node scripts/scorecard/run.mjs"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.0"
   }
 }

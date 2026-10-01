@@ -145,7 +145,7 @@ export async function queryAuditLogs(
   },
   superadminAccess: boolean = false
 ): Promise<any[]> {
-  let whereConditions: string[] = []
+  const whereConditions: string[] = []
   const params: any[] = []
   let paramCount = 1
 

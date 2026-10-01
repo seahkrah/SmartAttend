@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express'
+import express, { NextFunction, Request, Response } from 'express'
 import { query, getConnection } from '../db/connection.js'
 import {
   loginUser,
@@ -886,7 +886,7 @@ router.post('/logout-all', authenticateToken, async (req: Request, res: Response
 // ===========================
 
 // Middleware to verify superadmin access
-const verifySuperadmin = async (req: Request, res: Response, next: Function) => {
+const verifySuperadmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'Not authenticated' })

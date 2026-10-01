@@ -229,6 +229,7 @@ apps/backend/.file-storage/
 /apps/backend/*.ts
 !/apps/backend/setup-superadmin.ts
 !/apps/backend/vitest.config.ts
+!/apps/backend/eslint.config.js
 # Phase write-ups and component "specs" at the root: docs/ is the place.
 /*.ts
 /*.tsx

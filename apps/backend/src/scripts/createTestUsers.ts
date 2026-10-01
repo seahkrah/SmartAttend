@@ -117,7 +117,7 @@ async function createTestUsers() {
           console.log(`   Password: ${testPassword}`);
         }
       } catch (error) {
-        console.error(`❌ Error creating ${user.email}:`, error.message);
+        console.error(`❌ Error creating ${user.email}:`, (error as Error).message);
       }
     }
     

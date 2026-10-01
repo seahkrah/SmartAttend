@@ -240,7 +240,7 @@ export async function store(
         LIMIT 1`,
       [ctx.tenantId, object.checksumSha256, object.byteSize]
     )
-    if (existing.rowCount > 0) {
+    if ((existing.rowCount ?? 0) > 0) {
       await backend.remove(object.key).catch(() => undefined)
       return { file: existing.rows[0] as StoredFileRow, deduplicated: true }
     }

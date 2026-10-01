@@ -676,14 +676,14 @@ export async function saveTimesheet(
       FOR UPDATE`,
     [ctx.tenantId, employeeId, periodStart]
   )
-  if (existing.rowCount > 0 && !['draft', 'rejected'].includes(existing.rows[0].status)) {
+  if ((existing.rowCount ?? 0) > 0 && !['draft', 'rejected'].includes(existing.rows[0].status)) {
     throw new WorkforceError(
       `This timesheet is ${existing.rows[0].status} and can no longer be rebuilt`, 409
     )
   }
 
   let timesheetId: string
-  if (existing.rowCount > 0) {
+  if ((existing.rowCount ?? 0) > 0) {
     timesheetId = existing.rows[0].id
     await client.query(
       `DELETE FROM timesheet_entries WHERE timesheet_id = $1 AND tenant_id = $2`,

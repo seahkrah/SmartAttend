@@ -1,102 +1,19 @@
-# Database Cleanup & Migration Reset
+# Backend scripts
 
-This directory contains scripts for cleaning up failed database migrations and resetting the database schema.
+| Script | What it does |
+|---|---|
+| `run-all-e2e.sh` | Reseeds both platforms, runs every API suite, writes per-suite results to `$E2E_RESULTS` (read by `scripts/scorecard`). |
+| `validate-sql.mjs` | Hands every static SQL literal to PostgreSQL's parser against the live schema. Needs `DATABASE_URL`. |
+| `load-test.mjs` | Latency baseline (p50/p95/max) for the busiest API calls. |
+| `rotate-credentials.mjs` | Rotates application account passwords; see `SECURITY_CREDENTIAL_ROTATION.md`. |
+| `tfjs-native.mjs` | Makes the native TensorFlow binding load, especially on Windows. |
 
-## Quick Start
+Migrations are applied only by `npx tsx src/db/migrate.ts`. There is no
+script that deletes rows from the `migrations` ledger: one used to exist
+(`cleanup-migrations.*`), and re-running `001_init_schema.sql` over a live
+schema is not a repair. If a migration fails, it rolls back on its own and can
+be retried once fixed.
 
-### Option 1: Automatic Cleanup (Recommended)
-
-```powershell
-cd C:\jjelotech\apps\backend
-.\scripts\cleanup-migrations.ps1
-```
-
-This will:
-1. ✓ Connect to your database
-2. ✓ Remove failed migrations (001_init_schema.sql, 004_superadmin_system.sql)
-3. ✓ Display remaining migrations
-4. ✓ Provide next steps
-
-### Option 2: Manual Cleanup with psql
-
-If you have PostgreSQL client tools installed:
-
-```powershell
-# Set up environment
-$env:DATABASE_URL = "your_database_url_here"
-
-# Connect and run cleanup
-psql $env:DATABASE_URL -f .\scripts\cleanup-migrations.sql
-```
-
-### Option 3: Manual SQL Execution
-
-Connect to your database directly using any PostgreSQL client (pgAdmin, DBeaver, etc.) and run:
-
-```sql
-DELETE FROM migrations WHERE name = '001_init_schema.sql';
-DELETE FROM migrations WHERE name = '004_superadmin_system.sql';
-SELECT * FROM migrations ORDER BY executed_at;
-```
-
-## After Cleanup
-
-Restart the backend to re-execute migrations:
-
-```powershell
-cd C:\jjelotech\apps\backend
-npm run dev
-```
-
-You should see:
-```
-[MIGRATION] Running 001_init_schema.sql...
-[MIGRATION] ✓ 001_init_schema.sql completed
-[MIGRATION] Running 004_superadmin_system.sql...
-[MIGRATION] ✓ 004_superadmin_system.sql completed
-```
-
-## Troubleshooting
-
-### "Error: Could not find .env file"
-Run the script from the backend directory or parent directory:
-```powershell
-cd C:\jjelotech\apps\backend
-.\scripts\cleanup-migrations.ps1
-```
-
-### "Error: node_modules not found"
-Install dependencies first:
-```powershell
-npm install
-```
-
-### "Error: connect ECONNREFUSED"
-Make sure PostgreSQL is running:
-```powershell
-# Check if PostgreSQL is running (Windows)
-Get-Service postgresql-* | Select-Object Name, Status
-```
-
-### Database still has errors after cleanup
-The fixes required:
-1. Migration 001 had indexes on tables dropped in 002
-2. Migration 002 was missing the `description` column on `platforms`
-
-These have been fixed in the migration files. After cleanup, the correct versions will be applied.
-
-## Full Database Reset (Advanced)
-
-⚠️ **WARNING: This will delete ALL data!**
-
-If you need to completely reset the database:
-
-```sql
-TRUNCATE TABLE migrations CASCADE;
--- Then restart the backend to re-run all migrations from scratch
-```
-
-## Files
-
-- `cleanup-migrations.ps1` - PowerShell cleanup script (automated)
-- `cleanup-migrations.sql` - Raw SQL cleanup (manual)
+`npx tsx src/scripts/checkLedgerUpgrade.ts` (CI only, never production) proves
+that a database migrated under the old duplicated migration names upgrades
+without re-running anything; see `src/db/migrationLedger.ts`.

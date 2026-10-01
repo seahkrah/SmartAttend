@@ -8,12 +8,9 @@
 import { query } from '../db/connection.js'
 import pool from '../db/connection.js'
 import { splitStatements } from './splitStatements.js'
+import { migrationFiles, migrationsDir, reconcileLedger } from './migrationLedger.js'
 import * as fs from 'fs'
 import * as path from 'path'
-import { fileURLToPath } from 'url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 interface MigrationRecord {
   name: string
@@ -47,27 +44,15 @@ async function getExecutedMigrations(): Promise<MigrationRecord[]> {
 /**
  * Get list of pending migrations
  */
-async function getPendingMigrations(executedMigrations: MigrationRecord[]): Promise<string[]> {
-  const migrationsDir = path.join(__dirname, 'migrations')
-
-  // Superseded files are kept in the tree for reference but must never run:
-  // they sort after the migration that replaced them (…_OLD.sql > ….sql), so
-  // executing them re-applies an older schema over the current one.
-  const files = fs
-    .readdirSync(migrationsDir)
-    .filter(f => f.endsWith('.sql') && !f.endsWith('_OLD.sql'))
-
-  // Filter out already executed
+function getPendingMigrations(executedMigrations: MigrationRecord[]): string[] {
   const executedNames = new Set(executedMigrations.map(m => m.name))
-
-  return files.filter(f => !executedNames.has(f)).sort()
+  return migrationFiles().filter(f => !executedNames.has(f))
 }
 
 /**
  * Execute migration
  */
 async function executeMigration(filename: string): Promise<void> {
-  const migrationsDir = path.join(__dirname, 'migrations')
   const filepath = path.join(migrationsDir, filename)
 
   console.log(`\n📝 Executing migration: ${filename}`)
@@ -111,13 +96,24 @@ async function runMigrations(): Promise<void> {
   console.log('🚀 Starting database migrations...\n')
 
   try {
-    // Get executed migrations
+    await getExecutedMigrations() // creates the ledger table on a fresh database
+
+    // Old names of renumbered migrations become the current ones before
+    // anything is compared; see migrationLedger.ts.
+    const ledgerClient = await pool.connect()
+    try {
+      const renamed = await reconcileLedger(ledgerClient)
+      if (renamed) console.log(`🔁 Renamed ${renamed} ledger entries to their renumbered filenames`)
+    } finally {
+      ledgerClient.release()
+    }
+
     const executed = await getExecutedMigrations()
     console.log(`📊 Previously executed migrations: ${executed.length}`)
     executed.forEach(m => console.log(`  ✓ ${m.name}`))
 
     // Get pending migrations
-    const pending = await getPendingMigrations(executed)
+    const pending = getPendingMigrations(executed)
 
     if (pending.length === 0) {
       console.log('\n✅ No pending migrations. Database is up to date.')

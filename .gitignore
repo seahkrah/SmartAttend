@@ -218,3 +218,28 @@ rotated-credentials-*.txt
 # deployment; this is where it lands by default in development.
 .file-storage/
 apps/backend/.file-storage/
+
+# ── Repository hygiene (scripts/checks/repo-hygiene.mjs enforces these) ────
+# One-off debug and repair scripts belong in apps/backend/src/scripts/ with a
+# README entry, or nowhere. The backend root keeps only its manifests,
+# configs and setup-superadmin.ts.
+/apps/backend/*.js
+/apps/backend/*.cjs
+/apps/backend/*.mjs
+/apps/backend/*.ts
+!/apps/backend/setup-superadmin.ts
+!/apps/backend/vitest.config.ts
+# Phase write-ups and component "specs" at the root: docs/ is the place.
+/*.ts
+/*.tsx
+/*.ps1
+/*.sh
+# Superseded migrations are deleted, not kept beside their replacement.
+*_OLD.sql
+# Local Claude Code state and scratch copies.
+/.claude/settings.local.json
+/.claude/*.html
+# Scorecard tooling dependencies.
+/scripts/scorecard/node_modules/
+apps/frontend/test-results/
+apps/frontend/playwright-report/

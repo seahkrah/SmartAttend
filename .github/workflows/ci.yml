@@ -19,6 +19,41 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  # Repository hygiene, migration naming, formatting and lint. Cheap, so it
+  # runs first and fails fast.
+  repo-and-lint:
+    name: Hygiene and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # No loose debug scripts, _OLD migrations, committed node_modules or
+      # build output; every migration prefix used once.
+      - name: Repository hygiene and migration lint
+        run: npm run check:repo
+
+      - name: Install workspace tools
+        run: npm ci
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Install backend
+        working-directory: apps/backend
+        run: npm ci
+
+      - name: Install frontend
+        working-directory: apps/frontend
+        run: npm ci
+
+      # 0 errors, and the warning count may only go down (--max-warnings).
+      - name: Lint
+        run: npm run lint
+
   types-and-build:
     name: Types and build
     runs-on: ubuntu-latest
@@ -80,8 +115,6 @@ jobs:
     env:
       DATABASE_URL: postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_ci
       JWT_SECRET: ci-only-not-a-real-secret
-      # A throwaway key: CI templates are of synthetic test faces and are discarded.
-      BIOMETRIC_TEMPLATE_KEY: 3c1e0b7a9f5d2e8c4a6b1d0f7e9c2a5b8d3f6e1c0a9b7d5e2f4c6a8b0d1e3f5a
       PORT: '5000'
       # Uploaded documents land here rather than in the checkout, so a build
       # that writes files does not leave them in the working tree.
@@ -100,6 +133,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # Generated per run rather than committed, so the secret scan has
+      # nothing to excuse. CI templates are of synthetic faces and discarded.
+      - name: Throwaway biometric template key
+        run: echo "BIOMETRIC_TEMPLATE_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Install shared types
         working-directory: packages/types
         run: (npm ci || npm install) && npm run build
@@ -117,6 +155,12 @@ jobs:
       - name: Migrations are idempotent
         working-directory: apps/backend
         run: npx tsx src/db/migrate.ts
+
+      # A database migrated under the old duplicated names (006_, 007_, ...)
+      # upgrades by renaming ledger rows, never by re-running a migration.
+      - name: Upgrade from the old migration names
+        working-directory: apps/backend
+        run: npx tsx src/scripts/checkLedgerUpgrade.ts
 
       # Hands every literal SQL statement to PostgreSQL's parser. Catches a
       # query naming a column that does not exist before a user does.
@@ -149,9 +193,75 @@ jobs:
         working-directory: apps/backend
         run: bash scripts/run-all-e2e.sh
 
+      # A measurement, not a gate: it always exits 0. It runs here because
+      # this is the only job with a database, an API and e2e results, and it
+      # runs even when a suite failed, so the scorecard shows which.
+      - name: Install workspace tools and frontend for the scorecard
+        if: always()
+        run: |
+          npm ci
+          (cd scripts/scorecard && npm ci)
+          (cd apps/frontend && npm ci)
+
+      - name: Scorecard
+        if: always()
+        env:
+          API_BASE: http://127.0.0.1:5000
+          E2E_RESULTS: ${{ github.workspace }}/apps/backend/.e2e-fixtures/results.tsv
+        run: node scripts/scorecard/run.mjs --phase ci >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard
+          path: docs/scorecard/
+
       - name: API log on failure
         if: failure()
         run: cat /tmp/api.log || true
+
+  supply-chain:
+    name: Dependencies, secrets and static analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Production dependencies only, failing on high or critical. Moderate
+      # findings are tracked in docs/security/findings.md.
+      - name: Dependency audit
+        run: |
+          (cd apps/backend && npm audit --omit=dev --audit-level=high)
+          (cd apps/frontend && npm audit --omit=dev --audit-level=high)
+          (cd packages/types && npm audit --omit=dev --audit-level=high)
+
+      # The working tree, and the commits this push adds. Not the whole
+      # history: it holds the credentials described in
+      # SECURITY_CREDENTIAL_ROTATION.md until the owner rotates them and the
+      # purge in docs/security/history-purge-plan.md runs. After the purge,
+      # change this to scan everything.
+      - name: Secret scan (working tree)
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2             dir /repo --config /repo/.gitleaks.toml --redact --no-banner -v
+
+      - name: Secret scan (commits in this push)
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2             git /repo --config /repo/.gitleaks.toml --redact --no-banner -v             --log-opts="${{ github.event.before }}..${{ github.sha }}"
+
+      # Semgrep's open rule packs for the languages and frameworks in use.
+      # ERROR-severity findings fail the build.
+      - name: Static analysis (Semgrep)
+        run: |
+          docker run --rm -e SEMGREP_SEND_METRICS=off -v "$PWD:/src" semgrep/semgrep:1.178.0             semgrep scan --config p/javascript --config p/typescript --config p/expressjs --config p/react             --exclude docs/archive --severity ERROR --error --metrics off /src/apps /src/scripts /src/packages/types/src
 
   images:
     name: Container images
@@ -179,6 +289,25 @@ jobs:
 
       - name: Build the web image
         run: docker build -f apps/frontend/Dockerfile --build-arg VITE_API_BASE_URL=https://api.example.org/api -t jjelotech-web:ci .
+
+      # Fixed HIGH and CRITICAL vulnerabilities in either image fail the build.
+      - name: Scan the images
+        run: |
+          for image in jjelotech-api:ci jjelotech-web:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.1               image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress "$image"
+          done
+
+      - name: Software bill of materials
+        run: |
+          mkdir -p sbom
+          for image in api web; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/sbom:/out" aquasec/trivy:0.57.1               image --format cyclonedx --output "/out/jjelotech-$image.cdx.json" --no-progress "jjelotech-$image:ci"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
 
       # The image, not the checkout: migrations from an empty database, then a
       # production-mode server that must report ready.

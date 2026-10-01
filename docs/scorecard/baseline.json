@@ -1,0 +1,66 @@
+{
+  "description": "State of the repository when Phase 0 began, measured on the development machine. Assessed scores are from the analysis brief (A4); they are estimates, not gate results.",
+  "date": "2026-10-01",
+  "commit": "294197b",
+  "branch": "feat/grade-school-classes",
+  "environment": {
+    "os": "Windows 11",
+    "node": "22.20.0",
+    "database": "PGlite 0.5.8 (PostgreSQL in WASM) over a local socket. Docker Desktop would not start, and no PostgreSQL server binary is installed. PGlite serialises every connection through one session, so it is sound for migrations, the SQL validator and unit tests, and unsound for the concurrent API traffic the e2e suites create.",
+    "api": "Started against PGlite; became unstable under e2e load (pool timeouts, protocol errors)."
+  },
+  "measured": {
+    "backend_typecheck": { "result": "pass", "note": "strict mode was off (strict, noImplicitAny, strictNullChecks all false)" },
+    "frontend_typecheck": { "result": "pass" },
+    "frontend_build": { "result": "pass" },
+    "backend_unit_tests_without_db": { "result": "56 passed, 29 failed", "note": "all 29 failures are ECONNREFUSED: the tests need a database" },
+    "backend_unit_tests_with_pglite": { "result": "117 passed of 117", "note": "vitest exited non-zero on 50 unhandled PGlite protocol errors ('unexpected parseComplete'), an artefact of the single-session database, not of the code" },
+    "migrations_fresh": { "result": "74 applied" },
+    "migrations_idempotent": { "result": "pass (second run: no pending)" },
+    "validate_sql": { "result": "pass", "checked": 1171, "skipped_runtime_assembled": 108, "mismatches": 0 },
+    "e2e": {
+      "result": "not measurable locally",
+      "partial_pglite_run": {
+        "adminApi": "32 passed, 0 failed",
+        "attendanceApi": "25 passed, 0 failed",
+        "legacyRoutesIsolation": "23 passed, 0 failed",
+        "tenantIsolation": "19 passed, 0 failed",
+        "others": "failed with database pool timeouts or 'Connection terminated' from the single-session database; not attributable to the application"
+      },
+      "authoritative_source": "CI (.github/workflows/ci.yml, job 'Migrations, SQL and API') against PostgreSQL 16"
+    },
+    "lint": { "result": "none configured in either workspace" },
+    "frontend_tests": { "result": "none exist" },
+    "npm_audit": {
+      "backend": "3 (1 moderate, 2 critical) in vitest, dev only",
+      "frontend": "4 (3 moderate, 1 high) in vite (dev server) and react-router"
+    },
+    "repository": {
+      "loose_backend_scripts": 43,
+      "root_phase_spec_files": 11,
+      "migrations_with_duplicate_prefixes": 14,
+      "superseded_OLD_migrations": 4,
+      "tracked_node_modules_files": 1043,
+      "tracked_build_output_files": 24
+    }
+  },
+  "assessed": {
+    "composite": 5.3,
+    "reference_composite": 8.7,
+    "dimensions": {
+      "tenant-isolation": 6.5,
+      "authn": 6.5,
+      "authz-audit": 7.5,
+      "data-protection": 6.5,
+      "face-attendance": 6.0,
+      "sms-breadth": 5.0,
+      "ems-breadth": 4.5,
+      "offline-mobile": 1.5,
+      "reliability": 4.0,
+      "engineering": 5.5,
+      "ux-a11y-i18n": 4.5,
+      "integrations": 3.0,
+      "compliance": 4.0
+    }
+  }
+}

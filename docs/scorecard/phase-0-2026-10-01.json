@@ -1,0 +1,1500 @@
+{
+  "phase": "phase-0",
+  "date": "2026-10-01",
+  "commit": "b70660d",
+  "environment": {
+    "db": true,
+    "api": false,
+    "e2e": false
+  },
+  "composite": 2.4,
+  "baselineComposite": 5.3,
+  "referenceComposite": 8.7,
+  "audit": null,
+  "dimensions": [
+    {
+      "id": "tenant-isolation",
+      "n": 1,
+      "title": "Tenant isolation",
+      "weight": 12,
+      "baseline": 6.5,
+      "reference": 9,
+      "raw": 2,
+      "score": 2,
+      "caps": [],
+      "missingAttestations": [
+        "pentest"
+      ],
+      "gates": [
+        {
+          "id": "tenant-from-identity",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "Tenant resolved from identity; X-Tenant-Id only picks among own memberships",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "cross-tenant-triggers",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Database triggers refuse cross-tenant references",
+          "status": "fail",
+          "detail": "3 found, need 10"
+        },
+        {
+          "id": "scoped-helpers",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Tenant-scoped data helpers exist",
+          "status": "pass"
+        },
+        {
+          "id": "isolation-e2e",
+          "kind": "foundation",
+          "weight": 25,
+          "title": "Cross-tenant e2e suites pass",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "per-module-isolation-e2e",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Module suites (which each include cross-tenant cases) pass",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "rls-forced",
+          "kind": "target",
+          "weight": 8,
+          "title": "RLS enabled and FORCED, with a policy, on every table that has tenant_id",
+          "status": "fail",
+          "detail": "95/95 tenant tables lack forced RLS or a policy (e.g. academic_years, admission_intakes, applicants, application_choices, application_documents)"
+        },
+        {
+          "id": "runtime-role",
+          "kind": "target",
+          "weight": 6,
+          "title": "API connects as a non-owner, non-superuser NOBYPASSRLS role",
+          "status": "fail",
+          "detail": "APP_DATABASE_URL (the runtime role) is not set; the API uses the owner role"
+        },
+        {
+          "id": "no-context-no-rows",
+          "kind": "target",
+          "weight": 4,
+          "title": "A query without app.tenant_id returns no tenant rows (test)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "raw-query-lint",
+          "kind": "target",
+          "weight": 5,
+          "title": "Raw pool.query forbidden outside the tenant data-access helper",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "route-fuzzer",
+          "kind": "target",
+          "weight": 5,
+          "title": "Generated cross-tenant fuzzer over the route inventory passes",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "blind-write",
+          "kind": "target",
+          "weight": 2,
+          "title": "Blind-write suite (insert/update/delete across tenants) passes",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "storage-tenant-prefix",
+          "kind": "target",
+          "weight": 1,
+          "title": "Storage keys carry the tenant prefix and are verified on read",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "namespaced-keys",
+          "kind": "target",
+          "weight": 1,
+          "title": "Rate-limit, cache and queue keys namespaced by tenant",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "break-glass",
+          "kind": "target",
+          "weight": 2,
+          "title": "Superadmin cross-tenant access is break-glass, audited, tenant-visible",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "per-tenant-dek",
+          "kind": "target",
+          "weight": 1,
+          "title": "Per-tenant data keys behind a KMS interface",
+          "status": "fail",
+          "detail": "missing: apps/backend/src/security/kms/index.ts"
+        }
+      ]
+    },
+    {
+      "id": "authn",
+      "n": 2,
+      "title": "AuthN and sessions",
+      "weight": 8,
+      "baseline": 6.5,
+      "reference": 9,
+      "raw": 0.5,
+      "score": 0.5,
+      "caps": [],
+      "missingAttestations": [
+        "pentest"
+      ],
+      "gates": [
+        {
+          "id": "server-sessions",
+          "kind": "foundation",
+          "weight": 20,
+          "title": "Server-side sessions with short-lived access tokens (authFlow e2e)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "totp-mfa",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "TOTP two-factor with recovery codes (mfaApi e2e)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "lockout-single-use-links",
+          "kind": "foundation",
+          "weight": 25,
+          "title": "Lockout, single-use invitation and reset links (accountSecurity e2e)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "auth-unit",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Auth unit tests",
+          "status": "pass"
+        },
+        {
+          "id": "no-localstorage-tokens",
+          "kind": "target",
+          "weight": 10,
+          "title": "No access or refresh token in localStorage",
+          "status": "fail",
+          "detail": "59 occurrences"
+        },
+        {
+          "id": "csrf",
+          "kind": "target",
+          "weight": 4,
+          "title": "Cookie sessions carry CSRF protection (test)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "refresh-reuse",
+          "kind": "target",
+          "weight": 5,
+          "title": "Refresh-token rotation with reuse detection revoking the family",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "webauthn",
+          "kind": "target",
+          "weight": 4,
+          "title": "WebAuthn passkeys",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sso",
+          "kind": "target",
+          "weight": 4,
+          "title": "OIDC and SAML SSO per tenant",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "session-list",
+          "kind": "target",
+          "weight": 3,
+          "title": "Device and session list with remote revoke; step-up for sensitive actions",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "breached-password",
+          "kind": "target",
+          "weight": 2,
+          "title": "Breached-password check",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "shared-rate-limit-store",
+          "kind": "target",
+          "weight": 3,
+          "title": "Rate-limit store shared across replicas",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        }
+      ]
+    },
+    {
+      "id": "authz-audit",
+      "n": 3,
+      "title": "AuthZ, RBAC, audit",
+      "weight": 8,
+      "baseline": 7.5,
+      "reference": 8.5,
+      "raw": 3.5,
+      "score": 3.5,
+      "caps": [],
+      "missingAttestations": [],
+      "gates": [
+        {
+          "id": "rbac-e2e",
+          "kind": "foundation",
+          "weight": 30,
+          "title": "Role enforcement suites pass",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "audit-immutability-unit",
+          "kind": "foundation",
+          "weight": 25,
+          "title": "Audit immutability tests (DB triggers refuse UPDATE/DELETE)",
+          "status": "pass"
+        },
+        {
+          "id": "audit-checksum",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Audit rows carry a checksum",
+          "status": "pass"
+        },
+        {
+          "id": "audit-e2e",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Audit API suite passes",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "permission-map",
+          "kind": "target",
+          "weight": 10,
+          "title": "Every route declares a permission (route inventory vs map)",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "audit-hash-chain",
+          "kind": "target",
+          "weight": 8,
+          "title": "Per-tenant hash-chained audit with a verifier command",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "audit-export",
+          "kind": "target",
+          "weight": 3,
+          "title": "Audit export and streaming",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "escalation-idor",
+          "kind": "target",
+          "weight": 4,
+          "title": "Privilege-escalation and IDOR suites",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        }
+      ]
+    },
+    {
+      "id": "data-protection",
+      "n": 4,
+      "title": "Data protection and privacy",
+      "weight": 8,
+      "baseline": 6.5,
+      "reference": 8.5,
+      "raw": 6,
+      "score": 6,
+      "caps": [],
+      "missingAttestations": [
+        "pentest"
+      ],
+      "gates": [
+        {
+          "id": "template-aead",
+          "kind": "foundation",
+          "weight": 25,
+          "title": "Biometric templates AES-256-GCM, bound to tenant/person/model (unit tests)",
+          "status": "pass"
+        },
+        {
+          "id": "images-not-stored",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Face images processed in memory, documented",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "consent-records",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Biometric consent records",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "db-tls",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Database TLS verified by default in production",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "files-isolation",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Document storage tenant-checked (filesApi e2e)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "envelope-encryption",
+          "kind": "target",
+          "weight": 10,
+          "title": "Envelope encryption with per-tenant DEKs and rotation",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "retention",
+          "kind": "target",
+          "weight": 4,
+          "title": "Per-tenant retention policies",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "dsr",
+          "kind": "target",
+          "weight": 6,
+          "title": "Data-subject export and erasure tools",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "dpia",
+          "kind": "target",
+          "weight": 3,
+          "title": "DPIA for biometrics",
+          "status": "fail",
+          "detail": "missing: docs/compliance/dpia-biometrics.md"
+        },
+        {
+          "id": "residency",
+          "kind": "target",
+          "weight": 2,
+          "title": "Data-residency setting per tenant",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "secret-scan-ci",
+          "kind": "target",
+          "weight": 5,
+          "title": "Secret scanning in CI",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "log-redaction",
+          "kind": "target",
+          "weight": 5,
+          "title": "Log redaction test",
+          "status": "fail",
+          "detail": "exit 1: filter: src/utils/redact.test.ts | include: src/**/*.test.ts, test/**/*.test.ts | exclude:  dist/**, node_modules/**"
+        }
+      ]
+    },
+    {
+      "id": "face-attendance",
+      "n": 5,
+      "title": "Facial and attendance tracking",
+      "weight": 10,
+      "baseline": 6,
+      "reference": 8.5,
+      "raw": 1,
+      "score": 1,
+      "caps": [],
+      "missingAttestations": [
+        "pad-lab"
+      ],
+      "gates": [
+        {
+          "id": "face-matching-e2e",
+          "kind": "foundation",
+          "weight": 25,
+          "title": "Server-side matching, single-use 5-minute match IDs, failure pause (faceMatchingApi e2e)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "face-in-workflows",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "Face match wired into class marking and employee check-in, with manual paths",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "pose-challenge",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Random head-pose challenge",
+          "status": "pass"
+        },
+        {
+          "id": "face-doc-honest",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Face-matching doc states what is not defended",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "unified-core",
+          "kind": "target",
+          "weight": 6,
+          "title": "One attendance core for SMS and EMS (no attendance table written outside it)",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "manual-fallback-controls",
+          "kind": "target",
+          "weight": 5,
+          "title": "Manual fallback with reason codes, approval and abuse alerts on both platforms",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "kiosk",
+          "kind": "target",
+          "weight": 5,
+          "title": "Kiosk mode e2e with a fake camera",
+          "status": "fail",
+          "detail": "exit 1: Error: No tests found. | Make sure that arguments are regular expressions matching test files. | You may need to escape symbols like \"$\" or \"*\" and quote the arguments."
+        },
+        {
+          "id": "worker-isolation",
+          "kind": "target",
+          "weight": 6,
+          "title": "Face worker isolated; API falls back to manual while it is down",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "biometric-cross-tenant",
+          "kind": "target",
+          "weight": 3,
+          "title": "Cross-tenant biometric suite (enrol, match, templates, events) incl. RLS bypass attempt",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "checkin-burst-load",
+          "kind": "target",
+          "weight": 3,
+          "title": "Check-in burst load test meets the stated p95",
+          "status": "fail",
+          "detail": "missing: docs/operations/capacity.md, docs/scorecard/evidence/load-checkin-burst.json"
+        },
+        {
+          "id": "face-eval",
+          "kind": "target",
+          "weight": 6,
+          "title": "FAR <= 0.1% and FRR <= 5% on the evaluation set, report committed",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "layered-pad",
+          "kind": "target",
+          "weight": 3,
+          "title": "Layered presentation-attack detection with nonce-bound challenge",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "group-capture",
+          "kind": "target",
+          "weight": 3,
+          "title": "Group capture for classes with lecturer confirmation",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        }
+      ]
+    },
+    {
+      "id": "sms-breadth",
+      "n": 6,
+      "title": "SMS functional breadth",
+      "weight": 10,
+      "baseline": 5,
+      "reference": 9,
+      "raw": 0,
+      "score": 0,
+      "caps": [],
+      "missingAttestations": [],
+      "gates": [
+        {
+          "id": "sms-school-types",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "School types and levels",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-classes",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Classes",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-core",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Students",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-session-attendance",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Session attendance",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-gradebook",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Gradebook",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-admissions",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Admissions",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-fees",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Fees",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-guardians",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Guardians and parent portal",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-class-register",
+          "kind": "target",
+          "weight": 8,
+          "title": "Class register",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-report-cards",
+          "kind": "target",
+          "weight": 7,
+          "title": "Report cards",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-promotion",
+          "kind": "target",
+          "weight": 6,
+          "title": "Promotion and roll-forward",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-ledger",
+          "kind": "target",
+          "weight": 8,
+          "title": "Two currencies and double-entry ledger (trial balance zero)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-pdf",
+          "kind": "target",
+          "weight": 4,
+          "title": "Receipts",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-mobile-money",
+          "kind": "target",
+          "weight": 5,
+          "title": "Mobile-money CSV import and matching",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-timetabling",
+          "kind": "target",
+          "weight": 6,
+          "title": "Timetabling",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "sms-assignments",
+          "kind": "target",
+          "weight": 6,
+          "title": "Assignments",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        }
+      ]
+    },
+    {
+      "id": "ems-breadth",
+      "n": 7,
+      "title": "EMS functional breadth",
+      "weight": 10,
+      "baseline": 4.5,
+      "reference": 9,
+      "raw": 0,
+      "score": 0,
+      "caps": [],
+      "missingAttestations": [],
+      "gates": [
+        {
+          "id": "ems-employees",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Employees and departments",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-checkin",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Self-service check-in/out",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-today",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Today's attendance for HR",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-leave",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Leave",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-rosters",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Rosters",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-payroll",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Payroll runs and payslips (no statutory rules)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-shift-swap",
+          "kind": "target",
+          "weight": 8,
+          "title": "Shift swap and overtime rules",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-accrual",
+          "kind": "target",
+          "weight": 8,
+          "title": "Leave accrual policies",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-onboarding",
+          "kind": "target",
+          "weight": 8,
+          "title": "Onboarding and offboarding workflows",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-org-chart",
+          "kind": "target",
+          "weight": 5,
+          "title": "Org chart",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-expenses",
+          "kind": "target",
+          "weight": 8,
+          "title": "Expenses",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-performance",
+          "kind": "target",
+          "weight": 8,
+          "title": "Performance reviews",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-recruitment",
+          "kind": "target",
+          "weight": 6,
+          "title": "Recruitment (lite)",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "ems-country-payroll",
+          "kind": "target",
+          "weight": 4,
+          "title": "Country-payroll plug-in interface behind the assumption ledger",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        }
+      ]
+    },
+    {
+      "id": "offline-mobile",
+      "n": 8,
+      "title": "Offline and mobile",
+      "weight": 5,
+      "baseline": 1.5,
+      "reference": 8.5,
+      "raw": 1.5,
+      "score": 1.5,
+      "caps": [],
+      "missingAttestations": [],
+      "gates": [
+        {
+          "id": "mobile-viewport",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "Responsive web app reachable from phone browsers (viewport meta)",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "pwa-manifest",
+          "kind": "target",
+          "weight": 10,
+          "title": "Installable PWA manifest",
+          "status": "fail",
+          "detail": "missing: apps/frontend/public/manifest.webmanifest"
+        },
+        {
+          "id": "service-worker",
+          "kind": "target",
+          "weight": 15,
+          "title": "Service worker",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "offline-queue",
+          "kind": "target",
+          "weight": 20,
+          "title": "Signed",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "conflict-ui",
+          "kind": "target",
+          "weight": 10,
+          "title": "Offline conflict UI",
+          "status": "fail",
+          "detail": "exit 1: Error: No tests found. | Make sure that arguments are regular expressions matching test files. | You may need to escape symbols like \"$\" or \"*\" and quote the arguments."
+        },
+        {
+          "id": "encrypted-cache",
+          "kind": "target",
+          "weight": 10,
+          "title": "Offline roster cache encrypted at rest",
+          "status": "fail",
+          "detail": "exit 1: filter: src/offline | include: **/*.{test,spec}.?(c|m)[jt]s?(x) | exclude:  **/node_modules/**, **/.git/**"
+        },
+        {
+          "id": "kiosk-offline",
+          "kind": "target",
+          "weight": 10,
+          "title": "Kiosk offline queue",
+          "status": "fail",
+          "detail": "exit 1: Error: No tests found. | Make sure that arguments are regular expressions matching test files. | You may need to escape symbols like \"$\" or \"*\" and quote the arguments."
+        },
+        {
+          "id": "lighthouse",
+          "kind": "target",
+          "weight": 10,
+          "title": "Lighthouse PWA and performance budgets in CI",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        }
+      ]
+    },
+    {
+      "id": "reliability",
+      "n": 9,
+      "title": "Reliability, ops, observability",
+      "weight": 8,
+      "baseline": 4,
+      "reference": 9,
+      "raw": 4,
+      "score": 4,
+      "caps": [],
+      "missingAttestations": [
+        "slo-30d"
+      ],
+      "gates": [
+        {
+          "id": "backup-restore",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "Scripted backups with restore verification",
+          "status": "pass"
+        },
+        {
+          "id": "health-ready",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Liveness and readiness endpoints",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "image-boot-ci",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "CI migrates and boots the production image",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "metrics-stored",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Operational metrics stored",
+          "status": "pass"
+        },
+        {
+          "id": "otel",
+          "kind": "target",
+          "weight": 8,
+          "title": "OpenTelemetry traces",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "prometheus",
+          "kind": "target",
+          "weight": 8,
+          "title": "Prometheus metrics endpoint (exposition format)",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "json-logs",
+          "kind": "target",
+          "weight": 8,
+          "title": "Structured JSON logs with request and tenant IDs",
+          "status": "fail",
+          "detail": "exit 1: filter: src/observability | include: src/**/*.test.ts, test/**/*.test.ts | exclude:  dist/**, node_modules/**"
+        },
+        {
+          "id": "alerts",
+          "kind": "target",
+          "weight": 5,
+          "title": "Alert rules",
+          "status": "fail",
+          "detail": "missing: deploy/observability/alerts.yml"
+        },
+        {
+          "id": "staging",
+          "kind": "target",
+          "weight": 5,
+          "title": "Staging environment parity",
+          "status": "fail",
+          "detail": "missing: deploy/staging/docker-compose.yml"
+        },
+        {
+          "id": "load-tests",
+          "kind": "target",
+          "weight": 8,
+          "title": "k6 load tests with stated SLOs",
+          "status": "fail",
+          "detail": "missing: loadtest/k6/api.js, docs/operations/slo.md"
+        },
+        {
+          "id": "pitr",
+          "kind": "target",
+          "weight": 6,
+          "title": "Off-site encrypted backups and point-in-time recovery",
+          "status": "fail",
+          "detail": "missing: docs/operations/backup-and-pitr.md"
+        },
+        {
+          "id": "restore-schedule",
+          "kind": "target",
+          "weight": 4,
+          "title": "Monthly automated restore test",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "multi-replica",
+          "kind": "target",
+          "weight": 4,
+          "title": "Multi-replica deployment proven",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "face-worker",
+          "kind": "target",
+          "weight": 4,
+          "title": "Face engine runs outside the API process",
+          "status": "fail",
+          "detail": "missing: apps/face-worker/package.json"
+        }
+      ]
+    },
+    {
+      "id": "engineering",
+      "n": 10,
+      "title": "Engineering quality and secure SDLC",
+      "weight": 7,
+      "baseline": 5.5,
+      "reference": 8.5,
+      "raw": 6.6,
+      "score": 6.6,
+      "caps": [],
+      "missingAttestations": [],
+      "gates": [
+        {
+          "id": "ci-exists",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "CI workflow",
+          "status": "pass"
+        },
+        {
+          "id": "typecheck-backend",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Backend typechecks",
+          "status": "pass"
+        },
+        {
+          "id": "typecheck-frontend",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Frontend typechecks",
+          "status": "pass"
+        },
+        {
+          "id": "unit-tests",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Backend unit tests pass",
+          "status": "fail",
+          "detail": "exit 1: - The error was thrown, while Vitest was running this test. | - If the error occurred after the test had been completed, this was the last documented test before it was thrown. | ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
+        },
+        {
+          "id": "sql-validator",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Every static SQL statement resolves against the live schema",
+          "status": "pass"
+        },
+        {
+          "id": "e2e-all",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Every e2e suite in the runner passes",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "image-build",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Container images built in CI",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "eslint",
+          "kind": "target",
+          "weight": 5,
+          "title": "ESLint passes in both workspaces",
+          "status": "pass"
+        },
+        {
+          "id": "prettier",
+          "kind": "target",
+          "weight": 2,
+          "title": "Application code is Prettier-formatted (not only scripts/)",
+          "status": "fail",
+          "detail": "exit 1: [\u001b[33mwarn\u001b[39m] apps/frontend/src/utils/sessionRefresh.ts | [\u001b[33mwarn\u001b[39m] apps/frontend/src/utils/visualHierarchy.ts | [\u001b[33mwarn\u001b[39m] Code style issues found in 266 files. Run Prettier with --write to fix."
+        },
+        {
+          "id": "strict-ts-backend",
+          "kind": "target",
+          "weight": 5,
+          "title": "Backend TypeScript strict mode",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "frontend-tests",
+          "kind": "target",
+          "weight": 5,
+          "title": "Frontend unit and component tests",
+          "status": "fail",
+          "detail": "exit 1:  | include: **/*.{test,spec}.?(c|m)[jt]s?(x) | exclude:  **/node_modules/**, **/.git/**"
+        },
+        {
+          "id": "playwright",
+          "kind": "target",
+          "weight": 5,
+          "title": "Playwright e2e for critical flows in CI",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "coverage-floor",
+          "kind": "target",
+          "weight": 2,
+          "title": "Coverage floor enforced in CI",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "dependabot",
+          "kind": "target",
+          "weight": 3,
+          "title": "Dependabot",
+          "status": "pass"
+        },
+        {
+          "id": "sast",
+          "kind": "target",
+          "weight": 4,
+          "title": "SAST (CodeQL or Semgrep)",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "npm-audit",
+          "kind": "target",
+          "weight": 2,
+          "title": "Dependency audit in CI",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "container-scan",
+          "kind": "target",
+          "weight": 3,
+          "title": "Container image scanning",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "sbom",
+          "kind": "target",
+          "weight": 2,
+          "title": "SBOM generated",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "gitleaks",
+          "kind": "target",
+          "weight": 3,
+          "title": "Secret scan in CI and pre-commit",
+          "status": "pass"
+        },
+        {
+          "id": "migration-lint",
+          "kind": "target",
+          "weight": 2,
+          "title": "Migration ordering unique; no _OLD files",
+          "status": "pass"
+        },
+        {
+          "id": "repo-hygiene",
+          "kind": "target",
+          "weight": 2,
+          "title": "No stray debug scripts",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "id": "ux-a11y-i18n",
+      "n": 11,
+      "title": "UX, accessibility, i18n",
+      "weight": 6,
+      "baseline": 4.5,
+      "reference": 8.5,
+      "raw": 4.5,
+      "score": 4.5,
+      "caps": [],
+      "missingAttestations": [],
+      "gates": [
+        {
+          "id": "aria-usage",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "ARIA attributes in use (>= 100)",
+          "status": "pass",
+          "detail": "136 found"
+        },
+        {
+          "id": "responsive",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "Responsive utility classes in use",
+          "status": "pass",
+          "detail": "223 found"
+        },
+        {
+          "id": "nav-check",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "Navigation and API-path consistency checks",
+          "status": "pass"
+        },
+        {
+          "id": "axe-ci",
+          "kind": "target",
+          "weight": 15,
+          "title": "Automated axe checks in CI",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "i18n",
+          "kind": "target",
+          "weight": 10,
+          "title": "i18n framework",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        },
+        {
+          "id": "second-locale",
+          "kind": "target",
+          "weight": 5,
+          "title": "A second locale proves the pipeline",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "keyboard-checklist",
+          "kind": "target",
+          "weight": 5,
+          "title": "Manual keyboard and screen-reader checklist",
+          "status": "fail",
+          "detail": "missing: docs/accessibility/manual-checklist.md"
+        },
+        {
+          "id": "phone-width",
+          "kind": "target",
+          "weight": 5,
+          "title": "Layouts verified at phone width (Playwright)",
+          "status": "fail",
+          "detail": "exit 1: Error: No tests found. | Make sure that arguments are regular expressions matching test files. | You may need to escape symbols like \"$\" or \"*\" and quote the arguments."
+        },
+        {
+          "id": "bandwidth-budget",
+          "kind": "target",
+          "weight": 10,
+          "title": "Low-bandwidth bundle budget enforced",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "printable",
+          "kind": "target",
+          "weight": 5,
+          "title": "Printable and PDF views",
+          "status": "fail",
+          "detail": "0 found, need 1"
+        }
+      ]
+    },
+    {
+      "id": "integrations",
+      "n": 12,
+      "title": "Integrations and API",
+      "weight": 5,
+      "baseline": 3,
+      "reference": 8.5,
+      "raw": 0.5,
+      "score": 0.5,
+      "caps": [],
+      "missingAttestations": [],
+      "gates": [
+        {
+          "id": "csv-export",
+          "kind": "foundation",
+          "weight": 15,
+          "title": "CSV exports (adminApi",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "notification-providers",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Notification outbox with per-tenant providers",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "storage-backends",
+          "kind": "foundation",
+          "weight": 5,
+          "title": "Pluggable storage backend",
+          "status": "pass"
+        },
+        {
+          "id": "openapi",
+          "kind": "target",
+          "weight": 15,
+          "title": "OpenAPI 3.1 generated and checked in CI",
+          "status": "fail",
+          "detail": "missing: docs/api/openapi.json"
+        },
+        {
+          "id": "public-api-keys",
+          "kind": "target",
+          "weight": 15,
+          "title": "Versioned public API with scoped per-tenant keys",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "webhooks",
+          "kind": "target",
+          "weight": 10,
+          "title": "Signed outbound webhooks with retries",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "import",
+          "kind": "target",
+          "weight": 10,
+          "title": "CSV/XLSX import and export",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "scim",
+          "kind": "target",
+          "weight": 10,
+          "title": "SCIM provisioning",
+          "status": "not-run",
+          "detail": "no e2e results file"
+        },
+        {
+          "id": "payments",
+          "kind": "target",
+          "weight": 10,
+          "title": "Payment-provider abstraction",
+          "status": "fail",
+          "detail": "missing: apps/backend/src/payments/provider.ts"
+        }
+      ]
+    },
+    {
+      "id": "compliance",
+      "n": 13,
+      "title": "Compliance and governance",
+      "weight": 3,
+      "baseline": 4,
+      "reference": 8.5,
+      "raw": 4,
+      "score": 4,
+      "caps": [],
+      "missingAttestations": [
+        "soc2-iso"
+      ],
+      "gates": [
+        {
+          "id": "honest-readme",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "README lists what is not done",
+          "status": "pass",
+          "detail": "1 found"
+        },
+        {
+          "id": "credential-doc",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Credential exposure documented with rotation steps",
+          "status": "pass"
+        },
+        {
+          "id": "security-docs",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Security architecture documented",
+          "status": "pass"
+        },
+        {
+          "id": "immutable-audit",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Immutable audit trail exists",
+          "status": "pass"
+        },
+        {
+          "id": "control-mapping",
+          "kind": "target",
+          "weight": 15,
+          "title": "Control mapping (SOC 2",
+          "status": "fail",
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
+        },
+        {
+          "id": "ir-runbook",
+          "kind": "target",
+          "weight": 10,
+          "title": "Incident-response runbook",
+          "status": "fail",
+          "detail": "missing: docs/compliance/incident-response.md"
+        },
+        {
+          "id": "breach-notification",
+          "kind": "target",
+          "weight": 5,
+          "title": "Breach-notification runbook",
+          "status": "fail",
+          "detail": "missing: docs/compliance/breach-notification.md"
+        },
+        {
+          "id": "subprocessors",
+          "kind": "target",
+          "weight": 5,
+          "title": "Vendor and sub-processor list",
+          "status": "fail",
+          "detail": "missing: docs/compliance/subprocessors.md"
+        },
+        {
+          "id": "policies",
+          "kind": "target",
+          "weight": 10,
+          "title": "Policy set",
+          "status": "fail",
+          "detail": "missing: docs/compliance/policies/README.md"
+        },
+        {
+          "id": "security-txt",
+          "kind": "target",
+          "weight": 5,
+          "title": "security.txt served",
+          "status": "fail",
+          "detail": "missing: apps/frontend/public/.well-known/security.txt"
+        },
+        {
+          "id": "vdp",
+          "kind": "target",
+          "weight": 5,
+          "title": "Vulnerability-disclosure policy",
+          "status": "fail",
+          "detail": "missing: SECURITY.md"
+        },
+        {
+          "id": "ir-exercised",
+          "kind": "target",
+          "weight": 5,
+          "title": "Incident-response exercise recorded",
+          "status": "fail",
+          "detail": "missing: docs/compliance/exercises/ir-exercise-1.md"
+        }
+      ]
+    }
+  ]
+}

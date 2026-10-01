@@ -119,12 +119,16 @@ Run these before pushing; CI runs the same.
 
 | Check | Command |
 |---|---|
-| API types | `cd apps/backend && npx tsc --noEmit -p .` |
+| Repository hygiene and migration naming | `npm run check:repo` |
+| Lint, both apps (0 errors; warning count may only fall) | `npm ci && npm run lint` |
+| API types (strict) | `cd apps/backend && npx tsc --noEmit -p .` |
 | Every literal SQL statement parsed against the live schema | `node scripts/validate-sql.mjs` (needs `DATABASE_URL`) |
 | Unit tests (includes the real face models on fixtures) | `npm test` |
 | End-to-end API suites against a running API: seeds two schools and two companies, then runs 25 suites | `bash scripts/run-all-e2e.sh` |
 | Web app: types, every menu link routed, every API call matched to a server route, build | `cd apps/frontend && npm run build` |
-| Container images build, migrate an empty database and report ready (CI job `images`) | see `.github/workflows/ci.yml` |
+| Container images build, migrate an empty database and report ready, with a vulnerability scan and SBOM (CI job `images`) | see `.github/workflows/ci.yml` |
+| Dependency audit, secret scan, static analysis (CI job `supply-chain`) | see `.github/workflows/ci.yml` |
+| Scorecard: every gate in `scripts/scorecard/rubric.yml`, scored | `npm run scorecard -- --phase <name>`; latest in [docs/scorecard/LATEST.md](docs/scorecard/LATEST.md) |
 
 ## Not done yet
 
@@ -138,6 +142,15 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
 - No passkeys (WebAuthn) and no single sign-on. Two-factor is
   authenticator-app codes.
 - Tokens are held in `localStorage`, not `httpOnly` cookies.
+- Tenant isolation is enforced in application code (tenant from identity,
+  every query scoped by hand) and by database triggers on cross-tenant
+  references. There is no PostgreSQL row-level security yet, and the API
+  connects as the role that owns the tables. That is the next piece of work.
+- The web app has no automated tests. Prettier is configured but applied only
+  to `scripts/` so far.
+- The credentials once committed are still in git history until the purge in
+  [docs/security/history-purge-plan.md](docs/security/history-purge-plan.md)
+  runs (after rotation).
 - Email and SMS delivery depend on each tenant configuring a provider. Until
   then messages are recorded as *simulated*, never as sent.
 - Not built:

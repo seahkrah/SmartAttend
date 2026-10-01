@@ -10,6 +10,15 @@ The platform is the Express/TypeScript build under `apps/`
 ([decisions/2026-09-30-keep-express-platform.md](decisions/2026-09-30-keep-express-platform.md)).
 Stages are in order; each ends with the full check suite green.
 
+### Alongside the stages: hardening, measured
+
+From 2026-10-01 a hardening track runs alongside these stages (branch
+`feat/hardening`), measured by the scorecard in `scripts/scorecard/`. Its
+progress is the committed history of `docs/scorecard/`, and what only the
+owner can do is in `docs/scorecard/OWNER_ACTIONS.md`. Its next phase reverses
+one decision of record: tenant data moves under PostgreSQL row-level security,
+with the API on a role that cannot bypass it.
+
 ## Stage 0 · Consolidate (days)
 
 - [ ] Merge this branch into `main` (it is 59 commits ahead; `main` still

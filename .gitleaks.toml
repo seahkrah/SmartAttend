@@ -1,0 +1,13 @@
+# Secret scanning. Run in CI (.github/workflows/ci.yml) and before each
+# commit (.pre-commit-config.yaml). The default rules apply in full; the only
+# exclusions are generated or vendored trees, never a source path.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths that are not source"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)package-lock\.json$''',
+]

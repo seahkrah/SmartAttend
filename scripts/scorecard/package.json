@@ -1,0 +1,12 @@
+{
+  "name": "jjelotech-scorecard",
+  "private": true,
+  "type": "module",
+  "description": "Runs the gates in rubric.yml and writes docs/scorecard/",
+  "scripts": {
+    "score": "node run.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.6.0"
+  }
+}

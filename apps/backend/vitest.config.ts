@@ -16,10 +16,18 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/tests/**', 'dist/**'],
-      lines: 80,
-      functions: 80,
-      branches: 75,
-      statements: 80,
+      // A floor, raised as tests are added; never lowered. It was "80" before,
+      // at a level of the config Vitest ignores and with no coverage provider
+      // installed, so nothing was ever enforced. Measured 2026-10-01: lines
+      // 4.11%, statements 4.2%, functions 6.07%, branches 3.92%. That is unit
+      // tests only: the e2e suites exercise the API from outside the process
+      // and are not counted here.
+      thresholds: {
+        lines: 4,
+        statements: 4,
+        functions: 6,
+        branches: 3.5,
+      },
     },
     setupFiles: ['./src/tests/setup.ts'],
     testTimeout: 30000,

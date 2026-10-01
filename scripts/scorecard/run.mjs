@@ -5,12 +5,19 @@
  *   docs/scorecard/<phase>-<date>.json   the full result, committed
  *   docs/scorecard/LATEST.md             a human summary
  *
- *   node scripts/scorecard/run.mjs --phase phase-0 [--only tenant-isolation] [--no-write]
+ *   node scripts/scorecard/run.mjs --phase phase-0 [--only <dimension>] [--no-write] [--allow-dirty]
  *
- * Prerequisites are detected, never assumed: DATABASE_URL (and optionally
- * APP_DATABASE_URL, the API's runtime role), API_BASE, and E2E_RESULTS (the
- * file scripts/run-all-e2e.sh writes). A gate whose prerequisite is missing
- * is reported NOT RUN and earns nothing.
+ * Prerequisites are detected, never assumed:
+ *   DATABASE_URL       a migrated database (APP_DATABASE_URL: the API's runtime role)
+ *   API_BASE           a running API
+ *   E2E_RESULTS        the file scripts/run-all-e2e.sh writes; counted only if
+ *                      it was produced at the current commit
+ *   CI_NEEDS           in GitHub Actions, toJSON(needs): the result of each job
+ * A gate whose prerequisite is missing is NOT RUN and earns nothing.
+ *
+ * Only committed (or staged) files count: work in progress earns nothing.
+ * A phase scorecard (--phase phase-*) refuses to write from a dirty tree, so
+ * the commit it names is the code it measured.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -30,21 +37,70 @@ const arg = (name, fallback) => {
 const phase = arg('phase', 'adhoc')
 const only = arg('only', null)
 const write = !args.includes('--no-write')
+const allowDirty = args.includes('--allow-dirty')
 const today = new Date().toISOString().slice(0, 10)
 
+const git = cmd => execSync(`git ${cmd}`, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim()
+const head = git('rev-parse HEAD')
+const dirty = git('status --porcelain --untracked-files=no') !== ''
+
+if (write && !only && /^phase-/.test(phase) && dirty && !allowDirty) {
+  console.error('A phase scorecard must measure a commit: commit or stash your changes first (or pass --allow-dirty).')
+  process.exit(2)
+}
+
+// ── Rubric validation ──────────────────────────────────────────────────────
 const rubric = YAML.parse(fs.readFileSync(path.join(import.meta.dirname, 'rubric.yml'), 'utf8'))
 
-// The calibration rule in rubric.yml, enforced: gate weights add up to 100,
-// and foundation weights to the assessed baseline. Editing a weight without
-// keeping both true is an error, not a quiet change of score.
-for (const dim of rubric.dimensions) {
-  const total = dim.gates.reduce((s, g) => s + g.weight, 0)
-  const foundation = dim.gates.filter(g => g.kind === 'foundation').reduce((s, g) => s + g.weight, 0)
-  const ids = dim.gates.map(g => g.id)
-  if (total !== 100 || foundation !== dim.baseline * 10 || new Set(ids).size !== ids.length) {
-    console.error(
-      `rubric.yml: ${dim.id} gates weigh ${total} (want 100), foundation ${foundation} (want ${dim.baseline * 10}), or a gate id repeats`,
-    )
+const GATE_KEYS = {
+  common: ['id', 'kind', 'weight', 'title', 'type', 'requires'],
+  files: ['paths', 'minBytes'],
+  grep: ['paths', 'pattern', 'min', 'count'],
+  'grep-absent': ['paths', 'pattern'],
+  cmd: ['run', 'cwd', 'timeout'],
+  e2e: ['suites'],
+  check: ['check'],
+  'ci-job': ['jobs'],
+}
+const REQUIRED = {
+  files: ['paths'],
+  grep: ['paths', 'pattern'],
+  'grep-absent': ['paths', 'pattern'],
+  cmd: ['run'],
+  e2e: ['suites'],
+  check: ['check'],
+  'ci-job': ['jobs'],
+}
+
+function rubricProblems() {
+  const problems = []
+  const baseline = JSON.parse(fs.readFileSync(path.join(OUT_DIR, 'baseline.json'), 'utf8')).assessed.dimensions
+  for (const dim of rubric.dimensions) {
+    const total = dim.gates.reduce((s, g) => s + g.weight, 0)
+    const foundation = dim.gates.filter(g => g.kind === 'foundation').reduce((s, g) => s + g.weight, 0)
+    const ids = dim.gates.map(g => g.id)
+    if (total !== 100) problems.push(`${dim.id}: gates weigh ${total}, want 100`)
+    if (foundation !== Math.round(dim.baseline * 10))
+      problems.push(`${dim.id}: foundation weighs ${foundation}, want ${dim.baseline * 10}`)
+    if (baseline[dim.id] !== dim.baseline)
+      problems.push(`${dim.id}: baseline ${dim.baseline} differs from baseline.json (${baseline[dim.id]})`)
+    if (new Set(ids).size !== ids.length) problems.push(`${dim.id}: a gate id repeats`)
+    for (const g of dim.gates) {
+      const allowed = new Set([...GATE_KEYS.common, ...(GATE_KEYS[g.type] || [])])
+      if (!GATE_KEYS[g.type]) problems.push(`${g.id}: unknown type ${g.type}`)
+      for (const k of Object.keys(g))
+        if (!allowed.has(k)) problems.push(`${g.id}: unexpected key "${k}" (a comma in an unquoted value?)`)
+      for (const k of REQUIRED[g.type] || []) if (g[k] === undefined) problems.push(`${g.id}: missing ${k}`)
+      if (!['foundation', 'target'].includes(g.kind)) problems.push(`${g.id}: kind must be foundation or target`)
+      if (typeof g.title !== 'string' || !g.title) problems.push(`${g.id}: missing title`)
+    }
+  }
+  return problems
+}
+{
+  const problems = rubricProblems()
+  if (problems.length) {
+    console.error('rubric.yml is invalid:\n  ' + problems.join('\n  '))
     process.exit(2)
   }
 }
@@ -75,37 +131,75 @@ async function apiUp(base) {
   }
 }
 
+/** The suites scripts/run-all-e2e.sh runs, read from the script itself. */
+function runnerSuites() {
+  const script = fs.readFileSync(path.join(ROOT, 'apps', 'backend', 'scripts', 'run-all-e2e.sh'), 'utf8')
+  const block = /SUITES=\(([\s\S]*?)\n\)/.exec(script)
+  const suites = block[1]
+    .split('\n')
+    .map(l => l.replace(/#.*/, '').trim())
+    .filter(Boolean)
+  return [...suites, 'tenantIsolation']
+}
+
+/**
+ * Results count only when the run says it was made at this commit, from a
+ * clean tree, and covers every suite in the runner. Anything else is stale,
+ * partial or hand-made, and the e2e gates are NOT RUN.
+ */
 function readE2E(file) {
-  if (!file || !fs.existsSync(file)) return null
+  if (!file || !fs.existsSync(file)) return { results: null, note: 'no e2e results file' }
   const results = new Map()
+  let meta = {}
   for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    if (line.startsWith('#')) {
+      for (const kv of line.slice(1).trim().split(/\s+/)) {
+        const [k, v] = kv.split('=')
+        meta[k] = v
+      }
+      continue
+    }
     const [suite, status] = line.split('\t')
     if (suite && status) results.set(suite.trim(), status.trim())
   }
-  return results.size ? results : null
+  if (meta.commit !== head)
+    return {
+      results: null,
+      note: `e2e results are from ${meta.commit ? meta.commit.slice(0, 7) : 'an unknown commit'}, not ${head.slice(0, 7)}`,
+    }
+  if (meta.dirty !== 'false') return { results: null, note: 'e2e results came from a tree with uncommitted changes' }
+  const missing = runnerSuites().filter(s => !results.has(s))
+  if (missing.length) return { results: null, note: `e2e run is partial (missing ${missing.join(', ')})` }
+  return { results, note: `${results.size} suites at ${head.slice(0, 7)}` }
 }
 
+function readCiNeeds() {
+  if (!process.env.CI_NEEDS) return null
+  try {
+    return JSON.parse(process.env.CI_NEEDS)
+  } catch {
+    return null
+  }
+}
+
+const e2e = readE2E(process.env.E2E_RESULTS || path.join(ROOT, 'apps', 'backend', '.e2e-fixtures', 'results.tsv'))
 const env = {
   db: await dbClient(process.env.DATABASE_URL),
   appDbUrl: process.env.APP_DATABASE_URL || process.env.DATABASE_URL,
   api: await apiUp(process.env.API_BASE),
-  e2e: readE2E(process.env.E2E_RESULTS || path.join(ROOT, 'apps', 'backend', '.e2e-fixtures', 'results.tsv')),
+  e2e: e2e.results,
+  e2eNote: e2e.note,
+  ci: readCiNeeds(),
 }
-env.available = { db: !!env.db, api: env.api, e2e: !!env.e2e }
+env.available = { db: !!env.db, api: env.api, e2e: !!env.e2e, ci: !!env.ci }
 
 // ── Gate evaluation ────────────────────────────────────────────────────────
 let trackedFiles = null
 function tracked() {
-  // Tracked and untracked-but-not-ignored: a gate should see work in progress.
-  trackedFiles ??= execSync('git ls-files --cached --others --exclude-standard', {
-    cwd: ROOT,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  })
-    .split('\n')
-    .filter(Boolean)
+  trackedFiles ??= git('ls-files --cached').split('\n').filter(Boolean)
   return trackedFiles
 }
+const isTracked = p => tracked().includes(p.replace(/\\/g, '/'))
 
 function filesUnder(paths) {
   const prefixes = paths.map(p => p.replace(/\\/g, '/').replace(/\/$/, ''))
@@ -139,16 +233,17 @@ function grepCount(gate) {
   return gate.count === 'occurrences' ? occurrences : files
 }
 
-function globExists(pattern) {
-  // Supports a trailing ".*" (any extension) only; that is all the rubric uses.
-  const dir = path.join(ROOT, path.dirname(pattern))
-  const base = path.basename(pattern)
-  if (!fs.existsSync(dir)) return false
-  if (base.endsWith('.*')) {
-    const stem = base.slice(0, -2)
-    return fs.readdirSync(dir).some(f => f.startsWith(stem + '.'))
-  }
-  return fs.existsSync(path.join(dir, base))
+// A document that says it is unwritten is not the document.
+const PLACEHOLDER = /\b(TODO|TBD|not written|placeholder|lorem ipsum|coming soon)\b/i
+
+function checkFile(p, minBytes) {
+  if (!isTracked(p)) return `${p} not committed`
+  const full = path.join(ROOT, p)
+  const size = fs.statSync(full).size
+  if (size < minBytes) return `${p} is ${size} bytes (need ${minBytes})`
+  if (/\.(md|txt|ya?ml)$/i.test(p) && PLACEHOLDER.test(fs.readFileSync(full, 'utf8')))
+    return `${p} is marked as a placeholder`
+  return null
 }
 
 async function evaluate(gate) {
@@ -157,8 +252,8 @@ async function evaluate(gate) {
   }
   switch (gate.type) {
     case 'files': {
-      const missing = gate.paths.filter(p => !fs.existsSync(path.join(ROOT, p)))
-      return missing.length ? { status: 'fail', detail: `missing: ${missing.join(', ')}` } : { status: 'pass' }
+      const problems = gate.paths.map(p => checkFile(p, gate.minBytes ?? 300)).filter(Boolean)
+      return problems.length ? { status: 'fail', detail: problems.join('; ') } : { status: 'pass' }
     }
     case 'grep': {
       const n = grepCount(gate)
@@ -183,18 +278,21 @@ async function evaluate(gate) {
       return { status: 'fail', detail: res.error ? String(res.error.message) : `exit ${res.status}: ${tail}` }
     }
     case 'e2e': {
-      if (!env.e2e) return { status: 'not-run', detail: 'no e2e results file' }
-      if (gate.suites.length === 1 && gate.suites[0] === '*') {
-        const failed = [...env.e2e].filter(([, s]) => s !== 'pass').map(([n]) => n)
-        return failed.length
-          ? { status: 'fail', detail: `failed: ${failed.join(', ')}` }
-          : { status: 'pass', detail: `${env.e2e.size} suites` }
-      }
-      const missing = gate.suites.filter(s => !env.e2e.has(s))
-      const failed = gate.suites.filter(s => env.e2e.has(s) && env.e2e.get(s) !== 'pass')
+      if (!env.e2e) return { status: 'not-run', detail: env.e2eNote }
+      const wanted = gate.suites.length === 1 && gate.suites[0] === '*' ? runnerSuites() : gate.suites
+      const missing = wanted.filter(s => !env.e2e.has(s))
+      const failed = wanted.filter(s => env.e2e.has(s) && env.e2e.get(s) !== 'pass')
       if (missing.length) return { status: 'fail', detail: `suite not in runner: ${missing.join(', ')}` }
       if (failed.length) return { status: 'fail', detail: `failed: ${failed.join(', ')}` }
-      return { status: 'pass' }
+      return { status: 'pass', detail: `${wanted.length} suite(s)` }
+    }
+    case 'ci-job': {
+      // Configuration alone proves nothing: the job has to have run, and passed, in this workflow run.
+      if (!env.ci) return { status: 'not-run', detail: 'needs a CI run (CI_NEEDS)' }
+      const bad = gate.jobs.filter(j => env.ci[j]?.result !== 'success')
+      return bad.length
+        ? { status: 'fail', detail: bad.map(j => `${j}: ${env.ci[j]?.result ?? 'absent'}`).join(', ') }
+        : { status: 'pass' }
     }
     case 'check': {
       const fn = customChecks[gate.check]
@@ -210,15 +308,40 @@ async function evaluate(gate) {
   }
 }
 
+// ── Attestations and the audit ─────────────────────────────────────────────
+/**
+ * An attestation is outside evidence, so it must be a substantial committed
+ * file that the implementing agent did not add: the commit that added it may
+ * not carry a Claude co-author trailer. This is a guard against an agent
+ * writing its own evidence, not against a person forging one.
+ */
+function attestationProblem(pattern) {
+  const dir = path.dirname(pattern)
+  const stem = path.basename(pattern).replace(/\.\*$/, '')
+  const candidates = tracked().filter(f => path.dirname(f) === dir && path.basename(f).startsWith(stem + '.'))
+  if (!candidates.length) return 'missing'
+  for (const f of candidates) {
+    if (fs.statSync(path.join(ROOT, f)).size < 1024) continue
+    const added = git(`log --diff-filter=A --format=%B -- "${f}"`)
+    if (/co-authored-by:\s*claude/i.test(added)) continue
+    return null
+  }
+  return 'present but under 1 KB, or added by the implementing agent'
+}
+
+/** The audit counts only with its written report beside it. */
+function readAudit() {
+  const json = path.join(OUT_DIR, `audit-${phase}.json`)
+  const report = path.join(OUT_DIR, `audit-${phase}.md`)
+  if (!fs.existsSync(json)) return { audit: null, note: null }
+  if (!fs.existsSync(report) || fs.statSync(report).size < 1024)
+    return { audit: null, note: `audit-${phase}.json ignored: no report beside it` }
+  return { audit: JSON.parse(fs.readFileSync(json, 'utf8')), note: null }
+}
+
 // ── Scoring ────────────────────────────────────────────────────────────────
 const round1 = n => Math.round(n * 10) / 10
-
-function readAudit() {
-  const file = path.join(OUT_DIR, `audit-${phase}.json`)
-  if (!fs.existsSync(file)) return null
-  return JSON.parse(fs.readFileSync(file, 'utf8'))
-}
-const audit = readAudit()
+const { audit, note: auditNote } = readAudit()
 
 const dimensions = []
 for (const dim of rubric.dimensions) {
@@ -239,7 +362,7 @@ for (const dim of rubric.dimensions) {
     score = 8.9
     caps.push('not every gate passes (max 8.9)')
   }
-  const missingAttestations = (dim.attestations || []).filter(a => !globExists(rubric.attestations[a].file))
+  const missingAttestations = (dim.attestations || []).filter(a => attestationProblem(rubric.attestations[a].file))
   if (missingAttestations.length && score > 8.5) {
     score = 8.5
     caps.push(`attestation missing: ${missingAttestations.join(', ')} (max 8.5)`)
@@ -279,12 +402,15 @@ const baselineComposite = round1(
 const result = {
   phase,
   date: today,
-  commit: execSync('git rev-parse --short HEAD', { cwd: ROOT, encoding: 'utf8' }).trim(),
+  commit: head.slice(0, 7),
+  dirty,
   environment: env.available,
+  e2e: env.e2eNote,
   composite,
   baselineComposite,
   referenceComposite: rubric.phase_reference_composite,
   audit: audit ? `audit-${phase}.json` : null,
+  auditNote,
   dimensions,
 }
 
@@ -293,8 +419,8 @@ function previousResult() {
   if (!fs.existsSync(OUT_DIR)) return null
   const files = fs
     .readdirSync(OUT_DIR)
-    .filter(f => /^phase-.*-\d{4}-\d{2}-\d{2}\.json$/.test(f) && f !== `${phase}-${today}.json`)
-    .sort((a, b) => fs.statSync(path.join(OUT_DIR, a)).mtimeMs - fs.statSync(path.join(OUT_DIR, b)).mtimeMs)
+    .filter(f => /^phase-.*-\d{4}-\d{2}-\d{2}\.json$/.test(f) && !f.startsWith(`${phase}-`))
+    .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
   const last = files.at(-1)
   return last ? JSON.parse(fs.readFileSync(path.join(OUT_DIR, last), 'utf8')) : null
 }
@@ -305,7 +431,7 @@ function markdown(r, prev) {
     before === undefined || before === null ? '—' : `${now - before >= 0 ? '+' : ''}${(now - before).toFixed(1)}`
   const prevDim = id => prev?.dimensions?.find(d => d.id === id)?.score
   const lines = []
-  lines.push(`# Scorecard: ${r.phase} (${r.date}, ${r.commit})`, '')
+  lines.push(`# Scorecard: ${r.phase} (${r.date}, ${r.commit}${r.dirty ? ', DIRTY TREE' : ''})`, '')
   lines.push('Generated by `node scripts/scorecard/run.mjs`. Do not edit by hand.', '')
   lines.push(
     `**Composite ${fmt(r.composite)}** · previous ${prev ? `${fmt(prev.composite)} (${prev.phase})` : '—'} · assessed baseline ${fmt(r.baselineComposite)} · global-class reference about ${fmt(r.referenceComposite)}`,
@@ -314,8 +440,17 @@ function markdown(r, prev) {
   const envLine = Object.entries(r.environment)
     .map(([k, v]) => `${k} ${v ? 'available' : 'NOT available'}`)
     .join(', ')
-  lines.push(`Environment: ${envLine}. Gates needing something unavailable are NOT RUN and earn nothing.`, '')
-  if (!r.audit) lines.push(`No independent audit file for ${r.phase} yet, so no dimension can exceed 8.5.`, '')
+  lines.push(
+    `Environment: ${envLine} (e2e: ${r.e2e}). Gates needing something unavailable are NOT RUN and earn nothing.`,
+    '',
+  )
+  if (r.auditNote) lines.push(r.auditNote, '')
+  if (!r.audit) lines.push(`No independent audit for ${r.phase} yet, so no dimension can exceed 8.5.`, '')
+  else
+    lines.push(
+      `Independent audit: [audit-${r.phase}.md](audit-${r.phase}.md). Where it scored lower, its score is used.`,
+      '',
+    )
   lines.push(
     '| # | Dimension | Weight | Score | Δ prev | Baseline | Reference | Caps |',
     '|---|---|---|---|---|---|---|---|',

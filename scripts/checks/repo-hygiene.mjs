@@ -32,6 +32,21 @@ const rules = [
     why: 'Django leftover (the Django rebuild is retired)',
   },
   { re: /^\.claude\/.*\.html$/, allow: [], why: 'scratch copy under .claude/' },
+  {
+    // Environment files hold configuration that is often secret. Templates
+    // (.env.example) are fine anywhere. The others below predate Phase 0 and
+    // are under review (OA-2 in docs/scorecard/OWNER_ACTIONS.md); none may
+    // join them.
+    re: /(^|\/)\.env(?!\.example$)(\.[^/]*)?$/,
+    allow: [
+      '.env.development',
+      '.env.production',
+      '.env.staging',
+      'apps/backend/.env.development',
+      'apps/frontend/.env.development',
+    ],
+    why: 'environment file (only .env.example belongs in git)',
+  },
   { re: /(^|\/)node_modules\//, allow: [], why: 'installed dependency (lockfiles are the record)' },
   { re: /(^|\/)dist\//, allow: [], why: 'build output' },
 ]

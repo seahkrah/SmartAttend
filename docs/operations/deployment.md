@@ -118,6 +118,40 @@ For a managed PostgreSQL, use the provider's snapshots or
 4. Unpack the files archive into the files volume.
 5. Start the API and confirm `/api/health/ready` returns 200.
 
+## Rolling back across the migration renumbering
+
+Fourteen migrations were renamed on 2026-10-01 (`006_…` became `006a_…`, and
+so on; see `apps/backend/src/db/migrationLedger.ts`). The first `migrate.ts`
+run of a newer image rewrites those rows in the `migrations` table.
+
+An image built **before** that change knows only the old names. Rolled back
+onto a database the newer image has migrated, it would see fourteen pending
+migrations: its readiness check would never report ready, and its migrator
+would try to run them again over the existing schema. Do not run the old
+migrator. First put the ledger back, in one transaction:
+
+```sql
+BEGIN;
+UPDATE migrations SET name = '006_add_platform_id_to_school_departments.sql' WHERE name = '006a_add_platform_id_to_school_departments.sql';
+UPDATE migrations SET name = '006_infrastructure_control_plane.sql' WHERE name = '006b_infrastructure_control_plane.sql';
+UPDATE migrations SET name = '006_superadmin_security_tables.sql' WHERE name = '006c_superadmin_security_tables.sql';
+UPDATE migrations SET name = '007_add_platform_id_to_students.sql' WHERE name = '007a_add_platform_id_to_students.sql';
+UPDATE migrations SET name = '007_role_escalation_detection.sql' WHERE name = '007b_role_escalation_detection.sql';
+UPDATE migrations SET name = '007_safety_controls.sql' WHERE name = '007c_safety_controls.sql';
+UPDATE migrations SET name = '008_5_immutability_triggers.sql' WHERE name = '008a_immutability_triggers.sql';
+UPDATE migrations SET name = '008_add_platform_id_to_corporate_departments.sql' WHERE name = '008b_add_platform_id_to_corporate_departments.sql';
+UPDATE migrations SET name = '008_immutable_audit_logging.sql' WHERE name = '008c_immutable_audit_logging.sql';
+UPDATE migrations SET name = '008_incident_management_system.sql' WHERE name = '008d_incident_management_system.sql';
+UPDATE migrations SET name = '012_add_password_reset_flag.sql' WHERE name = '012a_add_password_reset_flag.sql';
+UPDATE migrations SET name = '012_platform_metrics_7_1.sql' WHERE name = '012b_platform_metrics_7_1.sql';
+UPDATE migrations SET name = '017_face_recognition_and_sessions.sql' WHERE name = '017a_face_recognition_and_sessions.sql';
+UPDATE migrations SET name = '017_time_authority_clock_drift_tracking.sql' WHERE name = '017b_time_authority_clock_drift_tracking.sql';
+COMMIT;
+```
+
+Then start the older image. Rolling forward again needs nothing: the newer
+migrator renames the rows once more.
+
 ## Building images behind a TLS-intercepting proxy
 
 Pass the proxy's CA as a build secret. It is used only while installing

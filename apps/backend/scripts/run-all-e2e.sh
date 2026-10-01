@@ -69,9 +69,13 @@ SUITES=(
   gradeSchoolApi
 )
 
-# One line per suite, "<suite> <pass|fail>", for scripts/scorecard to read.
+# One line per suite, "<suite><TAB><pass|fail>", for scripts/scorecard to read.
+# The header ties the results to the code that produced them: the scorecard
+# ignores results from any other commit or from a dirty tree.
 export E2E_RESULTS="${E2E_RESULTS:-$E2E_FIXTURE_DIR/results.tsv}"
-: > "$E2E_RESULTS"
+tree_dirty=true
+[ -z "$(git status --porcelain --untracked-files=no)" ] && tree_dirty=false
+printf '# commit=%s dirty=%s started=%s\n' "$(git rev-parse HEAD)" "$tree_dirty" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$E2E_RESULTS"
 record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }
 
 fail=0

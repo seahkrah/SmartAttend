@@ -8,7 +8,7 @@ files under `docs/scorecard/evidence/` where one is named.
 | ID | Action | Blocks / caps | State |
 |---|---|---|---|
 | OA-1 | **Rotate every credential** in `SECURITY_CREDENTIAL_ROTATION.md` (application accounts, both PostgreSQL passwords, anything that reused them). Then run the purge in `docs/security/history-purge-plan.md` and authorise the force-push. | Full-history secret scanning in CI; finding 1 | Open |
-| OA-2 | Confirm the tracked `.env.development`, `.env.production`, `.env.staging` (root) and `apps/backend/.env.development` hold placeholders only. If any holds a real secret, rotate it and add it to OA-1's purge list. | Finding 2 | Open |
+| OA-2 | Confirm the tracked `.env.development`, `.env.production`, `.env.staging` (root) and `apps/backend/.env.development` and `apps/frontend/.env.development` hold placeholders only. If any holds a real secret, rotate it and add it to OA-1's purge list. | Finding 2 | Open |
 | OA-3 | Start Docker Desktop on the development machine, or provide another PostgreSQL 16 for local runs. Phase 0 could not run the e2e suites locally; CI is the record until then. | Local e2e verification | Open |
 | OA-4 | Independent penetration test; save the report as `docs/scorecard/evidence/pentest-report.pdf` (or `.md`). | Caps dimensions 1, 2, 4 at 8.5 | Open |
 | OA-5 | ISO/IEC 30107-3 presentation-attack-detection lab test of face matching; report as `docs/scorecard/evidence/iso30107-3-pad-report.*`. | Caps dimension 5 at 8.5 | Open |

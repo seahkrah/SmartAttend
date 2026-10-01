@@ -246,7 +246,10 @@ function grepCount(gate) {
 }
 
 // A document that says it is unwritten is not the document.
-const PLACEHOLDER = /\b(TODO|TBD|not written|placeholder|lorem ipsum|coming soon)\b/i
+// Markers only: a document may discuss placeholders (authentication.md
+// describes rejecting placeholder secrets) without being one.
+const PLACEHOLDER =
+  /^\s*[-*]?\s*(TODO|TBD)\b|\bnot written( yet)?\b|^\s*\*\*status: (skeleton|draft|placeholder)|\[placeholder\]|lorem ipsum/im
 
 function checkFile(p, minBytes) {
   if (!isTracked(p)) return `${p} not committed`

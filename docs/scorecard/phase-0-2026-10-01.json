@@ -1,16 +1,20 @@
 {
   "phase": "phase-0",
   "date": "2026-10-01",
-  "commit": "b70660d",
+  "commit": "e89b5ad",
+  "dirty": false,
   "environment": {
     "db": true,
     "api": false,
-    "e2e": false
+    "e2e": false,
+    "ci": false
   },
-  "composite": 2.4,
+  "e2e": "no e2e results file",
+  "composite": 2,
   "baselineComposite": 5.3,
   "referenceComposite": 8.7,
-  "audit": null,
+  "audit": "audit-phase-0.json",
+  "auditNote": null,
   "dimensions": [
     {
       "id": "tenant-isolation",
@@ -19,8 +23,8 @@
       "weight": 12,
       "baseline": 6.5,
       "reference": 9,
-      "raw": 2,
-      "score": 2,
+      "raw": 1.5,
+      "score": 1.5,
       "caps": [],
       "missingAttestations": [
         "pentest"
@@ -30,17 +34,17 @@
           "id": "tenant-from-identity",
           "kind": "foundation",
           "weight": 15,
-          "title": "Tenant resolved from identity; X-Tenant-Id only picks among own memberships",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "Naming another tenant in X-Tenant-Id does not switch tenant (e2e)",
+          "status": "not-run",
+          "detail": "no e2e results file"
         },
         {
           "id": "cross-tenant-triggers",
           "kind": "foundation",
           "weight": 10,
-          "title": "Database triggers refuse cross-tenant references",
-          "status": "fail",
-          "detail": "3 found, need 10"
+          "title": "Database triggers refuse cross-tenant references (>= 20 guard_same_tenant uses)",
+          "status": "pass",
+          "detail": "23 found"
         },
         {
           "id": "scoped-helpers",
@@ -141,9 +145,9 @@
           "id": "per-tenant-dek",
           "kind": "target",
           "weight": 1,
-          "title": "Per-tenant data keys behind a KMS interface",
+          "title": "Per-tenant data keys behind a KMS interface (unit tests)",
           "status": "fail",
-          "detail": "missing: apps/backend/src/security/kms/index.ts"
+          "detail": "exit 1: filter: src/security/kms | include: src/**/*.test.ts, test/**/*.test.ts | exclude:  dist/**, node_modules/**"
         }
       ]
     },
@@ -341,8 +345,8 @@
       "weight": 8,
       "baseline": 6.5,
       "reference": 8.5,
-      "raw": 6,
-      "score": 6,
+      "raw": 5.5,
+      "score": 5.5,
       "caps": [],
       "missingAttestations": [
         "pentest"
@@ -417,7 +421,7 @@
           "weight": 3,
           "title": "DPIA for biometrics",
           "status": "fail",
-          "detail": "missing: docs/compliance/dpia-biometrics.md"
+          "detail": "docs/compliance/dpia-biometrics.md not committed"
         },
         {
           "id": "residency",
@@ -431,9 +435,9 @@
           "id": "secret-scan-ci",
           "kind": "target",
           "weight": 5,
-          "title": "Secret scanning in CI",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "Secret scan ran and passed in CI",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "log-redaction",
@@ -452,9 +456,11 @@
       "weight": 10,
       "baseline": 6,
       "reference": 8.5,
-      "raw": 1,
+      "raw": 2,
       "score": 1,
-      "caps": [],
+      "caps": [
+        "independent audit scored 1"
+      ],
       "missingAttestations": [
         "pad-lab"
       ],
@@ -487,8 +493,8 @@
           "kind": "foundation",
           "weight": 10,
           "title": "Face-matching doc states what is not defended",
-          "status": "fail",
-          "detail": "0 found, need 1"
+          "status": "pass",
+          "detail": "1 found"
         },
         {
           "id": "unified-core",
@@ -536,7 +542,7 @@
           "weight": 3,
           "title": "Check-in burst load test meets the stated p95",
           "status": "fail",
-          "detail": "missing: docs/operations/capacity.md, docs/scorecard/evidence/load-checkin-burst.json"
+          "detail": "docs/operations/capacity.md not committed; docs/scorecard/evidence/load-checkin-burst.json not committed"
         },
         {
           "id": "face-eval",
@@ -588,7 +594,7 @@
           "id": "sms-classes",
           "kind": "foundation",
           "weight": 5,
-          "title": "Classes",
+          "title": "Classes, class teachers, subjects",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -596,7 +602,7 @@
           "id": "sms-core",
           "kind": "foundation",
           "weight": 10,
-          "title": "Students",
+          "title": "Students, lecturers, courses, terms, schedules",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -612,7 +618,7 @@
           "id": "sms-gradebook",
           "kind": "foundation",
           "weight": 10,
-          "title": "Gradebook",
+          "title": "Gradebook, results, transcripts",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -628,7 +634,7 @@
           "id": "sms-fees",
           "kind": "foundation",
           "weight": 5,
-          "title": "Fees",
+          "title": "Fees, invoices, payments",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -676,7 +682,7 @@
           "id": "sms-pdf",
           "kind": "target",
           "weight": 4,
-          "title": "Receipts",
+          "title": "Receipts, class lists, arrears as PDF",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -754,7 +760,7 @@
           "id": "ems-rosters",
           "kind": "foundation",
           "weight": 5,
-          "title": "Rosters",
+          "title": "Rosters, shifts, timesheets",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -858,7 +864,7 @@
           "weight": 10,
           "title": "Installable PWA manifest",
           "status": "fail",
-          "detail": "missing: apps/frontend/public/manifest.webmanifest"
+          "detail": "apps/frontend/public/manifest.webmanifest not committed"
         },
         {
           "id": "service-worker",
@@ -872,7 +878,7 @@
           "id": "offline-queue",
           "kind": "target",
           "weight": 20,
-          "title": "Signed",
+          "title": "Signed, idempotent IndexedDB attendance queue reconciled to server time",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -904,9 +910,9 @@
           "id": "lighthouse",
           "kind": "target",
           "weight": 10,
-          "title": "Lighthouse PWA and performance budgets in CI",
-          "status": "fail",
-          "detail": "0 found, need 1"
+          "title": "Lighthouse PWA and performance budgets ran and passed in CI",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         }
       ]
     },
@@ -918,8 +924,10 @@
       "baseline": 4,
       "reference": 9,
       "raw": 4,
-      "score": 4,
-      "caps": [],
+      "score": 3,
+      "caps": [
+        "independent audit scored 3"
+      ],
       "missingAttestations": [
         "slo-30d"
       ],
@@ -984,7 +992,7 @@
           "weight": 5,
           "title": "Alert rules",
           "status": "fail",
-          "detail": "missing: deploy/observability/alerts.yml"
+          "detail": "deploy/observability/alerts.yml not committed"
         },
         {
           "id": "staging",
@@ -992,7 +1000,7 @@
           "weight": 5,
           "title": "Staging environment parity",
           "status": "fail",
-          "detail": "missing: deploy/staging/docker-compose.yml"
+          "detail": "deploy/staging/docker-compose.yml not committed"
         },
         {
           "id": "load-tests",
@@ -1000,7 +1008,7 @@
           "weight": 8,
           "title": "k6 load tests with stated SLOs",
           "status": "fail",
-          "detail": "missing: loadtest/k6/api.js, docs/operations/slo.md"
+          "detail": "loadtest/k6/api.js not committed; docs/operations/slo.md not committed"
         },
         {
           "id": "pitr",
@@ -1008,7 +1016,7 @@
           "weight": 6,
           "title": "Off-site encrypted backups and point-in-time recovery",
           "status": "fail",
-          "detail": "missing: docs/operations/backup-and-pitr.md"
+          "detail": "docs/operations/backup-and-pitr.md not committed"
         },
         {
           "id": "restore-schedule",
@@ -1030,9 +1038,9 @@
           "id": "face-worker",
           "kind": "target",
           "weight": 4,
-          "title": "Face engine runs outside the API process",
+          "title": "Face engine is a separate service with its own tests",
           "status": "fail",
-          "detail": "missing: apps/face-worker/package.json"
+          "detail": "exit 4294963238: npm error enoent This is related to npm not being able to find a file. | npm error enoent | npm error A complete log of this run can be found in: C:\\Users\\Cogito Seah Krah\\AppData\\Local\\npm-cache\\_logs\\2026-10-01T23_32_00_125Z-debug-0.log"
         }
       ]
     },
@@ -1043,9 +1051,11 @@
       "weight": 7,
       "baseline": 5.5,
       "reference": 8.5,
-      "raw": 6.6,
-      "score": 6.6,
-      "caps": [],
+      "raw": 5.2,
+      "score": 4.2,
+      "caps": [
+        "independent audit scored 4.2"
+      ],
       "missingAttestations": [],
       "gates": [
         {
@@ -1070,19 +1080,19 @@
           "status": "pass"
         },
         {
+          "id": "sql-validator",
+          "kind": "foundation",
+          "weight": 10,
+          "title": "Every static SQL statement resolves against the live schema",
+          "status": "pass"
+        },
+        {
           "id": "unit-tests",
           "kind": "foundation",
           "weight": 10,
           "title": "Backend unit tests pass",
           "status": "fail",
           "detail": "exit 1: - The error was thrown, while Vitest was running this test. | - If the error occurred after the test had been completed, this was the last documented test before it was thrown. | ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
-        },
-        {
-          "id": "sql-validator",
-          "kind": "foundation",
-          "weight": 10,
-          "title": "Every static SQL statement resolves against the live schema",
-          "status": "pass"
         },
         {
           "id": "e2e-all",
@@ -1119,7 +1129,7 @@
           "id": "strict-ts-backend",
           "kind": "target",
           "weight": 5,
-          "title": "Backend TypeScript strict mode",
+          "title": "Backend TypeScript strict mode on (explicit any not yet reduced)",
           "status": "pass",
           "detail": "1 found"
         },
@@ -1135,17 +1145,17 @@
           "id": "playwright",
           "kind": "target",
           "weight": 5,
-          "title": "Playwright e2e for critical flows in CI",
-          "status": "fail",
-          "detail": "0 found, need 1"
+          "title": "Playwright e2e for critical flows ran and passed in CI",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "coverage-floor",
           "kind": "target",
           "weight": 2,
-          "title": "Coverage floor enforced in CI",
+          "title": "Backend coverage thresholds enforced",
           "status": "fail",
-          "detail": "0 found, need 1"
+          "detail": "exit 1: - The error was thrown, while Vitest was running this test. | - If the error occurred after the test had been completed, this was the last documented test before it was thrown. | ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
         },
         {
           "id": "dependabot",
@@ -1158,40 +1168,41 @@
           "id": "sast",
           "kind": "target",
           "weight": 4,
-          "title": "SAST (CodeQL or Semgrep)",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "SAST (Semgrep) ran and passed in CI",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "npm-audit",
           "kind": "target",
           "weight": 2,
-          "title": "Dependency audit in CI",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "Dependency audit ran and passed in CI",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "container-scan",
           "kind": "target",
           "weight": 3,
-          "title": "Container image scanning",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "Container images scanned (Trivy) and passed in CI",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "sbom",
           "kind": "target",
           "weight": 2,
-          "title": "SBOM generated",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "SBOM generated in CI (images job)",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "gitleaks",
           "kind": "target",
           "weight": 3,
-          "title": "Secret scan in CI and pre-commit",
-          "status": "pass"
+          "title": "Secret scan in CI passed; pre-commit hook configured",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "migration-lint",
@@ -1204,7 +1215,7 @@
           "id": "repo-hygiene",
           "kind": "target",
           "weight": 2,
-          "title": "No stray debug scripts",
+          "title": "No stray debug scripts, logs or phase spec files tracked",
           "status": "pass"
         }
       ]
@@ -1274,7 +1285,7 @@
           "weight": 5,
           "title": "Manual keyboard and screen-reader checklist",
           "status": "fail",
-          "detail": "missing: docs/accessibility/manual-checklist.md"
+          "detail": "docs/accessibility/manual-checklist.md not committed"
         },
         {
           "id": "phone-width",
@@ -1318,7 +1329,7 @@
           "id": "csv-export",
           "kind": "foundation",
           "weight": 15,
-          "title": "CSV exports (adminApi",
+          "title": "CSV exports (adminApi, hrApi suites)",
           "status": "not-run",
           "detail": "no e2e results file"
         },
@@ -1341,9 +1352,9 @@
           "id": "openapi",
           "kind": "target",
           "weight": 15,
-          "title": "OpenAPI 3.1 generated and checked in CI",
+          "title": "OpenAPI 3.1 generated from code and in sync",
           "status": "fail",
-          "detail": "missing: docs/api/openapi.json"
+          "detail": "exit 1: }\r | \r | Node.js v22.20.0"
         },
         {
           "id": "public-api-keys",
@@ -1381,9 +1392,9 @@
           "id": "payments",
           "kind": "target",
           "weight": 10,
-          "title": "Payment-provider abstraction",
+          "title": "Payment-provider abstraction (unit tests)",
           "status": "fail",
-          "detail": "missing: apps/backend/src/payments/provider.ts"
+          "detail": "exit 1: filter: src/payments | include: src/**/*.test.ts, test/**/*.test.ts | exclude:  dist/**, node_modules/**"
         }
       ]
     },
@@ -1395,8 +1406,10 @@
       "baseline": 4,
       "reference": 8.5,
       "raw": 4,
-      "score": 4,
-      "caps": [],
+      "score": 3,
+      "caps": [
+        "independent audit scored 3"
+      ],
       "missingAttestations": [
         "soc2-iso"
       ],
@@ -1434,7 +1447,7 @@
           "id": "control-mapping",
           "kind": "target",
           "weight": 15,
-          "title": "Control mapping (SOC 2",
+          "title": "Control mapping (SOC 2, ISO 27001, GDPR, Liberia)",
           "status": "fail",
           "detail": "exit 1: }\r | \r | Node.js v22.20.0"
         },
@@ -1444,7 +1457,7 @@
           "weight": 10,
           "title": "Incident-response runbook",
           "status": "fail",
-          "detail": "missing: docs/compliance/incident-response.md"
+          "detail": "docs/compliance/incident-response.md not committed"
         },
         {
           "id": "breach-notification",
@@ -1452,7 +1465,7 @@
           "weight": 5,
           "title": "Breach-notification runbook",
           "status": "fail",
-          "detail": "missing: docs/compliance/breach-notification.md"
+          "detail": "docs/compliance/breach-notification.md not committed"
         },
         {
           "id": "subprocessors",
@@ -1460,7 +1473,7 @@
           "weight": 5,
           "title": "Vendor and sub-processor list",
           "status": "fail",
-          "detail": "missing: docs/compliance/subprocessors.md"
+          "detail": "docs/compliance/subprocessors.md not committed"
         },
         {
           "id": "policies",
@@ -1468,7 +1481,7 @@
           "weight": 10,
           "title": "Policy set",
           "status": "fail",
-          "detail": "missing: docs/compliance/policies/README.md"
+          "detail": "docs/compliance/policies/README.md not committed"
         },
         {
           "id": "security-txt",
@@ -1476,7 +1489,7 @@
           "weight": 5,
           "title": "security.txt served",
           "status": "fail",
-          "detail": "missing: apps/frontend/public/.well-known/security.txt"
+          "detail": "apps/frontend/public/.well-known/security.txt not committed"
         },
         {
           "id": "vdp",
@@ -1484,7 +1497,7 @@
           "weight": 5,
           "title": "Vulnerability-disclosure policy",
           "status": "fail",
-          "detail": "missing: SECURITY.md"
+          "detail": "SECURITY.md not committed"
         },
         {
           "id": "ir-exercised",
@@ -1492,7 +1505,7 @@
           "weight": 5,
           "title": "Incident-response exercise recorded",
           "status": "fail",
-          "detail": "missing: docs/compliance/exercises/ir-exercise-1.md"
+          "detail": "docs/compliance/exercises/ir-exercise-1.md not committed"
         }
       ]
     }

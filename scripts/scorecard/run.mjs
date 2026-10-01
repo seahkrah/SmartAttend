@@ -42,7 +42,9 @@ for (const dim of rubric.dimensions) {
   const foundation = dim.gates.filter(g => g.kind === 'foundation').reduce((s, g) => s + g.weight, 0)
   const ids = dim.gates.map(g => g.id)
   if (total !== 100 || foundation !== dim.baseline * 10 || new Set(ids).size !== ids.length) {
-    console.error(`rubric.yml: ${dim.id} gates weigh ${total} (want 100), foundation ${foundation} (want ${dim.baseline * 10}), or a gate id repeats`)
+    console.error(
+      `rubric.yml: ${dim.id} gates weigh ${total} (want 100), foundation ${foundation} (want ${dim.baseline * 10}), or a gate id repeats`,
+    )
     process.exit(2)
   }
 }

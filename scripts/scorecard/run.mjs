@@ -93,6 +93,18 @@ function rubricProblems() {
       for (const k of REQUIRED[g.type] || []) if (g[k] === undefined) problems.push(`${g.id}: missing ${k}`)
       if (!['foundation', 'target'].includes(g.kind)) problems.push(`${g.id}: kind must be foundation or target`)
       if (typeof g.title !== 'string' || !g.title) problems.push(`${g.id}: missing title`)
+      if (g.pattern !== undefined) {
+        // A double-quoted YAML "\b" is a backspace, not a word boundary: a
+        // pattern with a control character in it is a quoting mistake.
+        // eslint-disable-next-line no-control-regex
+        if (/[\u0000-\u001f]/.test(g.pattern))
+          problems.push(`${g.id}: pattern contains a control character (quote it with '')`)
+        try {
+          new RegExp(g.pattern.replace(/^\(\?i\)/, ''))
+        } catch (e) {
+          problems.push(`${g.id}: pattern does not compile: ${e.message}`)
+        }
+      }
     }
   }
   return problems

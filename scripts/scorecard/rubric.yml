@@ -479,7 +479,7 @@ dimensions:
         type: grep
         paths:
           - docs/features/face-matching.md
-        pattern: (?i)does **not** establish
+        pattern: (?i)does \*\*not\*\* establish
       - id: unified-core
         kind: target
         weight: 6
@@ -973,15 +973,6 @@ dimensions:
         type: cmd
         cwd: apps/frontend
         run: npx tsc --noEmit -p tsconfig.json
-      - id: unit-tests
-        kind: foundation
-        weight: 10
-        title: Backend unit tests pass
-        type: cmd
-        cwd: apps/backend
-        run: npx vitest run
-        requires:
-          - db
       - id: sql-validator
         kind: foundation
         weight: 10
@@ -989,6 +980,15 @@ dimensions:
         type: cmd
         cwd: apps/backend
         run: node scripts/validate-sql.mjs
+        requires:
+          - db
+      - id: unit-tests
+        kind: foundation
+        weight: 10
+        title: Backend unit tests pass
+        type: cmd
+        cwd: apps/backend
+        run: npx vitest run
         requires:
           - db
       - id: e2e-all
@@ -1187,7 +1187,7 @@ dimensions:
         type: grep
         paths:
           - apps/frontend/src
-        pattern: "@media print|\bprint:"
+        pattern: "@media print|\\bprint:"
   - id: integrations
     n: 12
     title: Integrations and API

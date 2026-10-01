@@ -124,7 +124,7 @@ Run these before pushing; CI runs the same.
 | API types (strict) | `cd apps/backend && npx tsc --noEmit -p .` |
 | Every literal SQL statement parsed against the live schema | `node scripts/validate-sql.mjs` (needs `DATABASE_URL`) |
 | Unit tests (includes the real face models on fixtures) | `npm test` |
-| End-to-end API suites against a running API: seeds two schools and two companies, then runs 25 suites | `bash scripts/run-all-e2e.sh` |
+| End-to-end API suites against a running API: seeds two schools and two companies, then runs 30 suites (29 Python, plus the tenant-scoped data layer proof) | `bash scripts/run-all-e2e.sh` |
 | Web app: types, every menu link routed, every API call matched to a server route, build | `cd apps/frontend && npm run build` |
 | Container images build, migrate an empty database and report ready, with a vulnerability scan and SBOM (CI job `images`) | see `.github/workflows/ci.yml` |
 | Dependency audit, secret scan, static analysis (CI job `supply-chain`) | see `.github/workflows/ci.yml` |

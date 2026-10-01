@@ -343,5 +343,26 @@ check("and resolved", row.get('status') == 'RESOLVED', f"({row.get('status')})")
 co, r = call("GET", f"/incidents/{inc}", S_ADMIN_B)
 check("another school cannot see the incident", co == 404, f"({co})")
 
+# A superadmin selects a tenant with X-Tenant-Id. The middleware said the
+# tenant "must exist" and did not check: a malformed value reached SQL, a
+# made-up one silently matched nothing.
+def as_superadmin_in(tenant):
+    o = subprocess.run(["curl", "-s", "-w", "\n%{http_code}", "--max-time", "30",
+                        "-H", f"Authorization: Bearer {sa['token']}", "-H", f"X-Tenant-Id: {tenant}",
+                        ROOT + "/metrics/failure-rates"], capture_output=True, text=True).stdout
+    txt, _, code = o.rpartition("\n")
+    try:
+        return int(code), json.loads(txt)
+    except Exception:
+        return int(code), txt
+
+co, r = as_superadmin_in("not-a-uuid")
+check("superadmin: a malformed tenant id is 404, not a database error", co == 404, f"({co} {r})")
+co, r = as_superadmin_in("00000000-0000-4000-8000-000000000000")
+check("superadmin: a tenant that does not exist is 404", co == 404, f"({co} {r})")
+co, r = as_superadmin_in(SA['tenantId'])
+check("superadmin: a real tenant resolves to exactly that tenant",
+      co == 200 and isinstance(r, dict) and r.get('tenant_id') == SA['tenantId'], f"({co} {r})")
+
 print(f"\n{P} passed, {F} failed")
 sys.exit(0 if F == 0 else 1)

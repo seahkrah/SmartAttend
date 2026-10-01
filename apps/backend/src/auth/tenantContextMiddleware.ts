@@ -39,6 +39,7 @@ export interface TenantRequest extends Request {
 }
 
 const SUPERADMIN_ROLES = new Set(['superadmin'])
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Resolves platform, role and tenant membership for the authenticated user.
@@ -160,10 +161,29 @@ export function requireTenant(req: TenantRequest, res: Response, next: NextFunct
       })
       return
     }
-    // A superadmin may act in any tenant, but it must exist and the choice is
-    // recorded in the context so downstream audit captures it.
-    req.ctx.tenantId = requested
-    next()
+    // A superadmin may act in any tenant, but it must exist. This used to be
+    // said here and not done: the header went into the context unchecked, so
+    // a malformed value reached SQL and a made-up one silently matched
+    // nothing. Recording the switch in a tenant-visible audit trail is the
+    // break-glass work (docs/security/findings.md, finding 12).
+    if (!UUID.test(requested)) {
+      res.status(404).json({ error: 'Tenant not found' })
+      return
+    }
+    query(`SELECT id, name FROM tenants WHERE id = $1`, [requested])
+      .then((r) => {
+        if (!r.rows.length) {
+          res.status(404).json({ error: 'Tenant not found' })
+          return
+        }
+        req.ctx!.tenantId = r.rows[0].id
+        req.ctx!.tenantName = r.rows[0].name
+        next()
+      })
+      .catch((error) => {
+        console.error('[TENANT_CTX] superadmin tenant lookup failed:', error)
+        res.status(500).json({ error: 'Internal error', message: 'Could not resolve tenant context' })
+      })
     return
   }
 

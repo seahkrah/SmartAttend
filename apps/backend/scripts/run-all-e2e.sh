@@ -69,13 +69,30 @@ SUITES=(
   gradeSchoolApi
 )
 
+# One line per suite, "<suite> <pass|fail>", for scripts/scorecard to read.
+export E2E_RESULTS="${E2E_RESULTS:-$E2E_FIXTURE_DIR/results.tsv}"
+: > "$E2E_RESULTS"
+record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }
+
 fail=0
 for suite in "${SUITES[@]}"; do
   echo "=== $suite ==="
-  python3 "src/tests/${suite}.e2e.py" || fail=1
+  if python3 "src/tests/${suite}.e2e.py"; then
+    record "$suite" pass
+  else
+    record "$suite" fail
+    fail=1
+  fi
 done
 
+# Its exit status used to vanish into `| tail -1`.
 echo "=== tenantIsolation ==="
-npx tsx src/tests/tenantIsolation.manual.ts | tail -1
+if npx tsx src/tests/tenantIsolation.manual.ts > "$E2E_FIXTURE_DIR/tenantIsolation.log" 2>&1; then
+  record tenantIsolation pass
+else
+  record tenantIsolation fail
+  fail=1
+fi
+tail -1 "$E2E_FIXTURE_DIR/tenantIsolation.log"
 
 exit $fail

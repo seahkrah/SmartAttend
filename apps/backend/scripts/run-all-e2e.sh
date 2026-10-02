@@ -99,6 +99,9 @@ TS_SUITES=(
   tenantIsolation
   rlsNoContext
   blindWrite
+  # Every route with a path parameter, as tenant A, with each of tenant B's
+  # ids. Needs RATE_LIMIT_API_PER_MINUTE raised: it is ~20,000 requests.
+  crossTenantFuzz
 )
 
 # Their exit status used to vanish into `| tail -1`.

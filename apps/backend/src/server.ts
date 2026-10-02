@@ -308,4 +308,8 @@ async function startServer() {
   }
 }
 
-startServer()
+// The route inventory (src/scripts/routeInventory.ts) imports this module to
+// read the routes; it must not open a port or a database connection.
+if (process.env.JJELO_ROUTE_INVENTORY !== '1') startServer()
+
+export { app }

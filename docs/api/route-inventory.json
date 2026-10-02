@@ -1,0 +1,3125 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/academics/programmes",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/programmes",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/academics/programmes/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/programmes/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/programmes/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/programmes/:id/courses",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/academics/programmes/:id/courses/:entryId",
+    "params": [
+      "id",
+      "entryId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/structure",
+    "params": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/student-programmes/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/students/:studentId/programme",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/students/:studentId/programme",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/terms",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/terms",
+    "params": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/terms/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/years",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/years",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/academics/years/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/years/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/access-requests",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/access-requests",
+    "params": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/access-requests/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/analytics",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/approvals/approve",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/approvals/pending",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/approvals/reject",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/courses",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/courses",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/courses/:courseId",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/courses/:courseId/assign-faculty",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/export/tenant-report",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/incidents/:id/acknowledge",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/incidents/:id/resolve",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/incidents/:id/root-cause",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents/stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents/stats/escalations",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/users",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/users",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admin/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/users/bulk-import",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applicants",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applicants",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applicants/:applicantId",
+    "params": [
+      "applicantId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admissions/applicants/:applicantId",
+    "params": [
+      "applicantId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId/choices",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/choices",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admissions/applications/:applicationId/choices/:choiceId",
+    "params": [
+      "applicationId",
+      "choiceId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId/documents",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/documents",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admissions/applications/:applicationId/documents/:documentId",
+    "params": [
+      "applicationId",
+      "documentId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admissions/applications/:applicationId/documents/:documentId",
+    "params": [
+      "applicationId",
+      "documentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/enrol",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId/events",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/transition",
+    "params": [
+      "applicationId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/intakes",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/intakes",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admissions/intakes/:intakeId",
+    "params": [
+      "intakeId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/intakes/:intakeId",
+    "params": [
+      "intakeId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admissions/intakes/:intakeId",
+    "params": [
+      "intakeId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/intakes/:intakeId/funnel",
+    "params": [
+      "intakeId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/overview",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/courses/:courseId/sessions",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/department/all",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/department/export",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/employees/:employeeId",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/mark-with-face",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/courses",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/discrepancies",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/me/discrepancies",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/export",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/metrics",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/notifications/send",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/profile",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/attendance/profile",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/sessions",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/sessions/:sessionId",
+    "params": [
+      "sessionId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/attendance/sessions/:sessionId",
+    "params": [
+      "sessionId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/sessions/:sessionId/attendance",
+    "params": [
+      "sessionId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/students/:studentId/courses/:courseId/attendance",
+    "params": [
+      "studentId",
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/access-log",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/access-patterns",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/logs",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/logs/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/logs/:id/verify",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/period",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/resource/:resourceType/:resourceId/trail",
+    "params": [
+      "resourceType",
+      "resourceId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/search",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/summary",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/audit/test-immutability",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/activate",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/approval-action",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/corporate/stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/pending-approvals",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/attendance/overview",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/courses",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/courses",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/courses/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/courses/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/departments",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/departments",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/departments/:departmentId",
+    "params": [
+      "departmentId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth/admin/school/departments/:departmentId",
+    "params": [
+      "departmentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/enrollments",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/enrollments",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/enrollments/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/faculty",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/faculty",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/faculty/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/faculty/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/faculty/:id/suspend",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/reports/attendance",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/rooms",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/rooms",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/rooms/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/rooms/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/schedules",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/schedules",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/schedules/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/schedules/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/settings",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth/admin/school/settings",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/students",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/students",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/students/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/students/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/students/:id/suspend",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/users",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/users",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/users/:userId/invitation",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/users/:userId/reset-access",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/change-password",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login-superadmin",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout-all",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth/me",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/mfa",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/disable",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/enable",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/recovery-codes",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/setup",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/verify",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/password/forgot",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/password/reset",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/refresh",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/register-superadmin",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/register-with-role",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sessions",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/sessions/:sessionId",
+    "params": [
+      "sessionId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/action-logs",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/dashboard",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/dashboard-stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/entities",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/entity-users",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/pending-approvals",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/user-statistics",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/challenges",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/enroll",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/events",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/identify",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/settings",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/biometrics/settings",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/subjects",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/subjects/:type/:id",
+    "params": [
+      "type",
+      "id"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/biometrics/subjects/:type/:id/consent",
+    "params": [
+      "type",
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/subjects/:type/:id/consent",
+    "params": [
+      "type",
+      "id"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/biometrics/subjects/:type/:id/template",
+    "params": [
+      "type",
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/verify",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/attendance",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/employees",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/admin/employees",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/admin/employees/:employeeId/invitation",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/admin/employees/:employeeId/reset-access",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/corporate/admin/employees/:employeeId/terminate",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/reports",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/settings",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/corporate/admin/settings",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/dashboard",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/departments",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/departments",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/corporate/departments/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/corporate/departments/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/employees",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/employees",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/employees/:employeeId",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/corporate/employees/:employeeId",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/corporate/employees/:employeeId/terminate",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corrections/:correctionId/revert",
+    "params": [
+      "correctionId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/active",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/audit-trail",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/by-type/:correctionType",
+    "params": [
+      "correctionType"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/compliance/silent-corrections",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/corrections/corporate/:checkinId",
+    "params": [
+      "checkinId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/history/:recordId",
+    "params": [
+      "recordId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corrections/school/:attendanceId",
+    "params": [
+      "attendanceId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/statistics",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/bulk-edit",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/attendance/draft",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/attendance/export",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/facial-match",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/attendance/history",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/lock",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/mark",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/submit",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses/:courseId/attendance-summary",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses/:courseId/qr-code",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses/:courseId/roster",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/dashboard",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/enrollment/add",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/enrollment/available",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/enrollment/enrolled",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/enrollment/remove",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/reports",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/schedules",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/schedules/:scheduleId/students",
+    "params": [
+      "scheduleId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/students",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/clearance",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/debtors",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/invoices",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/invoices/:invoiceId",
+    "params": [
+      "invoiceId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/fees/invoices/:invoiceId",
+    "params": [
+      "invoiceId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices/:invoiceId/issue",
+    "params": [
+      "invoiceId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices/:invoiceId/payments",
+    "params": [
+      "invoiceId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices/:invoiceId/void",
+    "params": [
+      "invoiceId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/overview",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/payments",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/payments/:paymentId/reverse",
+    "params": [
+      "paymentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/statement",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/structures",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/structures",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/fees/structures/:structureId",
+    "params": [
+      "structureId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/structures/:structureId",
+    "params": [
+      "structureId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/fees/structures/:structureId",
+    "params": [
+      "structureId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/structures/:structureId/items",
+    "params": [
+      "structureId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/fees/structures/:structureId/items/:itemId",
+    "params": [
+      "structureId",
+      "itemId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/fees/structures/:structureId/items/:itemId",
+    "params": [
+      "structureId",
+      "itemId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/files",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/files/:fileId",
+    "params": [
+      "fileId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/:fileId",
+    "params": [
+      "fileId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/:fileId/access-log",
+    "params": [
+      "fileId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/:fileId/download",
+    "params": [
+      "fileId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/limits",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/files/purge",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/classes",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/grade-school/classes",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/grade-school/classes/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/grade-school/classes/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/classes/:id/students",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/grade-school/classes/:id/students",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/grade-school/classes/:id/students/:studentId",
+    "params": [
+      "id",
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/subjects",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/grade-school/subjects",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/grade-school/subjects/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/grade-school/subjects/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/grade-school/subjects/:id/grades",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/teachers",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/unplaced-students",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/gradebook/assessments/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/gradebook/assessments/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/assessments/:id/scores",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/gradebook/assessments/:id/scores",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/courses/:courseId/assessments",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/courses/:courseId/assessments",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/courses/:courseId/results",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/courses/:courseId/results/publish",
+    "params": [
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/my/transcript",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/results/:id/withhold",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/schemes",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/schemes",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/gradebook/schemes/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/students/:studentId/transcript",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/attendance",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/fees",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/results",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/schedule",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardians",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/guardians",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/guardians/:guardianId",
+    "params": [
+      "guardianId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardians/:guardianId",
+    "params": [
+      "guardianId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/guardians/:guardianId",
+    "params": [
+      "guardianId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/guardians/:guardianId/invitation",
+    "params": [
+      "guardianId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/guardians/:guardianId/students",
+    "params": [
+      "guardianId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/guardians/:guardianId/students/:linkId",
+    "params": [
+      "guardianId",
+      "linkId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/guardians/:guardianId/students/:linkId",
+    "params": [
+      "guardianId",
+      "linkId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/health",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/health/ready",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/campaigns",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/hr/campaigns",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/hr/campaigns/:campaignId",
+    "params": [
+      "campaignId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/hr/campaigns/:campaignId/send",
+    "params": [
+      "campaignId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/compliance/summary",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/departments/metrics",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/export/organization-report",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/members",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/members/:memberId",
+    "params": [
+      "memberId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/hr/notifications/send",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/overview",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/patterns",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/today",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/incidents/:incidentId",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/acknowledge",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/close",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/escalate",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId/escalations",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/investigate",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/mitigate",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/resolve",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/root-cause",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId/root-causes",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId/timeline",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/critical",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/open",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/balances",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/leave/balances",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/calendar",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/requests",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests/:id/cancel",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests/:id/decision",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests/preview",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/types",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/types",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/leave/types/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/leave/types/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/api-latency",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/api-latency-by-endpoint",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/clock-drift",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/dashboard",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/early-signals",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/failure-rates",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/failure-reasons",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/health-status",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/problematic-records",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/summary",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/verification-mismatches",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/channels",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/channels/:channel",
+    "params": [
+      "channel"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/channels/:channel/test",
+    "params": [
+      "channel"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/dispatch",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/inbox",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/inbox/:notificationId/read",
+    "params": [
+      "notificationId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/inbox/read-all",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/messages",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/messages/:messageId",
+    "params": [
+      "messageId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/messages/:messageId/cancel",
+    "params": [
+      "messageId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/messages/:messageId/retry",
+    "params": [
+      "messageId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/overview",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/preferences",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/preferences",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/suppressions",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/suppressions",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/notifications/suppressions/:suppressionId",
+    "params": [
+      "suppressionId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/templates",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/templates",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/notifications/templates/:templateId",
+    "params": [
+      "templateId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/templates/preview",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/components",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/components",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/payroll/components/:componentId",
+    "params": [
+      "componentId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/payroll/components/:componentId",
+    "params": [
+      "componentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/employees/:employeeId/compensation",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/employees/:employeeId/compensation",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/employees/:employeeId/components",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/payroll/employees/:employeeId/components/:assignmentId",
+    "params": [
+      "employeeId",
+      "assignmentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/my/payslips",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/payslips/:payslipId",
+    "params": [
+      "payslipId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/periods",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/periods",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/periods/:periodId/inputs",
+    "params": [
+      "periodId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/periods/:periodId/inputs",
+    "params": [
+      "periodId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/payroll/periods/:periodId/inputs/:inputId",
+    "params": [
+      "periodId",
+      "inputId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/runs",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/runs/:runId",
+    "params": [
+      "runId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/approve",
+    "params": [
+      "runId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/calculate",
+    "params": [
+      "runId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/cancel",
+    "params": [
+      "runId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/pay",
+    "params": [
+      "runId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/runs/:runId/preview/:employeeId",
+    "params": [
+      "runId",
+      "employeeId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/tax-brackets",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/payroll/tax-brackets",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/faculty",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/school/faculty",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/faculty/:facultyId",
+    "params": [
+      "facultyId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/school/faculty/:facultyId",
+    "params": [
+      "facultyId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/faculty/:facultyId/courses",
+    "params": [
+      "facultyId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/school/faculty/:facultyId/courses/:courseId",
+    "params": [
+      "facultyId",
+      "courseId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/school/students",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/school/students/:studentId",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students/:studentId",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/school/students/:studentId",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students/:studentId/attendance",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students/:studentId/schedules",
+    "params": [
+      "studentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/comprehensive",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/duplicate-storm",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/network-instability",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/partial-outage",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/simulations/status",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/stress-test",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/time-drift",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/attendance",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/courses",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/dashboard",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/profile",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/student/profile",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/schedules",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/admins/mapping",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/audit-logs",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/audit-trail",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/diagnostics",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/entities",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/export/system-report",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/health",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/incidents",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/incidents",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/incidents/:incidentId",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/superadmin/incidents/:incidentId",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/incidents/override",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/locked-users",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/locked-users/unlock",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/school-types",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/tenant-admins",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenant-admins",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/tenant-admins/:adminId",
+    "params": [
+      "adminId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenant-admins/:adminId/invitation",
+    "params": [
+      "adminId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/tenants",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenants",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/tenants/:tenantId",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/tenants/:tenantId",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/superadmin/tenants/:tenantId",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenants/:tenantId/lifecycle",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/users",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/superadmin/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/users/:userId/mfa",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/drift/critical",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/drift/history",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/time/drift/investigate",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/drift/stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/status",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/sync",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/sync/precise",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/validate",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/admins/mapping",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/audit-logs",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/audit-trail",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/diagnostics",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/entities",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/export/system-report",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/health",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/incidents",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/incidents",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/incidents/:incidentId",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/superadmin/incidents/:incidentId",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/incidents/override",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/locked-users",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/locked-users/unlock",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/school-types",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/stats",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/tenant-admins",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenant-admins",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/tenant-admins/:adminId",
+    "params": [
+      "adminId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenant-admins/:adminId/invitation",
+    "params": [
+      "adminId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/tenants",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenants",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/tenants/:tenantId",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/tenants/:tenantId",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/superadmin/tenants/:tenantId",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenants/:tenantId/lifecycle",
+    "params": [
+      "tenantId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/users",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/superadmin/users/:userId",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/users/:userId/mfa",
+    "params": [
+      "userId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/handoff/:sessionId/accept",
+    "params": [
+      "sessionId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/validation/handoff/:sessionId/briefing",
+    "params": [
+      "sessionId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/handoff/initiate",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/validation/health",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/incidents/:incidentId/export",
+    "params": [
+      "incidentId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/platform-readiness",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/validation/platform-readiness/latest",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/scenarios",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/simulations",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/contracts",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/contracts",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/workforce/contracts/:contractId",
+    "params": [
+      "contractId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/workforce/contracts/:contractId",
+    "params": [
+      "contractId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/contracts/:contractId/activate",
+    "params": [
+      "contractId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/contracts/:contractId/end",
+    "params": [
+      "contractId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/my/attendance",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/check-in",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/check-out",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/my/contract",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/my/timesheets",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/roster",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster/:shiftId/cancel",
+    "params": [
+      "shiftId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster/bulk",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/roster/coverage",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster/publish",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/shift-patterns",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/shift-patterns",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/workforce/shift-patterns/:patternId",
+    "params": [
+      "patternId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/workforce/shift-patterns/:patternId",
+    "params": [
+      "patternId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets/:timesheetId",
+    "params": [
+      "timesheetId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/workforce/timesheets/:timesheetId/days/:entryId",
+    "params": [
+      "timesheetId",
+      "entryId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets/:timesheetId/decision",
+    "params": [
+      "timesheetId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets/:timesheetId/export",
+    "params": [
+      "timesheetId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets/:timesheetId/rate",
+    "params": [
+      "timesheetId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets/:timesheetId/submit",
+    "params": [
+      "timesheetId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets/preview",
+    "params": []
+  }
+]

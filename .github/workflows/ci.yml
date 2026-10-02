@@ -80,6 +80,12 @@ jobs:
         working-directory: apps/backend
         run: npx tsc --noEmit -p tsconfig.json
 
+      # Generated from the Express routers; the fuzzer and reviewers read the
+      # committed copy, so a route change must update it.
+      - name: Route inventory is current
+        working-directory: apps/backend
+        run: npx tsx src/scripts/routeInventory.ts --check
+
       - name: Install frontend
         working-directory: apps/frontend
         run: npm ci || npm install
@@ -125,6 +131,10 @@ jobs:
       # limiter's behaviour is covered by a unit test.
       RATE_LIMIT_ACCOUNT_PER_15MIN: '1000'
       RATE_LIMIT_LOGIN_PER_MINUTE: '1000'
+      # The cross-tenant fuzzer makes ~20,000 requests from one address, and
+      # treats a 429 as a failure rather than as a refusal.
+      RATE_LIMIT_API_PER_MINUTE: '1000000'
+      RATE_LIMIT_MFA_PER_15MIN: '100000'
 
     steps:
       - uses: actions/checkout@v4

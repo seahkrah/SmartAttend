@@ -20,6 +20,7 @@ Reset and invitation links are read out of the outbox table directly, which
 is exactly what an administrator cannot do through the API.
 """
 import base64, json, os, re, subprocess, time, uuid
+from support.psql import psql
 import urllib.request, urllib.error
 
 SP = os.environ.get("E2E_FIXTURE_DIR", os.path.join(os.getcwd(), ".e2e-fixtures"))
@@ -52,7 +53,7 @@ def call(method, path, body=None, token=None, headers=None):
     return code, parsed, hdrs
 
 def sql(q):
-    return subprocess.run(["psql", DB, "-Atc", q], capture_output=True, text=True).stdout.strip()
+    return psql(DB, q).stdout.strip()
 
 def check(name, ok, detail=""):
     global P, F

@@ -16,6 +16,7 @@ them. This suite checks the rules that protect a school's records:
   - a school created before types existed is a university, and loses nothing.
 """
 import json, subprocess, sys, time, os
+from support.psql import psql
 RUN = str(int(time.time()))[-6:]
 SP = os.environ.get("E2E_FIXTURE_DIR", os.path.join(os.getcwd(), ".e2e-fixtures"))
 d = json.load(open(f"{SP}/seed.json")); A = d['A']
@@ -43,7 +44,7 @@ def call(m, p, t=None, body=None):
     return int(code), parsed
 
 def sql(q):
-    r = subprocess.run(["psql", DB, "-Atc", q], capture_output=True, text=True)
+    r = psql(DB, q)
     return r.stdout.strip(), r.stderr.strip()
 
 def check(n, ok, dd=""):

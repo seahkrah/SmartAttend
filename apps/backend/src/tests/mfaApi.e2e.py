@@ -8,6 +8,7 @@ Uses fac.b@e2e.test, which no later suite signs in as; the next run's fixtures
 recreate it without two-factor.
 """
 import base64, hashlib, hmac, json, os, struct, subprocess, time
+from support.psql import psql
 
 SP = os.environ.get("E2E_FIXTURE_DIR", os.path.join(os.getcwd(), ".e2e-fixtures"))
 API = os.environ.get("API_BASE", "http://127.0.0.1:5000") + "/api"
@@ -177,9 +178,7 @@ try:
     tok = r.get("accessToken") or tok
     co, r = call("DELETE", f"/superadmin/users/{user_id}/mfa", SA, {})
     check("resetting an account without two-factor says so", co == 409, f"({co} {r})")
-    audit = subprocess.run(["psql", DB, "-Atc",
-        f"SELECT COUNT(*) FROM superadmin_audit_log WHERE action_type = 'USER_MFA_RESET' AND result = 'SUCCESS' AND target_entity_id = '{user_id}'"],
-        capture_output=True, text=True).stdout.strip()
+    audit = psql(DB, f"SELECT COUNT(*) FROM superadmin_audit_log WHERE action_type = 'USER_MFA_RESET' AND result = 'SUCCESS' AND target_entity_id = '{user_id}'").stdout.strip()
     check("the reset is in the audit trail", audit not in ("", "0"), f"({audit})")
 
     print("-- guessing --")
@@ -196,11 +195,9 @@ try:
     check("and wrong codes count towards the sign-in lockout", co == 429, f"({co} {r})")
 finally:
     # Leave the account as the fixtures made it, even after a failure.
-    subprocess.run(["psql", DB, "-Atc",
-        f"DELETE FROM auth_failed_logins WHERE email_norm = '{EMAIL}';"
+    psql(DB, f"DELETE FROM auth_failed_logins WHERE email_norm = '{EMAIL}';"
         f"DELETE FROM user_mfa WHERE user_id IN (SELECT id FROM users WHERE email = '{EMAIL}');"
-        f"DELETE FROM user_mfa_recovery_codes WHERE user_id IN (SELECT id FROM users WHERE email = '{EMAIL}');"],
-        capture_output=True, text=True)
+        f"DELETE FROM user_mfa_recovery_codes WHERE user_id IN (SELECT id FROM users WHERE email = '{EMAIL}');")
 
 print(f"{P} passed, {F} failed")
 raise SystemExit(1 if F else 0)

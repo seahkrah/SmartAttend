@@ -16,6 +16,7 @@ themselves.
 Plus the obvious: nobody but a superadmin gets in.
 """
 import json, subprocess, sys, time, os
+from support.psql import psql
 RUN = str(int(time.time()))[-6:]
 SP = os.environ.get("E2E_FIXTURE_DIR", os.path.join(os.getcwd(), ".e2e-fixtures"))
 d = json.load(open(f"{SP}/seed.json")); A, B = d['A'], d['B']
@@ -444,7 +445,7 @@ check("statistics count in the table's vocabulary", co == 200 and isinstance(r['
 print("-- clock drift: reviews are recorded, not just echoed --")
 DB = os.environ.get("DATABASE_URL", "postgresql://jjelo@127.0.0.1:55432/jjelotech_dev")
 def sql(q):
-    return subprocess.run(["psql", DB, "-Atc", q], capture_output=True, text=True).stdout.strip()
+    return psql(DB, q).stdout.strip()
 event = sql("INSERT INTO drift_audit_log (client_time, server_time, drift_ms, drift_seconds, drift_direction, "
             "drift_category, action_taken, action_type, was_accepted) VALUES (now() + interval '10 minutes', now(), "
             "600000, 600, 'AHEAD', 'CRITICAL', 'BLOCKED', 'ATTENDANCE_MARK', false) RETURNING id").split('\n')[0]
@@ -462,8 +463,7 @@ co, r = call("GET", "/drift/critical", SU, base="/time")
 ev = next((e for e in r.get('events', []) if e['id'] == event), {})
 check("the event shows its latest review", (ev.get('review') or {}).get('action') == 'resolved', f"({ev})")
 check("a review cannot be rewritten afterwards",
-      'add a new review' in subprocess.run(["psql", DB, "-Atc", f"UPDATE drift_reviews SET action = 'reviewed' WHERE drift_event_id = '{event}'"],
-                                           capture_output=True, text=True).stderr)
+      'add a new review' in psql(DB, f"UPDATE drift_reviews SET action = 'reviewed' WHERE drift_event_id = '{event}'").stderr)
 co, r = call("POST", "/drift/investigate", SU, {"driftEventId": "00000000-0000-0000-0000-000000000000", "action": "reviewed"}, base="/time")
 check("an unknown event is 404", co == 404, f"({co} {r})")
 co, r = call("POST", "/drift/investigate", AT, {"driftEventId": event, "action": "reviewed"}, base="/time")

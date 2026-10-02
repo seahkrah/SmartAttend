@@ -9,6 +9,7 @@ sees their own school's data, or confirms that a well-formed id belonging to
 the other school is refused.
 """
 import json, subprocess, sys, time
+from support.psql import psql
 # Identifiers are unique per run, so the suite is repeatable against a database
 # that already holds what a previous run created.
 RUN = str(int(time.time()))[-6:]
@@ -283,10 +284,8 @@ check("and no longer listed", co == 200 and all(u['id'] != leaver for u in r.get
 # the role name 'admin') and the failure was only logged, so nothing recorded
 # who removed whom.
 time.sleep(0.5)
-audited = subprocess.run(
-    ["psql", os.environ.get("DATABASE_URL", "postgresql://jjelo@127.0.0.1:55432/jjelotech_dev"), "-Atc",
-     f"SELECT COUNT(*) FROM audit_logs WHERE action_type = 'USER_REMOVED_FROM_TENANT' AND resource_id = '{leaver}'"],
-    capture_output=True, text=True).stdout.strip()
+audited = psql(os.environ.get("DATABASE_URL", "postgresql://jjelo@127.0.0.1:55432/jjelotech_dev"),
+               f"SELECT COUNT(*) FROM audit_logs WHERE action_type = 'USER_REMOVED_FROM_TENANT' AND resource_id = '{leaver}'").stdout.strip()
 check("the removal is in the audit trail", audited == '1', f"({audited})")
 
 # ---------------------------------------------------------------- enrolments

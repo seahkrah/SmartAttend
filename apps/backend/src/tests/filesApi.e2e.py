@@ -54,11 +54,14 @@ def put_file(name, data):
         fh.write(data)
     return path
 
-def upload(token, path, category, declared_type=None, owner_type=None, owner_id=None):
+def upload(token, path, category, declared_type=None, owner_type=None, owner_id=None, stdin=None):
+    """Uploads the file at path; or, with stdin=(name, bytes), bytes that never
+    touch the disk (an antivirus scanner may lock a file holding a web-shell
+    signature, which made curl fail on Windows before the API saw anything)."""
     cmd = ["curl", "-s", "-w", "\n%{http_code}", "--max-time", "30", "-X", "POST"]
     if token:
         cmd += ["-H", f"Authorization: Bearer {token}"]
-    spec = f"file=@{path}"
+    spec = f"file=@-;filename={stdin[0]}" if stdin else f"file=@{path}"
     if declared_type:
         spec += f";type={declared_type}"
     cmd += ["-F", spec, "-F", f"category={category}"]
@@ -67,7 +70,7 @@ def upload(token, path, category, declared_type=None, owner_type=None, owner_id=
     if owner_id:
         cmd += ["-F", f"ownerId={owner_id}"]
     cmd.append(ROOT + "/files")
-    o = subprocess.run(cmd, capture_output=True, text=True).stdout
+    o = subprocess.run(cmd, capture_output=True, input=stdin[1] if stdin else None).stdout.decode()
     txt, _, code = o.rpartition("\n")
     try:
         parsed = json.loads(txt)
@@ -196,7 +199,7 @@ co, r = upload(AT, put_file("sneaky.txt", HTML), "other", declared_type="text/pl
 check("HTML declared as plain text is still refused", co == 415, f"({co} {r})")
 
 PHP = b"<?php system($_GET['c']); ?>\n"
-co, r = upload(AT, put_file("shell.txt", PHP), "other")
+co, r = upload(AT, None, "other", stdin=("shell.txt", PHP))
 check("a PHP script declared as text is refused", co == 415, f"({co} {r})")
 
 ZIP = bytes([0x50, 0x4b, 0x03, 0x04]) + b"\x00" * 200

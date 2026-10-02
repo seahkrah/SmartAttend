@@ -55,6 +55,22 @@ co, r = call("GET", PROBE, SU, tenant=A['tenantId'])
 check("a superadmin cannot act inside a tenant without break-glass", co == 403, f"({co} {r})")
 check("and is told how to open it", isinstance(r, dict) and 'break-glass' in str(r.get('message', '')).lower(), f"({r})")
 
+# Other ways into a tenant account, found by the Phase 1 audit: appointing
+# an administrator and taking the setup link, or changing a tenant user's
+# email so that a password reset goes to the superadmin.
+RUN = str(int(__import__('time').time()))[-6:]
+victim = psql(DB, f"SELECT sua.user_id FROM school_user_associations sua JOIN users u ON u.id = sua.user_id "
+                  f"JOIN roles r ON r.id = u.role_id WHERE sua.school_entity_id = '{A['tenantId']}' "
+                  f"AND r.name = 'faculty' LIMIT 1").stdout.strip()
+victim_email = psql(DB, f"SELECT email FROM users WHERE id = '{victim}'").stdout.strip()
+co, r = call("POST", "/superadmin/tenant-admins", SU,
+             {"tenantId": A['tenantId'], "email": f"handover-{RUN}@e2e.test", "fullName": "Handover Test", "handover": True})
+check("without a grant, a handed-over setup link is refused", co == 403, f"({co} {r})")
+co, r = call("PATCH", f"/superadmin/users/{victim}", SU, {"email": f"taken-{RUN}@e2e.test"})
+check("without a grant, a tenant user's email cannot be changed", co == 403, f"({co} {r})")
+check("and the email is unchanged",
+      psql(DB, f"SELECT email FROM users WHERE id = '{victim}'").stdout.strip() == victim_email)
+
 print("-- opening --")
 co, r = call("POST", "/superadmin/break-glass", SU, {"tenantId": A['tenantId']})
 check("a reason is required", co == 400, f"({co})")
@@ -78,12 +94,23 @@ check("now the superadmin can act in A", co == 200 and isinstance(r, dict) and r
 co, r = call("GET", PROBE, SU, tenant=B['tenantId'])
 check("a grant for A does not open B", co == 403, f"({co})")
 
+co, r = call("POST", "/superadmin/tenant-admins", SU,
+             {"tenantId": A['tenantId'], "email": f"handover-{RUN}@e2e.test", "fullName": "Handover Test", "handover": True})
+check("under the grant, a setup link can be handed over", co == 201, f"({co} {r})")
+co, r = call("PATCH", f"/superadmin/users/{victim}", SU, {"email": f"taken-{RUN}@e2e.test"})
+check("and a tenant user's email changed", co == 200, f"({co} {r})")
+co, r = call("PATCH", f"/superadmin/users/{victim}", SU, {"email": victim_email})
+check("(and changed back)", co == 200, f"({co})")
+
 print("-- what the tenant sees --")
 co, r = call("GET", "/admin/break-glass", A['token'])
 mine = [g for g in (r.get('grants', []) if isinstance(r, dict) else []) if g.get('id') == gid]
 check("A's administrator sees the grant", co == 200 and len(mine) == 1, f"({co} {r})")
 check("with its reason", bool(mine) and mine[0].get('reason') == REASON, f"({mine})")
 check("and every request made under it", bool(mine) and any(x.get('path') == "/api" + PROBE for x in mine[0].get('requests', [])), f"({mine})")
+paths = [x.get('path') for x in (mine[0].get('requests', []) if mine else [])]
+check("including the handed-over setup link", "/api/superadmin/tenant-admins" in paths, f"({paths})")
+check("and the email change", f"/api/superadmin/users/{victim}" in paths, f"({paths})")
 co, r = call("GET", "/admin/break-glass", B['token'])
 check("B's administrator does not see A's grant",
       co == 200 and not any(g.get('id') == gid for g in r.get('grants', [])), f"({co} {r})")
@@ -91,6 +118,10 @@ co, r = call("GET", "/audit/logs?limit=200", A['token'])
 check("opening it is in A's own audit trail",
       co == 200 and any(x.get('action_type') == 'BREAK_GLASS_OPENED' and x.get('resource_id') == gid for x in r.get('logs', [])),
       f"({co})")
+
+co, r = call("GET", "/audit/logs?limit=200", A['token'])
+check("each such action is in A's audit trail",
+      co == 200 and sum(1 for x in r.get('logs', []) if x.get('action_type') == 'BREAK_GLASS_ACTION') >= 3, f"({co})")
 
 print("-- the record cannot be rewritten --")
 q = psql(DB, f"UPDATE break_glass_grants SET reason = 'nothing to see' WHERE id = '{gid}'")

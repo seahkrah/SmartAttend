@@ -138,11 +138,21 @@ const baseConfig = {
 // it, everything runs as DATABASE_URL's role, which RLS exempts: the
 // behaviour before migration 069, and what the runtime-role gate fails on.
 const appUrl = process.env.APP_DATABASE_URL || process.env.DATABASE_URL
-const appPool = new TenantBoundPool({ ...baseConfig, connectionString: appUrl }, 'app')
+// Named, so the database (and the scorecard's runtime-role gate) can tell
+// which role the running API actually uses, not which one a config file names.
+const appPool = new TenantBoundPool({ ...baseConfig, connectionString: appUrl, application_name: 'jjelotech-api' }, 'app')
 const systemPool =
   appUrl === process.env.DATABASE_URL
     ? appPool
-    : new TenantBoundPool({ ...baseConfig, max: Math.max(Math.ceil(poolMax / 4), 2), connectionString: process.env.DATABASE_URL }, 'system')
+    : new TenantBoundPool(
+        {
+          ...baseConfig,
+          max: Math.max(Math.ceil(poolMax / 4), 2),
+          connectionString: process.env.DATABASE_URL,
+          application_name: 'jjelotech-api-system',
+        },
+        'system',
+      )
 
 if (systemPool !== appPool) console.log('[DB] runtime role in use: tenant tables are filtered by row-level security')
 

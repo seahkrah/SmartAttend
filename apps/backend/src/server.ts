@@ -69,6 +69,8 @@ import {
   errorToIncidentHandler,
   setupUncaughtHandlers,
 } from './middleware/errorToIncidentMiddleware.js'
+import { templateKeyConfigured } from './biometrics/templateCrypto.js'
+import { tenantKeysConfigured } from './security/kms/dataKeys.js'
 
 dotenv.config()
 validateProductionConfig()
@@ -215,6 +217,12 @@ async function startServer() {
     console.log(`[STARTUP] Using port ${PORT}`)
     await initializeDatabase()
     console.log('[DB] ✓ Connected')
+
+    // Said once, loudly: without a KMS, new face templates are sealed under
+    // the single BIOMETRIC_TEMPLATE_KEY rather than each tenant's own key.
+    if (templateKeyConfigured() && !tenantKeysConfigured()) {
+      console.warn('[KMS] No KMS configured (KMS_BACKEND): face templates use BIOMETRIC_TEMPLATE_KEY, not per-tenant data keys')
+    }
 
     const pending = await pendingMigrations()
     if (pending.length > 0) {

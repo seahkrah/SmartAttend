@@ -178,9 +178,19 @@ check("another employer cannot reset that employee's access", co in (403, 404), 
 co, r, _ = call("POST", f"/corporate/admin/employees/{emp_id}/reset-access", {"handover": True}, CA['adminToken'])
 check("an employee who has not set up yet is invited, not reset", co == 409, f"({co} {r})")
 
+# School A is in use, so taking an administrator's setup link is a way into
+# its data: it needs an open break-glass grant (breakGlass.e2e.py).
 co, r, _ = call("POST", "/superadmin/tenant-admins", {"tenantId": A['tenantId'], "email": f"head.{RUN}@e2e.test",
                 "fullName": "Deputy Head", "handover": True}, SU)
-check("the operator appoints a school administrator by setup link", co == 201
+check("an operator cannot take a setup link for a school in use without break-glass", co == 403, f"({co} {r})")
+co, r, _ = call("POST", "/superadmin/break-glass", {"tenantId": A['tenantId'], "minutes": 5,
+                "reason": "accountSecurity: appoint a deputy head and hand over the setup link"}, SU)
+deputy_grant = (r.get('grant') or {}).get('id') if isinstance(r, dict) else None
+co, r, _ = call("POST", "/superadmin/tenant-admins", {"tenantId": A['tenantId'], "email": f"head.{RUN}@e2e.test",
+                "fullName": "Deputy Head", "handover": True}, SU)
+if deputy_grant:
+    call("POST", f"/superadmin/break-glass/{deputy_grant}/close", {}, SU)
+check("under break-glass, the operator appoints a school administrator by setup link", co == 201
       and '/activate?token=' in r.get('invitation', {}).get('link', '') and 'temporaryPassword' not in r, f"({co} {r})")
 head_token = r.get('invitation', {}).get('link', '').split('token=')[-1]
 co, r, _ = call("POST", "/auth/activate", {"token": head_token, "password": GOOD, "confirmPassword": GOOD})

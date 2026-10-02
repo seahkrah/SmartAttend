@@ -8,9 +8,12 @@
  *   1. No `pg` Pool or Client is constructed outside src/db/ (type-only
  *      imports of pg are fine). Maintenance scripts and tests that need
  *      their own connection are allow-listed.
- *   2. No SQL sets or resets app.tenant_id / app.user_id outside the pool.
+ *   2. No SQL calls set_config(...), or SET/RESET [SESSION|LOCAL] app.*,
+ *      outside the pool: the tenant setting belongs to the pool alone.
  *   3. runAsSystem (the RLS-exempt system pool) is called only from the
  *      files below, each with a reason string at the call.
+ *   4. withTenant (binding to any tenant id it is given) is called only
+ *      where the id was resolved from identity: the tenant middleware.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -53,6 +56,11 @@ const SYSTEM_ALLOWED = new Set([
 const SYSTEM_ALLOWED_PREFIX = f =>
   under(f, 'apps/backend/src/scripts/', 'apps/backend/src/tests/', 'apps/backend/test/') || f.endsWith('.test.ts')
 
+const WITH_TENANT_ALLOWED = new Set([
+  'apps/backend/src/auth/tenantContextMiddleware.ts', // the tenant comes from membership or break-glass
+  'apps/backend/src/db/dbContext.ts',
+])
+
 const problems = []
 for (const f of files) {
   const text = fs.readFileSync(path.join(ROOT, f), 'utf8')
@@ -67,8 +75,14 @@ for (const f of files) {
         problems.push(`${at}: imports pg for values; only \`import type\` is allowed outside src/db`)
     }
     if (f !== 'apps/backend/src/db/connection.ts' && !under(f, 'apps/backend/src/tests/')) {
-      if (/set_config\(\s*'app\.|\b(SET|RESET)\s+(LOCAL\s+)?app\./i.test(line))
-        problems.push(`${at}: sets app.* itself; the pool owns the tenant context`)
+      // Any set_config, whatever the name argument: `set_config($1, …)` with a
+      // name from elsewhere is the same hole as a literal 'app.tenant_id'.
+      if (/\bset_config\s*\(|\b(SET|RESET)\s+(SESSION\s+|LOCAL\s+)?app\./i.test(line))
+        problems.push(`${at}: sets a session setting itself; the pool owns the tenant context`)
+    }
+    if (/\bwithTenant\s*\(/.test(line) && !/^\s*export function withTenant/.test(line)) {
+      if (!WITH_TENANT_ALLOWED.has(f) && !SYSTEM_ALLOWED_PREFIX(f))
+        problems.push(`${at}: withTenant binds to any tenant id; only the tenant middleware resolves one from identity`)
     }
     if (/\brunAsSystem\s*\(/.test(line) && !/^\s*export function runAsSystem/.test(line)) {
       if (f !== 'apps/backend/src/db/dbContext.ts' && !SYSTEM_ALLOWED.has(f) && !SYSTEM_ALLOWED_PREFIX(f))

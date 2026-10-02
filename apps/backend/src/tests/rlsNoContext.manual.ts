@@ -34,8 +34,6 @@ const seed = JSON.parse(fs.readFileSync(path.join(dir, 'seed.json'), 'utf8'))
 const A: string = seed.A.tenantId
 const B: string = seed.B.tenantId
 
-// Tables that hold each kind of tenant data the seeds create.
-const SAMPLE = ['students', 'faculty', 'courses', 'class_schedules', 'student_courses', 'school_departments']
 
 async function owner(sql: string, params: unknown[] = []) {
   const c = new pg.Client({ connectionString: process.env.DATABASE_URL })
@@ -53,7 +51,21 @@ async function main() {
     return
   }
 
-  for (const table of SAMPLE) {
+  // Every tenant table that holds any of A's rows: not a sample.
+  const tables = (
+    await owner(`
+      SELECT c.relname AS t FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relkind = 'r'
+         AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped)
+       ORDER BY 1`)
+  ).rows.map((r) => r.t as string)
+  const withRows: string[] = []
+  for (const t of tables) {
+    if (Number((await owner(`SELECT count(*) AS n FROM ${t} WHERE tenant_id = $1`, [A])).rows[0].n) > 0) withRows.push(t)
+  }
+  check(`A has rows in several tenant tables (${withRows.length} of ${tables.length})`, withRows.length >= 10)
+
+  for (const table of withRows) {
     const total = Number((await owner(`SELECT count(*) AS n FROM ${table}`)).rows[0].n)
     const ofA = Number((await owner(`SELECT count(*) AS n FROM ${table} WHERE tenant_id = $1`, [A])).rows[0].n)
 
@@ -89,6 +101,41 @@ async function main() {
        AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity
             OR NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))`)
   check('every tenant table has forced RLS and a policy', unforced.rowCount === 0, `(${unforced.rows.map((r) => r.relname).join(', ')})`)
+  // A policy that exists but admits everything (USING (true)) would pass the
+  // check above. Every policy on a tenant table must be the tenant policy.
+  const loose = await owner(`
+    SELECT p.tablename, p.policyname FROM pg_policies p
+     WHERE p.schemaname = 'public'
+       AND p.tablename IN (SELECT c.relname FROM pg_class c WHERE EXISTS
+             (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped))
+       AND NOT (coalesce(p.qual, '') LIKE '%tenant_id = ( SELECT app_current_tenant()%'
+                AND coalesce(p.with_check, '') LIKE '%tenant_id = ( SELECT app_current_tenant()%')`)
+  check('every policy on a tenant table is the tenant policy', loose.rowCount === 0, `(${loose.rows.map((r) => `${r.tablename}.${r.policyname}`).join(', ')})`)
+  // Foreign keys are checked without RLS: every reference between tenant
+  // tables needs a same-tenant guard (migration 073 generates them).
+  const unguarded = await owner(`
+    WITH tt AS (SELECT c.oid FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+                 WHERE ns.nspname = 'public' AND c.relkind = 'r'
+                   AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped)),
+         fks AS (SELECT con.conrelid AS child, a.attname AS col, con.confrelid AS parent
+                   FROM pg_constraint con
+                   JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = con.conkey[1]
+                   JOIN pg_attribute pa ON pa.attrelid = con.confrelid AND pa.attnum = con.confkey[1]
+                  WHERE con.contype = 'f' AND array_length(con.conkey, 1) = 1 AND pa.attname = 'id' AND a.attname <> 'tenant_id'
+                    AND con.conrelid IN (SELECT oid FROM tt) AND con.confrelid IN (SELECT oid FROM tt)),
+         cov AS (SELECT tg.tgrelid AS child, arr[i] AS col, arr[i + 1] AS parent_name
+                   FROM pg_trigger tg JOIN pg_proc p ON p.oid = tg.tgfoid AND p.proname = 'guard_same_tenant'
+                   CROSS JOIN LATERAL (SELECT string_to_array(rtrim(encode(tg.tgargs, 'escape'), '\\000'), '\\000') AS arr) x
+                   CROSS JOIN LATERAL generate_series(1, coalesce(array_length(arr, 1), 0), 2) AS i
+                  WHERE NOT tg.tgisinternal)
+    SELECT f.child::regclass::text || '.' || f.col AS ref FROM fks f
+     WHERE NOT EXISTS (SELECT 1 FROM cov c WHERE c.child = f.child AND c.col = f.col AND c.parent_name = f.parent::regclass::text)`)
+  check('every reference between tenant tables has a same-tenant guard', unguarded.rowCount === 0, `(${unguarded.rows.map((r) => r.ref).slice(0, 8).join(', ')})`)
+  // The runtime role reads break-glass grants; only the control plane writes them.
+  const grantsWritable = await query(`SELECT has_table_privilege(current_user, 'break_glass_grants', 'INSERT,UPDATE,DELETE') AS w`)
+  check('the runtime role cannot write break-glass grants', grantsWritable.rows[0].w === false)
+  const logErasable = await query(`SELECT has_table_privilege(current_user, 'break_glass_access_log', 'UPDATE,DELETE') AS w`)
+  check('nor edit or erase the break-glass access log', logErasable.rows[0].w === false)
   const views = await owner(`
     SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname = 'public' AND c.relkind = 'v'

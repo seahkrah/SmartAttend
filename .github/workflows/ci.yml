@@ -423,6 +423,22 @@ jobs:
           APP_DB_USER=jjelotech_api APP_DB_PASSWORD="$pw" npx tsx src/scripts/createRuntimeRole.ts
           echo "APP_DATABASE_URL=postgresql://jjelotech_api:${pw}@127.0.0.1:5432/jjelotech_score" >> "$GITHUB_ENV"
 
+      # A running API, so the runtime-role gate can ask the database which
+      # role the API's own pool actually connects as.
+      - name: Start API (runtime role)
+        working-directory: apps/backend
+        env:
+          PORT: '5000'
+          FILE_STORAGE_ROOT: /tmp/ci-file-storage
+          FILE_STORAGE_BACKEND: local
+        run: |
+          nohup npx tsx src/server.ts > /tmp/api.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:5000/api/health >/dev/null && exit 0
+            sleep 1
+          done
+          echo "API did not become healthy"; cat /tmp/api.log; exit 1
+
       - uses: actions/download-artifact@v4
         continue-on-error: true
         with:
@@ -431,6 +447,7 @@ jobs:
 
       - name: Score
         env:
+          API_BASE: http://127.0.0.1:5000
           E2E_RESULTS: ${{ github.workspace }}/e2e-results/results.tsv
         run: node scripts/scorecard/run.mjs --phase ci | tee -a "$GITHUB_STEP_SUMMARY"
 

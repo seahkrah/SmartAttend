@@ -150,8 +150,11 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
   checks on stored-file keys; and by per-tenant keys for face templates.
   A fuzzer calls every route as one tenant with another's ids. Superadmin
   access to a tenant's data needs a time-boxed break-glass grant that the
-  tenant can see. Still outside it: tables with no `tenant_id` (incidents
-  and other control-plane records are scoped in code only), and per-tenant
+  tenant can see. Still outside it: tables with no `tenant_id`, scoped in
+  application code only. The most important are `users` (including password
+  hashes), memberships and sessions, which code running as the runtime role
+  can read across tenants; fixing that is the first item of the next phase.
+  Incidents and other control-plane records are in the same position. Per-tenant
   keys protect face templates only (documents and other personal data
   come later). Templates sealed before per-tenant keys are not yet
   re-encrypted under them.

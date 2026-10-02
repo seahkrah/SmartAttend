@@ -73,13 +73,11 @@ dimensions:
       - id: cross-tenant-triggers
         kind: foundation
         weight: 10
-        title: Database triggers refuse cross-tenant references (>= 20 guard_same_tenant uses)
-        type: grep
-        paths:
-          - apps/backend/src/db/migrations
-        pattern: guard_same_tenant
-        min: 20
-        count: occurrences
+        title: Every reference between tenant tables has a same-tenant guard (foreign keys bypass RLS)
+        type: check
+        check: sameTenantGuards
+        requires:
+          - db
       - id: scoped-helpers
         kind: foundation
         weight: 5
@@ -113,7 +111,7 @@ dimensions:
       - id: rls-forced
         kind: target
         weight: 8
-        title: RLS enabled and FORCED, with a policy, on every table that has tenant_id
+        title: RLS enabled and FORCED on every tenant table, with the tenant policy and no looser one
         type: check
         check: rlsCoverage
         requires:
@@ -121,11 +119,12 @@ dimensions:
       - id: runtime-role
         kind: target
         weight: 6
-        title: API connects as a non-owner, non-superuser NOBYPASSRLS role
+        title: The running API connects as a non-owner, non-superuser, NOBYPASSRLS role outside jjelotech_system
         type: check
         check: runtimeRole
         requires:
           - db
+          - api
       - id: no-context-no-rows
         kind: target
         weight: 4
@@ -136,7 +135,7 @@ dimensions:
       - id: raw-query-lint
         kind: target
         weight: 5
-        title: Raw pool.query forbidden outside the tenant data-access helper
+        title: 'Database access only through the tenant-bound pool: no own connections or session settings; runAsSystem and withTenant allow-listed (lint)'
         type: cmd
         run: node scripts/checks/no-raw-query.mjs
       - id: route-fuzzer
@@ -864,11 +863,10 @@ dimensions:
       - id: image-boot-ci
         kind: foundation
         weight: 10
-        title: CI migrates and boots the production image
-        type: grep
-        paths:
-          - .github/workflows/ci.yml
-        pattern: Migrate and start the API image
+        title: The production image migrates and boots in CI (job ran and passed)
+        type: ci-job
+        jobs:
+          - images
       - id: metrics-stored
         kind: foundation
         weight: 5
@@ -1005,11 +1003,10 @@ dimensions:
       - id: image-build
         kind: foundation
         weight: 5
-        title: Container images built in CI
-        type: grep
-        paths:
-          - .github/workflows/ci.yml
-        pattern: docker build
+        title: Container images built in CI (job ran and passed)
+        type: ci-job
+        jobs:
+          - images
       - id: eslint
         kind: target
         weight: 5

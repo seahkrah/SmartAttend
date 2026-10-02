@@ -806,6 +806,55 @@ router.get('/admins/mapping', async (_req: Request, res: Response) => {
   }
 })
 
+/**
+ * Some control-plane actions put a tenant account's credentials in the
+ * superadmin's hands: a setup link handed over instead of emailed, or a
+ * changed email address that a password reset then follows. That is acting
+ * inside the tenant, so it needs the same open break-glass grant as
+ * X-Tenant-Id does, is logged under it, and is written to the tenant's own
+ * audit trail. Without this, appointing an administrator with a handed-over
+ * link was a way into any tenant that the tenant never saw (Phase 1 audit).
+ *
+ * Returns false, having answered 403, when there is no open grant.
+ */
+async function underBreakGlass(req: Request, res: Response, tenantId: string, action: string): Promise<boolean> {
+  const grant = await query(
+    `SELECT id FROM break_glass_grants
+      WHERE tenant_id = $1 AND superadmin_id = $2 AND closed_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+      ORDER BY expires_at DESC LIMIT 1`,
+    [tenantId, actorOf(req)]
+  )
+  if (!grant.rows.length) {
+    res.status(403).json({
+      error: 'Break-glass required',
+      message: `${action} gives you access to a tenant account: open a break-glass grant for that tenant first (POST /api/superadmin/break-glass)`,
+    })
+    return false
+  }
+  await query(
+    `INSERT INTO break_glass_access_log (tenant_id, grant_id, method, path) VALUES ($1, $2, $3, $4)`,
+    [tenantId, grant.rows[0].id, req.method.slice(0, 10), (req.originalUrl.split('?')[0] || '/').slice(0, 500)]
+  )
+  await tenantTrail(req, tenantId, 'BREAK_GLASS_ACTION', { grantId: grant.rows[0].id, action }, undefined, true)
+  return true
+}
+
+/**
+ * Handing over a setup link is how a new tenant gets its first administrator
+ * (onboarding), and there is nothing in an empty tenant to protect. Once the
+ * tenant has an active member it is in use, and the same hand-over is a way
+ * into its data: break-glass. Either way the tenant's own trail records it.
+ */
+async function handoverAllowed(req: Request, res: Response, tenantId: string): Promise<boolean> {
+  const inUse = await query(
+    `SELECT EXISTS (SELECT 1 FROM user_tenant_memberships WHERE tenant_id = $1 AND status = 'active') AS used`,
+    [tenantId]
+  )
+  if (inUse.rows[0].used) return underBreakGlass(req, res, tenantId, 'Handing over a setup link')
+  await tenantTrail(req, tenantId, 'SETUP_LINK_HANDED_OVER', { grantId: null, onboarding: true }, undefined, true)
+  return true
+}
+
 router.post('/tenant-admins', async (req: Request, res: Response) => {
   const client = await getConnection()
   try {
@@ -846,6 +895,7 @@ router.post('/tenant-admins', async (req: Request, res: Response) => {
     // one-time setup link instead (`handover`), to pass on directly.
     const hashed = await unusablePasswordHash()
     const handover = b.handover === true
+    if (handover && !(await handoverAllowed(req, res, b.tenantId))) return
 
     await client.query('BEGIN')
 
@@ -916,6 +966,7 @@ router.post('/tenant-admins/:adminId/invitation', async (req: Request, res: Resp
     )
     if (admin.rowCount === 0) return notFound(res, 'Administrator')
     const handover = req.body?.handover === true
+    if (handover && !(await handoverAllowed(req, res, admin.rows[0].tenant_id))) return
 
     await client.query('BEGIN')
     const invitation = await sendInvitation(client, {
@@ -1050,6 +1101,17 @@ router.patch('/users/:userId', async (req: Request, res: Response) => {
       `SELECT id, full_name, email, phone, is_active FROM users WHERE id = $1`, [userId]
     )
     if (before.rowCount === 0) return notFound(res, 'User')
+
+    // A new email address is where the next password reset goes: for an
+    // account in a tenant, that is access to the tenant.
+    if (b.email && String(b.email).toLowerCase() !== String(before.rows[0].email).toLowerCase()) {
+      const tenants = await query(
+        `SELECT DISTINCT tenant_id FROM user_tenant_memberships WHERE user_id = $1`, [userId]
+      )
+      for (const t of tenants.rows) {
+        if (!(await underBreakGlass(req, res, t.tenant_id, "Changing a tenant user's email address"))) return
+      }
+    }
 
     // A superadmin locking themselves out is a support call nobody can answer.
     if (userId === actorOf(req) && b.isActive === false) {
@@ -1665,15 +1727,29 @@ router.post('/incidents/override', async (req: Request, res: Response) => {
 
 const BREAK_GLASS_MAX_MINUTES = 60
 
-async function tenantTrail(req: Request, tenantId: string, actionType: string, details: Record<string, unknown>, justification?: string) {
+/**
+ * Writes to the tenant's own audit trail. With `required`, a failed write
+ * fails the action: what the tenant is promised it can see is not
+ * best-effort.
+ */
+async function tenantTrail(
+  req: Request,
+  tenantId: string,
+  actionType: string,
+  details: Record<string, unknown>,
+  justification?: string,
+  required = false,
+) {
   try {
     await logAudit({
       actorId: actorOf(req),
       actorRole: 'superadmin',
       actionType,
       actionScope: 'TENANT',
-      resourceType: 'break_glass_grant',
-      resourceId: String(details.grantId),
+      // The grant when there is one; otherwise the tenant itself (a link
+      // handed over while onboarding a tenant nobody uses yet).
+      resourceType: details.grantId ? 'break_glass_grant' : 'tenant',
+      resourceId: details.grantId ? String(details.grantId) : tenantId,
       afterState: details,
       justification,
       ipAddress: getClientIp(req),
@@ -1682,6 +1758,7 @@ async function tenantTrail(req: Request, tenantId: string, actionType: string, d
     })
   } catch (e) {
     console.error(`[SUPERADMIN] tenant audit write failed for ${actionType}:`, e)
+    if (required) throw e
   }
 }
 
@@ -1708,7 +1785,13 @@ router.post('/break-glass', async (req: Request, res: Response) => {
     )
     const grant = g.rows[0]
     await audit(req, 'BREAK_GLASS_OPENED', 'TENANT', { result: 'SUCCESS' }, { type: 'tenant', id: tenantId }, { afterState: grant }, reason.trim())
-    await tenantTrail(req, tenantId, 'BREAK_GLASS_OPENED', { grantId: grant.id, expiresAt: grant.expires_at, minutes }, reason.trim())
+    try {
+      await tenantTrail(req, tenantId, 'BREAK_GLASS_OPENED', { grantId: grant.id, expiresAt: grant.expires_at, minutes }, reason.trim(), true)
+    } catch {
+      // A grant the tenant cannot see is not allowed to exist.
+      await query(`UPDATE break_glass_grants SET closed_at = CURRENT_TIMESTAMP WHERE id = $1`, [grant.id])
+      return res.status(500).json({ error: "Could not record the grant in the tenant's audit trail; it was not opened" })
+    }
     return res.status(201).json({ grant: { ...grant, tenant_name: t.rows[0].name } })
   } catch (e) {
     console.error('[SUPERADMIN] break-glass open:', e)

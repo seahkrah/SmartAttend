@@ -28,6 +28,18 @@ declare global {
 }
 
 /**
+ * The route that answered, as declared (`/api/school/students/:studentId`),
+ * not the path as requested. A raw path stores every id a caller typed,
+ * including another tenant's they had no right to and were refused; and one
+ * series per row id is not a metric anyone can read.
+ */
+function endpointPattern(req: Request): string {
+  const route = (req as Request & { route?: { path?: unknown } }).route?.path
+  if (typeof route === 'string') return `${req.baseUrl ?? ''}${route}`.replace(/\/$/, '') || '/'
+  return '(unmatched)'
+}
+
+/**
  * Middleware to track API latency
  * Records endpoint, method, status code, and response time
  */
@@ -59,7 +71,7 @@ export function apiLatencyTrackingMiddleware(
     if (tenantId && !_req.path.includes('/health')) {
       // Record metrics asynchronously (fire and forget)
       recordAPILatency({
-        endpoint: _req.path,
+        endpoint: endpointPattern(_req),
         http_method: _req.method,
         status_code: res.statusCode,
         response_time_ms: responseTimeMs,

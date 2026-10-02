@@ -361,8 +361,20 @@ check("superadmin: a malformed tenant id is 404, not a database error", co == 40
 co, r = as_superadmin_in("00000000-0000-4000-8000-000000000000")
 check("superadmin: a tenant that does not exist is 404", co == 404, f"({co} {r})")
 co, r = as_superadmin_in(SA['tenantId'])
-check("superadmin: a real tenant resolves to exactly that tenant",
+check("superadmin: a real tenant still needs break-glass", co == 403, f"({co} {r})")
+# Acting inside a tenant needs an open grant (breakGlass.e2e.py covers it in full).
+o = subprocess.run(["curl", "-s", "-X", "POST", "-H", "Content-Type: application/json",
+                    "-H", f"Authorization: Bearer {sa['token']}", ROOT + "/superadmin/break-glass",
+                    "-d", json.dumps({"tenantId": SA['tenantId'], "minutes": 5,
+                                      "reason": "crossTenantAudit: superadmin tenant selection resolves exactly"})],
+                   capture_output=True, text=True).stdout
+grant_id = (json.loads(o).get('grant') or {}).get('id') if o.startswith('{') else None
+co, r = as_superadmin_in(SA['tenantId'])
+check("superadmin: under break-glass, a real tenant resolves to exactly that tenant",
       co == 200 and isinstance(r, dict) and r.get('tenant_id') == SA['tenantId'], f"({co} {r})")
+if grant_id:
+    subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: Bearer {sa['token']}",
+                    ROOT + f"/superadmin/break-glass/{grant_id}/close"], capture_output=True)
 
 print(f"\n{P} passed, {F} failed")
 sys.exit(0 if F == 0 else 1)

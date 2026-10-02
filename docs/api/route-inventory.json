@@ -151,6 +151,11 @@
   },
   {
     "method": "GET",
+    "path": "/api/admin/break-glass",
+    "params": []
+  },
+  {
+    "method": "GET",
     "path": "/api/admin/courses",
     "params": []
   },
@@ -2527,6 +2532,23 @@
   },
   {
     "method": "GET",
+    "path": "/api/superadmin/break-glass",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/break-glass",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/break-glass/:grantId/close",
+    "params": [
+      "grantId"
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/superadmin/diagnostics",
     "params": []
   },
@@ -2736,6 +2758,23 @@
     "method": "GET",
     "path": "/api/v1/superadmin/audit-trail",
     "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/break-glass",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/break-glass",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/break-glass/:grantId/close",
+    "params": [
+      "grantId"
+    ]
   },
   {
     "method": "GET",

@@ -76,6 +76,8 @@ SUITES=(
   schoolTypesApi
   # Creates two grade schools with classes, subjects and children.
   gradeSchoolApi
+  # Opens, uses and closes a superadmin break-glass grant on school A.
+  breakGlass
 )
 
 record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }

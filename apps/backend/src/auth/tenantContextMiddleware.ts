@@ -167,29 +167,51 @@ export function requireTenant(req: TenantRequest, res: Response, next: NextFunct
       })
       return
     }
-    // A superadmin may act in any tenant, but it must exist. This used to be
-    // said here and not done: the header went into the context unchecked, so
-    // a malformed value reached SQL and a made-up one silently matched
-    // nothing. Recording the switch in a tenant-visible audit trail is the
-    // break-glass work (docs/security/findings.md, finding 12).
+    // A superadmin may act inside a tenant's data only through break-glass:
+    // an open, time-boxed grant with a stated reason, recorded in the
+    // tenant's audit trail when opened (POST /api/superadmin/break-glass),
+    // and every request under it logged where the tenant can see it.
+    // Unknown and malformed tenants read the same: 404.
     if (!UUID.test(requested)) {
       res.status(404).json({ error: 'Tenant not found' })
       return
     }
-    query(`SELECT id, name FROM tenants WHERE id = $1`, [requested])
-      .then((r) => {
-        if (!r.rows.length) {
-          res.status(404).json({ error: 'Tenant not found' })
+    const ctx = req.ctx
+    const tenantId = requested
+    ;(async () => {
+      const t = await query(`SELECT id, name FROM tenants WHERE id = $1`, [tenantId])
+      if (!t.rows.length) {
+        res.status(404).json({ error: 'Tenant not found' })
+        return
+      }
+      await withTenant({ tenantId, userId: ctx.userId }, async () => {
+        const grant = await query(
+          `SELECT id, expires_at FROM break_glass_grants
+            WHERE tenant_id = $1 AND superadmin_id = $2
+              AND closed_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+            ORDER BY expires_at DESC LIMIT 1`,
+          [tenantId, ctx.userId]
+        )
+        if (!grant.rows.length) {
+          res.status(403).json({
+            error: 'Break-glass required',
+            message:
+              'Acting inside a tenant needs an open break-glass grant: POST /api/superadmin/break-glass with the tenant and your reason',
+          })
           return
         }
-        req.ctx!.tenantId = r.rows[0].id
-        req.ctx!.tenantName = r.rows[0].name
-        withTenant({ tenantId: r.rows[0].id, userId: req.ctx!.userId }, next)
+        await query(
+          `INSERT INTO break_glass_access_log (tenant_id, grant_id, method, path) VALUES ($1, $2, $3, $4)`,
+          [tenantId, grant.rows[0].id, req.method.slice(0, 10), (req.originalUrl.split('?')[0] || '/').slice(0, 500)]
+        )
+        ctx.tenantId = tenantId
+        ctx.tenantName = t.rows[0].name
+        next()
       })
-      .catch((error) => {
-        console.error('[TENANT_CTX] superadmin tenant lookup failed:', error)
-        res.status(500).json({ error: 'Internal error', message: 'Could not resolve tenant context' })
-      })
+    })().catch((error) => {
+      console.error('[TENANT_CTX] superadmin tenant selection failed:', error)
+      res.status(500).json({ error: 'Internal error', message: 'Could not resolve tenant context' })
+    })
     return
   }
 

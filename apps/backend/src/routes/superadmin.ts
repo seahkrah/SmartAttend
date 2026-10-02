@@ -8,6 +8,7 @@ import { getClientIp } from '../utils/getClientIp.js'
 import { clearMfa } from '../auth/mfaService.js'
 import { revokeUserSessions } from '../auth/sessions.js'
 import { runAsSystem } from '../db/dbContext.js'
+import { logAudit } from '../services/domainAuditService.js'
 import {
   SCHOOL_TYPE_CATALOGUE, SCHOOL_TYPES, SchoolStructureError, applySchoolStructure, validateStructure,
 } from '../services/schoolTypes.js'
@@ -1649,6 +1650,107 @@ router.post('/incidents/override', async (req: Request, res: Response) => {
     await audit(req, 'INCIDENT_OVERRIDE', 'SYSTEM',
       { result: 'FAILURE', error: String((e as Error).message) })
     return fail(res, 'override that incident', e)
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Break-glass: acting inside one tenant's data
+// ---------------------------------------------------------------------------
+//
+// Everything else here administers tenants as a whole. Reading or changing a
+// tenant's own records goes through the tenant routes with X-Tenant-Id, and
+// requireTenant admits a superadmin there only under an open grant. Opening
+// and closing a grant is written to the tenant's own audit trail
+// (audit_logs, which its administrators read), not only the control plane's.
+
+const BREAK_GLASS_MAX_MINUTES = 60
+
+async function tenantTrail(req: Request, tenantId: string, actionType: string, details: Record<string, unknown>, justification?: string) {
+  try {
+    await logAudit({
+      actorId: actorOf(req),
+      actorRole: 'superadmin',
+      actionType,
+      actionScope: 'TENANT',
+      resourceType: 'break_glass_grant',
+      resourceId: String(details.grantId),
+      afterState: details,
+      justification,
+      ipAddress: getClientIp(req),
+      userAgent: req.get('user-agent') ?? undefined,
+      tenantId,
+    })
+  } catch (e) {
+    console.error(`[SUPERADMIN] tenant audit write failed for ${actionType}:`, e)
+  }
+}
+
+router.post('/break-glass', async (req: Request, res: Response) => {
+  const { tenantId, reason } = req.body ?? {}
+  const minutes = Number(req.body?.minutes ?? 30)
+  if (typeof tenantId !== 'string' || !UUID.test(tenantId)) {
+    return res.status(400).json({ error: 'tenantId is required' })
+  }
+  if (typeof reason !== 'string' || reason.trim().length < 20 || reason.length > 1000) {
+    return res.status(400).json({ error: 'Say why, in at least 20 characters: it is shown to the tenant' })
+  }
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > BREAK_GLASS_MAX_MINUTES) {
+    return res.status(400).json({ error: `minutes must be a whole number from 1 to ${BREAK_GLASS_MAX_MINUTES}` })
+  }
+  try {
+    const t = await query(`SELECT id, name FROM tenants WHERE id = $1`, [tenantId])
+    if (!t.rows.length) return res.status(404).json({ error: 'Tenant not found' })
+    const g = await query(
+      `INSERT INTO break_glass_grants (tenant_id, superadmin_id, reason, expires_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP + make_interval(mins => $4))
+       RETURNING id, tenant_id, opened_at, expires_at`,
+      [tenantId, actorOf(req), reason.trim(), minutes]
+    )
+    const grant = g.rows[0]
+    await audit(req, 'BREAK_GLASS_OPENED', 'TENANT', { result: 'SUCCESS' }, { type: 'tenant', id: tenantId }, { afterState: grant }, reason.trim())
+    await tenantTrail(req, tenantId, 'BREAK_GLASS_OPENED', { grantId: grant.id, expiresAt: grant.expires_at, minutes }, reason.trim())
+    return res.status(201).json({ grant: { ...grant, tenant_name: t.rows[0].name } })
+  } catch (e) {
+    console.error('[SUPERADMIN] break-glass open:', e)
+    return res.status(500).json({ error: 'Could not open break-glass' })
+  }
+})
+
+router.get('/break-glass', async (req: Request, res: Response) => {
+  try {
+    const r = await query(
+      `SELECT g.id, g.tenant_id, t.name AS tenant_name, g.reason, g.opened_at, g.expires_at, g.closed_at,
+              (SELECT count(*)::int FROM break_glass_access_log a WHERE a.grant_id = g.id) AS requests
+         FROM break_glass_grants g JOIN tenants t ON t.id = g.tenant_id
+        WHERE g.superadmin_id = $1
+        ORDER BY g.opened_at DESC LIMIT 100`,
+      [actorOf(req)]
+    )
+    return res.json({ grants: r.rows })
+  } catch (e) {
+    console.error('[SUPERADMIN] break-glass list:', e)
+    return res.status(500).json({ error: 'Could not list break-glass grants' })
+  }
+})
+
+router.post('/break-glass/:grantId/close', async (req: Request, res: Response) => {
+  const { grantId } = req.params
+  if (!UUID.test(grantId)) return res.status(404).json({ error: 'Grant not found' })
+  try {
+    const r = await query(
+      `UPDATE break_glass_grants SET closed_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND superadmin_id = $2 AND closed_at IS NULL
+        RETURNING id, tenant_id, closed_at`,
+      [grantId, actorOf(req)]
+    )
+    if (!r.rows.length) return res.status(404).json({ error: 'No open grant of yours with that id' })
+    const grant = r.rows[0]
+    await audit(req, 'BREAK_GLASS_CLOSED', 'TENANT', { result: 'SUCCESS' }, { type: 'tenant', id: grant.tenant_id }, { afterState: grant })
+    await tenantTrail(req, grant.tenant_id, 'BREAK_GLASS_CLOSED', { grantId: grant.id, closedAt: grant.closed_at })
+    return res.json({ grant })
+  } catch (e) {
+    console.error('[SUPERADMIN] break-glass close:', e)
+    return res.status(500).json({ error: 'Could not close break-glass' })
   }
 })
 

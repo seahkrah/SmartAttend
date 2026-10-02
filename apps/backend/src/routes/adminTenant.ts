@@ -67,6 +67,41 @@ function membershipTable(kind: 'school' | 'corporate') {
 // ---------------------------------------------------------------------------
 // GET /api/admin/analytics
 // ---------------------------------------------------------------------------
+/**
+ * Break-glass: when a platform superadmin acted inside this tenant's data,
+ * why, for how long, and every request made. Row-level security limits this
+ * to the tenant's own grants; the WHERE says so as well.
+ */
+router.get('/break-glass', async (req: TenantRequest, res: Response) => {
+  try {
+    const tenantId = req.ctx!.tenantId
+    const grants = await query(
+      `SELECT g.id, g.reason, g.opened_at, g.expires_at, g.closed_at,
+              u.full_name AS superadmin_name, u.email AS superadmin_email
+         FROM break_glass_grants g
+         JOIN users u ON u.id = g.superadmin_id
+        WHERE g.tenant_id = $1
+        ORDER BY g.opened_at DESC LIMIT 100`,
+      [tenantId]
+    )
+    const ids = grants.rows.map((g: any) => g.id)
+    const access = ids.length
+      ? await query(
+          `SELECT grant_id, method, path, at FROM break_glass_access_log
+            WHERE tenant_id = $1 AND grant_id = ANY($2::uuid[])
+            ORDER BY at`,
+          [tenantId, ids]
+        )
+      : { rows: [] as any[] }
+    return res.json({
+      grants: grants.rows.map((g: any) => ({ ...g, requests: access.rows.filter((a: any) => a.grant_id === g.id) })),
+    })
+  } catch (e) {
+    console.error('[ADMIN] break-glass:', e)
+    return res.status(500).json({ error: 'Could not load break-glass access' })
+  }
+})
+
 router.get('/analytics', async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {

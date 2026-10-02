@@ -527,6 +527,16 @@
   },
   {
     "method": "GET",
+    "path": "/api/audit/chain",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/export",
+    "params": []
+  },
+  {
+    "method": "GET",
     "path": "/api/audit/logs",
     "params": []
   },
@@ -561,6 +571,23 @@
     "method": "GET",
     "path": "/api/audit/search",
     "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/streams",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/audit/streams",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/audit/streams/:id",
+    "params": [
+      "id"
+    ]
   },
   {
     "method": "GET",
@@ -836,6 +863,11 @@
     "params": []
   },
   {
+    "method": "GET",
+    "path": "/api/auth/csrf",
+    "params": []
+  },
+  {
     "method": "POST",
     "path": "/api/auth/login",
     "params": []
@@ -896,6 +928,48 @@
     "params": []
   },
   {
+    "method": "GET",
+    "path": "/api/auth/passkeys",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/passkeys/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/register/options",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/register/verify",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/sign-in/options",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/sign-in/verify",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/step-up/options",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/step-up/verify",
+    "params": []
+  },
+  {
     "method": "POST",
     "path": "/api/auth/password/forgot",
     "params": []
@@ -931,6 +1005,11 @@
     "params": [
       "sessionId"
     ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/step-up",
+    "params": []
   },
   {
     "method": "GET",

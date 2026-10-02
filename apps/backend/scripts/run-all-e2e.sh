@@ -15,6 +15,15 @@ export API_BASE="${API_BASE:-http://127.0.0.1:5000}"
 export E2E_FIXTURE_DIR="${E2E_FIXTURE_DIR:-$(pwd)/.e2e-fixtures}"
 mkdir -p "$E2E_FIXTURE_DIR"
 
+# One line per suite, "<suite><TAB><pass|fail>", for scripts/scorecard to read.
+# The header ties the results to the code that produced them: the scorecard
+# ignores results from any other commit or from a dirty tree. Written first,
+# so a run that dies while seeding cannot leave the last run's results behind.
+export E2E_RESULTS="${E2E_RESULTS:-$E2E_FIXTURE_DIR/results.tsv}"
+tree_dirty=true
+[ -z "$(git status --porcelain --untracked-files=no)" ] && tree_dirty=false
+printf '# commit=%s dirty=%s started=%s\n' "$(git rev-parse HEAD)" "$tree_dirty" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$E2E_RESULTS"
+
 seed() {
   local script="$1" out="$2"
   local log="$E2E_FIXTURE_DIR/${2%.json}.log"
@@ -69,13 +78,6 @@ SUITES=(
   gradeSchoolApi
 )
 
-# One line per suite, "<suite><TAB><pass|fail>", for scripts/scorecard to read.
-# The header ties the results to the code that produced them: the scorecard
-# ignores results from any other commit or from a dirty tree.
-export E2E_RESULTS="${E2E_RESULTS:-$E2E_FIXTURE_DIR/results.tsv}"
-tree_dirty=true
-[ -z "$(git status --porcelain --untracked-files=no)" ] && tree_dirty=false
-printf '# commit=%s dirty=%s started=%s\n' "$(git rev-parse HEAD)" "$tree_dirty" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$E2E_RESULTS"
 record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }
 
 fail=0
@@ -89,14 +91,27 @@ for suite in "${SUITES[@]}"; do
   fi
 done
 
-# Its exit status used to vanish into `| tail -1`.
-echo "=== tenantIsolation ==="
-if npx tsx src/tests/tenantIsolation.manual.ts > "$E2E_FIXTURE_DIR/tenantIsolation.log" 2>&1; then
-  record tenantIsolation pass
-else
-  record tenantIsolation fail
-  fail=1
-fi
-tail -1 "$E2E_FIXTURE_DIR/tenantIsolation.log"
+# Suites that drive the data layer directly rather than over HTTP.
+# tenantIsolation: the tenant-scoped helpers. rlsNoContext and blindWrite:
+# row-level security as the runtime role (APP_DATABASE_URL); they fail,
+# rather than pass vacuously, when no runtime role is configured.
+TS_SUITES=(
+  tenantIsolation
+  rlsNoContext
+  blindWrite
+)
+
+# Their exit status used to vanish into `| tail -1`.
+for suite in "${TS_SUITES[@]}"; do
+  echo "=== $suite ==="
+  if npx tsx "src/tests/${suite}.manual.ts" > "$E2E_FIXTURE_DIR/${suite}.log" 2>&1; then
+    record "$suite" pass
+  else
+    record "$suite" fail
+    grep -E "FAIL|Error" "$E2E_FIXTURE_DIR/${suite}.log" | head -20
+    fail=1
+  fi
+  tail -1 "$E2E_FIXTURE_DIR/${suite}.log"
+done
 
 exit $fail

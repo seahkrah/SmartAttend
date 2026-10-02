@@ -146,12 +146,16 @@ async function apiUp(base) {
 /** The suites scripts/run-all-e2e.sh runs, read from the script itself. */
 function runnerSuites() {
   const script = fs.readFileSync(path.join(ROOT, 'apps', 'backend', 'scripts', 'run-all-e2e.sh'), 'utf8')
-  const block = /SUITES=\(([\s\S]*?)\n\)/.exec(script)
-  const suites = block[1]
-    .split('\n')
-    .map(l => l.replace(/#.*/, '').trim())
-    .filter(Boolean)
-  return [...suites, 'tenantIsolation']
+  const list = name => {
+    const start = script.indexOf(`\n${name}=(`)
+    if (start === -1) throw new Error(`run-all-e2e.sh has no ${name}=( ... ) list`)
+    const body = script.slice(start + name.length + 3, script.indexOf('\n)', start))
+    return body
+      .split('\n')
+      .map(l => l.replace(/#.*/, '').trim())
+      .filter(Boolean)
+  }
+  return [...list('SUITES'), ...list('TS_SUITES')]
 }
 
 /**

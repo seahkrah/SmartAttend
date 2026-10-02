@@ -178,6 +178,18 @@ jobs:
         working-directory: apps/backend
         run: npx vitest run --coverage --coverage.reporter=text-summary
 
+      # From here on the API and the suites connect as the runtime role: not
+      # the owner, not a superuser, NOBYPASSRLS. Row-level security filters
+      # every tenant table for it, so the e2e suites below run against the
+      # same enforcement production has. (Unit tests above read tenant
+      # tables directly and run as the owner.)
+      - name: Runtime database role
+        working-directory: apps/backend
+        run: |
+          pw=$(openssl rand -hex 24)
+          APP_DB_USER=jjelotech_api APP_DB_PASSWORD="$pw" npx tsx src/scripts/createRuntimeRole.ts
+          echo "APP_DATABASE_URL=postgresql://jjelotech_api:${pw}@127.0.0.1:5432/jjelotech_ci" >> "$GITHUB_ENV"
+
       - name: Start API
         working-directory: apps/backend
         run: |
@@ -387,6 +399,13 @@ jobs:
       - name: Migrate
         working-directory: apps/backend
         run: npx tsx src/db/migrate.ts
+
+      - name: Runtime database role
+        working-directory: apps/backend
+        run: |
+          pw=$(openssl rand -hex 24)
+          APP_DB_USER=jjelotech_api APP_DB_PASSWORD="$pw" npx tsx src/scripts/createRuntimeRole.ts
+          echo "APP_DATABASE_URL=postgresql://jjelotech_api:${pw}@127.0.0.1:5432/jjelotech_score" >> "$GITHUB_ENV"
 
       - uses: actions/download-artifact@v4
         continue-on-error: true

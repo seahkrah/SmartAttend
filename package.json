@@ -6,7 +6,7 @@
     "lint": "npm --prefix apps/backend run lint && npm --prefix apps/frontend run lint",
     "format:check": "prettier --check \"scripts/**/*.{mjs,js,json,yml}\"",
     "format": "prettier --write \"scripts/**/*.{mjs,js,json,yml}\"",
-    "check:repo": "node scripts/checks/repo-hygiene.mjs && node scripts/checks/migration-lint.mjs",
+    "check:repo": "node scripts/checks/repo-hygiene.mjs && node scripts/checks/migration-lint.mjs && node scripts/checks/no-raw-query.mjs",
     "scorecard": "node scripts/scorecard/run.mjs"
   },
   "devDependencies": {

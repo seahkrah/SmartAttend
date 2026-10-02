@@ -138,6 +138,9 @@ async function main() {
   await query(`DELETE FROM users WHERE email LIKE '%@e2e.test'`)
   await query(`DELETE FROM school_entities WHERE code LIKE 'E2E-%'`)
   await query(`DELETE FROM tenants WHERE code LIKE 'E2E-%'`)
+  // Their audit chains' heads go with them (migration 079); a chain whose tenant
+  // is gone has nothing left to verify.
+  await query(`DELETE FROM audit_chain_heads WHERE tenant_id IS NOT NULL AND tenant_id NOT IN (SELECT id FROM tenants)`)
 
   const hash = await bcrypt.hash('Passw0rd!x', 10)
   const out: any = {}

@@ -85,6 +85,10 @@ SUITES=(
   # The device list, remote sign-out and step-up. Ends every superadmin
   # session at the end, so it runs after every suite that uses one.
   sessionManagement
+  # The audit hash chain and its verifier (tampers with A's trail and puts it
+  # back); export, and streaming to a collector the suite runs.
+  auditChain
+  auditExport
 )
 
 record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }

@@ -58,6 +58,7 @@ import notificationRoutes from './routes/notifications.js'
 // Document storage: upload, download, quota, access log.
 import fileRoutes from './routes/files.js'
 import { startDispatcher, stopDispatcher } from './notifications/service.js'
+import { startAuditStreamDispatcher } from './services/auditStream.js'
 import { closeSmtpPools } from './notifications/providers/index.js'
 import biometricsRoutes from './routes/biometrics.js'
 import auditRoutes from './routes/audit.js'
@@ -273,6 +274,8 @@ async function startServer() {
       } else {
         console.log('[SERVER] Notification dispatcher off (set NOTIFICATION_DISPATCH=on)')
       }
+      // Each tenant's audit trail to its own collector, when it has named one.
+      startAuditStreamDispatcher()
     })
 
     server.on('listening', () => {

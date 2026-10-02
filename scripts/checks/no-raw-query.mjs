@@ -64,6 +64,7 @@ const SYSTEM_ALLOWED = new Set([
   'apps/backend/src/routes/incidentAdminRoutes.ts', // superadmin-only incident administration
   'apps/backend/src/routes/validation.ts', // superadmin incident export and replay
   'apps/backend/src/routes/time.ts', // superadmin clock-drift review across tenants
+  'apps/backend/src/services/auditStream.ts', // the dispatcher delivers every tenant's trail to its own collector
   'apps/backend/src/routes/superadmin.ts', // the control plane administers tenants
   'apps/backend/src/notifications/service.ts', // the dispatcher sweeps every outbox
   'apps/backend/src/services/metricsService.ts', // retention prunes every tenant

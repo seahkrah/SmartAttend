@@ -96,6 +96,9 @@ async function main() {
   await query(`DELETE FROM corporate_entities WHERE code LIKE 'C2E-%'`)
   await query(`DELETE FROM tenant_settings WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'C2E-%')`)
   await query(`DELETE FROM tenants WHERE code LIKE 'C2E-%'`)
+  // Their audit chains' heads go with them (migration 079); a chain whose tenant
+  // is gone has nothing left to verify.
+  await query(`DELETE FROM audit_chain_heads WHERE tenant_id IS NOT NULL AND tenant_id NOT IN (SELECT id FROM tenants)`)
 
   const hash = await bcrypt.hash('Passw0rd!x', 10)
   const out: any = {}

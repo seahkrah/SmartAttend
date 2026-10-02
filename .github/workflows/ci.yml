@@ -142,6 +142,12 @@ jobs:
       # sessionManagement ages its own session to test the step-up refusal.
       # Production keeps the five-minute default.
       STEP_UP_MAX_AGE_SECONDS: '7200'
+      # auditExport streams to a collector it runs on 127.0.0.1, over HTTP;
+      # production refuses both (services/auditStream.ts).
+      AUDIT_STREAM_ALLOW_HTTP: 'true'
+      AUDIT_STREAM_ALLOW_PRIVATE: 'true'
+      AUDIT_STREAM_INTERVAL_MS: '1000'
+      AUDIT_STREAM_RETRY_BASE_MS: '1000'
 
     steps:
       - uses: actions/checkout@v4

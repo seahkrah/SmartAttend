@@ -1,6 +1,12 @@
 import express, { Request, Response } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
-import { resolveTenantContext } from '../auth/tenantContextMiddleware.js'
+import { resolveTenantContext, requireRoles, requireTenant } from '../auth/tenantContextMiddleware.js'
+import { query } from '../db/connection.js'
+import { verifyChain } from '../services/auditChain.js'
+import { createTarget, StreamTargetError } from '../services/auditStream.js'
+import { requireRecentAuth } from '../auth/stepUp.js'
+import { KmsError } from '../security/kms/index.js'
+import { getClientIp } from '../utils/getClientIp.js'
 import {
   queryAuditLogs,
   getAuditLogById,
@@ -9,7 +15,8 @@ import {
   verifyAuditLogIntegrity,
   searchAuditLogsByJustification,
   getAuditLogsForPeriod,
-  testImmutabilityConstraint
+  testImmutabilityConstraint,
+  logAudit
 } from '../services/domainAuditService.js'
 import {
   queryAuditLogsWithAccessControl,
@@ -532,6 +539,99 @@ router.get('/access-patterns', async (req: Request, res: Response) => {
       message: error.message
     })
   }
+})
+
+// ── The hash chain, export and streaming (migration 079) ────────────────────
+// For the tenant's administrators, in their own tenant: row-level security
+// keeps every query below to that tenant's rows.
+const chainAdmin = [requireTenant, requireRoles('admin')] as const
+
+/** GET /api/audit/chain: whether this tenant's trail is intact, with every break found. */
+router.get('/chain', ...chainAdmin, async (req: Request, res: Response) => {
+  const ctx = contextOf(req)
+  try {
+    const report = await verifyChain({ query }, ctx.tenantId!)
+    await logAuditAccess({ actorId: ctx.userId, actorRole: auditRoleOf(ctx), accessType: 'AUDIT_CHAIN_VERIFY',
+      tenantId: ctx.tenantId!, resultsCount: report.rows, verificationAttempt: true })
+    return res.json({ success: true, data: report })
+  } catch (e) {
+    console.error('[AUDIT] chain verification failed:', e)
+    return res.status(500).json({ success: false, error: 'Could not verify the audit trail' })
+  }
+})
+
+/**
+ * GET /api/audit/export?fromSeq=&toSeq=: the tenant's trail as JSON lines, in
+ * chain order, each line with its position, both hashes and the canonical
+ * text its hash covers, so the export can be checked without the database.
+ */
+router.get('/export', ...chainAdmin, async (req: Request, res: Response) => {
+  const ctx = contextOf(req)
+  const from = Math.max(0, parseInt(String(req.query.fromSeq ?? '0'), 10) || 0)
+  const to = parseInt(String(req.query.toSeq ?? ''), 10)
+  try {
+    await logAuditAccess({ actorId: ctx.userId, actorRole: auditRoleOf(ctx), accessType: 'AUDIT_EXPORT',
+      tenantId: ctx.tenantId!, filtersApplied: { fromSeq: from, toSeq: Number.isFinite(to) ? to : null } })
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="audit-${ctx.tenantId}.jsonl"`)
+    let after = from
+    for (;;) {
+      const r = await query(
+        `SELECT a.*, audit_row_canonical(a) AS canonical FROM audit_logs a
+          WHERE a.tenant_id = $1 AND a.chain_seq > $2 AND ($3::bigint IS NULL OR a.chain_seq <= $3)
+          ORDER BY a.chain_seq LIMIT 1000`,
+        [ctx.tenantId, after, Number.isFinite(to) ? to : null]
+      )
+      for (const row of r.rows) res.write(JSON.stringify(row) + '\n')
+      if (r.rows.length < 1000) break
+      after = Number(r.rows[r.rows.length - 1].chain_seq)
+    }
+    return res.end()
+  } catch (e) {
+    console.error('[AUDIT] export failed:', e)
+    if (!res.headersSent) return res.status(500).json({ success: false, error: 'Could not export the audit trail' })
+    return res.end()
+  }
+})
+
+/** GET /api/audit/streams: where this tenant's trail is being sent. Secrets are never shown again. */
+router.get('/streams', ...chainAdmin, async (req: Request, res: Response) => {
+  const r = await query(
+    `SELECT id, url, enabled, last_seq, failures, last_error, last_delivered_at, created_at
+       FROM audit_stream_targets WHERE tenant_id = $1 ORDER BY created_at`,
+    [contextOf(req).tenantId]
+  )
+  return res.json({ success: true, data: r.rows })
+})
+
+/** POST /api/audit/streams { url, fromStart? }: answers the signing secret, once. */
+router.post('/streams', ...chainAdmin, requireRecentAuth, async (req: Request, res: Response) => {
+  const ctx = contextOf(req)
+  try {
+    const t = await createTarget({ query }, { tenantId: ctx.tenantId!, url: req.body?.url, createdBy: ctx.userId,
+      fromStart: req.body?.fromStart === true })
+    await logAudit({ actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'AUDIT_STREAM_CREATED', actionScope: 'TENANT',
+      resourceType: 'audit_stream', resourceId: t.id, tenantId: ctx.tenantId!, afterState: { url: t.url, fromSeq: t.fromSeq },
+      ipAddress: getClientIp(req) })
+    return res.status(201).json({ success: true, data: t })
+  } catch (e) {
+    if (e instanceof StreamTargetError) return res.status(400).json({ success: false, error: e.message })
+    if (e instanceof KmsError) return res.status(503).json({ success: false, error: 'Audit streaming needs a key manager (KMS) to keep its secret.' })
+    console.error('[AUDIT] stream target creation failed:', e)
+    return res.status(500).json({ success: false, error: 'Could not add the collector' })
+  }
+})
+
+/** DELETE /api/audit/streams/:id */
+router.delete('/streams/:id', ...chainAdmin, requireRecentAuth, async (req: Request, res: Response) => {
+  const ctx = contextOf(req)
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ success: false, error: 'Not found' })
+  const r = await query(`DELETE FROM audit_stream_targets WHERE id = $1 AND tenant_id = $2 RETURNING url`, [req.params.id, ctx.tenantId])
+  if (!r.rows.length) return res.status(404).json({ success: false, error: 'Not found' })
+  await logAudit({ actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'AUDIT_STREAM_REMOVED', actionScope: 'TENANT',
+    resourceType: 'audit_stream', resourceId: req.params.id, tenantId: ctx.tenantId!, beforeState: { url: r.rows[0].url },
+    ipAddress: getClientIp(req) })
+  return res.json({ success: true })
 })
 
 export default router

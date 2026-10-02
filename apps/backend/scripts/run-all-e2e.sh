@@ -116,6 +116,8 @@ TS_SUITES=(
   identityIsolation
   # Passkeys, with a software authenticator.
   webauthn
+  # Single sign-on through an OpenID Connect provider the suite runs.
+  sso
   # Every route with a path parameter, as tenant A, with each of tenant B's
   # ids. Needs RATE_LIMIT_API_PER_MINUTE raised: it is ~20,000 requests.
   crossTenantFuzz

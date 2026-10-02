@@ -19,15 +19,13 @@
  *
  * Targets are outbound requests chosen by a tenant, so they must not reach
  * the platform's own network: HTTPS only, no redirects, and the host must not
- * resolve to a private, loopback or link-local address. AUDIT_STREAM_ALLOW_HTTP
- * and AUDIT_STREAM_ALLOW_PRIVATE relax that for local testing only.
+ * resolve to a private, loopback or link-local address (security/outbound.ts).
  */
 import crypto from 'crypto'
-import dns from 'dns/promises'
-import net from 'net'
 import { query } from '../db/connection.js'
 import { runAsSystem } from '../db/dbContext.js'
 import { openForTenant, sealForTenant } from '../security/kms/dataKeys.js'
+import { checkOutboundUrl, OutboundUrlError } from '../security/outbound.js'
 
 const PURPOSE = 'audit_stream'
 const BATCH = 200
@@ -36,44 +34,11 @@ function sys(text: string, params?: any[]) {
   return runAsSystem('audit stream: delivering every tenant\'s trail to its collector', () => query(text, params))
 }
 
-export class StreamTargetError extends Error {}
+export { OutboundUrlError as StreamTargetError }
 
 function intEnv(key: string, fallback: number): number {
   const v = parseInt(process.env[key] ?? '', 10)
   return Number.isFinite(v) && v > 0 ? v : fallback
-}
-
-/** Whether an address is one a tenant's webhook must not reach. */
-export function isPrivateAddress(ip: string): boolean {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number)
-    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
-      || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224
-  }
-  const v6 = ip.toLowerCase()
-  if (v6.startsWith('::ffff:')) return isPrivateAddress(v6.slice(7))
-  return v6 === '::1' || v6 === '::' || v6.startsWith('fe80:') || v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('ff')
-}
-
-/** Refuses a target URL that is not HTTPS or that resolves into a private network. */
-export async function checkTargetUrl(raw: unknown, env: NodeJS.ProcessEnv = process.env): Promise<URL> {
-  let url: URL
-  try {
-    url = new URL(String(raw ?? ''))
-  } catch {
-    throw new StreamTargetError('Give the full address of your collector, starting https://')
-  }
-  if (url.username || url.password) throw new StreamTargetError('Put credentials in the signature check, not in the address')
-  const httpOk = env.AUDIT_STREAM_ALLOW_HTTP === 'true'
-  if (url.protocol !== 'https:' && !(httpOk && url.protocol === 'http:')) {
-    throw new StreamTargetError('The collector must be reached over HTTPS')
-  }
-  if (env.AUDIT_STREAM_ALLOW_PRIVATE === 'true') return url
-  const host = url.hostname.replace(/^\[|\]$/g, '')
-  const addrs = net.isIP(host) ? [host] : (await dns.lookup(host, { all: true }).catch(() => [])).map((a) => a.address)
-  if (!addrs.length) throw new StreamTargetError('That address does not resolve')
-  if (addrs.some(isPrivateAddress)) throw new StreamTargetError('That address is on a private network')
-  return url
 }
 
 export function signature(secret: string, timestamp: number, body: string): string {
@@ -85,7 +50,7 @@ export async function createTarget(
   runner: { query: (text: string, params?: any[]) => Promise<any> },
   opts: { tenantId: string; url: unknown; createdBy: string; fromStart?: boolean }
 ): Promise<{ id: string; url: string; secret: string; fromSeq: number }> {
-  const url = await checkTargetUrl(opts.url)
+  const url = await checkOutboundUrl(opts.url)
   const secret = crypto.randomBytes(32).toString('base64url')
   const id = crypto.randomUUID()
   const sealed = await sealForTenant(opts.tenantId, PURPOSE, Buffer.from(secret), `audit-stream:${id}`)
@@ -129,7 +94,7 @@ export async function deliverDue(fetchImpl: typeof fetch = fetch): Promise<numbe
         openForTenant(t.tenant_id, PURPOSE, {
           ciphertext: t.secret_sealed, iv: t.secret_iv, authTag: t.secret_tag, dekVersion: t.secret_dek_version,
         }, `audit-stream:${t.id}`))).toString()
-      const url = await checkTargetUrl(t.url)
+      const url = await checkOutboundUrl(t.url)
       const body = JSON.stringify({ tenantId: t.tenant_id, events: rows.rows.map(eventOf) })
       const ts = Math.floor(Date.now() / 1000)
       const res = await fetchImpl(url, {

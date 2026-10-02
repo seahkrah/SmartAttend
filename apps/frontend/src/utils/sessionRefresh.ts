@@ -44,7 +44,7 @@ export function seemsSignedIn(): boolean {
 
 /** Requests that must never trigger a refresh: they are how you get a session. */
 export function isSessionlessAuthCall(url: string | undefined): boolean {
-  return /\/auth\/(login|login-superadmin|refresh|register-with-role|register-superadmin|activate|password\/(forgot|reset)|mfa\/verify)\b/
+  return /\/auth\/(login|login-superadmin|refresh|register-with-role|register-superadmin|activate|password\/(forgot|reset)|mfa\/verify|sso|passkeys\/sign-in)\b/
     .test(url ?? '');
 }
 
@@ -87,7 +87,7 @@ export async function recoverSession(apiBase: string): Promise<boolean> {
 /** Sends the person to sign in again, unless they are already on a public page. */
 export function endSession(): void {
   clearStoredSession();
-  const publicPaths = ['/login', '/activate', '/reset-password', '/forgot-password', '/register', '/superadmin'];
+  const publicPaths = ['/login', '/activate', '/reset-password', '/forgot-password', '/register', '/superadmin', '/sso'];
   if (!publicPaths.some((p) => window.location.pathname.startsWith(p))) {
     window.location.href = '/login';
   }

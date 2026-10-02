@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { describe, expect, it } from 'vitest'
-import { checkTargetUrl, isPrivateAddress, signature, StreamTargetError } from './auditStream.js'
+import { checkOutboundUrl, isPrivateAddress, OutboundUrlError } from './outbound.js'
+import { signature } from '../services/auditStream.js'
 
 describe('isPrivateAddress', () => {
   it('refuses the addresses a webhook must never reach', () => {
@@ -17,28 +18,28 @@ describe('isPrivateAddress', () => {
   })
 })
 
-describe('checkTargetUrl', () => {
+describe('checkOutboundUrl', () => {
   const strict = { NODE_ENV: 'production' } as NodeJS.ProcessEnv
   it('needs HTTPS', async () => {
-    await expect(checkTargetUrl('http://8.8.8.8/hook', strict)).rejects.toThrow(StreamTargetError)
-    await expect(checkTargetUrl('ftp://8.8.8.8/x', strict)).rejects.toThrow(/HTTPS/)
-    await expect(checkTargetUrl('not a url', strict)).rejects.toThrow(/full address/)
+    await expect(checkOutboundUrl('http://8.8.8.8/hook', strict)).rejects.toThrow(OutboundUrlError)
+    await expect(checkOutboundUrl('ftp://8.8.8.8/x', strict)).rejects.toThrow(/HTTPS/)
+    await expect(checkOutboundUrl('not a url', strict)).rejects.toThrow(/full address/)
   })
   it('refuses private, loopback and metadata addresses, however written', async () => {
     for (const u of ['https://127.0.0.1/x', 'https://169.254.169.254/latest/meta-data', 'https://[::1]/x',
       'https://10.0.0.5:8443/x', 'https://localhost/x']) {
-      await expect(checkTargetUrl(u, strict), u).rejects.toThrow(StreamTargetError)
+      await expect(checkOutboundUrl(u, strict), u).rejects.toThrow(OutboundUrlError)
     }
   })
   it('refuses credentials in the address', async () => {
-    await expect(checkTargetUrl('https://user:pw@8.8.8.8/x', strict)).rejects.toThrow(/credentials/)
+    await expect(checkOutboundUrl('https://user:pw@8.8.8.8/x', strict)).rejects.toThrow(/credentials/)
   })
   it('accepts a public HTTPS address', async () => {
-    expect((await checkTargetUrl('https://8.8.8.8/hook', strict)).toString()).toBe('https://8.8.8.8/hook')
+    expect((await checkOutboundUrl('https://8.8.8.8/hook', strict)).toString()).toBe('https://8.8.8.8/hook')
   })
-  it('lets local testing reach a local collector only when told to', async () => {
-    const local = { AUDIT_STREAM_ALLOW_HTTP: 'true', AUDIT_STREAM_ALLOW_PRIVATE: 'true' } as NodeJS.ProcessEnv
-    expect((await checkTargetUrl('http://127.0.0.1:9000/x', local)).host).toBe('127.0.0.1:9000')
+  it('lets local testing reach a local service only when told to', async () => {
+    const local = { OUTBOUND_ALLOW_HTTP: 'true', OUTBOUND_ALLOW_PRIVATE: 'true' } as NodeJS.ProcessEnv
+    expect((await checkOutboundUrl('http://127.0.0.1:9000/x', local)).host).toBe('127.0.0.1:9000')
   })
 })
 

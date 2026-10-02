@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.js'
 import mfaRoutes from './routes/mfa.js'
 import schoolAdminRoutes from './routes/schoolAdmin.js'
 import passkeyRoutes from './routes/passkeys.js'
+import { ssoAdminRouter, ssoRouter } from './routes/sso.js'
 import schoolRoutes from './routes/school.js'
 import corporateRoutes from './routes/corporate.js'
 import attendanceRoutes from './routes/attendance.js'
@@ -117,6 +118,8 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/auth/mfa', mfaRoutes)
 app.use('/api/auth/passkeys', passkeyRoutes)
+app.use('/api/auth/sso', ssoRouter)
+app.use('/api/admin/sso', ssoAdminRouter)
 app.use('/api/auth', schoolAdminRoutes)
 app.use('/api/auth', authRoutes)
 

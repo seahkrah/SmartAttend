@@ -228,6 +228,30 @@
   },
   {
     "method": "GET",
+    "path": "/api/admin/sso",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/sso",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admin/sso/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admin/sso/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/admin/users",
     "params": []
   },
@@ -1005,6 +1029,28 @@
     "params": [
       "sessionId"
     ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/:providerId/start",
+    "params": [
+      "providerId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/sso/complete",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/oidc/callback",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/providers",
+    "params": []
   },
   {
     "method": "POST",

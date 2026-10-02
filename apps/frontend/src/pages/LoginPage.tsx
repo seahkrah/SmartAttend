@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import { Link, useNavigate } from 'react-router-dom';
 import { MfaCodeStep } from '../components/auth/MfaCodeStep';
 import { passkeysSupported } from '../services/passkeysService';
+import { SsoSignIn, ssoErrorMessage } from '../components/auth/SsoSignIn';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
@@ -13,7 +14,8 @@ export const LoginPage: React.FC = () => {
   const [platform, setPlatform] = React.useState<'school' | 'corporate'>('school');
   const [platformMismatch, setPlatformMismatch] = React.useState<string | null>(null);
   const [mfaToken, setMfaToken] = React.useState<string | null>(null);
-  const [notice, setNotice] = React.useState('');
+  // A single sign-on that came back refused says why in ?sso_error=.
+  const [notice, setNotice] = React.useState(() => ssoErrorMessage(new URLSearchParams(window.location.search).get('sso_error')));
   const navigate = useNavigate();
   const { login, passkeySignIn, isLoading, error, clearError } = useAuthStore();
 
@@ -220,6 +222,7 @@ export const LoginPage: React.FC = () => {
                 Sign in with a passkey
               </button>
             )}
+            <SsoSignIn />
           </form>
           )}
         </div>

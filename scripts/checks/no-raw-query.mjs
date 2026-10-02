@@ -55,6 +55,7 @@ const SYSTEM_ALLOWED = new Set([
   'apps/backend/src/auth/accountTokens.ts', // reset and activation links before sign-in
   'apps/backend/src/auth/stepUp.ts', // when the session last proved who it is
   'apps/backend/src/auth/passkeys.ts', // passkey challenges and sign-in before anyone is known
+  'apps/backend/src/auth/sso/service.ts', // single sign-on: the provider's answer before anyone is known
   'apps/backend/src/security/rateLimitStore.ts', // rate-limit counters shared across replicas, not tenant data
   'apps/backend/src/routes/mfa.ts', // the code step of sign-in and the caller's own settings
   // Platform-level records (migration 075).

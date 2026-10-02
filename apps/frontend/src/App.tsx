@@ -32,6 +32,7 @@ import { useAuthStore } from './store/authStore';
 // not all of them. See docs/CHANGE_NOTES.md (foundation step 3).
 const LandingPage = lazy(() => import('./pages/LandingPage').then((m) => ({ default: m.LandingPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
+const SsoCompletePage = lazy(() => import('./pages/SsoCompletePage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage })));
 const SuperadminRegisterPage = lazy(() => import('./pages/SuperadminRegisterPage').then((m) => ({ default: m.SuperadminRegisterPage })));
 const SuperadminLoginPage = lazy(() => import('./pages/SuperadminLoginPage').then((m) => ({ default: m.SuperadminLoginPage })));
@@ -142,6 +143,7 @@ export default function App() {
         {/* Public Routes */}
         <Route path="/" element={<DarkSurface><LandingPage /></DarkSurface>} />
         <Route path="/login" element={<DarkSurface><LoginPage /></DarkSurface>} />
+        <Route path="/sso/complete" element={<DarkSurface><SsoCompletePage /></DarkSurface>} />
         <Route path="/login-superadmin" element={<DarkSurface><SuperadminLoginPage /></DarkSurface>} />
         <Route path="/register" element={<DarkSurface><RegisterPage /></DarkSurface>} />
         <Route path="/register-superadmin" element={<DarkSurface><SuperadminRegisterPage /></DarkSurface>} />

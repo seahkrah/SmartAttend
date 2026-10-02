@@ -36,6 +36,8 @@ import {
   getEscalationHistory,
   getRootCauseAnalysis,
 } from '../services/incidentLifecycleService.js'
+import { runAsSystem } from '../db/dbContext.js'
+import type { TenantRequest } from '../auth/tenantContextMiddleware.js'
 
 const router = Router()
 
@@ -53,6 +55,15 @@ const router = Router()
  * have been readable and editable by another's administrators.
  */
 router.use(authenticateToken, resolveTenantContext)
+
+// A superadmin with no tenant selected reviews incidents platform-wide: the
+// control plane, on the system pool (migration 075). A tenant administrator's
+// requests stay in their tenant, under row-level security.
+router.use((req, _res, next) => {
+  const ctx = (req as unknown as TenantRequest).ctx
+  if (ctx?.isSuperadmin && !ctx.tenantId) return runAsSystem('control plane: a superadmin reviewing platform incidents', next)
+  next()
+})
 
 function visibility(req: ExtendedRequest): IncidentVisibility {
   return incidentVisibility(contextOf(req))

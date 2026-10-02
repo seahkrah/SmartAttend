@@ -27,18 +27,18 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({
 }) => {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
-  const token = useAuthStore((state) => state.token);
+  const hasSession = useAuthStore((state) => state.hasSession);
 
   console.log('[RoleRoute] Checking route protection', {
     requiredRole,
     userRole: user?.role,
     userExists: !!user,
     isLoading,
-    hasToken: !!token,
+    hasSession,
   });
 
-  // Show spinner only if we have a token but no user AND we're actively loading
-  if (token && !user && isLoading) {
+  // Show a spinner only while a session's user is still loading
+  if (hasSession && !user && isLoading) {
     console.log('[RoleRoute] Loading user data, showing spinner');
     return (
       <div className="flex items-center justify-center min-h-screen bg-card">
@@ -76,14 +76,14 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const user = useAuthStore((state) => state.user);
   const isLoading = useAuthStore((state) => state.isLoading);
-  const token = useAuthStore((state) => state.token);
+  const hasSession = useAuthStore((state) => state.hasSession);
   const location = useLocation();
 
-  console.log('[ProtectedRoute]', { hasUser: !!user, hasToken: !!token, isLoading });
+  console.log('[ProtectedRoute]', { hasUser: !!user, hasSession, isLoading });
 
-  // Show spinner only if we have a token but no user AND we're actively loading
-  if (token && !user && isLoading) {
-    console.log('[ProtectedRoute] Waiting for user to load from token');
+  // Show a spinner only while a session's user is still loading
+  if (hasSession && !user && isLoading) {
+    console.log('[ProtectedRoute] Waiting for the session user to load');
     return (
       <div className="flex items-center justify-center min-h-screen bg-card">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
@@ -92,7 +92,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   if (!user) {
-    console.log('[ProtectedRoute] No user and no token, redirecting to /login');
+    console.log('[ProtectedRoute] No user, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 

@@ -1,6 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { frontendConfig } from '../config/environment';
-import { recoverSession, clearStoredSession, isSessionlessAuthCall, redirectForMfaSetup } from '../utils/sessionRefresh';
+import {
+  recoverSession, clearStoredSession, isSessionlessAuthCall, redirectForMfaSetup, csrfHeader, rememberCsrfToken, markSignedIn,
+} from '../utils/sessionRefresh';
 import {
   AuthResponse,
   User,
@@ -14,19 +16,18 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
+      // The session is in httpOnly cookies (the API sets them because every
+      // request says X-Auth-Transport: cookie); the page never holds a token.
+      withCredentials: true,
       headers: {
         'Content-Type': 'application/json',
+        'X-Auth-Transport': 'cookie',
       },
     });
 
-    // The token is read at each request, not cached: another client or tab
-    // may have renewed it since.
     // `synchronous: true` is load-bearing: see utils/axiosClient.ts.
     this.client.interceptors.request.use((config) => {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+      Object.entries(csrfHeader(config.method)).forEach(([k, v]) => config.headers.set(k, v));
       return config;
     }, undefined, { synchronous: true });
 
@@ -37,10 +38,8 @@ class ApiClient {
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry
             && !isSessionlessAuthCall(originalRequest.url)) {
           originalRequest._retry = true;
-          const failedWith = String(originalRequest.headers?.Authorization ?? '').replace(/^Bearer /, '') || null;
-          const accessToken = await recoverSession(API_BASE_URL, failedWith);
-          if (accessToken) {
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          if (await recoverSession(API_BASE_URL)) {
+            Object.entries(csrfHeader(originalRequest.method)).forEach(([k, v]) => originalRequest.headers.set(k, v));
             return this.client(originalRequest);
           }
           clearStoredSession();
@@ -51,11 +50,13 @@ class ApiClient {
     );
   }
 
-  setToken(token: string) {
-    localStorage.setItem('accessToken', token);
+  /** Records a finished sign-in: the CSRF token it returned, and that there is a session. */
+  signedIn(response: { csrfToken?: string }) {
+    rememberCsrfToken(response.csrfToken);
+    markSignedIn();
   }
 
-  clearToken() {
+  clearSession() {
     clearStoredSession();
   }
 
@@ -89,18 +90,10 @@ class ApiClient {
       password,
     });
     
-    if (response.data.accessToken) {
-      this.setToken(response.data.accessToken);
-      localStorage.setItem('accessToken', response.data.accessToken);
-      if (response.data.refreshToken) {
-        localStorage.setItem('refreshToken', response.data.refreshToken);
-      }
-    }
-    
     return response.data;
   }
 
-  /** The code step of a sign-in; tokens are stored by the auth store. */
+  /** The code step of a sign-in; the API sets the session cookies. */
   async verifyMfa(mfaToken: string, answer: { code?: string; recoveryCode?: string }): Promise<AuthResponse> {
     const response = await this.client.post<AuthResponse>('/auth/mfa/verify', { mfaToken, ...answer });
     return response.data;
@@ -109,7 +102,8 @@ class ApiClient {
   async getCurrentUser(): Promise<User> {
     console.log('[API] Fetching /auth/me');
     try {
-      const response = await this.client.get<{ user: User }>('/auth/me');
+      const response = await this.client.get<{ user: User; csrfToken?: string }>('/auth/me');
+      rememberCsrfToken(response.data.csrfToken);
       console.log('[API] /auth/me success:', {
         id: response.data.user.id,
         email: response.data.user.email,
@@ -127,9 +121,7 @@ class ApiClient {
     try {
       await this.client.post('/auth/logout');
     } finally {
-      this.clearToken();
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      this.clearSession();
     }
   }
 

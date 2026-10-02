@@ -3,6 +3,9 @@ import { verifyAccessToken } from './authService.js'
 import { query } from '../db/connection.js'
 import { sessionIsLive } from './sessions.js'
 import { allowedDuringSetup } from './mfa.js'
+import { withNoTenant } from '../db/dbContext.js'
+import { ACCESS_COOKIE, cookiesOf, csrfProblem } from './cookies.js'
+import { allowedOrigins } from '../security/httpSecurity.js'
 
 // Extend Express Request to include auth info
 declare global {
@@ -16,6 +19,8 @@ declare global {
         role?: string        // Resolved role name
         platformType?: string // Resolved platform type
       }
+      /** How the request proved who it is: a cookie (the browser app) or a Bearer token. */
+      authVia?: 'cookie' | 'bearer'
     }
   }
 }
@@ -26,6 +31,11 @@ declare global {
  * A signature alone is not enough: it stays valid for fifteen minutes after
  * a logout, a password change or a deactivation. The session lookup is what
  * makes those take effect on the next request.
+ *
+ * The token comes from `Authorization: Bearer` (API clients) or the httpOnly
+ * session cookie (the browser app, auth/cookies.ts). A cookie is sent by the
+ * browser on its own, so a state-changing request authenticated by one must
+ * also carry the session's CSRF token.
  */
 export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   // Several routers apply this per route after a router-level gate already
@@ -33,7 +43,9 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
   if (req.user?.sessionId) return next()
 
   const authHeader = req.headers['authorization']
-  const token = authHeader && authHeader.split(' ')[1] // Bearer TOKEN
+  const bearer = authHeader && /^Bearer\s+/i.test(authHeader) ? authHeader.replace(/^Bearer\s+/i, '').trim() : ''
+  const cookie = bearer ? '' : (cookiesOf(req)[ACCESS_COOKIE] ?? '')
+  const token = bearer || cookie
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' })
@@ -55,6 +67,10 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
   } catch (error) {
     return res.status(500).json({ error: 'Authentication check failed' })
   }
+  if (cookie) {
+    const problem = csrfProblem(req, decoded.sid, new Set(allowedOrigins()))
+    if (problem) return res.status(403).json({ error: problem, code: 'CSRF' })
+  }
   // A role that must use two-factor sign-in, signed in without it, may only
   // set it up (the token says so: generateAccessToken).
   if (decoded.mfa === 'setup' && !allowedDuringSetup(req.originalUrl.split('?')[0])) {
@@ -69,7 +85,11 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     roleId: decoded.roleId,
     sessionId: decoded.sid,
   }
-  next()
+  req.authVia = cookie ? 'cookie' : 'bearer'
+  // Who is asking is known from here on, even before (or without) a tenant:
+  // the database shows them their own account (migration 074). The tenant
+  // middleware, where a route has it, replaces this with the tenant context.
+  withNoTenant(next, decoded.userId)
 }
 
 // Middleware to verify platform access

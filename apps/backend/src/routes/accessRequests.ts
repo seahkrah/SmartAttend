@@ -5,6 +5,13 @@ import { resolveTenantContext, type TenantRequest } from '../auth/tenantContextM
 import { enquiryLimiter } from '../security/httpSecurity.js'
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
+import { runAsSystem } from '../db/dbContext.js'
+
+// Enquiries come from people with no account, before any tenant exists, and
+// are read only by superadmins: platform-level (migration 075).
+function sys(text: string, params?: any[]) {
+  return runAsSystem('control plane: enquiries from prospective schools and companies', () => query(text, params))
+}
 
 /**
  * Access requests: a school or employer asking to use the platform.
@@ -100,7 +107,7 @@ router.post('/', enquiryLimiter, async (req: Request, res: Response) => {
       throw new InputError('Please agree to be contacted about this request')
     }
 
-    const r = await query(
+    const r = await sys(
       `INSERT INTO access_requests
          (organisation_name, organisation_type, country_code, size_band, contact_name, job_title,
           email, phone, preferred_contact, message, consent_at, consent_version)
@@ -128,7 +135,7 @@ router.get('/', authenticateToken, resolveTenantContext, requireSuperadmin, asyn
   try {
     const status = typeof req.query.status === 'string' && STATUSES.includes(req.query.status as any)
       ? req.query.status : null
-    const r = await query(
+    const r = await sys(
       `SELECT a.*, u.full_name AS handled_by_name
          FROM access_requests a
          LEFT JOIN users u ON u.id = a.handled_by
@@ -137,7 +144,7 @@ router.get('/', authenticateToken, resolveTenantContext, requireSuperadmin, asyn
         LIMIT 500`,
       [status]
     )
-    const counts = await query(`SELECT status, COUNT(*)::int AS n FROM access_requests GROUP BY status`)
+    const counts = await sys(`SELECT status, COUNT(*)::int AS n FROM access_requests GROUP BY status`)
     return res.json({
       requests: r.rows,
       counts: Object.fromEntries(counts.rows.map((x: any) => [x.status, x.n])),
@@ -155,7 +162,7 @@ router.patch('/:id', authenticateToken, resolveTenantContext, requireSuperadmin,
     const notes = req.body && 'internalNotes' in req.body ? text(req.body.internalNotes, 'Notes', 4000) : undefined
     if (!status && notes === undefined) return res.status(400).json({ error: 'Nothing to change' })
 
-    const r = await query(
+    const r = await sys(
       `UPDATE access_requests
           SET status = COALESCE($2, status),
               internal_notes = CASE WHEN $3::boolean THEN $4 ELSE internal_notes END,

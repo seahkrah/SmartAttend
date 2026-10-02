@@ -77,9 +77,8 @@ router.get('/break-glass', async (req: TenantRequest, res: Response) => {
     const tenantId = req.ctx!.tenantId
     const grants = await query(
       `SELECT g.id, g.reason, g.opened_at, g.expires_at, g.closed_at,
-              u.full_name AS superadmin_name, u.email AS superadmin_email
+              g.superadmin_name, g.superadmin_email
          FROM break_glass_grants g
-         JOIN users u ON u.id = g.superadmin_id
         WHERE g.tenant_id = $1
         ORDER BY g.opened_at DESC LIMIT 100`,
       [tenantId]

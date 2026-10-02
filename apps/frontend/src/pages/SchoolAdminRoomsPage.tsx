@@ -34,9 +34,7 @@ const SchoolAdminRoomsPage: React.FC = () => {
 
   const fetchRooms = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/rooms', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setRooms(response.data.rooms);
     } catch (error: any) {
@@ -48,17 +46,14 @@ const SchoolAdminRoomsPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('accessToken');
     
     try {
       if (editingRoom) {
         await axios.patch(`/api/auth/admin/school/rooms/${editingRoom.id}`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
         });
         addToast({ type: 'success', title: 'Success', message: 'Room updated successfully' });
       } else {
         await axios.post('/api/auth/admin/school/rooms', formData, {
-          headers: { Authorization: `Bearer ${token}` }
         });
         addToast({ type: 'success', title: 'Success', message: 'Room created successfully' });
       }
@@ -80,9 +75,7 @@ const SchoolAdminRoomsPage: React.FC = () => {
     });
     if (!confirmed) return;
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.delete(`/api/auth/admin/school/rooms/${room.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       addToast({ type: 'success', title: 'Success', message: 'Room deleted successfully' });
       fetchRooms();

@@ -56,9 +56,7 @@ const SchoolAdminFacultyPage: React.FC = () => {
   const fetchFaculty = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/faculty', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setFaculty(response.data.faculty);
     } catch (error: any) {
@@ -156,9 +154,7 @@ const SchoolAdminFacultyPage: React.FC = () => {
     }
     
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.patch(`/api/auth/admin/school/faculty/${editingFaculty.id}`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       showSuccess('Faculty updated successfully');
       setEditingFaculty(null);
@@ -206,10 +202,9 @@ const SchoolAdminFacultyPage: React.FC = () => {
 
   const handleSuspendFaculty = async (member: Faculty) => {
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.patch(`/api/auth/admin/school/faculty/${member.id}/suspend`, 
         { suspended: member.is_active },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {}
       );
       showSuccess(member.is_active ? 'Faculty member suspended' : 'Faculty member reactivated');
       fetchFaculty();
@@ -220,9 +215,7 @@ const SchoolAdminFacultyPage: React.FC = () => {
 
   const handleDeleteFaculty = async (member: Faculty) => {
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.delete(`/api/auth/admin/school/faculty/${member.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       showSuccess('Faculty member deleted successfully');
       setConfirmDelete(null);

@@ -54,9 +54,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
   const fetchSchoolEntity = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('accessToken')
       const response = await axios.get('/api/auth/admin/school/stats', {
-        headers: { Authorization: `Bearer ${token}` },
       })
       if (response.data.entity?.name) {
         setSettings(prev => ({ ...prev, schoolName: response.data.entity.name }))
@@ -70,9 +68,7 @@ const SchoolAdminSettingsPage: React.FC = () => {
 
   const fetchPlatformSettings = async () => {
     try {
-      const token = localStorage.getItem('accessToken')
       const response = await axios.get('/api/auth/admin/school/settings', {
-        headers: { Authorization: `Bearer ${token}` },
       })
       const s = response.data.settings
       if (s.schedule_day_format) {
@@ -95,11 +91,10 @@ const SchoolAdminSettingsPage: React.FC = () => {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const token = localStorage.getItem('accessToken')
       // Save schedule day format to platform_settings
       await axios.put('/api/auth/admin/school/settings', 
         { key: 'schedule_day_format', value: settings.scheduleDayFormat },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {}
       )
     } catch (error) {
       console.error('Error saving settings:', error)

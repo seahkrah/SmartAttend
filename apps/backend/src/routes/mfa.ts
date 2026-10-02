@@ -9,9 +9,17 @@ import {
   answerChallenge, ChallengeError, checkCode, clearMfa, mfaEnabled, replaceRecoveryCodes, spendRecoveryCode,
 } from '../auth/mfaService.js'
 import { revokeUserSessions } from '../auth/sessions.js'
+import { deliverTokens, setAccessCookie } from '../auth/cookies.js'
 import { loginLimiter, mfaManageLimiter } from '../security/httpSecurity.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { logError } from '../utils/errorMessages.js'
+import { runAsSystem } from '../db/dbContext.js'
+
+// The caller's own two-factor settings and the code step of sign-in, which
+// comes before any tenant is known: system-pool work (migration 074).
+function sys(text: string, params?: any[]) {
+  return runAsSystem("identity: the caller's own two-factor settings", () => query(text, params))
+}
 
 /**
  * Two-factor sign-in, mounted at /api/auth/mfa.
@@ -27,7 +35,7 @@ import { logError } from '../utils/errorMessages.js'
 const router = express.Router()
 
 async function accountOf(userId: string) {
-  const r = await query(
+  const r = await sys(
     `SELECT u.id, u.email, u.full_name, u.phone, u.profile_image_url, u.platform_id, u.role_id, u.is_active,
             u.must_reset_password, u.password_hash, r.name AS role_name, r.permissions, p.name AS platform_name
        FROM users u
@@ -61,11 +69,11 @@ router.post('/verify', loginLimiter, async (req: Request, res: Response) => {
     if (!user || !user.is_active) {
       return res.status(403).json({ error: 'Your account has been suspended. Please contact your administrator.', code: 'INACTIVE' })
     }
-    const { accessToken, refreshToken } = await issueTokens(user, { ip: getClientIp(req), userAgent: String(req.headers['user-agent'] ?? '') })
-    await query(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id])
-    await query(`DELETE FROM auth_failed_logins WHERE email_norm = $1`, [String(user.email).trim().toLowerCase()])
+    const tokens = await issueTokens(user, { ip: getClientIp(req), userAgent: String(req.headers['user-agent'] ?? '') })
+    await sys(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id])
+    await sys(`DELETE FROM auth_failed_logins WHERE email_norm = $1`, [String(user.email).trim().toLowerCase()])
     const left = usedRecoveryCode
-      ? (await query(`SELECT COUNT(*)::int AS n FROM user_mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL`, [user.id])).rows[0].n
+      ? (await sys(`SELECT COUNT(*)::int AS n FROM user_mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL`, [user.id])).rows[0].n
       : undefined
     return res.json({
       message: 'Login successful',
@@ -80,8 +88,7 @@ router.post('/verify', loginLimiter, async (req: Request, res: Response) => {
         profileImage: user.profile_image_url,
         mustResetPassword: user.must_reset_password || false,
       },
-      accessToken,
-      refreshToken,
+      ...deliverTokens(req, res, tokens),
       ...(left !== undefined ? { recoveryCodesLeft: left } : {}),
     })
   } catch (error) {
@@ -89,7 +96,7 @@ router.post('/verify', loginLimiter, async (req: Request, res: Response) => {
       if (error.wrongCode) {
         // Wrong codes count towards the same fifteen-minute lockout as wrong
         // passwords, so a stolen password buys only a handful of guesses.
-        const r = await query(
+        const r = await sys(
           `SELECT u.email FROM mfa_login_challenges c JOIN users u ON u.id = c.user_id WHERE c.token_hash = $1`,
           [hashChallengeToken(mfaToken)]
         ).catch(() => ({ rows: [] as any[] }))
@@ -111,13 +118,13 @@ router.use(authenticateToken)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId
-    const r = await query(
+    const r = await sys(
       `SELECT m.enabled_at,
               (SELECT COUNT(*)::int FROM user_mfa_recovery_codes c WHERE c.user_id = m.user_id AND c.used_at IS NULL) AS left
          FROM user_mfa m WHERE m.user_id = $1 AND m.enabled_at IS NOT NULL`,
       [userId]
     )
-    const role = await query(`SELECT name FROM roles WHERE id = $1`, [req.user!.roleId])
+    const role = await sys(`SELECT name FROM roles WHERE id = $1`, [req.user!.roleId])
     return res.json({
       enabled: r.rows.length > 0,
       enabledAt: r.rows[0]?.enabled_at ?? null,
@@ -141,7 +148,7 @@ router.post('/setup', mfaManageLimiter, async (req: Request, res: Response) => {
     const sealed = sealSecret(secret, userId)
     // Starting again replaces an unconfirmed secret; a confirmed one is
     // protected by the check above.
-    await query(
+    await sys(
       `INSERT INTO user_mfa (user_id, secret_ciphertext, secret_iv, secret_tag)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id) DO UPDATE
@@ -165,12 +172,17 @@ router.post('/enable', mfaManageLimiter, async (req: Request, res: Response) => 
     if (!(await checkCode(userId, code, true))) {
       return res.status(400).json({ error: 'That code is not correct. Check the time on your phone and try the next one.', code: 'MFA_INVALID' })
     }
-    await query(`UPDATE user_mfa SET enabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [userId])
+    await sys(`UPDATE user_mfa SET enabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [userId])
     const recoveryCodes = await replaceRecoveryCodes(userId)
     // Other sessions were signed in with a password alone; end them.
     await revokeUserSessions(userId, 'mfa_enabled', req.user!.sessionId)
     // This session's token may say "set up two-factor first"; replace it.
     const accessToken = generateAccessToken(userId, req.user!.platformId, req.user!.roleId, req.user!.sessionId!)
+    if (req.authVia === 'cookie') {
+      // Only the access cookie changes; the refresh token stays the session's.
+      setAccessCookie(res, accessToken)
+      return res.json({ enabled: true, recoveryCodes })
+    }
     return res.json({ enabled: true, recoveryCodes, accessToken })
   } catch (error) {
     logError('MFA enable', error)
@@ -204,7 +216,7 @@ router.post('/disable', mfaManageLimiter, async (req: Request, res: Response) =>
     if (!(await mfaEnabled(userId))) {
       return res.status(409).json({ error: 'Two-factor sign-in is not on.' })
     }
-    const role = await query(`SELECT name FROM roles WHERE id = $1`, [req.user!.roleId])
+    const role = await sys(`SELECT name FROM roles WHERE id = $1`, [req.user!.roleId])
     if (requiredRoles().has(role.rows[0]?.name)) {
       return res.status(403).json({
         error: 'Your role requires two-factor sign-in. To move it to a new phone, ask another administrator to reset your access.',

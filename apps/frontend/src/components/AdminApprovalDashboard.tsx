@@ -43,9 +43,7 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
   const fetchPendingApprovals = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/pending-approvals', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setApprovals(response.data.approvals || {});
       setError('');
@@ -59,14 +57,13 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
   const handleApprove = async (approvalId: string) => {
     try {
       setProcessingId(approvalId);
-      const token = localStorage.getItem('accessToken');
       await axios.post(
         '/api/auth/admin/approval-action',
         {
           approvalId,
           action: 'approve'
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {}
       );
 
       // Remove from list
@@ -92,7 +89,6 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
   const handleRejectSubmit = async (approvalId: string) => {
     try {
       setProcessingId(approvalId);
-      const token = localStorage.getItem('accessToken');
       await axios.post(
         '/api/auth/admin/approval-action',
         {
@@ -100,7 +96,7 @@ export const AdminApprovalDashboard: React.FC<AdminApprovalDashboardProps> = ({ 
           action: 'reject',
           rejectionReason: rejectionReason[approvalId]
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {}
       );
 
       // Remove from list

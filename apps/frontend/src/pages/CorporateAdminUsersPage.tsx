@@ -63,8 +63,7 @@ const CorporateAdminUsersPage: React.FC = () => {
     designation: '', departmentId: '', dateOfJoining: '', employmentType: 'full_time',
   })
 
-  const token = localStorage.getItem('accessToken')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = {}
 
   const fetchEmployees = useCallback(async () => {
     try {

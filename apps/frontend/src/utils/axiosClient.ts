@@ -4,13 +4,13 @@
  * Centralized HTTP client with:
  * - Base URL configuration
  * - Request/response interceptors
- * - Token injection (Authorization header)
+ * - The session cookies, and the CSRF token on state-changing requests
  * - Error handling & retry logic
  * - Request/response logging (dev mode)
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { recoverSession, endSession, isSessionlessAuthCall, redirectForMfaSetup } from './sessionRefresh';
+import { recoverSession, endSession, isSessionlessAuthCall, redirectForMfaSetup, csrfHeader } from './sessionRefresh';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -20,20 +20,19 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
 export const axiosClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  // The session is in httpOnly cookies the page cannot read; send them.
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 /**
- * Request Interceptor: Inject auth token
+ * Request Interceptor: the CSRF token on state-changing requests
  */
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    Object.entries(csrfHeader(config.method)).forEach(([k, v]) => config.headers.set(k, v));
 
     // The instance defaults to JSON, and axios turns a FormData body into
     // JSON when the content type says JSON — so every upload (documents,
@@ -84,10 +83,8 @@ axiosClient.interceptors.response.use(
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry
         && !isSessionlessAuthCall(originalRequest.url)) {
       originalRequest._retry = true;
-      const failedWith = String(originalRequest.headers?.Authorization ?? '').replace(/^Bearer /, '') || null;
-      const accessToken = await recoverSession(API_BASE_URL, failedWith);
-      if (accessToken) {
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+      if (await recoverSession(API_BASE_URL)) {
+        Object.entries(csrfHeader(originalRequest.method)).forEach(([k, v]) => originalRequest.headers.set(k, v));
         return axiosClient(originalRequest);
       }
       endSession();

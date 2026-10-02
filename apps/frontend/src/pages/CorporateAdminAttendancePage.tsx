@@ -48,8 +48,7 @@ const CorporateAdminAttendancePage: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [deptFilter, setDeptFilter] = useState('')
 
-  const token = localStorage.getItem('accessToken')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = {}
 
   const fetchAttendance = useCallback(async () => {
     try {

@@ -3,11 +3,12 @@ import { query, getConnection } from '../db/connection.js'
 import {
   loginUser,
   getUserWithRole,
+  accountPasswordMatches,
+  setAccountPassword,
   getUserByEmail,
   generateAccessToken,
   issueTokens,
   LoginError,
-  verifyPassword,
   registerUserWithRole,
   getPendingApprovalsForAdmin,
   approveOrRejectRegistration,
@@ -36,10 +37,20 @@ import { rotateSession, revokeSession, revokeUserSessions, SessionError } from '
 import { checkPassword } from '../auth/passwordPolicy.js'
 import { requestPasswordReset, redeemToken, AccountTokenError } from '../auth/accountTokens.js'
 import { runAsSystem } from '../db/dbContext.js'
-import { loginLimiter, refreshLimiter, accountLimiter } from '../security/httpSecurity.js'
+import { loginLimiter, refreshLimiter, accountLimiter, allowedOrigins } from '../security/httpSecurity.js'
+import {
+  REFRESH_COOKIE, clearSessionCookies, cookiesOf, csrfTokenFor, deliverTokens, setSessionCookies,
+} from '../auth/cookies.js'
 import crypto from 'crypto'
 
 const router = express.Router()
+
+// Registration happens before sign-in, with no tenant and nobody known: the
+// school or company chosen, and whether the address is taken, are identity
+// lookups on the system pool (migration 074).
+function beforeSignIn(_req: Request, _res: Response, next: NextFunction) {
+  runAsSystem('identity: registration before sign-in', next)
+}
 
 // ===========================
 // ROLE-BASED REGISTRATION WITH APPROVAL WORKFLOW
@@ -58,7 +69,7 @@ interface RoleBasedRegisterRequest extends Request {
   }
 }
 
-router.post('/register-with-role', accountLimiter, async (req: RoleBasedRegisterRequest, res: Response) => {
+router.post('/register-with-role', accountLimiter, beforeSignIn, async (req: RoleBasedRegisterRequest, res: Response) => {
   try {
     const { platform, email, fullName, password, confirmPassword, phone, role, entityId } = req.body
 
@@ -316,7 +327,7 @@ router.post('/login', loginLimiter, async (req: LoginRequest, res: Response) => 
     if ('mfaToken' in signIn) {
       return res.json({ mfaRequired: true, mfaToken: signIn.mfaToken })
     }
-    const { user, accessToken, refreshToken } = signIn
+    const { user } = signIn
 
     // Get role name and permissions
     const roleResult = await query(
@@ -339,8 +350,7 @@ router.post('/login', loginLimiter, async (req: LoginRequest, res: Response) => 
         profileImage: user.profile_image_url,
         mustResetPassword: (user as any).must_reset_password || false
       },
-      accessToken,
-      refreshToken
+      ...deliverTokens(req, res, signIn),
     })
   } catch (error: any) {
     return loginRefusal(res, error)
@@ -367,7 +377,7 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
     }
     
     const userResult = await query(
-      `SELECT password_hash, email, full_name FROM users WHERE id = $1`,
+      `SELECT email, full_name FROM users WHERE id = $1`,
       [req.user.userId]
     )
     
@@ -383,21 +393,14 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
     }
     
     // Verify current password
-    const isValidPassword = await verifyPassword(currentPassword, user.password_hash)
-    if (!isValidPassword) {
+    if (!(await accountPasswordMatches(req.user.userId, currentPassword))) {
       return res.status(401).json({ error: 'Current password is incorrect' })
     }
-    if (await verifyPassword(newPassword, user.password_hash)) {
+    if (await accountPasswordMatches(req.user.userId, newPassword)) {
       return res.status(400).json({ error: 'The new password must differ from the current one' })
     }
-    
-    const newPasswordHash = await hashPassword(newPassword)
-    await query(
-      `UPDATE users SET password_hash = $1, must_reset_password = false,
-              password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2`,
-      [newPasswordHash, req.user.userId]
-    )
+
+    await setAccountPassword(req.user.userId, await hashPassword(newPassword))
     // Whoever knew the old password may be signed in elsewhere. This device
     // stays signed in; every other session ends.
     const ended = await revokeUserSessions(req.user.userId, 'password_changed', req.user.sessionId)
@@ -543,7 +546,7 @@ interface SuperadminRegisterRequest extends Request {
 // SECURITY: Superadmin registration is gated â€” only works if:
 // 1. No superadmin exists yet (bootstrap mode), OR
 // 2. Request includes a valid SUPERADMIN_BOOTSTRAP_TOKEN from env
-router.post('/register-superadmin', accountLimiter, async (req: SuperadminRegisterRequest, res: Response) => {
+router.post('/register-superadmin', accountLimiter, beforeSignIn, async (req: SuperadminRegisterRequest, res: Response) => {
   try {
     const { email, fullName, password, confirmPassword } = req.body
 
@@ -670,7 +673,7 @@ interface SuperadminLoginRequest extends Request {
   }
 }
 
-router.post('/login-superadmin', loginLimiter, async (req: SuperadminLoginRequest, res: Response) => {
+router.post('/login-superadmin', loginLimiter, beforeSignIn, async (req: SuperadminLoginRequest, res: Response) => {
   try {
     const { email, password } = req.body
 
@@ -700,8 +703,6 @@ router.post('/login-superadmin', loginLimiter, async (req: SuperadminLoginReques
     if ('mfaToken' in signIn) {
       return res.json({ mfaRequired: true, mfaToken: signIn.mfaToken })
     }
-    const { accessToken, refreshToken } = signIn
-
     return res.json({
       message: 'Superadmin login successful',
       user: {
@@ -711,8 +712,7 @@ router.post('/login-superadmin', loginLimiter, async (req: SuperadminLoginReques
         role: u.role_name,
         permissions: u.permissions || []
       },
-      accessToken,
-      refreshToken
+      ...deliverTokens(req, res, signIn),
     })
   } catch (error: any) {
     return loginRefusal(res, error)
@@ -737,34 +737,43 @@ interface RefreshRequest extends Request {
  */
 router.post('/refresh', refreshLimiter, async (req: RefreshRequest, res: Response) => {
   try {
-    const { refreshToken } = req.body ?? {}
+    // The browser app's refresh token is in a cookie it cannot read; API
+    // clients send theirs in the body.
+    const fromCookie = !req.body?.refreshToken
+    const refreshToken = req.body?.refreshToken ?? cookiesOf(req)[REFRESH_COOKIE]
+    if (fromCookie && refreshToken) {
+      // SameSite=Strict keeps other sites' requests from carrying the
+      // cookie; a sibling subdomain is the same site, so the origin is
+      // checked too. A forged refresh would only rotate the victim's own
+      // cookies, but there is no reason to let it.
+      const origin = req.headers.origin
+      if (origin && !new Set(allowedOrigins()).has(String(origin).replace(/\/$/, ''))) {
+        return res.status(403).json({ error: 'This origin may not call the API', code: 'CSRF' })
+      }
+    }
 
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token required' })
     }
 
+    // rotateSession refuses an inactive account, and says whose session it is.
     const rotated = await rotateSession(refreshToken)
-    const userResult = await query(
-      `SELECT id, platform_id, role_id FROM users WHERE id = $1 AND is_active = TRUE`,
-      [rotated.userId]
-    )
-    if (userResult.rows.length === 0) {
-      await revokeSession(rotated.sessionId, 'account_inactive')
-      return res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'SESSION_ENDED' })
-    }
-    const user = userResult.rows[0]
+    const user = { id: rotated.userId, platform_id: rotated.platformId, role_id: rotated.roleId }
 
+    const accessToken = generateAccessToken(user.id, user.platform_id, user.role_id, rotated.sessionId,
+      await mfaSetupPending(user.id, user.role_id))
+    const tokens = { accessToken, refreshToken: rotated.refreshToken, sessionId: rotated.sessionId }
     return res.json({
       message: 'Token refreshed successfully',
-      accessToken: generateAccessToken(user.id, user.platform_id, user.role_id, rotated.sessionId,
-        await mfaSetupPending(user.id, user.role_id)),
-      refreshToken: rotated.refreshToken,
+      // A cookie came in, so cookies go out, whatever the header says.
+      ...(fromCookie ? setSessionCookies(res, tokens) : deliverTokens(req, res, tokens)),
     })
   } catch (error: any) {
     if (error instanceof SessionError && error.code === 'race') {
       return res.status(409).json({ error: error.message, code: 'REFRESH_RACE' })
     }
     if (error instanceof SessionError) {
+      clearSessionCookies(res)
       return res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'SESSION_ENDED' })
     }
     logError('Refresh', error)
@@ -775,6 +784,14 @@ router.post('/refresh', refreshLimiter, async (req: RefreshRequest, res: Respons
 // ===========================
 // GET CURRENT USER ENDPOINT
 // ===========================
+
+/**
+ * The CSRF token of the caller's session, for a browser app that reloaded
+ * and lost the one it held in memory. CORS keeps other sites from reading it.
+ */
+router.get('/csrf', authenticateToken, (req: Request, res: Response) => {
+  return res.json({ csrfToken: csrfTokenFor(req.user!.sessionId!) })
+})
 
 router.get('/me', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -809,7 +826,9 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
         isActive: user.is_active,
         lastLogin: user.last_login,
         mustResetPassword: user.must_reset_password || false
-      }
+      },
+      // A browser app that reloaded lost the CSRF token it held in memory.
+      ...(req.authVia === 'cookie' ? { csrfToken: csrfTokenFor(req.user.sessionId!) } : {}),
     };
     
     return res.json(responseData);
@@ -872,6 +891,7 @@ router.put('/me', authenticateToken, async (req: Request, res: Response) => {
 router.post('/logout', authenticateToken, async (req: Request, res: Response) => {
   try {
     await revokeSession(req.user!.sessionId!, 'logout')
+    clearSessionCookies(res)
     return res.json({ message: 'Logout successful' })
   } catch (error) {
     logError('Logout', error)
@@ -883,6 +903,7 @@ router.post('/logout', authenticateToken, async (req: Request, res: Response) =>
 router.post('/logout-all', authenticateToken, async (req: Request, res: Response) => {
   try {
     const ended = await revokeUserSessions(req.user!.userId, 'logout_all')
+    clearSessionCookies(res)
     return res.json({ message: 'Signed out everywhere', sessionsEnded: ended })
   } catch (error) {
     logError('Logout all', error)
@@ -906,7 +927,9 @@ const verifySuperadmin = async (req: Request, res: Response, next: NextFunction)
       return res.status(403).json({ error: 'Superadmin access required' })
     }
 
-    next()
+    // These reports count every tenant's schools, companies and people: the
+    // control plane, platform-wide by design (as routes/superadmin.ts).
+    runAsSystem('control plane: superadmin dashboard and reports', next)
   } catch (error: any) {
     return res.status(500).json({ error: 'Authorization error' })
   }

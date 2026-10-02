@@ -1778,8 +1778,9 @@ router.post('/break-glass', async (req: Request, res: Response) => {
     const t = await query(`SELECT id, name FROM tenants WHERE id = $1`, [tenantId])
     if (!t.rows.length) return res.status(404).json({ error: 'Tenant not found' })
     const g = await query(
-      `INSERT INTO break_glass_grants (tenant_id, superadmin_id, reason, expires_at)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP + make_interval(mins => $4))
+      `INSERT INTO break_glass_grants (tenant_id, superadmin_id, superadmin_name, superadmin_email, reason, expires_at)
+       SELECT $1, u.id, u.full_name, u.email, $3, CURRENT_TIMESTAMP + make_interval(mins => $4)
+         FROM users u WHERE u.id = $2
        RETURNING id, tenant_id, opened_at, expires_at`,
       [tenantId, actorOf(req), reason.trim(), minutes]
     )

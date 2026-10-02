@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { query } from '../db/connection.js'
+import { runAsSystem } from '../db/dbContext.js'
 import type { User } from '../types/database.js'
 import crypto from 'crypto'
 import { createSession } from './sessions.js'
@@ -22,6 +23,15 @@ function requireEnvSecret(key: string): string {
 }
 
 const JWT_SECRET = requireEnvSecret('JWT_SECRET')
+
+// Sign-in, registration and the lockout happen before any tenant is known,
+// and an account can belong to several tenants, so they read accounts on the
+// system pool (migration 074 hides accounts and password hashes from the
+// runtime role). So do the platform-wide superadmin reports. The approval
+// queue below stays on the runtime role: it is one tenant's.
+function sys(text: string, params?: any[]) {
+  return runAsSystem('identity: sign-in, registration and platform reports', () => query(text, params))
+}
 
 // Hash password (12 rounds for stronger security)
 export async function hashPassword(password: string): Promise<string> {
@@ -103,7 +113,7 @@ function normEmail(email: string): string {
 }
 
 async function lockedFor(emailNorm: string): Promise<number> {
-  const r = await query(
+  const r = await sys(
     `SELECT COUNT(*)::int AS n, MIN(attempted_at) AS first
        FROM (SELECT attempted_at FROM auth_failed_logins
               WHERE email_norm = $1 AND attempted_at > CURRENT_TIMESTAMP - ($2 || ' minutes')::interval
@@ -122,13 +132,13 @@ export async function noteFailedSignIn(email: string, ip?: string | null) {
 }
 
 async function recordFailure(emailNorm: string, ip?: string | null) {
-  await query(
+  await sys(
     `INSERT INTO auth_failed_logins (email_norm, ip) VALUES ($1, $2)`,
     [emailNorm, ip?.slice(0, 64) ?? null]
   )
   // Keep the table small: nothing older than a day is ever consulted.
   if (Math.random() < 0.02) {
-    await query(`DELETE FROM auth_failed_logins WHERE attempted_at < CURRENT_TIMESTAMP - INTERVAL '1 day'`)
+    await sys(`DELETE FROM auth_failed_logins WHERE attempted_at < CURRENT_TIMESTAMP - INTERVAL '1 day'`)
   }
 }
 
@@ -153,7 +163,7 @@ export async function loginUser(
     throw new LoginError('locked', 'Too many failed sign-in attempts. Try again later.', { retryAfter: wait })
   }
 
-  const candidates = await query(
+  const candidates = await sys(
     `SELECT u.*, r.permissions, r.name AS role_name, p.name AS platform_name
        FROM users u
        LEFT JOIN roles r ON u.role_id = r.id
@@ -185,7 +195,7 @@ export async function loginUser(
   }
 
   if (!user.is_active) {
-    const pending = await query(
+    const pending = await sys(
       `SELECT 1 FROM school_user_approvals WHERE user_id = $1 AND status = 'pending'
        UNION ALL
        SELECT 1 FROM corporate_user_approvals WHERE user_id = $1 AND status = 'pending'
@@ -199,7 +209,7 @@ export async function loginUser(
   }
 
   if (!isPlatformSuperadmin && (user.platform_name === 'school' || user.platform_name === 'corporate')) {
-    const t = await query(
+    const t = await sys(
       `SELECT m.tenant_name, t.is_active
          FROM user_tenant_memberships m JOIN tenants t ON t.id = m.tenant_id
         WHERE m.user_id = $1 AND m.platform_kind = $2 AND m.status = 'active'`,
@@ -224,20 +234,41 @@ export async function loginUser(
     return { user: safeUser, mfaRequired: true, mfaToken: await createChallenge(user.id, meta.ip) }
   }
 
-  await query(`DELETE FROM auth_failed_logins WHERE email_norm = $1`, [emailNorm])
-  const { accessToken, refreshToken } = await issueTokens(user, meta)
-  await query(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id])
+  await sys(`DELETE FROM auth_failed_logins WHERE email_norm = $1`, [emailNorm])
+  const { accessToken, refreshToken, sessionId } = await issueTokens(user, meta)
+  await sys(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id])
 
-  return { user: safeUser, mfaRequired: false, accessToken, refreshToken }
+  return { user: safeUser, mfaRequired: false, accessToken, refreshToken, sessionId }
 }
 
 export type SignInResult =
-  | { user: User; mfaRequired: false; accessToken: string; refreshToken: string }
+  | { user: User; mfaRequired: false; accessToken: string; refreshToken: string; sessionId: string }
   | { user: User; mfaRequired: true; mfaToken: string }
+
+/**
+ * Whether `password` is this account's password; null when there is no such
+ * account. The runtime role cannot read password hashes (migration 074), so
+ * every check of a typed password comes here.
+ */
+export async function accountPasswordMatches(userId: string, password: string): Promise<boolean | null> {
+  const r = await sys(`SELECT password_hash FROM users WHERE id = $1`, [userId])
+  if (r.rows.length === 0) return null
+  return bcrypt.compare(String(password ?? ''), r.rows[0].password_hash ?? DUMMY_HASH)
+}
+
+/** Sets a new password the person chose. The caller has checked who they are. */
+export async function setAccountPassword(userId: string, newHash: string): Promise<void> {
+  await sys(
+    `UPDATE users SET password_hash = $1, must_reset_password = false,
+            password_changed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2`,
+    [newHash, userId]
+  )
+}
 
 // Verify user exists and get their details with role
 export async function getUserWithRole(userId: string): Promise<any> {
-  const result = await query(
+  const result = await sys(
     `SELECT u.*, r.name as role_name, r.permissions FROM users u
      LEFT JOIN roles r ON u.role_id = r.id
      WHERE u.id = $1`,
@@ -256,7 +287,7 @@ export async function getUserWithRole(userId: string): Promise<any> {
 
 // Get user by email
 export async function getUserByEmail(email: string, platformId: string): Promise<any> {
-  const result = await query(
+  const result = await sys(
     `SELECT * FROM users WHERE email = $1 AND platform_id = $2`,
     [email, platformId]
   )
@@ -291,7 +322,7 @@ export async function registerUserWithRole(
   message: string
 }> {
   // Validate role exists
-  const roleResult = await query(
+  const roleResult = await sys(
     `SELECT id, name FROM roles WHERE platform_id = $1 AND name = $2`,
     [platformId, roleName]
   )
@@ -309,7 +340,7 @@ export async function registerUserWithRole(
   }
   
   // Get platform name
-  const platformResult = await query(
+  const platformResult = await sys(
     `SELECT name FROM platforms WHERE id = $1`,
     [platformId]
   )
@@ -331,7 +362,7 @@ export async function registerUserWithRole(
   const passwordHash = await hashPassword(password)
   
   // Create user (inactive if requires approval)
-  const result = await query(
+  const result = await sys(
     `INSERT INTO users (platform_id, email, full_name, phone, role_id, password_hash, is_active)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id, platform_id, email, full_name, phone, role_id, profile_image_url, is_active, created_at, updated_at`,
@@ -347,13 +378,13 @@ export async function registerUserWithRole(
   if (requiresApproval) {
     // Create approval request
     if (platformName === 'school') {
-      await query(
+      await sys(
         `INSERT INTO school_user_approvals (user_id, school_entity_id, requested_role, status, requested_at)
          VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP)`,
         [user.id, entityId, roleName]
       )
     } else if (platformName === 'corporate') {
-      await query(
+      await sys(
         `INSERT INTO corporate_user_approvals (user_id, corporate_entity_id, requested_role, status, requested_at)
          VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP)`,
         [user.id, entityId, roleName]
@@ -362,13 +393,13 @@ export async function registerUserWithRole(
   } else {
     // Auto-create association for non-approval roles (student, employee)
     if (platformName === 'school') {
-      await query(
+      await sys(
         `INSERT INTO school_user_associations (user_id, school_entity_id, status, assigned_at)
          VALUES ($1, $2, 'active', CURRENT_TIMESTAMP)`,
         [user.id, entityId]
       )
     } else if (platformName === 'corporate') {
-      await query(
+      await sys(
         `INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status, assigned_at)
          VALUES ($1, $2, 'active', CURRENT_TIMESTAMP)`,
         [user.id, entityId]
@@ -636,7 +667,7 @@ export async function approveOrRejectRegistration(
 
 // Check if user is superadmin
 export async function isSuperadmin(userId: string): Promise<boolean> {
-  const result = await query(
+  const result = await sys(
     `SELECT EXISTS(
       SELECT 1 FROM users u
       JOIN roles r ON u.role_id = r.id
@@ -656,7 +687,7 @@ export async function getSuperadminDashboardStats(superadminUserId: string) {
     throw new Error('Unauthorized: User is not a superadmin')
   }
 
-  const stats = await query(
+  const stats = await sys(
     `SELECT 
       (SELECT CAST(COUNT(*) AS INTEGER) FROM school_entities) as total_schools,
       (SELECT CAST(COUNT(*) AS INTEGER) FROM school_entities WHERE is_active = true) as active_schools,
@@ -678,7 +709,7 @@ export async function getSuperadminAllEntities(superadminUserId: string) {
     throw new Error('Unauthorized: User is not a superadmin')
   }
 
-  const schools = await query(
+  const schools = await sys(
     `SELECT id, name, code, email, is_active, 
             (SELECT COUNT(*) FROM school_user_associations WHERE school_entity_id = school_entities.id) as user_count,
             (SELECT COUNT(*) FROM school_user_approvals WHERE school_entity_id = school_entities.id AND status = 'pending') as pending_approvals
@@ -686,7 +717,7 @@ export async function getSuperadminAllEntities(superadminUserId: string) {
      ORDER BY created_at DESC`
   )
 
-  const corporates = await query(
+  const corporates = await sys(
     `SELECT id, name, code, email, is_active,
             (SELECT COUNT(*) FROM corporate_user_associations WHERE corporate_entity_id = corporate_entities.id) as user_count,
             (SELECT COUNT(*) FROM corporate_user_approvals WHERE corporate_entity_id = corporate_entities.id AND status = 'pending') as pending_approvals
@@ -707,7 +738,7 @@ export async function getSuperadminAllPendingApprovals(superadminUserId: string)
     throw new Error('Unauthorized: User is not a superadmin')
   }
 
-  const approvals = await query(
+  const approvals = await sys(
     `SELECT * FROM superadmin_all_pending_approvals ORDER BY requested_at DESC`
   )
 
@@ -721,7 +752,7 @@ export async function getSuperadminActionLogs(superadminUserId: string, limit: n
     throw new Error('Unauthorized: User is not a superadmin')
   }
 
-  const logs = await query(
+  const logs = await sys(
     `SELECT id, superadmin_user_id, action, entity_type, entity_id, details, created_at
      FROM superadmin_action_logs
      ORDER BY created_at DESC
@@ -729,7 +760,7 @@ export async function getSuperadminActionLogs(superadminUserId: string, limit: n
     [limit, offset]
   )
 
-  const countResult = await query(`SELECT COUNT(*) as total FROM superadmin_action_logs`)
+  const countResult = await sys(`SELECT COUNT(*) as total FROM superadmin_action_logs`)
   const total = countResult.rows[0].total
 
   return {
@@ -749,7 +780,7 @@ export async function logSuperadminAction(
   details?: any,
   ipAddress?: string
 ) {
-  await query(
+  await sys(
     `INSERT INTO superadmin_action_logs (superadmin_user_id, action, entity_type, entity_id, details, ip_address)
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [superadminUserId, action, entityType || null, entityId || null, details ? JSON.stringify(details) : null, ipAddress || null]
@@ -763,7 +794,7 @@ export async function getSuperadminUserStatistics(superadminUserId: string) {
     throw new Error('Unauthorized: User is not a superadmin')
   }
 
-  const stats = await query(
+  const stats = await sys(
     `SELECT * FROM superadmin_user_statistics ORDER BY platform_name`
   )
 
@@ -778,7 +809,7 @@ export async function getSuperadminEntityUsers(superadminUserId: string, entityT
   }
 
   if (entityType === 'school') {
-    const users = await query(
+    const users = await sys(
       `SELECT u.id, u.email, u.full_name, r.name as role, sua.status, sua.assigned_at
        FROM users u
        JOIN roles r ON u.role_id = r.id
@@ -789,7 +820,7 @@ export async function getSuperadminEntityUsers(superadminUserId: string, entityT
     )
     return users.rows
   } else if (entityType === 'corporate') {
-    const users = await query(
+    const users = await sys(
       `SELECT u.id, u.email, u.full_name, r.name as role, cua.status, cua.assigned_at
        FROM users u
        JOIN roles r ON u.role_id = r.id

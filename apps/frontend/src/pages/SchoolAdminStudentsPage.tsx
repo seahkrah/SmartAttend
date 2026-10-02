@@ -211,9 +211,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
     }
     
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.patch(`/api/auth/admin/school/students/${editingStudent.id}`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       showSuccess('Student updated successfully');
       setEditingStudent(null);
@@ -247,10 +245,8 @@ const SchoolAdminStudentsPage: React.FC = () => {
 
   const handleSuspendStudent = async (student: Student) => {
     try {
-      const token = localStorage.getItem('accessToken');
       const suspended = student.is_active; // if active, we suspend; if inactive, we reactivate
       await axios.patch(`/api/auth/admin/school/students/${student.id}/suspend`, { suspended }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       showSuccess(suspended ? 'Student suspended' : 'Student reactivated');
       fetchStudents();
@@ -261,9 +257,7 @@ const SchoolAdminStudentsPage: React.FC = () => {
 
   const handleDeleteStudent = async (student: Student) => {
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.delete(`/api/auth/admin/school/students/${student.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       showSuccess('Student deleted successfully');
       setConfirmDelete(null);

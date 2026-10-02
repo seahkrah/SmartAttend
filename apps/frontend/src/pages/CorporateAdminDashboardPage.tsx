@@ -61,9 +61,7 @@ export const CorporateAdminDashboardPage: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('accessToken')
       const response = await axios.get('/api/corporate/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
       })
       setData(response.data)
     } catch (error) {

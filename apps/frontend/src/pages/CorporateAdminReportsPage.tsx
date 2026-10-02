@@ -43,8 +43,7 @@ const CorporateAdminReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
 
-  const token = localStorage.getItem('accessToken')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = {}
 
   useEffect(() => {
     const fetchReports = async () => {

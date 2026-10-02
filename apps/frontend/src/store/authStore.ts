@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { User } from '@jjelotech/types';
 import { apiClient } from '../services/api';
-import { frontendConfig } from '../config/environment';
+import { seemsSignedIn, clearStoredSession } from '../utils/sessionRefresh';
 import { getUserFriendlyError } from '../utils/errorMessages';
 import { useToastStore } from '../components/Toast';
 
@@ -10,7 +10,8 @@ let loadUserInProgress = false;
 
 interface AuthState {
   user: User | null;
-  token: string | null;
+  /** Whether this browser seems to have a session (its cookies cannot be read to tell). */
+  hasSession: boolean;
   isLoading: boolean;
   error: string | null;
   /** Resolves with `mfaToken` when the account uses two-factor sign-in: pass it to verifyMfa with a code. */
@@ -19,20 +20,20 @@ interface AuthState {
   verifyMfa: (mfaToken: string, answer: { code?: string; recoveryCode?: string }) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
-  setToken: (token: string) => void;
   clearError: () => void;
   loadUserFromToken: () => Promise<void>;
 }
 
 export type SignInStep = { mfaToken?: string };
 
-/** Stores a finished sign-in's tokens and user. */
+/**
+ * Records a finished sign-in. The session itself is in httpOnly cookies the
+ * API set; what the page keeps is the user and, in memory, the CSRF token.
+ */
 function signedIn(set: (s: Partial<AuthState>) => void, response: any) {
-  localStorage.setItem('accessToken', response.accessToken);
-  if (response.refreshToken) localStorage.setItem('refreshToken', response.refreshToken);
-  apiClient.setToken(response.accessToken);
+  apiClient.signedIn(response);
   set({
-    token: response.accessToken,
+    hasSession: true,
     user: {
       id: response.user.id,
       email: response.user.email,
@@ -54,12 +55,12 @@ function signedIn(set: (s: Partial<AuthState>) => void, response: any) {
 }
 
 export const useAuthStore = create<AuthState>((set) => {
-  const initialToken = localStorage.getItem('accessToken');
+  const initialSession = seemsSignedIn();
 
   return {
     user: null,
-    token: initialToken,
-    isLoading: !!initialToken, // Set to true if we have a token to load
+    hasSession: initialSession,
+    isLoading: initialSession, // true while /auth/me says who is signed in
     error: null,
 
     login: async (email: string, password: string, platform: 'school' | 'corporate') => {
@@ -94,15 +95,10 @@ export const useAuthStore = create<AuthState>((set) => {
     superadminLogin: async (email: string, password: string) => {
       set({ isLoading: true, error: null });
       try {
-        const response = await fetch(`${frontendConfig.apiBaseUrl}/auth/login-superadmin`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        }).then((res) => res.json());
-
-        if (response.error) {
-          throw new Error(response.error);
-        }
+        const response: any = await apiClient
+          .post('/auth/login-superadmin', { email, password })
+          .then((res) => res.data)
+          .catch((e: any) => { throw new Error(e?.response?.data?.error || 'Superadmin login failed'); });
 
         if (response.mfaRequired) {
           set({ isLoading: false });
@@ -144,19 +140,14 @@ export const useAuthStore = create<AuthState>((set) => {
       set({ isLoading: true });
       try {
         await apiClient.logout();
-        set({ user: null, token: null, isLoading: false });
+        set({ user: null, hasSession: false, isLoading: false });
       } catch (error) {
         // Clear state even if logout fails
-        set({ user: null, token: null, isLoading: false });
+        set({ user: null, hasSession: false, isLoading: false });
       }
     },
 
     setUser: (user) => set({ user }),
-
-    setToken: (token: string) => {
-      localStorage.setItem('accessToken', token);
-      set({ token });
-    },
 
     clearError: () => set({ error: null }),
 
@@ -171,14 +162,13 @@ export const useAuthStore = create<AuthState>((set) => {
         return;
       }
 
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        console.log('[authStore] ❌ No token found, clearing user');
-        set({ user: null, token: null });
+      if (!seemsSignedIn()) {
+        console.log('[authStore] ❌ No session, clearing user');
+        set({ user: null, hasSession: false });
         return;
       }
 
-      console.log('[authStore] 🔄 Token found, loading user from /auth/me');
+      console.log('[authStore] 🔄 Session found, loading user from /auth/me');
       loadUserInProgress = true;
       set({ isLoading: true });
 
@@ -191,7 +181,7 @@ export const useAuthStore = create<AuthState>((set) => {
           platform: user.platform,
         });
         set({
-          token: token,
+          hasSession: true,
           user: {
             id: user.id,
             email: user.email,
@@ -204,10 +194,9 @@ export const useAuthStore = create<AuthState>((set) => {
         });
       } catch (error) {
         console.error('[authStore] ❌ Failed to load user from /auth/me:', error);
-        // Token is invalid
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        set({ user: null, token: null, isLoading: false, error: 'Session expired' });
+        // The session has ended
+        clearStoredSession();
+        set({ user: null, hasSession: false, isLoading: false, error: 'Session expired' });
         // Only worth saying where the person was actually using their session.
         // A stale token left in the browser from weeks ago would otherwise
         // greet a visitor to the home page or the access-request form with

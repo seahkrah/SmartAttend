@@ -66,7 +66,11 @@ export function applyHttpSecurity(app: Express) {
       cb(null, origins.has(origin.replace(/\/$/, '')))
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Bootstrap-Token'],
+    // The browser app's session is in cookies (auth/cookies.ts): an allowed
+    // origin may send them, and read the answers. Other origins can do
+    // neither, which is what keeps the CSRF token out of their reach.
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Bootstrap-Token', 'X-CSRF-Token', 'X-Auth-Transport'],
     exposedHeaders: ['Content-Disposition', 'RateLimit', 'RateLimit-Policy', 'Retry-After'],
     maxAge: 600,
   }))

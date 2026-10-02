@@ -21,6 +21,14 @@ import { hashToken, revokeUserSessions } from './sessions.js'
 import { checkPassword } from './passwordPolicy.js'
 import { notify, channelConfig } from '../notifications/service.js'
 import { clearMfa } from './mfaService.js'
+import { runAsSystem } from '../db/dbContext.js'
+
+// Requesting and redeeming a link happen before sign-in: system-pool work
+// (migration 074). Links issued by an administrator use the caller's runner,
+// inside their tenant's transaction.
+function sys(text: string, params?: any[]) {
+  return runAsSystem('identity: reset and activation links before sign-in', () => query(text, params))
+}
 
 type Runner = { query: (text: string, params?: any[]) => Promise<any> }
 export type TokenPurpose = 'account_activation' | 'password_reset'
@@ -200,7 +208,7 @@ export async function resetAccessByAdmin(
  * another superadmin.
  */
 export async function requestPasswordReset(email: string, platformId: string): Promise<void> {
-  const u = await query(
+  const u = await sys(
     `SELECT u.id FROM users u
       WHERE LOWER(u.email) = LOWER($1) AND u.platform_id = $2
         AND u.is_active = TRUE AND u.activated_at IS NOT NULL
@@ -210,20 +218,20 @@ export async function requestPasswordReset(email: string, platformId: string): P
   if (u.rows.length === 0) return
   const userId = u.rows[0].id
   // One email per account every two minutes, however often it is asked for.
-  const recent = await query(
+  const recent = await sys(
     `SELECT 1 FROM auth_tokens WHERE user_id = $1 AND purpose = 'password_reset'
         AND created_at > CURRENT_TIMESTAMP - INTERVAL '2 minutes'`,
     [userId]
   )
   if (recent.rows.length > 0) return
-  const m = await query(
+  const m = await sys(
     `SELECT tenant_id FROM user_tenant_memberships WHERE user_id = $1 AND status = 'active' LIMIT 1`,
     [userId]
   )
   if (m.rows.length === 0) return
-  const token = await issue({ query }, userId, 'password_reset', null)
-  const r = await recipientOf({ query }, userId)
-  await notify({ query }, { tenantId: m.rows[0].tenant_id, userId: null }, {
+  const token = await issue({ query: sys }, userId, 'password_reset', null)
+  const r = await recipientOf({ query: sys }, userId)
+  await notify({ query: sys }, { tenantId: m.rows[0].tenant_id, userId: null }, {
     eventKey: 'account.password_reset',
     channels: ['email'],
     recipients: [{ userId: r.userId, name: r.name, email: r.email }],
@@ -240,7 +248,7 @@ export async function redeemToken(purpose: TokenPurpose, token: string, password
   if (typeof token !== 'string' || token.length < 20 || token.length > 200) {
     throw new AccountTokenError(400, 'This link is not valid')
   }
-  const owner = await query(
+  const owner = await sys(
     `SELECT u.id, u.email, u.full_name FROM auth_tokens t JOIN users u ON u.id = t.user_id
       WHERE t.token_hash = $1 AND t.purpose = $2`,
     [hashToken(token), purpose]
@@ -249,7 +257,7 @@ export async function redeemToken(purpose: TokenPurpose, token: string, password
   const problems = checkPassword(password, { email: owner.rows[0].email, name: owner.rows[0].full_name })
   if (problems.length > 0) throw new AccountTokenError(400, 'Choose a stronger password', problems)
 
-  const spent = await query(
+  const spent = await sys(
     `UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP
       WHERE token_hash = $1 AND purpose = $2 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
       RETURNING user_id`,
@@ -260,7 +268,7 @@ export async function redeemToken(purpose: TokenPurpose, token: string, password
   }
   const userId = spent.rows[0].user_id
   const hash = await bcrypt.hash(password, 12)
-  await query(
+  await sys(
     `UPDATE users
         SET password_hash = $2, must_reset_password = FALSE, password_changed_at = CURRENT_TIMESTAMP,
             activated_at = COALESCE(activated_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP

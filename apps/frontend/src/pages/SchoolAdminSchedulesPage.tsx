@@ -97,9 +97,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/schedules', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setSchedules(response.data.schedules);
     } catch (error: any) {
@@ -111,9 +109,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
 
   const fetchCourses = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/courses', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setCourses(response.data.courses);
     } catch (error: any) {
@@ -123,9 +119,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
 
   const fetchFaculty = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/faculty', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setFaculty(response.data.faculty);
     } catch (error: any) {
@@ -135,9 +129,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
 
   const fetchRooms = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/rooms', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setRooms(response.data.rooms);
     } catch (error: any) {
@@ -147,9 +139,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
 
   const fetchDayFormat = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/settings', {
-        headers: { Authorization: `Bearer ${token}` }
       });
       const fmt = response.data.settings?.schedule_day_format;
       if (fmt) setScheduleDayFormat(parseInt(fmt));
@@ -183,9 +173,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
       return;
     }
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.post('/api/auth/admin/school/schedules', formData, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       showSuccess(`Schedule created for ${formData.daysOfWeek.length} day(s)`);
       setShowAddModal(false);
@@ -201,9 +189,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
     if (!editingSchedule) return;
     
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.patch(`/api/auth/admin/school/schedules/${editingSchedule.id}`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       showSuccess('Schedule updated successfully');
       setEditingSchedule(null);
@@ -246,9 +232,7 @@ const SchoolAdminSchedulesPage: React.FC = () => {
     });
     if (!confirmed) return;
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.delete(`/api/auth/admin/school/schedules/${schedule.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       addToast({ type: 'success', title: 'Success', message: 'Schedule deleted successfully' });
       fetchSchedules();

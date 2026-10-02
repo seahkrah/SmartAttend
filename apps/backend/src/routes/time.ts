@@ -1,7 +1,8 @@
-import { Router, Request, Response } from 'express'
+import { Router, Request, Response, NextFunction } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
 import { isSuperadmin } from '../auth/authService.js'
 import { query } from '../db/connection.js'
+import { runAsSystem } from '../db/dbContext.js'
 import {
   getServerTime,
   getServerTimeISO,
@@ -28,6 +29,18 @@ const router = Router()
  * 
  * Public endpoint - helps clients adjust for drift
  */
+/**
+ * Clock-drift review is platform operations: a superadmin looks across every
+ * tenant's devices. Refused to anyone else; for a superadmin, the handler runs
+ * on the system pool (migration 075 keeps drift records to the person and
+ * their tenant otherwise).
+ */
+async function platformOperator(req: Request, res: Response, next: NextFunction) {
+  if (!req.user?.userId) return res.status(401).json({ error: 'Not authenticated' })
+  if (!(await isSuperadmin(req.user.userId))) return res.status(403).json({ error: 'Superadmin access required' })
+  runAsSystem('control plane: clock-drift review across tenants', next)
+}
+
 router.get('/sync', async (req: Request, res: Response) => {
   try {
     const serverTime = getServerTime()
@@ -172,7 +185,7 @@ router.get('/drift/history', authenticateToken, async (req: Request, res: Respon
  * 
  * Superadmin only - aggregated tenant statistics
  */
-router.get('/drift/stats', authenticateToken, async (req: Request, res: Response) => {
+router.get('/drift/stats', authenticateToken, platformOperator, async (req: Request, res: Response) => {
   try {
     const user = req.user
     if (!user?.userId) {
@@ -210,7 +223,7 @@ router.get('/drift/stats', authenticateToken, async (req: Request, res: Response
  * 
  * Superadmin only - events that affected attendance
  */
-router.get('/drift/critical', authenticateToken, async (req: Request, res: Response) => {
+router.get('/drift/critical', authenticateToken, platformOperator, async (req: Request, res: Response) => {
   try {
     const user = req.user
     if (!user?.userId) {
@@ -259,7 +272,7 @@ router.get('/drift/critical', authenticateToken, async (req: Request, res: Respo
  * - action: 'reviewed' | 'resolved' | 'flagged'
  * - notes: Investigation notes
  */
-router.post('/drift/investigate', authenticateToken, async (req: Request, res: Response) => {
+router.post('/drift/investigate', authenticateToken, platformOperator, async (req: Request, res: Response) => {
   try {
     const user = req.user
     if (!user?.userId) {

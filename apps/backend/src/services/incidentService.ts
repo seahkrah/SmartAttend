@@ -18,6 +18,15 @@ import {
   fingerprintDatabaseError,
   type ErrorFingerprint,
 } from './errorFingerprintService.js'
+import { runAsSystem } from '../db/dbContext.js'
+
+// Errors become platform incidents, recorded whatever tenant the failing
+// request was in, and returned by id (RETURNING), which a tenant could not
+// read for a platform-level incident: system-pool work (migration 075).
+// Reads below stay on the runtime role, under the caller's visibility.
+function sys(text: string, params?: any[]) {
+  return runAsSystem('platform incidents: recording an error whatever the tenant', () => query(text, params))
+}
 
 export interface CreateIncidentInput {
   platformId: string
@@ -62,7 +71,7 @@ async function getOrCreateFingerprint(
 ): Promise<string> {
   try {
     // Check if fingerprint already exists
-    const existingResult = await query(
+    const existingResult = await sys(
       'SELECT id FROM error_fingerprints WHERE fingerprint_hash = $1',
       [fingerprint.hash]
     )
@@ -72,7 +81,7 @@ async function getOrCreateFingerprint(
     }
 
     // Create new fingerprint record
-    const createResult = await query(
+    const createResult = await sys(
       `INSERT INTO error_fingerprints 
         (fingerprint_hash, error_code, error_message, stack_trace_pattern, is_active) 
        VALUES ($1, $2, $3, $4, true) 
@@ -130,7 +139,7 @@ export async function createIncident(input: CreateIncidentInput): Promise<string
     const title = `${errorClassification.category.toUpperCase()}: ${input.errorMessage.substring(0, 80)}`
 
     // Create incident record
-    const result = await query(
+    const result = await sys(
       `INSERT INTO incidents 
         (
           platform_id,
@@ -207,7 +216,7 @@ async function logError(
   fingerprintId: string
 ): Promise<void> {
   try {
-    await query(
+    await sys(
       `INSERT INTO error_logs 
         (
           platform_id,
@@ -264,7 +273,7 @@ export async function createTimelineEvent(
   performedByUserId?: string
 ): Promise<void> {
   try {
-    await query(
+    await sys(
       `INSERT INTO incident_timeline_events 
         (incident_id, event_type, old_value, new_value, description, performed_by_user_id) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -338,7 +347,7 @@ export async function updateIncident(
     }
 
     values.push(incidentId)
-    await query(
+    await sys(
       `UPDATE incidents SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
       values
     )

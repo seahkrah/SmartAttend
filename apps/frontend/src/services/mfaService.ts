@@ -28,7 +28,7 @@ export const mfaService = {
     (await axiosClient.post('/auth/mfa/setup', {})).data,
 
   /** Returns the recovery codes, shown once, and a fresh access token for this session. */
-  enable: async (code: string): Promise<{ recoveryCodes: string[]; accessToken: string }> =>
+  enable: async (code: string): Promise<{ recoveryCodes: string[] }> =>
     (await axiosClient.post('/auth/mfa/enable', { code })).data,
 
   disable: async (proof: Reauth): Promise<void> => {

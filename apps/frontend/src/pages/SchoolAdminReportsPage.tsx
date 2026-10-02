@@ -31,7 +31,6 @@ const SchoolAdminReportsPage: React.FC = () => {
   const fetchReport = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
       const params = new URLSearchParams();
       if (filters.startDate) params.append('startDate', filters.startDate);
       if (filters.endDate) params.append('endDate', filters.endDate);
@@ -40,7 +39,6 @@ const SchoolAdminReportsPage: React.FC = () => {
       if (filters.studentId) params.append('studentId', filters.studentId);
 
       const response = await axios.get(`/api/auth/admin/school/reports/attendance?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       setRecords(response.data.records);
       addToast({ type: 'success', title: 'Success', message: `Loaded ${response.data.totalRecords} records` });

@@ -17,6 +17,13 @@
  */
 import crypto from 'crypto'
 import { query } from '../db/connection.js'
+import { runAsSystem } from '../db/dbContext.js'
+
+// Sessions are checked on every request before the tenant is resolved, and
+// span tenants: system-pool work (migration 074).
+function sys(text: string, params?: any[]) {
+  return runAsSystem('identity: sessions are checked before any tenant is known', () => query(text, params))
+}
 
 export const SESSION_LIFETIME_DAYS = 30
 export const REFRESH_RACE_GRACE_SECONDS = 30
@@ -40,7 +47,7 @@ export async function createSession(
   meta: { ip?: string | null; userAgent?: string | null } = {}
 ): Promise<{ sessionId: string; refreshToken: string }> {
   const refreshToken = newToken()
-  const r = await query(
+  const r = await sys(
     `INSERT INTO auth_sessions (user_id, current_token_hash, expires_at, created_ip, user_agent)
      VALUES ($1, $2, CURRENT_TIMESTAMP + ($3 || ' days')::interval, $4, $5)
      RETURNING id`,
@@ -49,7 +56,7 @@ export async function createSession(
   )
   // Now and then, forget sessions that ended more than thirty days ago.
   if (Math.random() < 0.02) {
-    await query(
+    await sys(
       `DELETE FROM auth_sessions
         WHERE COALESCE(revoked_at, expires_at) < CURRENT_TIMESTAMP - INTERVAL '30 days'`
     ).catch(() => undefined)
@@ -64,6 +71,8 @@ export async function createSession(
 export async function rotateSession(refreshToken: string): Promise<{
   sessionId: string
   userId: string
+  platformId: string
+  roleId: string
   refreshToken: string
 }> {
   if (typeof refreshToken !== 'string' || refreshToken.length < 20 || refreshToken.length > 200) {
@@ -74,7 +83,7 @@ export async function rotateSession(refreshToken: string): Promise<{
 
   // The swap is one statement, so two refreshes racing on the same token
   // cannot both win: the second finds the hash already moved to "previous".
-  const r = await query(
+  const r = await sys(
     `UPDATE auth_sessions s
         SET previous_token_hash = s.current_token_hash,
             current_token_hash = $2,
@@ -86,15 +95,16 @@ export async function rotateSession(refreshToken: string): Promise<{
         AND s.revoked_at IS NULL
         AND s.expires_at > CURRENT_TIMESTAMP
         AND u.is_active = TRUE
-      RETURNING s.id, s.user_id`,
+      RETURNING s.id, s.user_id, u.platform_id, u.role_id`,
     [h, hashToken(next)]
   )
   if (r.rows.length > 0) {
-    return { sessionId: r.rows[0].id, userId: r.rows[0].user_id, refreshToken: next }
+    const row = r.rows[0]
+    return { sessionId: row.id, userId: row.user_id, platformId: row.platform_id, roleId: row.role_id, refreshToken: next }
   }
 
   // Not the current token. Was it the one just replaced?
-  const old = await query(
+  const old = await sys(
     `SELECT id, rotated_at, revoked_at,
             rotated_at > CURRENT_TIMESTAMP - ($2 || ' seconds')::interval AS in_grace
        FROM auth_sessions WHERE previous_token_hash = $1`,
@@ -112,7 +122,7 @@ export async function rotateSession(refreshToken: string): Promise<{
 }
 
 export async function revokeSession(sessionId: string, reason: string): Promise<void> {
-  await query(
+  await sys(
     `UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, revoked_reason = $2
       WHERE id = $1 AND revoked_at IS NULL`,
     [sessionId, reason.slice(0, 60)]
@@ -121,7 +131,7 @@ export async function revokeSession(sessionId: string, reason: string): Promise<
 
 /** Ends every session of a user, optionally keeping one (the caller's own). */
 export async function revokeUserSessions(userId: string, reason: string, keep?: string | null): Promise<number> {
-  const r = await query(
+  const r = await sys(
     `UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, revoked_reason = $2
       WHERE user_id = $1 AND revoked_at IS NULL AND ($3::uuid IS NULL OR id <> $3::uuid)`,
     [userId, reason.slice(0, 60), keep ?? null]
@@ -131,7 +141,7 @@ export async function revokeUserSessions(userId: string, reason: string, keep?: 
 
 /** Whether a session is live and its account active. One indexed lookup. */
 export async function sessionIsLive(sessionId: string, userId: string): Promise<boolean> {
-  const r = await query(
+  const r = await sys(
     `SELECT 1
        FROM auth_sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = $1 AND s.user_id = $2 AND s.revoked_at IS NULL

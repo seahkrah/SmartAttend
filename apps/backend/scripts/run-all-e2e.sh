@@ -78,6 +78,10 @@ SUITES=(
   gradeSchoolApi
   # Opens, uses and closes a superadmin break-glass grant on school A.
   breakGlass
+  # Cookie sessions and CSRF; refresh-token rotation and reuse (waits out
+  # the 30-second race window twice).
+  csrf
+  refreshReuse
 )
 
 record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }
@@ -101,6 +105,8 @@ TS_SUITES=(
   tenantIsolation
   rlsNoContext
   blindWrite
+  # Accounts and credentials under RLS (migrations 074 and 075).
+  identityIsolation
   # Every route with a path parameter, as tenant A, with each of tenant B's
   # ids. Needs RATE_LIMIT_API_PER_MINUTE raised: it is ~20,000 requests.
   crossTenantFuzz

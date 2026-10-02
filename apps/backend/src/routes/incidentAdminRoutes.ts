@@ -60,6 +60,7 @@ import {
   getEscalationHistory,
   getRootCauseAnalysis,
 } from '../services/incidentLifecycleService.js'
+import { runAsSystem } from '../db/dbContext.js'
 
 const router = Router()
 
@@ -116,6 +117,15 @@ async function auditIncidentAccess(
 
 router.use(verifySuperadminAccess)
 router.use(auditIncidentAccess)
+
+// A superadmin with no tenant selected reviews incidents platform-wide: the
+// control plane, on the system pool (migration 075). A tenant administrator's
+// requests stay in their tenant, under row-level security.
+router.use((req, _res, next) => {
+  const ctx = (req as unknown as TenantRequest).ctx
+  if (ctx?.isSuperadmin && !ctx.tenantId) return runAsSystem('control plane: incident administration', next)
+  next()
+})
 
 function visibility(req: Request): IncidentVisibility {
   return incidentVisibility(contextOf(req))

@@ -44,8 +44,7 @@ const CorporateAdminSettingsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const token = localStorage.getItem('accessToken')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = {}
 
   useEffect(() => {
     const fetchSettings = async () => {

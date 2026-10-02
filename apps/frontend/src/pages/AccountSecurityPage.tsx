@@ -9,8 +9,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Check, Copy, Download, KeyRound, ShieldAlert, ShieldCheck, ShieldOff } from 'lucide-react';
 import { ErrorState, LoadingState } from '../components/states/PageStates';
 import { mfaService, type MfaStatus, type Reauth } from '../services/mfaService';
-import { useAuthStore } from '../store/authStore';
-import { apiClient } from '../services/api';
 
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
@@ -79,7 +77,6 @@ const RecoveryCodes: React.FC<{ codes: string[]; onDone: () => void }> = ({ code
 
 /** Scan, confirm with a code, then save the recovery codes. */
 const Setup: React.FC<{ onEnabled: (codes: string[]) => void; onCancel: () => void }> = ({ onEnabled, onCancel }) => {
-  const setToken = useAuthStore((s) => s.setToken);
   const [secret, setSecret] = useState<{ secret: string; otpauthUri: string } | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -106,9 +103,8 @@ const Setup: React.FC<{ onEnabled: (codes: string[]) => void; onCancel: () => vo
     setError('');
     try {
       const r = await mfaService.enable(code);
-      // This session's token may have said "set up two-factor first".
-      apiClient.setToken(r.accessToken);
-      setToken(r.accessToken);
+      // The API has replaced this session's access cookie, which may have
+      // said "set up two-factor first".
       onEnabled(r.recoveryCodes);
     } catch (e) {
       setError(errorOf(e, 'That code is not correct.'));

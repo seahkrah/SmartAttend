@@ -77,9 +77,7 @@ const SchoolAdminUsersPage: React.FC = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('accessToken')
       const response = await axios.get('/api/auth/admin/school/users', {
-        headers: { Authorization: `Bearer ${token}` },
       })
       setUsers(response.data.users || [])
     } catch (error) {
@@ -113,11 +111,9 @@ const SchoolAdminUsersPage: React.FC = () => {
 
   const handleUserAction = async (userId: string, action: 'activate' | 'suspend' | 'disable' | 'delete') => {
     try {
-      const token = localStorage.getItem('accessToken')
       
       if (action === 'delete') {
         await axios.delete(`/api/auth/admin/school/users/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` },
         })
         setUsers((prev) => prev.filter((u) => u.id !== userId))
         showToast('success', 'Removed from the school')
@@ -125,7 +121,7 @@ const SchoolAdminUsersPage: React.FC = () => {
         await axios.patch(
           `/api/auth/admin/school/users/${userId}`,
           { action },
-          { headers: { Authorization: `Bearer ${token}` } }
+          {}
         )
         setUsers((prev) =>
           prev.map((u) =>
@@ -162,12 +158,10 @@ const SchoolAdminUsersPage: React.FC = () => {
   const handleEditUser = async () => {
     if (!editingUser) return
     try {
-      const token = localStorage.getItem('accessToken')
       await axios.patch(`/api/auth/admin/school/users/${editingUser.id}`, {
         fullName: editingUser.fullName,
         phone: editingUser.phone,
       }, {
-        headers: { Authorization: `Bearer ${token}` },
       })
       showToast('success', 'User updated successfully')
       setEditingUser(null)

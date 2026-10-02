@@ -99,9 +99,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
   const fetchEnrollments = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/enrollments', {
-        headers: { Authorization: `Bearer ${token}` },
       });
       setEnrollments(response.data.enrollments);
     } catch (error: any) {
@@ -113,9 +111,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/students', {
-        headers: { Authorization: `Bearer ${token}` },
         params: { fields: 'summary' },
       });
       setStudents(response.data.students);
@@ -126,9 +122,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
 
   const fetchSchedules = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
       const response = await axios.get('/api/auth/admin/school/schedules', {
-        headers: { Authorization: `Bearer ${token}` },
       });
       setSchedules(response.data.schedules);
     } catch (error: any) {
@@ -147,11 +141,10 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
 
     for (const studentId of selectedStudents) {
       try {
-        const token = localStorage.getItem('accessToken');
         await axios.post(
           '/api/auth/admin/school/enrollments',
           { studentId, scheduleId: selectedSchedule },
-          { headers: { Authorization: `Bearer ${token}` } }
+          {}
         );
         successCount++;
       } catch (error: any) {
@@ -191,9 +184,7 @@ const SchoolAdminEnrollmentPage: React.FC = () => {
     if (!confirmed) return;
 
     try {
-      const token = localStorage.getItem('accessToken');
       await axios.delete(`/api/auth/admin/school/enrollments/${enrollment.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
       });
       addToast({ type: 'success', title: 'Success', message: 'Student unenrolled successfully' });
       fetchEnrollments();

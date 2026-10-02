@@ -47,6 +47,20 @@ const SYSTEM_ALLOWED = new Set([
   'apps/backend/src/db/migrate.ts', // schema migrations run as the owner
   'apps/backend/src/auth/tenantContextMiddleware.ts', // memberships decide the tenant
   'apps/backend/src/routes/auth.ts', // password reset happens before sign-in
+  // Identity (migration 074): accounts span tenants and are read before any
+  // tenant is known; the runtime role cannot read password hashes.
+  'apps/backend/src/auth/authService.ts', // sign-in, registration, password checks
+  'apps/backend/src/auth/sessions.ts', // sessions are checked before the tenant is resolved
+  'apps/backend/src/auth/mfaService.ts', // two-factor state, read during sign-in
+  'apps/backend/src/auth/accountTokens.ts', // reset and activation links before sign-in
+  'apps/backend/src/routes/mfa.ts', // the code step of sign-in and the caller's own settings
+  // Platform-level records (migration 075).
+  'apps/backend/src/services/incidentService.ts', // errors become platform incidents, whatever the tenant
+  'apps/backend/src/routes/accessRequests.ts', // enquiries before any tenant exists; superadmin reads
+  'apps/backend/src/routes/incidents.ts', // a superadmin with no tenant reviews platform-wide
+  'apps/backend/src/routes/incidentAdminRoutes.ts', // superadmin-only incident administration
+  'apps/backend/src/routes/validation.ts', // superadmin incident export and replay
+  'apps/backend/src/routes/time.ts', // superadmin clock-drift review across tenants
   'apps/backend/src/routes/superadmin.ts', // the control plane administers tenants
   'apps/backend/src/notifications/service.ts', // the dispatcher sweeps every outbox
   'apps/backend/src/services/metricsService.ts', // retention prunes every tenant

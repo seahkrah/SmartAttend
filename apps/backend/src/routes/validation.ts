@@ -16,6 +16,7 @@ import { withIncidentTracking } from '../middleware/errorToIncidentMiddleware.js
 // write to tables that do not exist in this schema, so their routes refuse
 // rather than import them.
 import { runAllScenarios } from '../services/incidentScenarioService.js'
+import { runAsSystem } from '../db/dbContext.js'
 
 const router = Router()
 
@@ -33,6 +34,15 @@ const router = Router()
  * identity rather than from a JWT claim a token need not carry.
  */
 router.use(authenticateToken, resolveTenantContext)
+
+// A superadmin with no tenant selected reviews incidents platform-wide: the
+// control plane, on the system pool (migration 075). A tenant administrator's
+// requests stay in their tenant, under row-level security.
+router.use((req, _res, next) => {
+  const ctx = (req as unknown as TenantRequest).ctx
+  if (ctx?.isSuperadmin && !ctx.tenantId) return runAsSystem('control plane: a superadmin exporting and replaying incidents', next)
+  next()
+})
 
 function isSuperadmin(req: ExtendedRequest): boolean {
   return (req as unknown as TenantRequest).ctx?.isSuperadmin === true

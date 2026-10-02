@@ -57,11 +57,9 @@ const SchoolAdminDashboardPage: React.FC = () => {
     try {
       setLoading(true)
       setLoadError(null)
-      const token = localStorage.getItem('accessToken')
       
       // Fetch dashboard stats
       const response = await axios.get('/api/auth/admin/school/stats', {
-        headers: { Authorization: `Bearer ${token}` },
       })
       
       if (response.data.stats) {

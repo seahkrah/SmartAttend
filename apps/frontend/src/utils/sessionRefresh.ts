@@ -1,18 +1,46 @@
 /**
  * Keeping a session alive.
  *
- * The server replaces the refresh token on every refresh and treats the old
- * one, presented again later, as stolen: it ends the session. So the browser
- * must (1) always store the new refresh token, (2) never run two refreshes
- * at once in one tab, and (3) cope with another tab having refreshed first,
- * which the server answers with 409 and which leaves the new tokens in the
- * shared localStorage.
+ * The session lives in cookies the page cannot read (httpOnly): the API sets
+ * them when the person signs in and replaces them on every refresh. What the
+ * page does hold, in memory only, is the CSRF token the API hands back with
+ * each sign-in and refresh; every state-changing request sends it as
+ * X-CSRF-Token. A page reload loses it, and the next /auth/me or refresh
+ * returns it again.
  *
- * Both HTTP clients (utils/axiosClient.ts and services/api.ts) use this.
+ * The server treats a replaced refresh token, presented again later, as
+ * stolen and ends the session. Two tabs refreshing at once is not theft: the
+ * slower one is answered 409, by which time the faster one's answer has put
+ * the new cookies in the browser, so it simply retries its request.
+ *
+ * Both HTTP clients (utils/axiosClient.ts and services/api.ts), and the
+ * default axios instance (utils/httpDefaults.ts), use this.
  */
 import axios from 'axios';
 
-let inflight: Promise<string | null> | null = null;
+let csrfToken: string | null = null;
+let inflight: Promise<boolean> | null = null;
+
+/** Whether this browser believes it has a session. Not a credential: a hint for the first render. */
+const SIGNED_IN_FLAG = 'signedIn';
+
+export function rememberCsrfToken(token: unknown): void {
+  if (typeof token === 'string' && token) csrfToken = token;
+}
+
+export function csrfHeader(method: string | undefined): Record<string, string> {
+  const m = String(method ?? 'get').toUpperCase();
+  if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS' || !csrfToken) return {};
+  return { 'X-CSRF-Token': csrfToken };
+}
+
+export function markSignedIn(): void {
+  try { localStorage.setItem(SIGNED_IN_FLAG, '1'); } catch { /* private mode: the flag is only a hint */ }
+}
+
+export function seemsSignedIn(): boolean {
+  try { return localStorage.getItem(SIGNED_IN_FLAG) === '1'; } catch { return false; }
+}
 
 /** Requests that must never trigger a refresh: they are how you get a session. */
 export function isSessionlessAuthCall(url: string | undefined): boolean {
@@ -21,43 +49,35 @@ export function isSessionlessAuthCall(url: string | undefined): boolean {
 }
 
 export function clearStoredSession(): void {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
+  csrfToken = null;
+  try {
+    localStorage.removeItem(SIGNED_IN_FLAG);
+    localStorage.removeItem('user');
+  } catch { /* nothing stored */ }
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function refreshOnce(apiBase: string): Promise<string | null> {
-  const used = localStorage.getItem('refreshToken');
-  if (!used) return null;
+async function refreshOnce(apiBase: string): Promise<boolean> {
   try {
-    const res = await axios.post(`${apiBase}/auth/refresh`, { refreshToken: used });
-    localStorage.setItem('accessToken', res.data.accessToken);
-    localStorage.setItem('refreshToken', res.data.refreshToken);
-    return res.data.accessToken as string;
+    const res = await axios.post(`${apiBase}/auth/refresh`, {}, {
+      withCredentials: true,
+      headers: { 'X-Auth-Transport': 'cookie' },
+    });
+    rememberCsrfToken(res.data?.csrfToken);
+    return true;
   } catch (e: any) {
+    // Another tab refreshed a moment ago; its answer set the new cookies.
     if (e?.response?.status === 409) {
-      // Another tab refreshed with the same token a moment ago and has stored
-      // (or is about to store) the new pair. Use what it stored.
-      for (let i = 0; i < 10; i++) {
-        await wait(150);
-        const now = localStorage.getItem('refreshToken');
-        if (now && now !== used) return localStorage.getItem('accessToken');
-      }
+      await wait(200);
+      return true;
     }
-    return null;
+    return false;
   }
 }
 
-/**
- * Returns a usable access token after a 401, or null when the session has
- * ended. `failedWith` is the token the failed request carried: if another
- * tab has already replaced it, that replacement is used without a refresh.
- */
-export async function recoverSession(apiBase: string, failedWith: string | null): Promise<string | null> {
-  const current = localStorage.getItem('accessToken');
-  if (current && failedWith && current !== failedWith) return current;
+/** After a 401: whether the session could be renewed, so the request is worth retrying. */
+export async function recoverSession(apiBase: string): Promise<boolean> {
   if (!inflight) {
     inflight = refreshOnce(apiBase).finally(() => { inflight = null; });
   }

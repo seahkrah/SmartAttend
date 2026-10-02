@@ -118,8 +118,9 @@ export const filesService = {
   /**
    * Fetches the bytes as a blob.
    *
-   * The download route needs the Authorization header, so a plain anchor
-   * pointing at it would come back 401. The bytes are fetched, handed to the
+   * The download goes through the API client, which sends the session and
+   * renews it when it has expired; a plain anchor pointing at the route would
+   * do neither. The bytes are fetched, handed to the
    * browser as an object URL, and the URL revoked afterwards — leaving them
    * un-revoked is a memory leak that grows with every download.
    */

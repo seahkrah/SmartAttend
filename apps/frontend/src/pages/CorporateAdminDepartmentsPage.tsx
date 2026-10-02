@@ -44,8 +44,7 @@ const CorporateAdminDepartmentsPage: React.FC = () => {
   const [error, setError] = useState('')
   const [form, setForm] = useState<DepartmentForm>({ name: '', description: '', head_id: '' })
 
-  const token = localStorage.getItem('accessToken')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = {}
 
   const fetchDepartments = async () => {
     try {

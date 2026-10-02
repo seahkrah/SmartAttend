@@ -1,7 +1,7 @@
 {
   "phase": "phase-1",
   "date": "2026-10-02",
-  "commit": "43046e5",
+  "commit": "ca92c90",
   "dirty": false,
   "environment": {
     "db": true,
@@ -9,11 +9,11 @@
     "e2e": true,
     "ci": false
   },
-  "e2e": "34 suites at 43046e5",
-  "composite": 5.7,
+  "e2e": "34 suites at ca92c90",
+  "composite": 5.5,
   "baselineComposite": 5.3,
   "referenceComposite": 8.7,
-  "audit": null,
+  "audit": "audit-phase-1.json",
   "auditNote": null,
   "dimensions": [
     {
@@ -24,9 +24,10 @@
       "baseline": 6.5,
       "reference": 9,
       "raw": 10,
-      "score": 8.5,
+      "score": 8.3,
       "caps": [
-        "attestation missing: pentest (max 8.5)"
+        "attestation missing: pentest (max 8.5)",
+        "independent audit scored 8.3"
       ],
       "missingAttestations": [
         "pentest"
@@ -44,9 +45,9 @@
           "id": "cross-tenant-triggers",
           "kind": "foundation",
           "weight": 10,
-          "title": "Database triggers refuse cross-tenant references (>= 20 guard_same_tenant uses)",
+          "title": "Every reference between tenant tables has a same-tenant guard (foreign keys bypass RLS)",
           "status": "pass",
-          "detail": "26 found"
+          "detail": "115 references guarded"
         },
         {
           "id": "scoped-helpers",
@@ -75,7 +76,7 @@
           "id": "rls-forced",
           "kind": "target",
           "weight": 8,
-          "title": "RLS enabled and FORCED, with a policy, on every table that has tenant_id",
+          "title": "RLS enabled and FORCED on every tenant table, with the tenant policy and no looser one",
           "status": "pass",
           "detail": "98 tenant tables"
         },
@@ -83,7 +84,7 @@
           "id": "runtime-role",
           "kind": "target",
           "weight": 6,
-          "title": "API connects as a non-owner, non-superuser NOBYPASSRLS role",
+          "title": "The running API connects as a non-owner, non-superuser, NOBYPASSRLS role outside jjelotech_system",
           "status": "pass",
           "detail": "jjelotech_api"
         },
@@ -99,7 +100,7 @@
           "id": "raw-query-lint",
           "kind": "target",
           "weight": 5,
-          "title": "Raw pool.query forbidden outside the tenant data-access helper",
+          "title": "Database access only through the tenant-bound pool: no own connections or session settings; runAsSystem and withTenant allow-listed (lint)",
           "status": "pass"
         },
         {
@@ -919,8 +920,8 @@
       "weight": 8,
       "baseline": 4,
       "reference": 9,
-      "raw": 4,
-      "score": 4,
+      "raw": 3,
+      "score": 3,
       "caps": [],
       "missingAttestations": [
         "slo-30d"
@@ -945,9 +946,9 @@
           "id": "image-boot-ci",
           "kind": "foundation",
           "weight": 10,
-          "title": "CI migrates and boots the production image",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "The production image migrates and boots in CI (job ran and passed)",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "metrics-stored",
@@ -1034,7 +1035,7 @@
           "weight": 4,
           "title": "Face engine is a separate service with its own tests",
           "status": "fail",
-          "detail": "exit 4294963238: npm error enoent This is related to npm not being able to find a file. | npm error enoent | npm error A complete log of this run can be found in: C:\\Users\\Cogito Seah Krah\\AppData\\Local\\npm-cache\\_logs\\2026-10-02T06_28_38_783Z-debug-0.log"
+          "detail": "exit 4294963238: npm error enoent This is related to npm not being able to find a file. | npm error enoent | npm error A complete log of this run can be found in: C:\\Users\\Cogito Seah Krah\\AppData\\Local\\npm-cache\\_logs\\2026-10-02T10_19_53_518Z-debug-0.log"
         }
       ]
     },
@@ -1045,8 +1046,8 @@
       "weight": 7,
       "baseline": 5.5,
       "reference": 8.5,
-      "raw": 7.4,
-      "score": 7.4,
+      "raw": 6.9,
+      "score": 6.9,
       "caps": [],
       "missingAttestations": [],
       "gates": [
@@ -1097,9 +1098,9 @@
           "id": "image-build",
           "kind": "foundation",
           "weight": 5,
-          "title": "Container images built in CI",
-          "status": "pass",
-          "detail": "1 found"
+          "title": "Container images built in CI (job ran and passed)",
+          "status": "not-run",
+          "detail": "needs a CI run (CI_NEEDS)"
         },
         {
           "id": "eslint",
@@ -1396,8 +1397,10 @@
       "baseline": 4,
       "reference": 8.5,
       "raw": 4,
-      "score": 4,
-      "caps": [],
+      "score": 3,
+      "caps": [
+        "independent audit scored 3"
+      ],
       "missingAttestations": [
         "soc2-iso"
       ],

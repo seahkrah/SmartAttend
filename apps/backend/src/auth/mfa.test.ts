@@ -80,11 +80,19 @@ describe('recovery codes', () => {
 })
 
 describe('policy', () => {
-  it('requires admins and superadmins in production by default, nobody elsewhere', () => {
-    expect([...requiredRoles({ NODE_ENV: 'production' } as any)].sort()).toEqual(['admin', 'superadmin'])
+  it('requires every privileged role outside local development and tests, and cannot be loosened there', () => {
+    const privileged = ['admin', 'hr', 'hr_director', 'it', 'superadmin']
+    expect([...requiredRoles({ NODE_ENV: 'production' } as any)].sort()).toEqual(privileged)
+    // Staging, or an unset NODE_ENV, is not local: the same rule as production.
+    expect([...requiredRoles({ NODE_ENV: 'staging' } as any)].sort()).toEqual(privileged)
+    expect([...requiredRoles({} as any)].sort()).toEqual(privileged)
     expect(requiredRoles({ NODE_ENV: 'development' } as any).size).toBe(0)
-    expect([...requiredRoles({ NODE_ENV: 'production', MFA_REQUIRED_ROLES: 'superadmin' } as any)]).toEqual(['superadmin'])
-    expect(requiredRoles({ NODE_ENV: 'production', MFA_REQUIRED_ROLES: '' } as any).size).toBe(0)
+    expect(requiredRoles({ NODE_ENV: 'test' } as any).size).toBe(0)
+    expect([...requiredRoles({ NODE_ENV: 'development', MFA_REQUIRED_ROLES: 'admin' } as any)]).toEqual(['admin'])
+    // Outside local, the setting can add roles but never remove the privileged ones.
+    expect([...requiredRoles({ NODE_ENV: 'production', MFA_REQUIRED_ROLES: 'superadmin' } as any)].sort()).toEqual(privileged)
+    expect([...requiredRoles({ NODE_ENV: 'production', MFA_REQUIRED_ROLES: '' } as any)].sort()).toEqual(privileged)
+    expect(requiredRoles({ NODE_ENV: 'production', MFA_REQUIRED_ROLES: 'manager' } as any).has('manager')).toBe(true)
   })
 
   it('leaves only the setup paths open to someone who must set it up', () => {

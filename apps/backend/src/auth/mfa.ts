@@ -168,13 +168,25 @@ export function hashChallengeToken(token: string): string {
 // ---------------------------------------------------------------- policy
 
 /**
- * Roles that must use two-factor sign-in. MFA_REQUIRED_ROLES is a comma list
- * ('superadmin,admin'); unset, it is 'superadmin,admin' in production and
- * nobody elsewhere, so development and the test suites are not blocked.
+ * Roles with power over other people's accounts or data: platform staff,
+ * administrators, HR (salaries, contracts) and IT.
+ */
+export const PRIVILEGED_ROLES = ['superadmin', 'admin', 'hr_director', 'hr', 'it'] as const
+
+/** Local development and the test suites: the only places two-factor is optional. */
+export function isLocalEnvironment(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.NODE_ENV === 'development' || env.NODE_ENV === 'test'
+}
+
+/**
+ * Roles that must use two-factor sign-in. Everywhere but local development
+ * and tests (staging included), every privileged role does, and
+ * MFA_REQUIRED_ROLES (a comma list) can only add to them. Locally it is
+ * MFA_REQUIRED_ROLES alone, nobody by default, so the suites are not blocked.
  */
 export function requiredRoles(env: NodeJS.ProcessEnv = process.env): Set<string> {
-  const raw = env.MFA_REQUIRED_ROLES ?? (env.NODE_ENV === 'production' ? 'superadmin,admin' : '')
-  return new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))
+  const extra = (env.MFA_REQUIRED_ROLES ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  return new Set(isLocalEnvironment(env) ? extra : [...PRIVILEGED_ROLES, ...extra])
 }
 
 /** Paths a person who must set up two-factor may still reach to do it. */

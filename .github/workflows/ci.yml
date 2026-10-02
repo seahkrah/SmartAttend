@@ -121,6 +121,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_ci
       JWT_SECRET: ci-only-not-a-real-secret
+      # A test environment: two-factor is optional for privileged roles only
+      # in development and test (auth/mfa.ts), and the suites sign in as them.
+      NODE_ENV: test
       PORT: '5000'
       # Uploaded documents land here rather than in the checkout, so a build
       # that writes files does not leave them in the working tree.
@@ -393,6 +396,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_score
       JWT_SECRET: ci-only-not-a-real-secret
+      # A test environment: two-factor is optional for privileged roles only
+      # in development and test (auth/mfa.ts), and the suites sign in as them.
+      NODE_ENV: test
       CI_NEEDS: ${{ toJSON(needs) }}
 
     steps:

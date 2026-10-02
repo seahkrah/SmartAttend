@@ -1,10 +1,11 @@
 import React from 'react';
-import { LogIn, Lock, Mail } from 'lucide-react';
+import { Fingerprint, LogIn, Lock, Mail } from 'lucide-react';
 import { JjeloTechLogo } from '../components/BrandLogo';
 import { PasswordInput } from '../components/PasswordInput';
 import { useAuthStore } from '../store/authStore';
 import { Link, useNavigate } from 'react-router-dom';
 import { MfaCodeStep } from '../components/auth/MfaCodeStep';
+import { passkeysSupported } from '../services/passkeysService';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = React.useState('');
@@ -14,7 +15,7 @@ export const LoginPage: React.FC = () => {
   const [mfaToken, setMfaToken] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState('');
   const navigate = useNavigate();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, passkeySignIn, isLoading, error, clearError } = useAuthStore();
 
   // Route based on role after login
   const goHome = () => {
@@ -207,6 +208,18 @@ export const LoginPage: React.FC = () => {
               <LogIn className="w-4 h-4" />
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
+
+            {passkeysSupported() && (
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => void passkeySignIn().then(goHome, () => undefined)}
+                className="btn-secondary w-full justify-center inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                <Fingerprint className="w-4 h-4" aria-hidden />
+                Sign in with a passkey
+              </button>
+            )}
           </form>
           )}
         </div>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User } from '@jjelotech/types';
 import { apiClient } from '../services/api';
+import { passkeysService } from '../services/passkeysService';
 import { seemsSignedIn, clearStoredSession } from '../utils/sessionRefresh';
 import { getUserFriendlyError } from '../utils/errorMessages';
 import { useToastStore } from '../components/Toast';
@@ -18,6 +19,8 @@ interface AuthState {
   login: (email: string, password: string, platform: 'school' | 'corporate') => Promise<SignInStep>;
   superadminLogin: (email: string, password: string) => Promise<SignInStep>;
   verifyMfa: (mfaToken: string, answer: { code?: string; recoveryCode?: string }) => Promise<void>;
+  /** Signs in with a passkey the device offers. */
+  passkeySignIn: () => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   clearError: () => void;
@@ -133,6 +136,17 @@ export const useAuthStore = create<AuthState>((set) => {
       } catch (error: any) {
         set({ error: getUserFriendlyError(error), isLoading: false });
         throw error;
+      }
+    },
+
+    passkeySignIn: async () => {
+      set({ isLoading: true, error: null });
+      try {
+        signedIn(set, await passkeysService.signIn());
+      } catch (error: any) {
+        const cancelled = error?.name === 'NotAllowedError';
+        set({ error: cancelled ? null : getUserFriendlyError(error), isLoading: false });
+        if (!cancelled) throw error;
       }
     },
 

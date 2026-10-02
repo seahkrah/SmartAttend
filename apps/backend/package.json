@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@jjelotech/types": "file:../../packages/types",
+    "@simplewebauthn/server": "^14.0.3",
     "@tensorflow/tfjs-node": "^4.22.0",
     "@vladmandic/face-api": "^1.7.15",
     "axios": "^1.6.0",

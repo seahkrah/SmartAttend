@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import axiosClient from '../../utils/axiosClient';
 import { useStepUpStore } from '../../utils/stepUp';
+import { passkeysService, passkeysSupported } from '../../services/passkeysService';
 
 export const StepUpDialog: React.FC = () => {
   const open = useStepUpStore((s) => s.open);
@@ -34,6 +35,18 @@ export const StepUpDialog: React.FC = () => {
     } catch (err: any) {
       setError(err?.response?.data?.error || 'That did not work. Try again.');
       setValue('');
+      setBusy(false);
+    }
+  };
+
+  const withPasskey = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await passkeysService.stepUp();
+      close(true);
+    } catch (err: any) {
+      if (err?.name !== 'NotAllowedError') setError(err?.response?.data?.error || 'The passkey was not accepted.');
       setBusy(false);
     }
   };
@@ -69,6 +82,11 @@ export const StepUpDialog: React.FC = () => {
                   onClick={() => { setMode(mode === 'password' ? 'code' : 'password'); setValue(''); setError(''); }}>
             {mode === 'password' ? 'Use an authenticator code instead' : 'Use your password instead'}
           </button>
+          {passkeysSupported() && (
+            <button type="button" className="block text-sm text-blue-500 underline" onClick={() => void withPasskey()} disabled={busy}>
+              Use a passkey
+            </button>
+          )}
         </div>
         <div className="flex gap-2 p-6 border-t border-subtle bg-card">
           <button type="button" onClick={() => close(false)} disabled={busy}

@@ -179,5 +179,5 @@ export function requiredRoles(env: NodeJS.ProcessEnv = process.env): Set<string>
 
 /** Paths a person who must set up two-factor may still reach to do it. */
 export function allowedDuringSetup(path: string): boolean {
-  return /^\/api\/auth\/(me|logout|mfa(\/.*)?|sessions(\/.*)?|change-password)$/.test(path)
+  return /^\/api\/auth\/(me|logout|csrf|mfa(\/.*)?|passkeys(\/.*)?|sessions(\/.*)?|change-password)$/.test(path)
 }

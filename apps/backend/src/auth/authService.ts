@@ -6,6 +6,7 @@ import type { User } from '../types/database.js'
 import crypto from 'crypto'
 import { createSession } from './sessions.js'
 import { createChallenge, mfaEnabled, mfaSetupPending } from './mfaService.js'
+import { requiredRoles } from './mfa.js'
 
 // SECURITY: Never use hardcoded fallback secrets. Fail hard if not configured.
 function requireEnvSecret(key: string): string {
@@ -96,7 +97,7 @@ export const LOGIN_LOCK_MINUTES = 15
 export class LoginError extends Error {
   constructor(
     readonly code: 'invalid' | 'locked' | 'not_activated' | 'pending_approval' | 'inactive'
-      | 'no_tenant' | 'tenant_suspended' | 'platform_mismatch',
+      | 'no_tenant' | 'tenant_suspended' | 'platform_mismatch' | 'passkey_required',
     message: string,
     readonly extra: Record<string, unknown> = {}
   ) {
@@ -139,6 +140,70 @@ async function recordFailure(emailNorm: string, ip?: string | null) {
   // Keep the table small: nothing older than a day is ever consulted.
   if (Math.random() < 0.02) {
     await sys(`DELETE FROM auth_failed_logins WHERE attempted_at < CURRENT_TIMESTAMP - INTERVAL '1 day'`)
+  }
+}
+
+/** Records a finished sign-in on the account. */
+export async function recordSignIn(userId: string): Promise<void> {
+  await sys(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [userId])
+}
+
+/** An account as sign-in needs it (role, platform), without its password hash. */
+export async function accountForSignIn(userId: string): Promise<any | null> {
+  const r = await sys(
+    `SELECT u.*, r.permissions, r.name AS role_name, p.name AS platform_name
+       FROM users u
+       LEFT JOIN roles r ON u.role_id = r.id
+       LEFT JOIN platforms p ON u.platform_id = p.id
+      WHERE u.id = $1`,
+    [userId]
+  )
+  if (!r.rows.length) return null
+  const { password_hash: _hash, ...user } = r.rows[0]
+  return user
+}
+
+/**
+ * What must hold, beyond knowing a credential, for an account to sign in:
+ * set up, active (or waiting for approval, which is said), and, outside the
+ * platform staff, an active member of an active school or company. Shared by
+ * the password and the passkey sign-in.
+ */
+export async function assertMaySignIn(user: any, isPlatformSuperadmin: boolean): Promise<void> {
+  if (!user.activated_at) {
+    throw new LoginError('not_activated',
+      'This account has not been set up yet. Use the link in your invitation email to choose a password.')
+  }
+
+  if (!user.is_active) {
+    const pending = await sys(
+      `SELECT 1 FROM school_user_approvals WHERE user_id = $1 AND status = 'pending'
+       UNION ALL
+       SELECT 1 FROM corporate_user_approvals WHERE user_id = $1 AND status = 'pending'
+       LIMIT 1`,
+      [user.id]
+    )
+    if (pending.rows.length > 0) {
+      throw new LoginError('pending_approval', 'Your registration is waiting for an administrator to approve it.')
+    }
+    throw new LoginError('inactive', 'Your account has been suspended. Please contact your administrator.')
+  }
+
+  if (!isPlatformSuperadmin && (user.platform_name === 'school' || user.platform_name === 'corporate')) {
+    const t = await sys(
+      `SELECT m.tenant_name, t.is_active
+         FROM user_tenant_memberships m JOIN tenants t ON t.id = m.tenant_id
+        WHERE m.user_id = $1 AND m.platform_kind = $2 AND m.status = 'active'`,
+      [user.id, user.platform_name]
+    )
+    if (t.rows.length === 0) {
+      const what = user.platform_name === 'school' ? 'school' : 'company'
+      throw new LoginError('no_tenant', `You are not assigned to any ${what}. Please contact your administrator.`)
+    }
+    if (!t.rows.some((row: any) => row.is_active)) {
+      throw new LoginError('tenant_suspended',
+        `Your ${user.platform_name === 'school' ? 'school' : 'company'} (${t.rows[0].tenant_name}) has been suspended. Please contact support.`)
+    }
   }
 }
 
@@ -189,41 +254,7 @@ export async function loginUser(
     throw new LoginError('platform_mismatch', `PLATFORM_MISMATCH:${correctPlatform}`, { correctPlatform })
   }
 
-  if (!user.activated_at) {
-    throw new LoginError('not_activated',
-      'This account has not been set up yet. Use the link in your invitation email to choose a password.')
-  }
-
-  if (!user.is_active) {
-    const pending = await sys(
-      `SELECT 1 FROM school_user_approvals WHERE user_id = $1 AND status = 'pending'
-       UNION ALL
-       SELECT 1 FROM corporate_user_approvals WHERE user_id = $1 AND status = 'pending'
-       LIMIT 1`,
-      [user.id]
-    )
-    if (pending.rows.length > 0) {
-      throw new LoginError('pending_approval', 'Your registration is waiting for an administrator to approve it.')
-    }
-    throw new LoginError('inactive', 'Your account has been suspended. Please contact your administrator.')
-  }
-
-  if (!isPlatformSuperadmin && (user.platform_name === 'school' || user.platform_name === 'corporate')) {
-    const t = await sys(
-      `SELECT m.tenant_name, t.is_active
-         FROM user_tenant_memberships m JOIN tenants t ON t.id = m.tenant_id
-        WHERE m.user_id = $1 AND m.platform_kind = $2 AND m.status = 'active'`,
-      [user.id, user.platform_name]
-    )
-    if (t.rows.length === 0) {
-      const what = user.platform_name === 'school' ? 'school' : 'company'
-      throw new LoginError('no_tenant', `You are not assigned to any ${what}. Please contact your administrator.`)
-    }
-    if (!t.rows.some((row: any) => row.is_active)) {
-      throw new LoginError('tenant_suspended',
-        `Your ${user.platform_name === 'school' ? 'school' : 'company'} (${t.rows[0].tenant_name}) has been suspended. Please contact support.`)
-    }
-  }
+  await assertMaySignIn(user, isPlatformSuperadmin)
 
   const { password_hash, ...safeUser } = user
 
@@ -232,6 +263,14 @@ export async function loginUser(
   // once the code is right, so wrong codes accumulate against it.
   if (await mfaEnabled(user.id)) {
     return { user: safeUser, mfaRequired: true, mfaToken: await createChallenge(user.id, meta.ip) }
+  }
+  // A role that must use two factors, whose only second factor is a passkey:
+  // the password alone is one factor, so the passkey is the way in.
+  if (requiredRoles().has(user.role_name)) {
+    const pk = await sys(`SELECT 1 FROM webauthn_credentials WHERE user_id = $1 LIMIT 1`, [user.id])
+    if (pk.rows.length > 0) {
+      throw new LoginError('passkey_required', 'Your role needs two factors to sign in: use your passkey.')
+    }
   }
 
   await sys(`DELETE FROM auth_failed_logins WHERE email_norm = $1`, [emailNorm])

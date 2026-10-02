@@ -32,7 +32,9 @@ export async function mfaSetupPending(userId: string, roleId: string): Promise<b
   if (roles.size === 0) return false
   const r = await sys(
     `SELECT r.name,
-            EXISTS (SELECT 1 FROM user_mfa m WHERE m.user_id = $1 AND m.enabled_at IS NOT NULL) AS enabled
+            EXISTS (SELECT 1 FROM user_mfa m WHERE m.user_id = $1 AND m.enabled_at IS NOT NULL)
+              -- A passkey (user verification required) is two factors on its own.
+              OR EXISTS (SELECT 1 FROM webauthn_credentials w WHERE w.user_id = $1) AS enabled
        FROM roles r WHERE r.id = $2`,
     [userId, roleId]
   )

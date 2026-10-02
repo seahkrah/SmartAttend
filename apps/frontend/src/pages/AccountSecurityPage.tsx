@@ -9,6 +9,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Check, Copy, Download, KeyRound, ShieldAlert, ShieldCheck, ShieldOff } from 'lucide-react';
 import { ErrorState, LoadingState } from '../components/states/PageStates';
 import { mfaService, type MfaStatus, type Reauth } from '../services/mfaService';
+import { PasskeysSection } from '../components/auth/PasskeysSection';
 
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
@@ -303,6 +304,8 @@ export const AccountSecurityPage: React.FC = () => {
           )}
         </section>
       )}
+
+      {mode === 'view' && <PasskeysSection />}
 
       {mode === 'view' && (
         <section className="card flex items-center justify-between gap-4" aria-labelledby="pw-heading">

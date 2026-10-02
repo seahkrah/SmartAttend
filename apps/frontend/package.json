@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@jjelotech/types": "file:../../packages/types",
+    "@simplewebauthn/browser": "^14.0.0",
     "axios": "^1.6.0",
     "framer-motion": "^10.16.0",
     "lucide-react": "^0.263.1",

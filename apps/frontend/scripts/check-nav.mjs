@@ -98,6 +98,7 @@ const UNLISTED = new Map([
   ['/forgot-password', 'reached from the sign-in page, before there is a menu'],
   ['/reset-password', 'reached from the link in a password-reset email'],
   ['/activate', 'reached from the link in an account invitation'],
+  ['/sso/complete', 'where an identity provider sends the browser back after single sign-on'],
   ['/unauthorized', 'an error destination, not a place to go'],
   ['/dashboard', 'the legacy post-sign-in landing; each audience has its own home'],
   ['/admin', 'legacy tenant panel, superseded by /admin/school and /admin/corporate'],

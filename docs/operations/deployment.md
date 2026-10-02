@@ -49,9 +49,11 @@ certificate checked, against `DATABASE_SSL_CA` for a private CA. Use
 as in the compose file. There is no setting that encrypts without checking the
 certificate.
 
-Two-factor sign-in is required for superadmins and administrators in
-production (`MFA_REQUIRED_ROLES`, default `superadmin,admin`). Each of them sets
-it up on first sign-in. Set `MFA_ENCRYPTION_KEY` (`openssl rand -base64 32`)
+Two-factor sign-in (an authenticator app or a passkey) is required for every
+privileged role (superadmin, admin, hr_director, hr, it) everywhere but
+`NODE_ENV=development` or `test`, staging included. `MFA_REQUIRED_ROLES` can
+add roles to that list, never remove them. Each person sets it up on first
+sign-in. Set `MFA_ENCRYPTION_KEY` (`openssl rand -base64 32`)
 before anyone enrols, and keep it with the other secrets: losing it means
 everyone sets up two-factor again. `DATABASE_POOL_MAX` (default 20) should be
 the database's `max_connections` divided by the number of API replicas.
@@ -68,6 +70,51 @@ Either of:
 
 Then create tenants and appoint their administrators from the control plane.
 Administrators receive invitation links, or you hand the links over.
+
+### Sessions, cookies and sign-in
+
+The browser app keeps its session in two `httpOnly`, `SameSite=Strict`
+cookies set by the API (`src/auth/cookies.ts`), and sends a CSRF token with
+every state-changing request. For the browser to send those cookies, **the
+app and the API must be on the same site**: one registrable domain, such as
+`app.school.lr` and `api.school.lr`. Two unrelated domains will not work.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `CORS_ORIGINS` | none in production | The app's origin(s). Also the origins whose cookie-authenticated writes are accepted, and the passkey origins unless `WEBAUTHN_ORIGINS` is set. |
+| `CSRF_SECRET` | `JWT_SECRET` | Key of the CSRF token (an HMAC of the session id). Set its own value to rotate it apart from the access tokens. |
+| `COOKIE_SECURE` | on in production | Cookies sent over HTTPS only. Cannot be turned off in production. |
+| `STEP_UP_MAX_AGE_SECONDS` | `300` | How recent a sign-in or step-up must be for sensitive actions. |
+| `PASSWORD_BREACH_CHECK` | `range` in production | `off` stops the Pwned Passwords range lookup (only five hex characters of a SHA-1 leave the server). `PASSWORD_BREACH_RANGE_URL` points it at a mirror. |
+| `RATE_LIMIT_SHARED_API` | `false` | Also count the general per-address limit in PostgreSQL. The sign-in, refresh, account and two-factor limits always are. |
+| `WEBAUTHN_RP_ID` | host of `PUBLIC_APP_URL` | The passkey relying party. Changing it later makes existing passkeys unusable. |
+| `API_PUBLIC_URL` | `http://localhost:$PORT` | The API's public address: single sign-on's redirect and SAML endpoints are built from it. |
+
+Single sign-on is configured per tenant by its administrators
+(`/api/admin/sso`): an OpenID Connect provider by issuer, client id and
+secret (register `<API_PUBLIC_URL>/api/auth/sso/oidc/callback` as its
+redirect URI), or a SAML provider by entity id, sign-in URL and signing
+certificate (give it `<API_PUBLIC_URL>/api/auth/sso/saml/metadata`). The
+client secret, and every audit-stream secret, is sealed under the tenant's
+data key, so both need the KMS (see "Encryption keys"). Addresses a tenant
+chooses (an identity provider, an audit collector) must be public HTTPS;
+`OUTBOUND_ALLOW_HTTP` and `OUTBOUND_ALLOW_PRIVATE` exist for test
+environments only.
+
+### The audit trail
+
+Each tenant's audit rows form a hash chain (migration 079). Check it with
+
+```bash
+node dist/scripts/verifyAuditChain.js --checkpoint /secure/audit-checkpoint.json
+```
+
+(`npm run audit:verify` from a checkout). It exits 1 and names every break.
+Run it on a schedule, and keep the checkpoint file where the database's
+owner cannot write: it is what shows the end of a chain cut off and the head
+rewound. Tenants can also stream their trail to a collector of their own
+(`/api/audit/streams`); `AUDIT_STREAM_INTERVAL_MS` (5 s) and
+`AUDIT_STREAM_RETRY_BASE_MS` (5 s) pace delivery.
 
 ## Health
 
@@ -228,9 +275,11 @@ docker build --secret id=ca,src=/path/to/ca.pem -f apps/backend/Dockerfile -t jj
 - No platform metrics exporter (Prometheus or OpenTelemetry) and no alerting.
   Per-tenant operational figures are at `/api/metrics`, for tenant
   administrators only.
-- API rate limits and the notification dispatcher run per process. Running
-  more than one API replica needs a shared rate-limit store, and the
-  dispatcher enabled on exactly one replica.
+- The notification dispatcher and the audit-stream dispatcher run in every
+  API process. With more than one replica, enable the notification dispatcher
+  on exactly one; the audit-stream dispatcher may run on several but then
+  delivers some batches twice (collectors drop repeats by `chainSeq`).
+- Nothing schedules `verifyAuditChain` yet.
 - Uploaded files use the local-disk backend (a volume). An object store is
   not implemented.
 - No staging environment, blue/green deploy or load test has been set up.

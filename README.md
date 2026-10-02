@@ -139,25 +139,41 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
 - A grade school has grades, classes and subjects but not yet a class
   register, report cards or promotion. There is no second currency (LRD), no offline
   mode and no printed receipt. These come first in the roadmap.
-- No passkeys (WebAuthn) and no single sign-on. Two-factor is
-  authenticator-app codes.
-- Tokens are held in `localStorage`, not `httpOnly` cookies.
+- Sign-in: passwords (checked against breached-password lists when the
+  range service is configured), TOTP two-factor, passkeys (WebAuthn), and
+  single sign-on per tenant through OpenID Connect or SAML 2.0. The browser
+  holds its session in `httpOnly`, `SameSite=Strict` cookies with a CSRF
+  token, never a token in `localStorage`. Two-factor is required for every
+  privileged role outside local development. Sensitive actions need a
+  sign-in or step-up from the last five minutes. Single sign-on has been
+  tested against a provider the test suite runs, not yet against a real
+  Google Workspace, Entra ID or SAML tenant, and there is no admin screen
+  for configuring providers yet (the API is there). Signing in never
+  creates an account: there is no SCIM or just-in-time provisioning.
+- The app and the API must share a registrable domain (for example
+  `app.school.lr` and `api.school.lr`) for the session cookies to be sent;
+  see [docs/operations/deployment.md](docs/operations/deployment.md).
 - Tenant isolation is enforced in layers: in application code; by
-  PostgreSQL row-level security on every table that carries `tenant_id`
-  (the API connects as a role that cannot bypass it; see
+  PostgreSQL row-level security on every table that carries `tenant_id`, and
+  on accounts, memberships, sessions, credentials and every other table that
+  names an account (the API connects as a role that cannot bypass it and
+  cannot read password hashes; see
   [docs/operations/deployment.md](docs/operations/deployment.md),
   "Database roles"); by triggers on cross-tenant references; by tenant
   checks on stored-file keys; and by per-tenant keys for face templates.
   A fuzzer calls every route as one tenant with another's ids. Superadmin
   access to a tenant's data needs a time-boxed break-glass grant that the
-  tenant can see. Still outside it: tables with no `tenant_id`, scoped in
-  application code only. The most important are `users` (including password
-  hashes), memberships and sessions, which code running as the runtime role
-  can read across tenants; fixing that is the first item of the next phase.
-  Incidents and other control-plane records are in the same position. Per-tenant
-  keys protect face templates only (documents and other personal data
-  come later). Templates sealed before per-tenant keys are not yet
-  re-encrypted under them.
+  tenant can see. Per-tenant keys protect face templates, audit-stream and
+  SSO secrets only (documents and other personal data come later).
+  Templates sealed before per-tenant keys are not yet re-encrypted under
+  them.
+- The audit trail is a hash chain per tenant, verified by
+  `npm run audit:verify` and exportable and streamable to the tenant's own
+  collector. Nothing yet runs the verifier on a schedule; that, and keeping
+  its checkpoint out of the database owner's reach, is an operations task.
+- Rate limits that guard credentials are shared across API replicas (in
+  PostgreSQL); the general per-address flood limit is still per process
+  unless `RATE_LIMIT_SHARED_API=true`.
 - The web app has no automated tests. Prettier is configured but applied only
   to `scripts/` so far.
 - The credentials once committed are still in git history until the purge in

@@ -177,8 +177,14 @@ async function main() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: hasBody ? JSON.stringify(variant === 'body' ? ids : {}) : undefined,
         signal: AbortSignal.timeout(30_000),
+        // The API's own answer is what is judged. A redirect (single sign-on
+        // sends the browser to a provider or back to the app) is compared by
+        // where it points, which goes into the body compared below.
+        redirect: 'manual',
       })
-      return { status: res.status, body: await res.text() }
+      const location = res.headers.get('location')
+      return { status: res.status, body: (location ? `Location: ${location}
+` : '') + (await res.text()) }
     } catch (e: any) {
       return { status: 0, body: String(e.message) }
     }

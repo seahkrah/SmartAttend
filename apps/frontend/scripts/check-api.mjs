@@ -21,17 +21,23 @@ const BACK = path.resolve(here, '..', '..', 'backend', 'src');
 
 // ---------------------------------------------------------------- backend
 const server = fs.readFileSync(path.join(BACK, 'server.ts'), 'utf8');
+// A default import names the file's `router`; a named import (a file with
+// more than one router, routes/sso.ts) names the router variable itself.
 const imports = new Map();
-for (const m of server.matchAll(/import\s+(\w+)\s+from\s+'\.\/routes\/([\w.]+)\.js'/g)) imports.set(m[1], m[2]);
+for (const m of server.matchAll(/import\s+(\w+)\s+from\s+'\.\/routes\/([\w.]+)\.js'/g)) imports.set(m[1], { file: m[2], v: 'router' });
+for (const m of server.matchAll(/import\s+\{([^}]+)\}\s+from\s+'\.\/routes\/([\w.]+)\.js'/g)) {
+  for (const name of m[1].split(',').map((x) => x.trim()).filter(Boolean)) imports.set(name, { file: m[2], v: name });
+}
 const mounts = [];
 for (const m of server.matchAll(/app\.use\(\s*'([^']+)'\s*,\s*(\w+)\s*\)/g)) {
-  if (imports.has(m[2])) mounts.push({ prefix: m[1], file: imports.get(m[2]) });
+  if (imports.has(m[2])) mounts.push({ prefix: m[1], ...imports.get(m[2]) });
 }
 
 const routes = [];
-for (const { prefix, file } of mounts) {
+for (const { prefix, file, v } of mounts) {
   const src = fs.readFileSync(path.join(BACK, 'routes', `${file}.ts`), 'utf8');
-  for (const m of src.matchAll(/router\.(get|post|put|patch|delete)\(\s*['`]([^'`]+)['`]/g)) {
+  const def = new RegExp(String.raw`\b${v}\.(get|post|put|patch|delete)\(\s*['` + '`' + String.raw`]([^'` + '`' + String.raw`]+)['` + '`' + ']', 'g');
+  for (const m of src.matchAll(def)) {
     routes.push({ method: m[1].toUpperCase(), path: (prefix + (m[2] === '/' ? '' : m[2])).replace(/\/$/, '') || '/', file });
   }
 }

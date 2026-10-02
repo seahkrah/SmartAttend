@@ -93,13 +93,23 @@ SUITES=(
 
 record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }
 
+# In GitHub Actions, a failing suite also becomes an annotation naming its
+# first failures: annotations can be read without access to the job's log.
+annotate() {
+  [ -n "${GITHUB_ACTIONS:-}" ] || return 0
+  local lines
+  lines=$(grep -E "FAIL|Error|Traceback" "$2" | head -8 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+  echo "::error title=e2e suite $1 failed::${lines:-no FAIL lines; see the log}"
+}
+
 fail=0
 for suite in "${SUITES[@]}"; do
   echo "=== $suite ==="
-  if python3 "src/tests/${suite}.e2e.py"; then
+  if python3 "src/tests/${suite}.e2e.py" 2>&1 | tee "$E2E_FIXTURE_DIR/${suite}.log"; then
     record "$suite" pass
   else
     record "$suite" fail
+    annotate "$suite" "$E2E_FIXTURE_DIR/${suite}.log"
     fail=1
   fi
 done
@@ -131,6 +141,7 @@ for suite in "${TS_SUITES[@]}"; do
   else
     record "$suite" fail
     grep -E "FAIL|Error" "$E2E_FIXTURE_DIR/${suite}.log" | head -20
+    annotate "$suite" "$E2E_FIXTURE_DIR/${suite}.log"
     fail=1
   fi
   tail -1 "$E2E_FIXTURE_DIR/${suite}.log"

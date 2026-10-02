@@ -1054,6 +1054,16 @@
   },
   {
     "method": "POST",
+    "path": "/api/auth/sso/saml/acs",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/saml/metadata",
+    "params": []
+  },
+  {
+    "method": "POST",
     "path": "/api/auth/step-up",
     "params": []
   },

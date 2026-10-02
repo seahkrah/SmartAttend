@@ -20,6 +20,8 @@ import { runAsSystem } from '../../db/dbContext.js'
 import { openForTenant, sealForTenant } from '../../security/kms/dataKeys.js'
 import { hashToken } from '../sessions.js'
 import { authorizeUrl, discover, exchangeAndVerify, newSignInSecrets, OidcError } from './oidc.js'
+import { normaliseIdpCertificate, samlAuthorizeUrl, SamlError, samlVerify } from './saml.js'
+import { checkOutboundUrl } from '../../security/outbound.js'
 
 function sys(text: string, params?: any[]) {
   return runAsSystem('identity: single sign-on before anyone is known', () => query(text, params))
@@ -73,6 +75,32 @@ export async function createOidcProvider(runner: Runner, o: {
   return r.rows[0]
 }
 
+export async function createSamlProvider(runner: Runner, o: {
+  tenantId: string; name: unknown; entityId: unknown; ssoUrl: unknown; certificate: unknown
+  emailDomains?: unknown; trustIdpMfa?: unknown; createdBy: string
+}) {
+  const name = String(o.name ?? '').trim().slice(0, 80)
+  const entityId = String(o.entityId ?? '').trim()
+  if (!name || !entityId) throw new SsoError('invalid', "Give a name and the identity provider's entity id")
+  let ssoUrl: string
+  let cert: string
+  try {
+    // The browser is sent there, not the server; still, only to a public HTTPS address.
+    ssoUrl = (await checkOutboundUrl(o.ssoUrl)).toString()
+    cert = normaliseIdpCertificate(o.certificate)
+  } catch (e) {
+    throw new SsoError('invalid', e instanceof Error ? e.message : String(e))
+  }
+  const r = await runner.query(
+    `INSERT INTO tenant_sso_providers (tenant_id, kind, name, idp_entity_id, idp_sso_url, idp_certificate, email_domains,
+       trust_idp_mfa, created_by)
+     VALUES ($1, 'saml', $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, kind, name, idp_entity_id, email_domains, trust_idp_mfa, enabled, created_at`,
+    [o.tenantId, name, entityId, ssoUrl, cert, domainsOf(o.emailDomains), o.trustIdpMfa === true, o.createdBy]
+  )
+  return r.rows[0]
+}
+
 // ── Signing in (before anyone is known: the system pool) ─────────────────────
 
 /** The enabled providers of a tenant, by its public code, for the sign-in page. */
@@ -94,8 +122,17 @@ export async function startSignIn(providerId: string): Promise<string> {
   )
   const p = r.rows[0]
   if (!p) throw new SsoError('unknown_provider', 'This sign-in option is not available')
-  if (p.kind !== 'oidc') throw new SsoError('unsupported', 'This provider type is not supported')
   const s = newSignInSecrets()
+  if (p.kind === 'saml') {
+    // The state travels as RelayState; the AuthnRequest's id is kept with it.
+    const { url, requestId } = await samlAuthorizeUrl(p, apiPublicUrl(), s.state)
+    await sys(
+      `INSERT INTO sso_sign_ins (provider_id, state_hash, nonce, expires_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP + ($4 || ' minutes')::interval)`,
+      [p.id, hashToken(s.state), requestId, String(SIGN_IN_TTL_MINUTES)]
+    )
+    return url
+  }
   await sys(
     `INSERT INTO sso_sign_ins (provider_id, state_hash, nonce, code_verifier, expires_at)
      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP + ($5 || ' minutes')::interval)`,
@@ -153,13 +190,41 @@ export async function finishOidc(state: unknown, code: unknown): Promise<string>
   }
   const userId = await matchAccount(p, who.email, who.emailVerified)
   const mfaDone = p.trust_idp_mfa && who.amr.some((m) => ['mfa', 'otp', 'hwk', 'swk', 'fpt', 'face'].includes(m))
+  return handoffFor(userId, p.id, mfaDone)
+}
+
+async function handoffFor(userId: string, providerId: string, mfaDone: boolean): Promise<string> {
   const handoff = crypto.randomBytes(32).toString('base64url')
   await sys(
     `INSERT INTO sso_handoffs (code_hash, user_id, provider_id, mfa_done, expires_at)
      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP + ($5 || ' seconds')::interval)`,
-    [hashToken(handoff), userId, p.id, mfaDone, String(HANDOFF_TTL_SECONDS)]
+    [hashToken(handoff), userId, providerId, mfaDone, String(HANDOFF_TTL_SECONDS)]
   )
   return handoff
+}
+
+/** Finishes a SAML sign-in from the posted SAMLResponse and RelayState. */
+export async function finishSaml(relayState: unknown, samlResponse: unknown): Promise<string> {
+  if (typeof relayState !== 'string' || relayState.length > 200) throw new SsoError('invalid', 'The sign-in answer was malformed')
+  const s = await sys(
+    `UPDATE sso_sign_ins SET used_at = CURRENT_TIMESTAMP
+      WHERE state_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+      RETURNING provider_id, nonce`,
+    [hashToken(relayState)]
+  )
+  if (!s.rows.length) throw new SsoError('expired', 'This sign-in has expired or was already used. Start again.')
+  const p = (await sys(`SELECT * FROM tenant_sso_providers WHERE id = $1 AND enabled AND kind = 'saml'`, [s.rows[0].provider_id])).rows[0]
+  if (!p) throw new SsoError('unknown_provider', 'This sign-in option is no longer available')
+  let who
+  try {
+    who = await samlVerify(p, apiPublicUrl(), s.rows[0].nonce, samlResponse)
+  } catch (e) {
+    throw new SsoError('provider_refused', e instanceof SamlError ? e.message : "The identity provider's answer could not be checked")
+  }
+  // A signed assertion from the tenant's own identity provider vouches for
+  // the address; there is no separate "verified" flag in SAML.
+  const userId = await matchAccount(p, who.email, true)
+  return handoffFor(userId, p.id, false)
 }
 
 /** Trades the one-time code for whose sign-in it was. Works once, within a minute. */

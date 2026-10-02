@@ -4,12 +4,14 @@
  * Public, at /api/auth/sso:
  *   GET  /providers?tenant=CODE   the sign-in options a school or company offers
  *   GET  /:providerId/start       sends the browser to the provider
- *   GET  /oidc/callback           the provider sends it back here
+ *   GET  /oidc/callback           an OpenID Connect provider sends it back here
+ *   POST /saml/acs                a SAML provider posts its answer here
+ *   GET  /saml/metadata           this service provider, for the IdP's configuration
  *   POST /complete { code }       the app trades its one-time code for a session
  *
  * For a tenant's administrators, at /api/admin/sso:
  *   GET    /           the tenant's providers (never their secrets)
- *   POST   /           add an OpenID Connect provider (step-up)
+ *   POST   /           add an OpenID Connect or SAML provider (step-up)
  *   PATCH  /:id        enable or disable one
  *   DELETE /:id        remove one (step-up)
  */
@@ -22,7 +24,10 @@ import { accountForSignIn, assertMaySignIn, issueTokens, LoginError, recordSignI
 import { createChallenge, mfaEnabled } from '../auth/mfaService.js'
 import { deliverTokens } from '../auth/cookies.js'
 import { appUrl } from '../auth/accountTokens.js'
-import { createOidcProvider, finishOidc, providersForTenantCode, SsoError, spendHandoff, startSignIn } from '../auth/sso/service.js'
+import {
+  apiPublicUrl, createOidcProvider, createSamlProvider, finishOidc, finishSaml, providersForTenantCode, SsoError, spendHandoff, startSignIn,
+} from '../auth/sso/service.js'
+import { samlAcsUrl, samlEntityId } from '../auth/sso/saml.js'
 import { loginLimiter } from '../security/httpSecurity.js'
 import { KmsError } from '../security/kms/index.js'
 import { logAudit } from '../services/domainAuditService.js'
@@ -43,7 +48,10 @@ ssoRouter.get('/providers', loginLimiter, async (req: Request, res: Response) =>
 })
 
 /** Back to the app's sign-in page, saying why, in a word the page knows. */
-function backToLogin(res: Response, code: string) {
+function backToLogin(res: Response, code: string, error?: unknown) {
+  // Why a provider's answer was refused helps whoever configures it; the
+  // message names the check, never a token or an assertion.
+  if (code === 'provider_refused' && error instanceof Error) console.warn('[SSO] refused:', error.message)
   return res.redirect(302, `${appUrl()}/login?sso_error=${encodeURIComponent(code)}`)
 }
 
@@ -66,10 +74,33 @@ ssoRouter.get('/oidc/callback', loginLimiter, async (req: Request, res: Response
     // In the fragment: it reaches the app's script, and no server's log.
     return res.redirect(302, `${appUrl()}/sso/complete#code=${encodeURIComponent(code)}`)
   } catch (error) {
-    if (error instanceof SsoError) return backToLogin(res, error.code)
+    if (error instanceof SsoError) return backToLogin(res, error.code, error)
     logError('SSO callback', error)
     return backToLogin(res, 'error')
   }
+})
+
+ssoRouter.post('/saml/acs', loginLimiter, async (req: Request, res: Response) => {
+  try {
+    const code = await finishSaml(req.body?.RelayState, req.body?.SAMLResponse)
+    return res.redirect(302, `${appUrl()}/sso/complete#code=${encodeURIComponent(code)}`)
+  } catch (error) {
+    if (error instanceof SsoError) return backToLogin(res, error.code, error)
+    logError('SAML ACS', error)
+    return backToLogin(res, 'error')
+  }
+})
+
+/** What an identity provider's administrator needs to register this service. */
+ssoRouter.get('/saml/metadata', (_req: Request, res: Response) => {
+  const api = apiPublicUrl()
+  res.type('application/samlmetadata+xml').send(`<?xml version="1.0"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="${samlEntityId(api)}">
+  <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol" WantAssertionsSigned="true">
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="${samlAcsUrl(api)}" index="1"/>
+  </md:SPSSODescriptor>
+</md:EntityDescriptor>`)
 })
 
 ssoRouter.post('/complete', loginLimiter, async (req: Request, res: Response) => {
@@ -107,30 +138,38 @@ ssoAdminRouter.use(authenticateToken, resolveTenantContext, requireTenant, requi
 
 ssoAdminRouter.get('/', async (req: TenantRequest, res: Response) => {
   const r = await query(
-    `SELECT id, kind, name, issuer, client_id, email_domains, trust_idp_mfa, enabled, created_at
+    `SELECT id, kind, name, issuer, client_id, idp_entity_id, idp_sso_url, email_domains, trust_idp_mfa, enabled, created_at
        FROM tenant_sso_providers WHERE tenant_id = $1 ORDER BY created_at`,
     [req.ctx!.tenantId]
   )
+  const api = apiPublicUrl()
   return res.json({
     providers: r.rows,
-    redirectUri: `${process.env.API_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}`}/api/auth/sso/oidc/callback`,
+    // What to register at the provider.
+    oidcRedirectUri: `${api}/api/auth/sso/oidc/callback`,
+    saml: { entityId: samlEntityId(api), acsUrl: samlAcsUrl(api), metadataUrl: `${api}/api/auth/sso/saml/metadata` },
   })
 })
 
 ssoAdminRouter.post('/', requireRecentAuth, async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {
-    if (req.body?.kind && req.body.kind !== 'oidc') {
-      return res.status(400).json({ error: 'Only OpenID Connect providers can be added here' })
-    }
-    const p = await createOidcProvider({ query }, {
-      tenantId: ctx.tenantId!, name: req.body?.name, issuer: req.body?.issuer, clientId: req.body?.clientId,
-      clientSecret: req.body?.clientSecret, emailDomains: req.body?.emailDomains, trustIdpMfa: req.body?.trustIdpMfa,
-      createdBy: ctx.userId,
-    })
+    const kind = req.body?.kind ?? 'oidc'
+    if (kind !== 'oidc' && kind !== 'saml') return res.status(400).json({ error: 'kind is oidc or saml' })
+    const p = kind === 'saml'
+      ? await createSamlProvider({ query }, {
+          tenantId: ctx.tenantId!, name: req.body?.name, entityId: req.body?.entityId, ssoUrl: req.body?.ssoUrl,
+          certificate: req.body?.certificate, emailDomains: req.body?.emailDomains, trustIdpMfa: req.body?.trustIdpMfa,
+          createdBy: ctx.userId,
+        })
+      : await createOidcProvider({ query }, {
+          tenantId: ctx.tenantId!, name: req.body?.name, issuer: req.body?.issuer, clientId: req.body?.clientId,
+          clientSecret: req.body?.clientSecret, emailDomains: req.body?.emailDomains, trustIdpMfa: req.body?.trustIdpMfa,
+          createdBy: ctx.userId,
+        })
     await logAudit({ actorId: ctx.userId, actorRole: ctx.roleName, actionType: 'SSO_PROVIDER_ADDED', actionScope: 'TENANT',
       resourceType: 'sso_provider', resourceId: p.id, tenantId: ctx.tenantId!, ipAddress: getClientIp(req),
-      afterState: { name: p.name, issuer: p.issuer, emailDomains: p.email_domains, trustIdpMfa: p.trust_idp_mfa } })
+      afterState: { kind: p.kind, name: p.name, issuer: p.issuer ?? p.idp_entity_id, emailDomains: p.email_domains, trustIdpMfa: p.trust_idp_mfa } })
     return res.status(201).json({ provider: p })
   } catch (error) {
     if (error instanceof SsoError) return res.status(400).json({ error: error.message, code: error.code.toUpperCase() })

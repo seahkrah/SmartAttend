@@ -8,6 +8,11 @@
  * catch: another issuer or audience, a stale nonce, another key, no signature,
  * an expired token, an unverified or foreign address, someone else's school.
  *
+ * The second half does the same for SAML 2.0: this suite plays the identity
+ * provider, reads the AuthnRequest, and posts back assertions it signs with
+ * xml-crypto, good and bad (another key, unsigned, edited after signing,
+ * for another audience or request, expired, from another issuer).
+ *
  * Suite "sso" in scripts/run-all-e2e.sh. Needs the e2e seed, the API, a KMS
  * (KMS_LOCAL_KEK) for the client secret, and OUTBOUND_ALLOW_HTTP/PRIVATE.
  */
@@ -17,6 +22,8 @@ import http from 'http'
 import type { AddressInfo } from 'net'
 import path from 'path'
 import jwt from 'jsonwebtoken'
+import zlib from 'zlib'
+import { SignedXml } from 'xml-crypto'
 
 const API = (process.env.API_BASE ?? 'http://127.0.0.1:5000') + '/api'
 const dir = process.env.E2E_FIXTURE_DIR ?? path.join(process.cwd(), '.e2e-fixtures')
@@ -186,7 +193,118 @@ async function main() {
   check('and removed', r.status === 200, `(${r.status})`)
 }
 
+// ── SAML ────────────────────────────────────────────────────────────────────
+const SAML_IDP = 'https://idp.e2e.test/saml'
+const samlKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+const pem = (k: crypto.KeyObject, type: 'spki' | 'pkcs8') => k.export({ type, format: 'pem' }).toString()
+
+type SamlMode = {
+  email?: string; key?: 'rogue'; unsigned?: boolean; editAfterSigning?: string; audience?: string
+  inResponseTo?: string; expired?: boolean; issuer?: string
+}
+
+function samlResponse(req: { id: string; acs: string; sp: string }, m: SamlMode): string {
+  const now = new Date()
+  const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+  const later = new Date(now.getTime() + (m.expired ? -10 * 60_000 : 5 * 60_000))
+  const before = new Date(now.getTime() - (m.expired ? 20 * 60_000 : 60_000))
+  const irt = m.inResponseTo ?? req.id
+  const iss = m.issuer ?? SAML_IDP
+  const email = m.email ?? 'fac.a@e2e.test'
+  const assertion =
+    `<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_a${crypto.randomBytes(8).toString('hex')}" Version="2.0" IssueInstant="${iso(now)}">` +
+    `<saml:Issuer>${iss}</saml:Issuer>` +
+    `<saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${email}</saml:NameID>` +
+    `<saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData NotOnOrAfter="${iso(later)}" Recipient="${req.acs}" InResponseTo="${irt}"/></saml:SubjectConfirmation></saml:Subject>` +
+    `<saml:Conditions NotBefore="${iso(before)}" NotOnOrAfter="${iso(later)}"><saml:AudienceRestriction><saml:Audience>${m.audience ?? req.sp}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
+    `<saml:AuthnStatement AuthnInstant="${iso(now)}" SessionIndex="_s1"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>` +
+    `</saml:Assertion>`
+  let signed = assertion
+  if (!m.unsigned) {
+    const sig = new SignedXml({
+      privateKey: pem(m.key === 'rogue' ? rogue.privateKey : samlKey.privateKey, 'pkcs8'),
+      canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#',
+      signatureAlgorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+    })
+    sig.addReference({
+      xpath: "//*[local-name(.)='Assertion']",
+      transforms: ['http://www.w3.org/2000/09/xmldsig#enveloped-signature', 'http://www.w3.org/2001/10/xml-exc-c14n#'],
+      digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
+    })
+    sig.computeSignature(assertion, { location: { reference: "//*[local-name(.)='Issuer']", action: 'after' } })
+    signed = sig.getSignedXml()
+  }
+  if (m.editAfterSigning) signed = signed.replace(email, m.editAfterSigning)
+  const xml =
+    `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_r${crypto.randomBytes(8).toString('hex')}" Version="2.0" IssueInstant="${iso(now)}" Destination="${req.acs}" InResponseTo="${irt}">` +
+    `<saml:Issuer>${iss}</saml:Issuer><samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>${signed}</samlp:Response>`
+  return Buffer.from(xml).toString('base64')
+}
+
+async function samlSignIn(providerId: string, m: SamlMode) {
+  const start = await api('GET', `/auth/sso/${providerId}/start`)
+  const u = new URL(start.location)
+  const request = zlib.inflateRawSync(Buffer.from(u.searchParams.get('SAMLRequest') ?? '', 'base64')).toString()
+  const id = /ID="([^"]+)"/.exec(request)?.[1] ?? ''
+  const acs = /AssertionConsumerServiceURL="([^"]+)"/.exec(request)?.[1] ?? ''
+  const sp = /<saml:Issuer[^>]*>([^<]+)</.exec(request)?.[1] ?? ''
+  const relay = u.searchParams.get('RelayState') ?? ''
+  const form = new URLSearchParams({ SAMLResponse: samlResponse({ id, acs, sp }, m), RelayState: relay })
+  const res = await fetch(API + '/auth/sso/saml/acs', {
+    method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form,
+  })
+  return { start, u, request, id, relay, form, location: res.headers.get('location') ?? '', status: res.status }
+}
+
+async function saml() {
+  console.log('-- SAML: a tenant administrator adds a provider --')
+  let r = await api('POST', '/admin/sso', {
+    kind: 'saml', name: 'School SAML', entityId: SAML_IDP, ssoUrl: `${issuer}/saml/sso`, certificate: 'not a certificate',
+  }, A.token)
+  check('a certificate that is not one is refused', r.status === 400, `(${r.status})`)
+  r = await api('POST', '/admin/sso', {
+    kind: 'saml', name: 'School SAML', entityId: SAML_IDP, ssoUrl: `${issuer}/saml/sso`,
+    certificate: pem(samlKey.publicKey, 'spki'), emailDomains: ['e2e.test'],
+  }, A.token)
+  check("A's administrator adds a SAML provider", r.status === 201 && r.body.provider?.kind === 'saml', `(${r.status} ${JSON.stringify(r.body)})`)
+  const pid: string = r.body.provider?.id
+  const meta = await fetch(API + '/auth/sso/saml/metadata').then((x) => x.text())
+  check('the service provider publishes its metadata', /AssertionConsumerService/.test(meta) && /WantAssertionsSigned="true"/.test(meta))
+
+  console.log('-- SAML: signing in --')
+  const ok = await samlSignIn(pid, {})
+  check('the browser is sent to the provider with an AuthnRequest and a RelayState',
+    ok.start.status === 302 && !!ok.id && ok.relay.length >= 40, ok.start.location.slice(0, 120))
+  check('a signed assertion brings it back with a one-time code', ok.status === 302 && !!handoffOf(ok.location), ok.location)
+  const done = await api('POST', '/auth/sso/complete', { code: handoffOf(ok.location) })
+  check('which becomes a session for the person named', done.status === 200 && done.body.user?.email === 'fac.a@e2e.test', `(${done.status})`)
+  const replay = await fetch(API + '/auth/sso/saml/acs', {
+    method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: ok.form,
+  })
+  check('the same answer posted again is refused', errorOf(replay.headers.get('location') ?? '') === 'expired', replay.headers.get('location') ?? '')
+
+  console.log('-- SAML: what the API must refuse --')
+  const other = await samlSignIn(pid, {})
+  const cases: Array<[string, SamlMode, string]> = [
+    ['an assertion signed by another key', { key: 'rogue' }, 'provider_refused'],
+    ['an unsigned assertion', { unsigned: true }, 'provider_refused'],
+    ["a signed assertion edited afterwards (to school A's administrator)", { editAfterSigning: 'admin.a@e2e.test' }, 'provider_refused'],
+    ['an assertion for another service provider', { audience: 'https://elsewhere.example/sp' }, 'provider_refused'],
+    ['an answer to another sign-in request', { inResponseTo: other.id }, 'provider_refused'],
+    ['an expired assertion', { expired: true }, 'provider_refused'],
+    ['an assertion from another issuer', { issuer: 'https://evil.example/idp' }, 'provider_refused'],
+    ["school B's administrator, through school A's provider", { email: 'admin.b@e2e.test' }, 'no_account'],
+    ['an address outside the allowed domains', { email: 'x@elsewhere.test' }, 'wrong_domain'],
+  ]
+  for (const [name, m, want] of cases) {
+    const x = await samlSignIn(pid, m)
+    check(`${name}: refused (${want})`, errorOf(x.location) === want && !handoffOf(x.location), x.location)
+  }
+  await api('DELETE', `/admin/sso/${pid}`, undefined, A.token)
+}
+
 main()
+  .then(saml)
   .catch((e) => { fail++; console.error(e) })
   .finally(() => {
     idp.close()

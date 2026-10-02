@@ -38,12 +38,15 @@ export interface ChainReport {
   problems: ChainProblem[]
 }
 
-/** The rows of one chain: a tenant's, or the platform's (tenantId null). */
-function scope(tenantId: string | null, from: number): { where: string; params: any[] } {
-  return tenantId
-    ? { where: 'tenant_id = $1 AND chain_seq > $2', params: [tenantId, from] }
-    : { where: 'tenant_id IS NULL AND chain_seq > $1', params: [from] }
-}
+// A chain is named by its key: the tenant's id, or NIL for the platform's.
+// COALESCE(tenant_id, NIL) is the expression the unique position index
+// (migration 079) is on, so every query below uses it, with the key bound.
+const IN_CHAIN = `COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid) = $1`
+const BATCH_SQL =
+  `SELECT chain_seq, prev_hash, row_hash, encode(digest(audit_row_canonical(a), 'sha256'), 'hex') AS recomputed
+     FROM audit_logs a WHERE ${IN_CHAIN} AND chain_seq > $2 ORDER BY chain_seq LIMIT ${BATCH}`
+const UNCHAINED_SQL = `SELECT count(*)::int AS n FROM audit_logs WHERE ${IN_CHAIN} AND chain_seq IS NULL`
+const AT_SQL = `SELECT row_hash FROM audit_logs WHERE ${IN_CHAIN} AND chain_seq = $2`
 
 export async function verifyChain(q: Runner, tenantId: string | null, maxProblems = 50): Promise<ChainReport> {
   const chain = tenantId ?? NIL
@@ -55,12 +58,7 @@ export async function verifyChain(q: Runner, tenantId: string | null, maxProblem
   let rows = 0
   let last: ChainReport['last'] = null
   for (;;) {
-    const s = scope(tenantId, last?.seq ?? 0)
-    const r = await q.query(
-      `SELECT chain_seq, prev_hash, row_hash, encode(digest(audit_row_canonical(a), 'sha256'), 'hex') AS recomputed
-         FROM audit_logs a WHERE ${s.where} ORDER BY chain_seq LIMIT ${BATCH}`,
-      s.params
-    )
+    const r = await q.query(BATCH_SQL, [chain, last?.seq ?? 0])
     for (const row of r.rows) {
       const seq = Number(row.chain_seq)
       if (seq !== expected) {
@@ -85,10 +83,7 @@ export async function verifyChain(q: Runner, tenantId: string | null, maxProblem
   }
   if (!head && lastSeen) add({ kind: 'head', seq: null, detail: 'the chain has rows but no head' })
 
-  const un = await q.query(
-    `SELECT count(*)::int AS n FROM audit_logs WHERE ${tenantId ? 'tenant_id = $1' : 'tenant_id IS NULL'} AND chain_seq IS NULL`,
-    tenantId ? [tenantId] : []
-  )
+  const un = await q.query(UNCHAINED_SQL, [chain])
   if (un.rows[0].n > 0) add({ kind: 'unchained', seq: null, detail: `${un.rows[0].n} rows were written outside the chain` })
 
   return { chain, ok: problems.length === 0, rows, head, last: lastSeen, problems }
@@ -100,10 +95,7 @@ export async function verifyChain(q: Runner, tenantId: string | null, maxProblem
  * rewritten, even if the chain is now consistent with itself.
  */
 export async function checkCheckpoint(q: Runner, tenantId: string | null, cp: { seq: number; hash: string }): Promise<ChainProblem | null> {
-  const r = await q.query(
-    `SELECT row_hash FROM audit_logs WHERE ${tenantId ? 'tenant_id = $1 AND chain_seq = $2' : 'tenant_id IS NULL AND chain_seq = $1'}`,
-    tenantId ? [tenantId, cp.seq] : [cp.seq]
-  )
+  const r = await q.query(AT_SQL, [tenantId ?? NIL, cp.seq])
   if (!r.rows.length) return { kind: 'head', seq: cp.seq, detail: `position ${cp.seq}, seen before, is gone (rows were removed from the end)` }
   if (r.rows[0].row_hash !== cp.hash) return { kind: 'content', seq: cp.seq, detail: `position ${cp.seq} is not the row seen before` }
   return null

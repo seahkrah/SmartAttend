@@ -19,17 +19,23 @@ export default defineConfig({
       // A floor, raised as tests are added; never lowered. It was "80" before,
       // at a level of the config Vitest ignores and with no coverage provider
       // installed, so nothing was ever enforced. Measured 2026-10-01: lines
-      // 4.11%, statements 4.2%, functions 6.07%, branches 3.92%. That is unit
-      // tests only: the e2e suites exercise the API from outside the process
-      // and are not counted here.
+      // 4.11%. 2026-10-02, with the tenancy, storage and KMS tests: lines
+      // 5.52%, statements 5.55%, functions 8.43%, branches 5.06%. That is
+      // unit tests only: the e2e suites exercise the API from outside the
+      // process and are not counted here.
       thresholds: {
-        lines: 4,
-        statements: 4,
-        functions: 6,
-        branches: 3.5,
+        lines: 5.5,
+        statements: 5.5,
+        functions: 8,
+        branches: 5,
       },
     },
     setupFiles: ['./src/tests/setup.ts'],
+    // Unit tests run as DATABASE_URL's role (the owner). Several read tenant
+    // tables with no tenant in context on purpose; as the runtime role, row-
+    // level security would show them nothing. RLS itself is tested as the
+    // runtime role by the rlsNoContext and blindWrite suites.
+    env: { APP_DATABASE_URL: '' },
     testTimeout: 30000,
   },
   resolve: {

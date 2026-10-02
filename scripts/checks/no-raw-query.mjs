@@ -49,8 +49,9 @@ const SYSTEM_ALLOWED = new Set([
   'apps/backend/src/services/metricsService.ts', // retention prunes every tenant
   'apps/backend/setup-superadmin.ts', // bootstrap, before any tenant exists
 ])
+// Tests anywhere: setting up and comparing across tenants is their job.
 const SYSTEM_ALLOWED_PREFIX = f =>
-  under(f, 'apps/backend/src/scripts/', 'apps/backend/src/tests/', 'apps/backend/test/')
+  under(f, 'apps/backend/src/scripts/', 'apps/backend/src/tests/', 'apps/backend/test/') || f.endsWith('.test.ts')
 
 const problems = []
 for (const f of files) {

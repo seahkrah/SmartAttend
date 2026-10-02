@@ -31,6 +31,9 @@ async function main() {
   await query(`DELETE FROM incidents WHERE affected_tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
   await query(`DELETE FROM audit_logs WHERE actor_id IN (SELECT id FROM users WHERE email LIKE '%@e2e.test')`)
+  // Entries a superadmin wrote into a test tenant's trail (break-glass) have
+  // neither a test user nor a test actor, but they name the tenant.
+  await query(`DELETE FROM audit_logs WHERE tenant_id IN (SELECT id FROM tenants WHERE code LIKE 'E2E-%')`)
   await query(`ALTER TABLE audit_logs ENABLE TRIGGER USER`)
   // audit_access_log records who read the trail and is immutable for the same
   // reason, with actor_id now RESTRICT rather than SET NULL (037). The fixture

@@ -49,6 +49,10 @@ services:
       CORS_ORIGINS: ${PUBLIC_APP_URL}
       TRUST_PROXY: ${TRUST_PROXY:-1}
       BIOMETRIC_TEMPLATE_KEY: ${BIOMETRIC_TEMPLATE_KEY:-}
+      # Per-tenant data keys (envelope encryption). Unset: off, and new face
+      # templates are sealed under BIOMETRIC_TEMPLATE_KEY as before.
+      KMS_BACKEND: ${KMS_BACKEND:-}
+      KMS_LOCAL_KEK: ${KMS_LOCAL_KEK:-}
       SUPERADMIN_BOOTSTRAP_TOKEN: ${SUPERADMIN_BOOTSTRAP_TOKEN:-}
       FILE_STORAGE_BACKEND: local
       FILE_STORAGE_ROOT: /data/files

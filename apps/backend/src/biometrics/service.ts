@@ -27,7 +27,7 @@ import { randomSequence, sequenceMatches, type Pose, POSES } from './pose.js'
 import {
   MODEL_ID, THRESHOLDS, clampThreshold, distance, identify as identifyAmong, mean, spread,
 } from './matching.js'
-import { openTemplate, sealTemplate, templateContext, templateKeyConfigured } from './templateCrypto.js'
+import { openStoredTemplate, sealTemplateForStorage, templateContext, templateKeyConfigured } from './templateCrypto.js'
 
 export type SubjectType = 'student' | 'employee'
 export interface Subject { type: SubjectType; id: string }
@@ -526,7 +526,8 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[]) {
   }
   const faces = (capture as Capture).faces
   const template = mean(faces.map((f) => f.descriptor))
-  const sealed = sealTemplate(template, templateContext(ctx.tenantId, subject.type, subject.id, MODEL_ID))
+  const sealed = await sealTemplateForStorage(
+    ctx.tenantId, template, templateContext(ctx.tenantId, subject.type, subject.id, MODEL_ID))
 
   const client = await pool.connect()
   try {
@@ -538,10 +539,10 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[]) {
     await client.query(
       `INSERT INTO face_templates
          (tenant_id, subject_type, subject_id, consent_id, model, ciphertext, iv, auth_tag,
-          key_version, frames_used, spread, enrolled_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          key_version, dek_version, frames_used, spread, enrolled_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [ctx.tenantId, subject.type, subject.id, consentId, MODEL_ID, sealed.ciphertext, sealed.iv,
-       sealed.authTag, sealed.keyVersion, faces.length, spread(faces.map((f) => f.descriptor)), ctx.userId]
+       sealed.authTag, sealed.keyVersion, sealed.dekVersion, faces.length, spread(faces.map((f) => f.descriptor)), ctx.userId]
     )
     const eventId = await recordEvent(client, ctx, {
       action: 'enrolled', outcome: 'success', subject, challengeId: ch.id })
@@ -557,14 +558,15 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[]) {
 
 async function loadTemplate(ctx: Ctx, s: Subject): Promise<Float32Array | null> {
   const r = await query(
-    `SELECT ciphertext, iv, auth_tag, key_version, model FROM face_templates
+    `SELECT ciphertext, iv, auth_tag, key_version, dek_version, model FROM face_templates
       WHERE tenant_id = $1 AND subject_type = $2 AND subject_id = $3`,
     [ctx.tenantId, s.type, s.id]
   )
   const row = r.rows[0]
   if (!row) return null
-  return openTemplate(
-    { ciphertext: row.ciphertext, iv: row.iv, authTag: row.auth_tag, keyVersion: row.key_version },
+  return openStoredTemplate(
+    ctx.tenantId,
+    { ciphertext: row.ciphertext, iv: row.iv, authTag: row.auth_tag, keyVersion: row.key_version, dekVersion: row.dek_version },
     templateContext(ctx.tenantId, s.type, s.id, row.model)
   )
 }
@@ -621,20 +623,23 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
 
   // Candidates: this class's enrolled students with a current template.
   const rows = await query(
-    `SELECT t.subject_id, t.ciphertext, t.iv, t.auth_tag, t.key_version, t.model
+    `SELECT t.subject_id, t.ciphertext, t.iv, t.auth_tag, t.key_version, t.dek_version, t.model
        FROM face_templates t
        JOIN student_courses sc ON sc.student_id = t.subject_id AND sc.tenant_id = t.tenant_id
       WHERE t.tenant_id = $1 AND t.subject_type = 'student'
         AND sc.schedule_id = $2 AND sc.status = 'enrolled'`,
     [ctx.tenantId, scheduleId]
   )
-  const candidates = rows.rows.map((row: any) => ({
+  // Unwrapping the tenant's data key is cached, so a class of forty costs
+  // one KMS call at most, not forty.
+  const candidates = await Promise.all(rows.rows.map(async (row: any) => ({
     id: row.subject_id,
-    template: openTemplate(
-      { ciphertext: row.ciphertext, iv: row.iv, authTag: row.auth_tag, keyVersion: row.key_version },
+    template: await openStoredTemplate(
+      ctx.tenantId,
+      { ciphertext: row.ciphertext, iv: row.iv, authTag: row.auth_tag, keyVersion: row.key_version, dekVersion: row.dek_version },
       templateContext(ctx.tenantId, 'student', row.subject_id, row.model)
     ),
-  }))
+  })))
   const probe = mean(capture.faces.map((f) => f.descriptor))
   const result = identifyAmong(probe, candidates, settings.threshold)
 

@@ -118,6 +118,30 @@ For a managed PostgreSQL, use the provider's snapshots or
 4. Unpack the files archive into the files volume.
 5. Start the API and confirm `/api/health/ready` returns 200.
 
+## Encryption keys
+
+Two kinds of secret protect data at rest, and neither is ever stored in the
+database:
+
+- `BIOMETRIC_TEMPLATE_KEY`: the original key for face templates.
+  Templates sealed under it keep opening.
+- A **key-encryption key (KEK)** for per-tenant data keys
+  ([src/security/kms](../../apps/backend/src/security/kms)). Each tenant gets
+  its own data key per purpose, stored only wrapped by the KEK and bound to
+  that tenant. New face templates are sealed under the tenant's key, so a
+  template copied into another tenant's row cannot be opened, and deleting a
+  tenant's keys (`tenant_data_keys`) makes its sealed data unreadable,
+  backups included.
+
+| Setting | Meaning |
+|---|---|
+| `KMS_BACKEND=local` with `KMS_LOCAL_KEK` (32 bytes, `openssl rand -hex 32`) or `KMS_LOCAL_KEK_FILE` | The KEK in the environment or a file. Keep it out of database backups. |
+| `KMS_BACKEND=vault-transit` with `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_TRANSIT_KEY` | HashiCorp Vault's transit engine. Create the key with `derived=true`, so the tenant context binds every wrap. |
+| unset | Per-tenant keys are off; templates are sealed under `BIOMETRIC_TEMPLATE_KEY`. |
+
+Losing the KEK makes every tenant's sealed data unreadable. Back it up
+separately from the database, and test a restore with it.
+
 ## Database roles
 
 Tenant data is filtered by PostgreSQL row-level security

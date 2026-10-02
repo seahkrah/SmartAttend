@@ -14,6 +14,7 @@
  * last key still open during a rotation.
  */
 import crypto from 'crypto'
+import { openForTenant, sealForTenant, tenantKeysConfigured } from '../security/kms/dataKeys.js'
 
 export class BiometricKeyError extends Error {}
 
@@ -84,4 +85,34 @@ export function openTemplate(sealed: Sealed, context: string): Float32Array {
 /** What a template is bound to. Changing any part makes it unopenable. */
 export function templateContext(tenantId: string, subjectType: string, subjectId: string, model: string): string {
   return `face-template:v1:${tenantId}:${subjectType}:${subjectId}:${model}`
+}
+
+// ── Per-tenant data keys (migration 072) ───────────────────────────────────
+// When a KMS is configured, new templates are sealed under the tenant's own
+// data key: a template copied into another tenant's row fails twice over,
+// on the bound context and on the key. Templates sealed before that, under
+// BIOMETRIC_TEMPLATE_KEY, keep opening: dekVersion null says which scheme.
+
+export interface StoredTemplate extends Sealed {
+  dekVersion: number | null
+}
+
+const PURPOSE = 'face_template'
+
+export async function sealTemplateForStorage(tenantId: string, descriptor: Float32Array, context: string): Promise<StoredTemplate> {
+  if (!tenantKeysConfigured()) return { ...sealTemplate(descriptor, context), dekVersion: null }
+  const plain = Buffer.from(descriptor.buffer, descriptor.byteOffset, descriptor.byteLength)
+  const s = await sealForTenant(tenantId, PURPOSE, plain, context)
+  return { ciphertext: s.ciphertext, iv: s.iv, authTag: s.authTag, keyVersion: 0, dekVersion: s.dekVersion }
+}
+
+export async function openStoredTemplate(tenantId: string, stored: StoredTemplate, context: string): Promise<Float32Array> {
+  if (stored.dekVersion === null || stored.dekVersion === undefined) return openTemplate(stored, context)
+  const plain = await openForTenant(
+    tenantId,
+    PURPOSE,
+    { ciphertext: stored.ciphertext, iv: stored.iv, authTag: stored.authTag, dekVersion: stored.dekVersion },
+    context,
+  )
+  return new Float32Array(plain.buffer.slice(plain.byteOffset, plain.byteOffset + plain.byteLength))
 }

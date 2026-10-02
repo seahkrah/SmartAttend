@@ -177,10 +177,12 @@ dimensions:
       - id: per-tenant-dek
         kind: target
         weight: 1
-        title: Per-tenant data keys behind a KMS interface (unit tests)
+        title: Per-tenant data keys behind a KMS interface, used for face templates (unit and database tests)
         type: cmd
         cwd: apps/backend
         run: npx vitest run src/security/kms
+        requires:
+          - db
   - id: authn
     n: 2
     title: AuthN and sessions

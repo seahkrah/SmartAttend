@@ -5,7 +5,7 @@ import { checkPassword, PASSWORD_MIN } from './passwordPolicy.js'
 import { configProblems } from '../config/validateEnv.js'
 import { limiter, allowedOrigins, trustProxySetting } from '../security/httpSecurity.js'
 import { hashToken } from './sessions.js'
-import { databaseSsl } from '../db/connection.js'
+import { databaseSsl, query } from '../db/connection.js'
 
 describe('password policy', () => {
   it('accepts a long passphrase with no composition rules', () => {
@@ -110,6 +110,27 @@ describe('rate limiter', () => {
       expect(last!.headers.get('ratelimit-policy')).toMatch(/"probe"; q=3/)
     } finally {
       server.close()
+    }
+  })
+
+  it('shared: two replicas count against one limit, in the database', async () => {
+    // Two separate apps, each with its own limiter instance, as two API
+    // replicas would have. In memory each would allow 3; shared, 3 in all.
+    const name = `probe-shared-${Date.now()}`
+    const servers = [0, 1].map(() => {
+      const app = express()
+      app.use(limiter(name, 3, 60_000, 'slow down', { shared: true }))
+      app.get('/', (_req, res) => res.json({ ok: true }))
+      return app.listen(0)
+    })
+    try {
+      const ports = servers.map((s) => (s.address() as AddressInfo).port)
+      const codes: number[] = []
+      for (let i = 0; i < 6; i++) codes.push((await fetch(`http://127.0.0.1:${ports[i % 2]}/`)).status)
+      expect(codes).toEqual([200, 200, 200, 429, 429, 429])
+    } finally {
+      servers.forEach((s) => s.close())
+      await query(`DELETE FROM http_rate_limits WHERE key LIKE $1`, [`${name}:%`])
     }
   })
 })

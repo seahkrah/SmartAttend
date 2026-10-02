@@ -18,7 +18,7 @@ import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { query } from '../db/connection.js'
 import { hashToken, revokeUserSessions } from './sessions.js'
-import { checkPassword } from './passwordPolicy.js'
+import { passwordProblems } from './breachedPassword.js'
 import { notify, channelConfig } from '../notifications/service.js'
 import { clearMfa } from './mfaService.js'
 import { runAsSystem } from '../db/dbContext.js'
@@ -254,7 +254,7 @@ export async function redeemToken(purpose: TokenPurpose, token: string, password
     [hashToken(token), purpose]
   )
   if (owner.rows.length === 0) throw new AccountTokenError(400, 'This link is not valid')
-  const problems = checkPassword(password, { email: owner.rows[0].email, name: owner.rows[0].full_name })
+  const problems = await passwordProblems(password, { email: owner.rows[0].email, name: owner.rows[0].full_name })
   if (problems.length > 0) throw new AccountTokenError(400, 'Choose a stronger password', problems)
 
   const spent = await sys(

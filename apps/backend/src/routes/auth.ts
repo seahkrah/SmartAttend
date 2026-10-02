@@ -35,7 +35,7 @@ import {
 import { ErrorMessages, getUserFriendlyError, logError } from '../utils/errorMessages.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { rotateSession, revokeSession, revokeUserSessions, SessionError } from '../auth/sessions.js'
-import { checkPassword } from '../auth/passwordPolicy.js'
+import { passwordProblems } from '../auth/breachedPassword.js'
 import { markAuthenticated, stepUpMaxAgeSeconds } from '../auth/stepUp.js'
 import { requestPasswordReset, redeemToken, AccountTokenError } from '../auth/accountTokens.js'
 import { runAsSystem } from '../db/dbContext.js'
@@ -84,7 +84,7 @@ router.post('/register-with-role', accountLimiter, beforeSignIn, async (req: Rol
       return res.status(400).json({ error: ErrorMessages.VALIDATION_PASSWORD_MISMATCH })
     }
 
-    const problems = checkPassword(password, { email, name: fullName })
+    const problems = await passwordProblems(password, { email, name: fullName })
     if (problems.length > 0) {
       return res.status(400).json({ error: 'Choose a stronger password', problems })
     }
@@ -389,7 +389,7 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
     
     const user = userResult.rows[0]
 
-    const problems = checkPassword(newPassword, { email: user.email, name: user.full_name })
+    const problems = await passwordProblems(newPassword, { email: user.email, name: user.full_name })
     if (problems.length > 0) {
       return res.status(400).json({ error: 'Choose a stronger password', problems })
     }
@@ -561,7 +561,7 @@ router.post('/register-superadmin', accountLimiter, beforeSignIn, async (req: Su
       return res.status(400).json({ error: 'Passwords do not match' })
     }
 
-    const problems = checkPassword(password, { email, name: fullName })
+    const problems = await passwordProblems(password, { email, name: fullName })
     if (problems.length > 0) {
       return res.status(400).json({ error: 'Choose a stronger password', problems })
     }

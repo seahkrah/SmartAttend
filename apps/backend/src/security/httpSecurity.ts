@@ -3,17 +3,21 @@
  * the API, which proxies are trusted to report the client's address, and
  * request-rate limits.
  *
- * Rate limits here are per process and per client address. They blunt floods
- * and credential stuffing; they are not what stops password guessing on one
- * account (that is the per-address lockout in authService, stored in the
- * database so it holds across processes and restarts). Behind a school's or
- * company's single NAT address many people share one client address, so the
- * limits are generous and configurable.
+ * Rate limits here are per client address. The ones that guard credentials
+ * (sign-in, refresh, account, two-factor, enquiries) count in PostgreSQL, so
+ * every replica shares them (security/rateLimitStore.ts); the global flood
+ * limit counts per process unless RATE_LIMIT_SHARED_API=true. They blunt
+ * floods and credential stuffing; they are not what stops password guessing
+ * on one account (that is the per-address lockout in authService, also in
+ * the database). Behind a school's or company's single NAT address many
+ * people share one client address, so the limits are generous and
+ * configurable.
  */
 import type { Express, RequestHandler } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import { rateLimit } from 'express-rate-limit'
+import { PostgresRateLimitStore } from './rateLimitStore.js'
 
 function intEnv(key: string, fallback: number): number {
   const v = parseInt(process.env[key] ?? '', 10)
@@ -76,10 +80,16 @@ export function applyHttpSecurity(app: Express) {
   }))
 
   app.use('/api', limiter('api', intEnv('RATE_LIMIT_API_PER_MINUTE', 3000), 60_000,
-    'Too many requests. Slow down and try again shortly.'))
+    'Too many requests. Slow down and try again shortly.',
+    { shared: process.env.RATE_LIMIT_SHARED_API === 'true' }))
 }
 
-export function limiter(name: string, limit: number, windowMs: number, message: string): RequestHandler {
+/**
+ * A per-address limit. `shared` counts in PostgreSQL, across every replica;
+ * otherwise in this process's memory.
+ */
+export function limiter(name: string, limit: number, windowMs: number, message: string,
+                        opts: { shared?: boolean } = {}): RequestHandler {
   return rateLimit({
     windowMs,
     limit,
@@ -87,20 +97,28 @@ export function limiter(name: string, limit: number, windowMs: number, message: 
     legacyHeaders: false,
     identifier: name,
     message: { error: message, code: 'RATE_LIMITED' },
+    ...(opts.shared ? {
+      store: new PostgresRateLimitStore(name),
+      // A database hiccup should not refuse every sign-in; the request then
+      // meets the database itself, and the per-account lockout, anyway.
+      passOnStoreError: true,
+    } : {}),
   })
 }
 
+const SHARED = { shared: true }
+
 /** Sign-in attempts per client address. */
 export const loginLimiter = limiter('login', intEnv('RATE_LIMIT_LOGIN_PER_MINUTE', 120), 60_000,
-  'Too many sign-in attempts from this network. Try again in a minute.')
+  'Too many sign-in attempts from this network. Try again in a minute.', SHARED)
 
 /** Token refreshes per client address. */
 export const refreshLimiter = limiter('refresh', intEnv('RATE_LIMIT_REFRESH_PER_MINUTE', 600), 60_000,
-  'Too many requests. Try again in a minute.')
+  'Too many requests. Try again in a minute.', SHARED)
 
 /** Password-reset requests, activations, resets and registrations per client address. */
 export const accountLimiter = limiter('account', intEnv('RATE_LIMIT_ACCOUNT_PER_15MIN', 30), 15 * 60_000,
-  'Too many account requests from this network. Try again later.')
+  'Too many account requests from this network. Try again later.', SHARED)
 
 /**
  * Two-factor management by a signed-in person (setup, enable, disable, new
@@ -109,8 +127,8 @@ export const accountLimiter = limiter('account', intEnv('RATE_LIMIT_ACCOUNT_PER_
  * a session, and the sensitive ones the password as well.
  */
 export const mfaManageLimiter = limiter('mfa', intEnv('RATE_LIMIT_MFA_PER_15MIN', 60), 15 * 60_000,
-  'Too many two-factor requests. Try again later.')
+  'Too many two-factor requests. Try again later.', SHARED)
 
 /** Public access-request enquiries per client address. */
 export const enquiryLimiter = limiter('enquiry', intEnv('RATE_LIMIT_ENQUIRY_PER_HOUR', 20), 60 * 60_000,
-  'Too many requests from this network. Please try again later, or email us instead.')
+  'Too many requests from this network. Please try again later, or email us instead.', SHARED)

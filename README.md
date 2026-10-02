@@ -142,15 +142,19 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
 - No passkeys (WebAuthn) and no single sign-on. Two-factor is
   authenticator-app codes.
 - Tokens are held in `localStorage`, not `httpOnly` cookies.
-- Tenant isolation is enforced three times: in application code (tenant
-  from identity, queries scoped by tenant), by PostgreSQL row-level security
-  on all 95 tables that carry `tenant_id` (the API connects as a role that
-  cannot bypass it; see [docs/operations/deployment.md](docs/operations/deployment.md),
-  "Database roles"), and by triggers on cross-tenant references. Not yet:
-  an auto-generated cross-tenant fuzzer over every route, break-glass for
-  superadmin access to a tenant, tenant-namespaced cache and rate-limit
-  keys, and per-tenant encryption keys. Tables without `tenant_id` (identity,
-  incidents, control plane) are outside RLS.
+- Tenant isolation is enforced in layers: in application code; by
+  PostgreSQL row-level security on every table that carries `tenant_id`
+  (the API connects as a role that cannot bypass it; see
+  [docs/operations/deployment.md](docs/operations/deployment.md),
+  "Database roles"); by triggers on cross-tenant references; by tenant
+  checks on stored-file keys; and by per-tenant keys for face templates.
+  A fuzzer calls every route as one tenant with another's ids. Superadmin
+  access to a tenant's data needs a time-boxed break-glass grant that the
+  tenant can see. Still outside it: tables with no `tenant_id` (incidents
+  and other control-plane records are scoped in code only), and per-tenant
+  keys protect face templates only (documents and other personal data
+  come later). Templates sealed before per-tenant keys are not yet
+  re-encrypted under them.
 - The web app has no automated tests. Prettier is configured but applied only
   to `scripts/` so far.
 - The credentials once committed are still in git history until the purge in

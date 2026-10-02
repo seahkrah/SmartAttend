@@ -295,7 +295,17 @@ jobs:
         run: >-
           docker run --rm -e SEMGREP_SEND_METRICS=off -v "$PWD:/src" -w /src semgrep/semgrep:1.178.0
           semgrep scan --config p/javascript --config p/typescript --config p/expressjs --config p/react
-          --exclude docs/archive --severity ERROR --error --metrics off apps scripts packages/types/src
+          --exclude docs/archive --severity ERROR --error --metrics off --json-output=semgrep.json
+          apps scripts packages/types/src
+
+      # Each finding as an annotation on its file and line, readable without
+      # access to the job's log.
+      - name: Semgrep findings as annotations
+        if: failure()
+        run: >-
+          node -e "const r=require('./semgrep.json');for(const x of r.results)
+          console.log('::error file='+x.path+',line='+x.start.line+',title='+x.check_id.split('.').pop()+'::'
+          +x.extra.message.replace(/\r?\n/g,' ').slice(0,400))"
 
   images:
     name: Container images

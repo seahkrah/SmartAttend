@@ -35,6 +35,10 @@ RUN cd apps/backend \
 
 FROM node:20-bookworm-slim
 ENV NODE_ENV=production PORT=5000
+# The base image lags Debian's security updates; take them. The server runs
+# `node` and nothing else, so npm, npx and corepack (and the dependency tree
+# npm bundles, which the image scan flags) are removed rather than patched.
+RUN apt-get update   && apt-get upgrade -y --no-install-recommends   && rm -rf /var/lib/apt/lists/*   && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack             /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 WORKDIR /app
 # The same layout as the build, so node_modules/@jjelotech/types (a link to
 # ../../packages/types) still resolves.

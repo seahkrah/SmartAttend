@@ -62,7 +62,7 @@ export function sealTemplate(descriptor: Float32Array, context: string): Sealed 
   const { current } = keys()
   if (!current) throw new BiometricKeyError('BIOMETRIC_TEMPLATE_KEY is not configured')
   const iv = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv('aes-256-gcm', current.key, iv)
+  const cipher = crypto.createCipheriv('aes-256-gcm', current.key, iv, { authTagLength: 16 })
   cipher.setAAD(Buffer.from(context, 'utf8'))
   const plain = Buffer.from(descriptor.buffer, descriptor.byteOffset, descriptor.byteLength)
   const ciphertext = Buffer.concat([cipher.update(plain), cipher.final()])
@@ -73,7 +73,8 @@ export function openTemplate(sealed: Sealed, context: string): Float32Array {
   const { current, previous } = keys()
   const key = [current, previous].find((k) => k && k.version === sealed.keyVersion)
   if (!key) throw new BiometricKeyError(`No key for template key version ${sealed.keyVersion}`)
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key.key, sealed.iv)
+  // Pinned tag length: Node otherwise accepts a truncated (forgeable) tag.
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key.key, sealed.iv, { authTagLength: 16 })
   decipher.setAAD(Buffer.from(context, 'utf8'))
   decipher.setAuthTag(sealed.authTag)
   const plain = Buffer.concat([decipher.update(sealed.ciphertext), decipher.final()])

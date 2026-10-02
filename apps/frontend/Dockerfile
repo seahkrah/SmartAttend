@@ -31,6 +31,11 @@ COPY apps/backend/src apps/backend/src
 RUN cd apps/frontend && VITE_API_BASE_URL="$VITE_API_BASE_URL" npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine
+# The base image lags Alpine's security updates; take them, then drop back to
+# the image's unprivileged user.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 # Rendered to conf.d/default.conf at start, with API_ORIGIN filled in.
 ENV API_ORIGIN=""
 COPY apps/frontend/nginx.conf.template /etc/nginx/templates/default.conf.template

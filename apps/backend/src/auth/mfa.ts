@@ -125,7 +125,7 @@ function sealingKey(): Buffer {
 
 export function sealSecret(secret: Buffer, userId: string): { ciphertext: string; iv: string; tag: string } {
   const iv = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv('aes-256-gcm', sealingKey(), iv)
+  const cipher = crypto.createCipheriv('aes-256-gcm', sealingKey(), iv, { authTagLength: 16 })
   // Bound to the user: a sealed secret copied onto another account's row
   // does not open.
   cipher.setAAD(Buffer.from(`mfa:${userId}`))
@@ -134,7 +134,11 @@ export function sealSecret(secret: Buffer, userId: string): { ciphertext: string
 }
 
 export function openSecret(row: { secret_ciphertext: string; secret_iv: string; secret_tag: string }, userId: string): Buffer {
-  const decipher = crypto.createDecipheriv('aes-256-gcm', sealingKey(), Buffer.from(row.secret_iv, 'base64'))
+  // The tag length is pinned: Node otherwise accepts a truncated tag, so a
+  // forged 4-byte tag on a tampered row would be 2^32 tries from opening.
+  const decipher = crypto.createDecipheriv('aes-256-gcm', sealingKey(), Buffer.from(row.secret_iv, 'base64'), {
+    authTagLength: 16,
+  })
   decipher.setAAD(Buffer.from(`mfa:${userId}`))
   decipher.setAuthTag(Buffer.from(row.secret_tag, 'base64'))
   return Buffer.concat([decipher.update(Buffer.from(row.secret_ciphertext, 'base64')), decipher.final()])

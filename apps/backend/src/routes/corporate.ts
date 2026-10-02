@@ -293,6 +293,8 @@ router.delete('/departments/:id', peopleAdmins, async (req: TenantRequest, res: 
       [id, tenantId]
     )
     if (parseInt(empCheck.rows[0].count) > 0) {
+      // An error message that begins with the word "delete", not SQL.
+      // nosemgrep: javascript.express.security.injection.tainted-sql-string.tainted-sql-string
       return res.status(400).json({ error: `Cannot delete: ${empCheck.rows[0].count} active employee(s) in this department` })
     }
 

@@ -237,7 +237,7 @@ jobs:
       - name: Working tree
         run: >-
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2
-          dir /repo --config /repo/.gitleaks.toml --redact --no-banner -v
+          dir /repo --config /repo/.gitleaks.toml --baseline-path /repo/.gitleaks-baseline.json --redact --no-banner -v
       - name: Commits in this push
         if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
         run: >-

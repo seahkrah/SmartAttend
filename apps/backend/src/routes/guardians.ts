@@ -387,7 +387,10 @@ router.patch('/:guardianId', async (req: TenantRequest, res: Response) => {
 
     await client.query('BEGIN')
     const sets = columns.map((c, i) => `${c} = $${i + 3}`)
+    // Column names come only from guardianInput's fixed field list; every
+    // value is a bound parameter.
     await client.query(
+      // nosemgrep: javascript.express.security.injection.tainted-sql-string.tainted-sql-string
       `UPDATE guardians SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND tenant_id = $2`,
       [guardian.id, ctx.tenantId, ...columns.map((c) => (changes as any)[c])]
@@ -564,7 +567,9 @@ router.patch('/:guardianId/students/:linkId', async (req: TenantRequest, res: Re
       )
     }
     const sets = columns.map((c, i) => `${c} = $${i + 3}`)
+    // Column names come only from LINK_KEYS; every value is a bound parameter.
     await client.query(
+      // nosemgrep: javascript.express.security.injection.tainted-sql-string.tainted-sql-string
       `UPDATE guardian_students SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND tenant_id = $2`,
       [existing.id, ctx.tenantId, ...columns.map((c) => changes[c])]

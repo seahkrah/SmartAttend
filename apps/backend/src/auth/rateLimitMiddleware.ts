@@ -58,7 +58,10 @@ export function rateLimitMiddleware(
       return res.status(401).json({ error: 'Not authenticated' })
     }
 
-    const key = `${actorId}:${currentAction}`
+    // Namespaced by tenant: a person acting in two tenants has a budget in each,
+    // and no key can collide across tenants.
+    const tenantId = (req as any).ctx?.tenantId ?? 'none'
+    const key = `${tenantId}:${actorId}:${currentAction}`
     const now = Date.now()
     const limitData = rateLimitStore.get(key)
 

@@ -1,7 +1,8 @@
 import { open, unlink } from 'node:fs/promises'
 import type { PoolClient } from 'pg'
 import { query } from '../db/connection.js'
-import { activeBackend, backendFor, buildKey, type BackendName } from './backend.js'
+import { activeBackend, backendFor, buildKey, keyBelongsTo, type BackendName } from './backend.js'
+import { currentDbContext } from '../db/dbContext.js'
 import { extensionFor, isAllowed, ruleFor, safeDownloadName, sniff } from './contentTypes.js'
 
 /**
@@ -303,6 +304,15 @@ export async function openForDownload(
   const unavailable = backend.unavailableReason()
   if (unavailable) throw new FileError(unavailable, 503)
 
+  // The object must be the file's tenant's, and the file the caller's
+  // tenant's. Answered as "not found", like any file outside the tenant.
+  const ctx = currentDbContext()
+  const callerTenant = ctx.mode === 'tenant' ? ctx.tenantId : null
+  if (!keyBelongsTo(file.storage_key, file.tenant_id) || (callerTenant && callerTenant !== file.tenant_id)) {
+    console.error(`[FILES] refused to serve ${file.id}: its object is not in tenant ${callerTenant ?? file.tenant_id}`)
+    throw new FileError('File not found', 404)
+  }
+
   const stream = await backend.stream(file.storage_key).catch(() => {
     // The row says the file exists and the bytes do not. Worth saying so
     // rather than returning an empty download.
@@ -527,6 +537,10 @@ export async function purgeDeleted(tenantId: string, olderThanDays = 30): Promis
 
   const purged: string[] = []
   for (const row of due.rows) {
+    if (!keyBelongsTo(row.storage_key, tenantId)) {
+      console.error(`[FILES] not purging ${row.id}: its object is not in tenant ${tenantId}`)
+      continue
+    }
     try {
       await backendFor(row.backend).remove(row.storage_key)
       purged.push(row.id)

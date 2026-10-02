@@ -56,6 +56,22 @@ export function buildKey(tenantId: string, category: string, extension: string):
 }
 
 /**
+ * Whether an object key belongs to a tenant. Keys are built tenant-first
+ * (buildKey), so this is checked again on every read and removal: a row
+ * that names another tenant's object, by a bug or by tampering, is refused
+ * instead of served.
+ */
+export function keyBelongsTo(key: string, tenantId: string): boolean {
+  return (
+    typeof key === 'string' &&
+    typeof tenantId === 'string' &&
+    tenantId.length > 0 &&
+    key.startsWith(`${tenantId}/`) &&
+    !key.split('/').some((part) => part === '..' || part === '.' || part === '')
+  )
+}
+
+/**
  * The root every local object lives under.
  *
  * Configurable, because a deployment will want it on a mounted volume rather

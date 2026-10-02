@@ -156,15 +156,17 @@ dimensions:
       - id: storage-tenant-prefix
         kind: target
         weight: 1
-        title: Storage keys carry the tenant prefix and are verified on read
+        title: Storage keys carry the tenant prefix and are verified on read and removal (unit tests)
         type: cmd
-        run: node scripts/checks/storage-tenant-prefix.mjs
+        cwd: apps/backend
+        run: npx vitest run src/storage/tenantKeys.test.ts
       - id: namespaced-keys
         kind: target
         weight: 1
-        title: Rate-limit, cache and queue keys namespaced by tenant
+        title: Destructive-action rate-limit keys namespaced by tenant (unit test)
         type: cmd
-        run: node scripts/checks/namespaced-keys.mjs
+        cwd: apps/backend
+        run: npx vitest run src/auth/rateLimitKeys.test.ts
       - id: break-glass
         kind: target
         weight: 2

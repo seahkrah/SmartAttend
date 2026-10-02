@@ -61,6 +61,7 @@ const VOLATILE: Array<[RegExp, string]> = [
     "aggregates of the caller tenant's own live traffic, which the fuzz moves; reads hours and endpoint only",
   ],
   [/^GET \/api\/notifications\/(overview|messages)$/, "live counts of the tenant's own outbox; ids filter via relatedId, which is injected"],
+  [/^(GET|POST) \/api\/notifications\/inbox(\/read-all)?$/, "the caller's own inbox, which the fuzz's own writes keep filling; reads unread and limit only"],
 ]
 const isVolatile = (r: RouteEntry) => VOLATILE.some(([re]) => re.test(`${r.method} ${r.path}`))
 const victims = [school.B.tenantId as string, corp.B.tenantId as string]

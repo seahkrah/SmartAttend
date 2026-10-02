@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url'
 import pg from 'pg'
 import pool from '../db/connection.js'
 import { RENAMED, migrationFiles } from '../db/migrationLedger.js'
+import { runAsSystem } from '../db/dbContext.js'
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -56,7 +57,7 @@ async function main() {
   console.log(`ledger upgrade ok: ${Object.keys(RENAMED).length} renamed, nothing re-ran, ${after} rows`)
 }
 
-main().catch((e) => {
+runAsSystem('rewrite and restore the migration ledger', main).catch((e) => {
   console.error(e)
   process.exit(1)
 })

@@ -4,8 +4,9 @@
  * clock drift frequency, API latency. Tenant-aware metrics collection and queries.
  */
 
-import { Pool, QueryResult } from 'pg';
+import type { QueryResult } from 'pg';
 import pool from '../db/connection.js';
+import { runAsSystem } from '../db/dbContext.js';
 
 // Metric types
 export type MetricType = 
@@ -163,7 +164,11 @@ export async function recordAPILatency(metric: APILatencyMetric): Promise<Metric
 
   // One row per request adds up; nothing reads more than 30 days back.
   if (Math.random() < 0.001) {
-    pool.query(`DELETE FROM platform_metrics WHERE created_at < NOW() - INTERVAL '30 days'`)
+    // Every tenant's old rows, not only the caller's: retention is not
+    // tenant data access, and under row-level security a tenant-bound sweep
+    // would never prune tenants that stopped making requests.
+    runAsSystem('metrics retention: prune rows older than 30 days in every tenant', () =>
+      pool.query(`DELETE FROM platform_metrics WHERE created_at < NOW() - INTERVAL '30 days'`))
       .catch((e) => console.error('[metrics] retention sweep failed:', e.message));
   }
 

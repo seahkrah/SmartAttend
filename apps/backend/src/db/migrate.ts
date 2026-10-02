@@ -11,6 +11,7 @@ import { splitStatements } from './splitStatements.js'
 import { migrationFiles, migrationsDir, reconcileLedger } from './migrationLedger.js'
 import * as fs from 'fs'
 import * as path from 'path'
+import { runAsSystem } from '../db/dbContext.js'
 
 interface MigrationRecord {
   name: string
@@ -138,7 +139,7 @@ async function runMigrations(): Promise<void> {
 }
 
 // Run migrations
-runMigrations().catch(error => {
+runAsSystem('apply schema migrations as the owner', runMigrations).catch(error => {
   console.error('Fatal error:', error)
   process.exit(1)
 })

@@ -11,6 +11,7 @@ import { issueTokens } from '../auth/authService.js'
 const generateAccessToken = async (id: string, platform_id: string, role_id: string) =>
   (await issueTokens({ id, platform_id, role_id }, { userAgent: 'e2e fixture' })).accessToken
 import { hashPassword } from '../auth/authService.js'
+import { runAsSystem } from '../db/dbContext.js'
 
 async function cleanup() {
   // The audit log refuses deletion by design, which is the whole point of it.
@@ -141,7 +142,7 @@ async function main() {
   process.exit(0)
 }
 
-main().catch((e) => {
+runAsSystem('seed the e2e superadmin fixture', main).catch((e) => {
   console.error(e)
   process.exit(1)
 })

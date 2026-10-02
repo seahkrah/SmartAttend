@@ -12,6 +12,7 @@ import {
   countScoped, assertAllInTenant, TenantScopeError,
 } from '../db/tenantScoped.js'
 import type { ResolvedTenantContext } from '../auth/tenantContextMiddleware.js'
+import { runAsSystem } from '../db/dbContext.js'
 
 let pass = 0, fail = 0
 function check(name: string, ok: boolean, detail = '') {
@@ -121,4 +122,4 @@ async function main() {
   process.exit(fail === 0 ? 0 : 1)
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+runAsSystem('prove the tenant-scoped helpers across seeded tenants', main).catch(e => { console.error(e); process.exit(1) })

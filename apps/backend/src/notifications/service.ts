@@ -7,6 +7,7 @@ import {
 import { render, tidy, variablesIn } from './render.js'
 import { transportFor } from './providers/index.js'
 import type { Channel, ChannelConfig, DeliveryResult, OutboundMessage, ProviderName } from './types.js'
+import { runAsSystem } from '../db/dbContext.js'
 
 /**
  * Notification delivery.
@@ -808,7 +809,12 @@ export function startDispatcher(intervalMs = 15_000): boolean {
   timer = setInterval(() => {
     if (running) return
     running = true
-    runOnce()
+    // Outside any request there is no tenant, and under row-level security
+    // the sweep would see no queued rows at all: it would run, find nothing,
+    // and never send. Sweeping every tenant's outbox is system work; each
+    // row carries its own tenant_id, which delivery uses to find that
+    // tenant's provider.
+    runAsSystem("notification dispatcher: sweep every tenant's outbox", () => runOnce())
       .then((s) => {
         if (s.claimed > 0) {
           console.log(

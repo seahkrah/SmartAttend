@@ -16,6 +16,7 @@ import { query } from './src/db/connection.js'
 import { hashPassword } from './src/auth/authService.js'
 import { checkPassword } from './src/auth/passwordPolicy.js'
 import { revokeUserSessions } from './src/auth/sessions.js'
+import { runAsSystem } from './src/db/dbContext.js'
 
 function hiddenPrompt(label: string): Promise<string> {
   return new Promise((resolve) => {
@@ -76,7 +77,7 @@ async function main() {
   process.exit(0)
 }
 
-main().catch((e) => {
+runAsSystem('create the first superadmin', main).catch((e) => {
   console.error('Setup failed:', e.message)
   process.exit(1)
 })

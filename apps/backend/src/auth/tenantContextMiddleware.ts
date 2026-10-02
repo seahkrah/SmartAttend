@@ -1,5 +1,6 @@
 import { Response, NextFunction, Request } from 'express'
 import { query } from '../db/connection.js'
+import { runAsSystem, withNoTenant, withTenant } from '../db/dbContext.js'
 
 /**
  * Platform and tenant resolution.
@@ -86,14 +87,16 @@ export async function resolveTenantContext(
     // resolve a corporate tenant, and vice versa.
     let memberships: ResolvedTenantContext['memberships'] = []
     if (!isSuperadmin && (platformKind === 'school' || platformKind === 'corporate')) {
-      const m = await query(
+      // Identity, not tenant data: which tenants this person belongs to is
+      // what decides the tenant, so it cannot be filtered by one.
+      const m = await runAsSystem("resolve the caller's own tenant memberships", () => query(
         `SELECT tenant_id, tenant_name, platform_kind
            FROM user_tenant_memberships
           WHERE user_id = $1
             AND platform_kind = $2
             AND status = 'active'`,
         [row.user_id, platformKind]
-      )
+      ))
       memberships = m.rows.map((r: any) => ({
         tenantId: r.tenant_id,
         tenantName: r.tenant_name,
@@ -132,7 +135,10 @@ export async function resolveTenantContext(
       isSuperadmin,
     }
 
-    next()
+    // Everything downstream runs bound to this tenant (or to none): every
+    // database connection it takes carries app.tenant_id for RLS.
+    if (req.ctx.tenantId) withTenant({ tenantId: req.ctx.tenantId, userId: row.user_id }, next)
+    else withNoTenant(next, row.user_id)
   } catch (error: any) {
     console.error('[TENANT_CTX] resolution failed:', error)
     res.status(500).json({ error: 'Internal error', message: 'Could not resolve tenant context' })
@@ -178,7 +184,7 @@ export function requireTenant(req: TenantRequest, res: Response, next: NextFunct
         }
         req.ctx!.tenantId = r.rows[0].id
         req.ctx!.tenantName = r.rows[0].name
-        next()
+        withTenant({ tenantId: r.rows[0].id, userId: req.ctx!.userId }, next)
       })
       .catch((error) => {
         console.error('[TENANT_CTX] superadmin tenant lookup failed:', error)

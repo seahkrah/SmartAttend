@@ -118,6 +118,44 @@ For a managed PostgreSQL, use the provider's snapshots or
 4. Unpack the files archive into the files volume.
 5. Start the API and confirm `/api/health/ready` returns 200.
 
+## Database roles
+
+Tenant data is filtered by PostgreSQL row-level security
+([decisions/2026-10-02-adopt-rls.md](../decisions/2026-10-02-adopt-rls.md)).
+That needs two connections:
+
+| Setting | Role | Used for |
+|---|---|---|
+| `DATABASE_URL` | the owner (runs migrations; member of `jjelotech_system`) | migrations, and the API's system pool: identity lookups, the control plane, the notification dispatcher |
+| `APP_DATABASE_URL` | the runtime login, a member of `jjelotech_app`: not the owner, not a superuser, `NOBYPASSRLS` | every other query the API makes |
+
+The compose stack does this for you: set `APP_DB_PASSWORD` in `deploy/.env`
+(`openssl rand -hex 24`; hex, so it needs no escaping in a URL), and the
+`migrate` job creates or updates the `jjelotech_api` login after migrating.
+Elsewhere, after migrations:
+
+```bash
+DATABASE_URL=<owner> APP_DB_USER=jjelotech_api APP_DB_PASSWORD=<secret>   node dist/scripts/createRuntimeRole.js
+```
+
+then set `APP_DATABASE_URL` for the API. Without it the API runs everything
+as the owner and nothing is filtered (the API logs
+`runtime role in use` at start when it is set).
+
+**If the owner cannot create roles** (a managed database where the
+migration user lacks `CREATEROLE`), migration 069 warns, enables RLS without
+forcing it, and the API keeps working as before. Have an administrator run,
+once:
+
+```sql
+CREATE ROLE jjelotech_app NOLOGIN NOBYPASSRLS;
+CREATE ROLE jjelotech_system NOLOGIN;
+GRANT jjelotech_system TO <migration user>;
+```
+
+then re-run migrations (069 is idempotent and forces RLS once the roles
+exist) and create the runtime login as above.
+
 ## Rolling back across the migration renumbering
 
 Fourteen migrations were renamed on 2026-10-01 (`006_…` became `006a_…`, and

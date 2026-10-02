@@ -142,10 +142,15 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
 - No passkeys (WebAuthn) and no single sign-on. Two-factor is
   authenticator-app codes.
 - Tokens are held in `localStorage`, not `httpOnly` cookies.
-- Tenant isolation is enforced in application code (tenant from identity,
-  every query scoped by hand) and by database triggers on cross-tenant
-  references. There is no PostgreSQL row-level security yet, and the API
-  connects as the role that owns the tables. That is the next piece of work.
+- Tenant isolation is enforced three times: in application code (tenant
+  from identity, queries scoped by tenant), by PostgreSQL row-level security
+  on all 95 tables that carry `tenant_id` (the API connects as a role that
+  cannot bypass it; see [docs/operations/deployment.md](docs/operations/deployment.md),
+  "Database roles"), and by triggers on cross-tenant references. Not yet:
+  an auto-generated cross-tenant fuzzer over every route, break-glass for
+  superadmin access to a tenant, tenant-namespaced cache and rate-limit
+  keys, and per-tenant encryption keys. Tables without `tenant_id` (identity,
+  incidents, control plane) are outside RLS.
 - The web app has no automated tests. Prettier is configured but applied only
   to `scripts/` so far.
 - The credentials once committed are still in git history until the purge in

@@ -5,6 +5,7 @@
  */
 
 import pkg from 'pg';
+import { runAsSystem } from '../db/dbContext.js'
 const { Pool } = pkg;
 
 if (!process.env.DATABASE_URL) {
@@ -199,4 +200,4 @@ async function setupTenantEntities() {
   }
 }
 
-setupTenantEntities();
+runAsSystem('create tenant entities across tenants', setupTenantEntities);

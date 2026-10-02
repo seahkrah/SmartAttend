@@ -7,6 +7,7 @@ import { extractAuditContext, logAuditEntry, getAuditLogs } from '../services/au
 import { getClientIp } from '../utils/getClientIp.js'
 import { clearMfa } from '../auth/mfaService.js'
 import { revokeUserSessions } from '../auth/sessions.js'
+import { runAsSystem } from '../db/dbContext.js'
 import {
   SCHOOL_TYPE_CATALOGUE, SCHOOL_TYPES, SchoolStructureError, applySchoolStructure, validateStructure,
 } from '../services/schoolTypes.js'
@@ -68,7 +69,13 @@ async function verifySuperadmin(req: Request, res: Response, next: NextFunction)
     }
 
     ;(req as any).superadminId = userId
-    return next()
+    // The control plane administers tenants as a whole (creating them,
+    // appointing administrators, suspending, counting what a tenant holds
+    // before deletion), so it reads across tenants on the system pool. Under
+    // row-level security those counts saw nothing, and a tenant holding data
+    // could be deleted. Acting *inside* one tenant's data goes through
+    // X-Tenant-Id on the tenant routes instead.
+    return runAsSystem('superadmin control plane: cross-tenant administration', next)
   } catch (e) {
     console.error('[SUPERADMIN] gate:', e)
     return res.status(500).json({ error: 'Could not verify access' })

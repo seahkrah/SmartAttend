@@ -35,6 +35,7 @@ import { getClientIp } from '../utils/getClientIp.js'
 import { rotateSession, revokeSession, revokeUserSessions, SessionError } from '../auth/sessions.js'
 import { checkPassword } from '../auth/passwordPolicy.js'
 import { requestPasswordReset, redeemToken, AccountTokenError } from '../auth/accountTokens.js'
+import { runAsSystem } from '../db/dbContext.js'
 import { loginLimiter, refreshLimiter, accountLimiter } from '../security/httpSecurity.js'
 import crypto from 'crypto'
 
@@ -427,7 +428,15 @@ router.post('/password/forgot', accountLimiter, async (req: Request, res: Respon
   // long it takes depends on whether the account exists. Errors are logged,
   // not reported, for the same reason.
   query(`SELECT id FROM platforms WHERE name = $1`, [platform])
-    .then((p) => (p.rows.length > 0 ? requestPasswordReset(email, p.rows[0].id) : undefined))
+    // Before sign-in there is no tenant: finding the account, its tenant and
+    // queuing the email in that tenant's outbox is identity work.
+    .then((p) =>
+      p.rows.length > 0
+        ? runAsSystem('password reset: find the account and queue its email before sign-in', () =>
+            requestPasswordReset(email, p.rows[0].id),
+          )
+        : undefined,
+    )
     .catch((error) => logError('Password reset request', error))
   return res.status(202).json({
     message: 'If an account uses that address, we have sent it a link to reset the password. The link works for 30 minutes.',

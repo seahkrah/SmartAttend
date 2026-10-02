@@ -4,6 +4,7 @@ import { issueTokens } from '../auth/authService.js'
 const generateAccessToken = async (id: string, platform_id: string, role_id: string) =>
   (await issueTokens({ id, platform_id, role_id }, { userAgent: 'e2e fixture' })).accessToken
 import bcrypt from 'bcryptjs'
+import { runAsSystem } from '../db/dbContext.js'
 
 async function main() {
   const cp = (await query(`SELECT id FROM platforms WHERE name='corporate'`)).rows[0]
@@ -278,4 +279,4 @@ async function main() {
   }
   console.log(JSON.stringify(out))
 }
-main().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})
+runAsSystem('seed e2e fixtures across tenants', main).then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1)})

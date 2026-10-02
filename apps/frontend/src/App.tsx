@@ -22,6 +22,7 @@ import HomeRedirect from './components/routing/HomeRedirect';
 import { RoleRoute, ProtectedRoute } from './components/routing/RoleRoute';
 import { AppShell } from './components/shell/AppShell';
 import { ToastContainer } from './components/Toast';
+import { StepUpDialog } from './components/auth/StepUpDialog';
 import { DarkSurface } from './theme/DarkSurface';
 
 // Store
@@ -135,6 +136,7 @@ export default function App() {
   return (
     <Router>
       <ToastContainer />
+      <StepUpDialog />
       <Suspense fallback={<div className="min-h-screen bg-page" aria-busy="true" />}>
       <Routes>
         {/* Public Routes */}

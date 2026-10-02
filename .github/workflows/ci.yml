@@ -135,6 +135,10 @@ jobs:
       # treats a 429 as a failure rather than as a refusal.
       RATE_LIMIT_API_PER_MINUTE: '1000000'
       RATE_LIMIT_MFA_PER_15MIN: '100000'
+      # The suites run for most of an hour on sessions seeded at the start;
+      # sessionManagement ages its own session to test the step-up refusal.
+      # Production keeps the five-minute default.
+      STEP_UP_MAX_AGE_SECONDS: '7200'
 
     steps:
       - uses: actions/checkout@v4

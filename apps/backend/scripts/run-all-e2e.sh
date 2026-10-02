@@ -82,6 +82,9 @@ SUITES=(
   # the 30-second race window twice).
   csrf
   refreshReuse
+  # The device list, remote sign-out and step-up. Ends every superadmin
+  # session at the end, so it runs after every suite that uses one.
+  sessionManagement
 )
 
 record() { printf '%s\t%s\n' "$1" "$2" >> "$E2E_RESULTS"; }

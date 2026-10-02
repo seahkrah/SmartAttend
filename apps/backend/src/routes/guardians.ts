@@ -12,6 +12,7 @@ import {
 import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth/accountTokens.js'
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
+import { handingOverLink, requireRecentAuthWhen } from '../auth/stepUp.js'
 
 /**
  * SMS — guardians, as the school's administrators manage them.
@@ -627,7 +628,7 @@ router.delete('/:guardianId/students/:linkId', async (req: TenantRequest, res: R
  * there is nothing to invite them to — they simply see this school's
  * children next time.
  */
-router.post('/:guardianId/invitation', async (req: TenantRequest, res: Response) => {
+router.post('/:guardianId/invitation', requireRecentAuthWhen(handingOverLink), async (req: TenantRequest, res: Response) => {
   const client = await getConnection()
   try {
     const ctx = ctxOf(req)

@@ -53,6 +53,7 @@ const SYSTEM_ALLOWED = new Set([
   'apps/backend/src/auth/sessions.ts', // sessions are checked before the tenant is resolved
   'apps/backend/src/auth/mfaService.ts', // two-factor state, read during sign-in
   'apps/backend/src/auth/accountTokens.ts', // reset and activation links before sign-in
+  'apps/backend/src/auth/stepUp.ts', // when the session last proved who it is
   'apps/backend/src/routes/mfa.ts', // the code step of sign-in and the caller's own settings
   // Platform-level records (migration 075).
   'apps/backend/src/services/incidentService.ts', // errors become platform incidents, whatever the tenant

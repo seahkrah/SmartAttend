@@ -3,6 +3,7 @@ import { frontendConfig } from '../config/environment';
 import {
   recoverSession, clearStoredSession, isSessionlessAuthCall, redirectForMfaSetup, csrfHeader, rememberCsrfToken, markSignedIn,
 } from '../utils/sessionRefresh';
+import { isStepUpRequired, requestStepUp } from '../utils/stepUp';
 import {
   AuthResponse,
   User,
@@ -35,6 +36,11 @@ class ApiClient {
       (response) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as any;
+        if (isStepUpRequired(error) && originalRequest && !originalRequest._steppedUp) {
+          originalRequest._steppedUp = true;
+          if (await requestStepUp()) return this.client(originalRequest);
+          return Promise.reject(error);
+        }
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry
             && !isSessionlessAuthCall(originalRequest.url)) {
           originalRequest._retry = true;

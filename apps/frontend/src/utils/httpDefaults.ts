@@ -9,6 +9,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { csrfHeader, endSession, isSessionlessAuthCall, recoverSession, redirectForMfaSetup } from './sessionRefresh';
 import { frontendConfig } from '../config/environment';
+import { isStepUpRequired, requestStepUp } from './stepUp';
 
 axios.defaults.withCredentials = true;
 
@@ -20,7 +21,12 @@ axios.interceptors.request.use((config) => {
 axios.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _steppedUp?: boolean };
+    if (isStepUpRequired(error) && original && !original._steppedUp) {
+      original._steppedUp = true;
+      if (await requestStepUp()) return axios(original);
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401 && original && !original._retry && !isSessionlessAuthCall(original.url)) {
       original._retry = true;
       if (await recoverSession(frontendConfig.apiBaseUrl)) {

@@ -14,6 +14,7 @@ import {
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import { TenantScopeError } from '../db/tenantScoped.js'
+import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
 
 /**
  * SMS — the school administrator's surface.
@@ -361,7 +362,7 @@ router.patch('/admin/school/users/:userId', async (req: TenantRequest, res: Resp
  * no working email; that is audited. Only for accounts nobody has signed in
  * to, and never for an administrator's account.
  */
-router.post('/admin/school/users/:userId/invitation', async (req: TenantRequest, res: Response) => {
+router.post('/admin/school/users/:userId/invitation', requireRecentAuthWhen(handingOverLink), async (req: TenantRequest, res: Response) => {
   const client = await getConnection()
   try {
     const ctx = ctxOf(req)
@@ -406,7 +407,7 @@ router.post('/admin/school/users/:userId/invitation', async (req: TenantRequest,
  * `handover`) given to the administrator to pass on. Audited before the link
  * exists. Not for administrators, nor for the caller's own account.
  */
-router.post('/admin/school/users/:userId/reset-access', async (req: TenantRequest, res: Response) => {
+router.post('/admin/school/users/:userId/reset-access', requireRecentAuth, async (req: TenantRequest, res: Response) => {
   const client = await getConnection()
   try {
     const ctx = ctxOf(req)

@@ -11,6 +11,7 @@ import {
   requireRoles,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
+import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
 
 const router = express.Router()
 
@@ -515,7 +516,7 @@ router.patch('/admin/employees/:employeeId/terminate', authenticateToken, async 
  * employer without working email; that is audited. Only for accounts nobody
  * has signed in to yet.
  */
-router.post('/admin/employees/:employeeId/invitation', authenticateToken, async (req: Request, res: Response) => {
+router.post('/admin/employees/:employeeId/invitation', requireRecentAuthWhen(handingOverLink), authenticateToken, async (req: Request, res: Response) => {
   const client = await pool.connect()
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
@@ -561,7 +562,7 @@ router.post('/admin/employees/:employeeId/invitation', authenticateToken, async 
 })
 
 /** Restores an employee's access; see the school equivalent in schoolAdmin.ts. */
-router.post('/admin/employees/:employeeId/reset-access', authenticateToken, async (req: Request, res: Response) => {
+router.post('/admin/employees/:employeeId/reset-access', requireRecentAuth, authenticateToken, async (req: Request, res: Response) => {
   const client = await pool.connect()
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })

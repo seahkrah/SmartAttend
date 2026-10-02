@@ -4,6 +4,7 @@ import {
   loginUser,
   getUserWithRole,
   accountPasswordMatches,
+  noteFailedSignIn,
   setAccountPassword,
   getUserByEmail,
   generateAccessToken,
@@ -23,7 +24,7 @@ import {
   hashPassword
 } from '../auth/authService.js'
 import { authenticateToken } from '../auth/middleware.js'
-import { mfaSetupPending } from '../auth/mfaService.js'
+import { checkCode, mfaEnabled, mfaSetupPending } from '../auth/mfaService.js'
 import {
   resolveTenantContext,
   requireTenant,
@@ -35,6 +36,7 @@ import { ErrorMessages, getUserFriendlyError, logError } from '../utils/errorMes
 import { getClientIp } from '../utils/getClientIp.js'
 import { rotateSession, revokeSession, revokeUserSessions, SessionError } from '../auth/sessions.js'
 import { checkPassword } from '../auth/passwordPolicy.js'
+import { markAuthenticated, stepUpMaxAgeSeconds } from '../auth/stepUp.js'
 import { requestPasswordReset, redeemToken, AccountTokenError } from '../auth/accountTokens.js'
 import { runAsSystem } from '../db/dbContext.js'
 import { loginLimiter, refreshLimiter, accountLimiter, allowedOrigins } from '../security/httpSecurity.js'
@@ -784,6 +786,38 @@ router.post('/refresh', refreshLimiter, async (req: RefreshRequest, res: Respons
 // ===========================
 // GET CURRENT USER ENDPOINT
 // ===========================
+
+/**
+ * Step-up: the person proves again who they are, with their password or a
+ * code from their authenticator app, so that the next few minutes'
+ * sensitive actions are allowed (auth/stepUp.ts). A wrong answer counts
+ * towards the same lockout as a wrong sign-in.
+ */
+router.post('/step-up', loginLimiter, authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId
+    const password = typeof req.body?.password === 'string' ? req.body.password : ''
+    const code = typeof req.body?.code === 'string' ? req.body.code : ''
+    if (!password && !code) {
+      return res.status(400).json({ error: 'Enter your password or a code from your authenticator app.' })
+    }
+    const ok = password
+      ? (await accountPasswordMatches(userId, password)) === true
+      : (await mfaEnabled(userId)) && (await checkCode(userId, code))
+    if (!ok) {
+      const who = await query(`SELECT email FROM users WHERE id = $1`, [userId])
+      if (who.rows[0]) await noteFailedSignIn(who.rows[0].email, getClientIp(req))
+      // 403, not 401: the session is fine; a 401 would send the app off to
+      // refresh it and try the same wrong answer again.
+      return res.status(403).json({ error: password ? 'That password is not correct.' : 'That code is not correct.', code: 'STEP_UP_FAILED' })
+    }
+    await markAuthenticated(req.user!.sessionId!)
+    return res.json({ steppedUp: true, validForSeconds: stepUpMaxAgeSeconds() })
+  } catch (error) {
+    logError('Step-up', error)
+    return res.status(500).json({ error: 'Could not confirm it is you. Please try again.' })
+  }
+})
 
 /**
  * The CSRF token of the caller's session, for a browser app that reloaded

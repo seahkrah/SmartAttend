@@ -12,6 +12,7 @@ import { logAudit } from '../services/domainAuditService.js'
 import {
   SCHOOL_TYPE_CATALOGUE, SCHOOL_TYPES, SchoolStructureError, applySchoolStructure, validateStructure,
 } from '../services/schoolTypes.js'
+import { requireRecentAuth } from '../auth/stepUp.js'
 
 /**
  * The control plane.
@@ -855,7 +856,7 @@ async function handoverAllowed(req: Request, res: Response, tenantId: string): P
   return true
 }
 
-router.post('/tenant-admins', async (req: Request, res: Response) => {
+router.post('/tenant-admins', requireRecentAuth, async (req: Request, res: Response) => {
   const client = await getConnection()
   try {
     const b = req.body ?? {}
@@ -951,7 +952,7 @@ router.post('/tenant-admins', async (req: Request, res: Response) => {
  * cancelling any earlier one; `handover: true` returns the setup link rather
  * than emailing it.
  */
-router.post('/tenant-admins/:adminId/invitation', async (req: Request, res: Response) => {
+router.post('/tenant-admins/:adminId/invitation', requireRecentAuth, async (req: Request, res: Response) => {
   const client = await getConnection()
   try {
     const { adminId } = req.params
@@ -1091,7 +1092,7 @@ router.get('/users', async (req: Request, res: Response) => {
   }
 })
 
-router.patch('/users/:userId', async (req: Request, res: Response) => {
+router.patch('/users/:userId', requireRecentAuth, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params
     if (!UUID.test(userId)) return notFound(res, 'User')
@@ -1224,7 +1225,7 @@ router.get('/locked-users', async (_req: Request, res: Response) => {
  * their password and set it up again. A superadmin cannot do this to
  * themselves: another superadmin must.
  */
-router.delete('/users/:userId/mfa', async (req: Request, res: Response) => {
+router.delete('/users/:userId/mfa', requireRecentAuth, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params
     if (!UUID.test(userId)) return notFound(res, 'User')
@@ -1762,7 +1763,7 @@ async function tenantTrail(
   }
 }
 
-router.post('/break-glass', async (req: Request, res: Response) => {
+router.post('/break-glass', requireRecentAuth, async (req: Request, res: Response) => {
   const { tenantId, reason } = req.body ?? {}
   const minutes = Number(req.body?.minutes ?? 30)
   if (typeof tenantId !== 'string' || !UUID.test(tenantId)) {

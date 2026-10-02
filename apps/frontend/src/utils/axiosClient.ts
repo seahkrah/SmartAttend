@@ -11,6 +11,7 @@
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { recoverSession, endSession, isSessionlessAuthCall, redirectForMfaSetup, csrfHeader } from './sessionRefresh';
+import { isStepUpRequired, requestStepUp } from './stepUp';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -76,7 +77,15 @@ axiosClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _steppedUp?: boolean };
+
+    // A sensitive action from a session that signed in a while ago: confirm
+    // who you are, then try once more.
+    if (isStepUpRequired(error) && originalRequest && !originalRequest._steppedUp) {
+      originalRequest._steppedUp = true;
+      if (await requestStepUp()) return axiosClient(originalRequest);
+      return Promise.reject(error);
+    }
 
     // A 401 means the access token expired or the session ended. Try to
     // renew it once; if that fails the session is over.

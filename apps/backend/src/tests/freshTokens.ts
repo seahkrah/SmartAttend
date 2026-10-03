@@ -30,3 +30,18 @@ export function keepFresh(callers: Array<{ token: string }>, minutes = 5): () =>
   timer.unref()
   return () => clearInterval(timer)
 }
+
+/**
+ * A new session for the account a seed token names, for suites late in the
+ * run that must not depend on the seed's session still being live (another
+ * suite may end it). Returns the access token.
+ */
+export async function freshSession(token: string): Promise<string> {
+  const t = jwt.decode(token) as { userId: string; platformId: string; roleId: string } | null
+  if (!t?.userId) throw new Error('not an access token this API issued')
+  const { issueTokens } = await import('../auth/authService.js')
+  const { runAsSystem } = await import('../db/dbContext.js')
+  const out = await runAsSystem('e2e: a fresh session for a seeded account', () =>
+    issueTokens({ id: t.userId, platform_id: t.platformId, role_id: t.roleId }, { userAgent: 'e2e fresh session' }))
+  return out.accessToken
+}

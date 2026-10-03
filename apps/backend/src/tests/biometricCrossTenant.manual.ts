@@ -22,7 +22,7 @@ import path from 'path'
 import pg from 'pg'
 import pool, { query } from '../db/connection.js'
 import { withTenant } from '../db/dbContext.js'
-import { reissue } from './freshTokens.js'
+import { freshSession } from './freshTokens.js'
 
 const API = (process.env.API_BASE ?? 'http://127.0.0.1:5000').replace(/\/$/, '')
 const dir = process.env.E2E_FIXTURE_DIR ?? path.join(process.cwd(), '.e2e-fixtures')
@@ -87,10 +87,10 @@ async function frames(route: string, token: string, challengeId: string, steps: 
 }
 
 async function main() {
-  const aAdmin = reissue(school.A.token)
-  const aFac = reissue(school.A.facToken)
-  const bAdmin = reissue(school.B.token)
-  const bFac = reissue(school.B.facToken)
+  // Fresh sessions: this suite runs late, and must not depend on the seed's
+  // sessions surviving every suite before it.
+  const [aAdmin, aFac, bAdmin, bFac] = await Promise.all(
+    [school.A.token, school.A.facToken, school.B.token, school.B.facToken].map(freshSession))
   const bStudent = school.B.students[0] as string
   const aStudents = school.A.students as string[]
   const settingOf = async (tenant: string) =>
@@ -178,7 +178,7 @@ async function main() {
     check("a consent cannot be planted in B's name", planted !== null, `(${planted ?? 'it ran'})`)
 
     console.log('-- employers --')
-    const aHr = reissue(corp.A.token)
+    const aHr = await freshSession(corp.A.token)
     const otherEmp = (corp.B.employees as string[])[0]
     r = await call('GET', `/api/biometrics/subjects/employee/${otherEmp}`, aHr)
     check("A's HR cannot read B's employee's face-matching status", r.status === 404, `(${r.status})`)

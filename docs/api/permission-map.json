@@ -1535,6 +1535,163 @@
   },
   {
     "method": "GET",
+    "path": "/api/attendance-review/alerts",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance-review/alerts/:alertId/acknowledge",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance-review/approvals",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance-review/approvals/:eventId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance-review/manual",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance-review/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/attendance-review/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/attendance/courses/:courseId/sessions",
     "guards": [
       {

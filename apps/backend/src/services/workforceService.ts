@@ -1020,6 +1020,11 @@ export interface CheckInRow {
   siteLocation: string | null
   state: string
   faceVerified: boolean
+  /** How it was taken, so a manual check-in is marked wherever it is shown (brief 5.2). */
+  method: 'face' | 'manual'
+  manualReason: string | null
+  /** A manual check-in beyond the tenant's allowance, waiting for a manager. */
+  awaitingApproval: boolean
   /** Hours for a closed check-in; null while it is open. */
   hours: string | null
 }
@@ -1033,6 +1038,9 @@ function toCheckInRow(r: any): CheckInRow {
     siteLocation: r.site_location,
     state: r.checkin_state,
     faceVerified: r.face_verified === true,
+    method: r.face_verified === true ? 'face' : 'manual',
+    manualReason: r.face_verified === true ? null : (r.manual_reason ?? null),
+    awaitingApproval: r.approval_state === 'pending',
     hours: r.hours === null || r.hours === undefined ? null : String(r.hours),
   }
 }
@@ -1040,6 +1048,15 @@ function toCheckInRow(r: any): CheckInRow {
 const CHECKIN_COLUMNS = `
   id, check_in_type, check_in_time, check_out_time, site_location,
   checkin_state, face_verified,
+  (SELECT ev.reason_code FROM attendance_events ev
+    WHERE ev.tenant_id = corporate_checkins.tenant_id AND ev.checkin_id = corporate_checkins.id AND ev.kind = 'check_in'
+    ORDER BY ev.server_time LIMIT 1) AS manual_reason,
+  (SELECT CASE WHEN ev.approval_state = 'pending' AND NOT EXISTS (
+            SELECT 1 FROM attendance_events d WHERE d.tenant_id = ev.tenant_id AND d.kind = 'approval'
+               AND d.supersedes_event_id = ev.id) THEN 'pending' ELSE ev.approval_state END
+     FROM attendance_events ev
+    WHERE ev.tenant_id = corporate_checkins.tenant_id AND ev.checkin_id = corporate_checkins.id AND ev.kind = 'check_in'
+    ORDER BY ev.server_time LIMIT 1) AS approval_state,
   CASE WHEN check_out_time IS NULL THEN NULL
        ELSE ROUND((GREATEST(EXTRACT(EPOCH FROM (check_out_time - check_in_time)), 0)
                    / 3600.0)::numeric, 2)

@@ -120,6 +120,87 @@ interface EventRow {
   supersedes?: string | null
 }
 
+/** A tenant's whole-number setting, or the default when unset or not a non-negative integer. */
+async function intSetting(client: PoolClient, tenantId: string, key: string, fallback: number): Promise<number> {
+  const raw = await setting(client, tenantId, key)
+  const v = Number(raw)
+  return raw !== null && Number.isInteger(v) && v >= 0 ? v : fallback
+}
+
+export const ALERT_DEFAULTS = {
+  /** Different people entered manually from one device within an hour. */
+  deviceManualPerHour: 5,
+  /** "Face not recognised" for one person within seven days. */
+  faceNotRecognisedPerWeek: 3,
+  /** Minutes before a rostered shift that a check-in still counts as on time. */
+  shiftEarlyMinutes: 60,
+}
+
+async function raiseAlert(
+  client: PoolClient, ctx: CoreContext, kind: string,
+  subject: { studentId?: string | null; employeeId?: string | null; deviceId?: string | null },
+  eventId: string, detail: Record<string, unknown>
+) {
+  await client.query(
+    `INSERT INTO attendance_alerts (tenant_id, kind, student_id, employee_id, device_id, event_id, detail)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT DO NOTHING`,
+    [ctx.tenantId, kind, subject.studentId ?? null, subject.employeeId ?? null, subject.deviceId ?? null, eventId,
+     JSON.stringify(detail)]
+  )
+}
+
+/**
+ * The fallback's abuse alerts (brief 5.2), checked as each manual capture is
+ * recorded: many people entered by hand from one device within an hour; one
+ * person "not recognised" again and again; a manual check-in outside the
+ * employee's rostered shift. At most one alert of a kind per subject and day.
+ */
+async function checkForAbuse(
+  client: PoolClient, ctx: CoreContext, eventId: string, capture: Capture,
+  subject: { studentId?: string | null; employeeId?: string | null }, isCheckIn: boolean
+) {
+  if (!isManual(capture.method) || capture.reasonCode === FACE_NOT_IN_USE) return
+  const device = capture.deviceId ? String(capture.deviceId).slice(0, 128) : null
+  if (device) {
+    const limit = await intSetting(client, ctx.tenantId, 'attendance.device_manual_alert', ALERT_DEFAULTS.deviceManualPerHour)
+    const r = await client.query(
+      `SELECT count(DISTINCT COALESCE(student_id, employee_id))::int AS people FROM attendance_events
+        WHERE tenant_id = $1 AND device_id = $2 AND method IN ('manual', 'offline_manual')
+          AND kind IN ('mark', 'check_in') AND server_time > CURRENT_TIMESTAMP - INTERVAL '1 hour'`,
+      [ctx.tenantId, device])
+    if (limit > 0 && r.rows[0].people >= limit) {
+      await raiseAlert(client, ctx, 'device_manual_burst', { deviceId: device }, eventId,
+        { people: r.rows[0].people, withinMinutes: 60, limit })
+    }
+  }
+  if (capture.reasonCode === 'face_not_recognised') {
+    const limit = await intSetting(client, ctx.tenantId, 'attendance.face_not_recognised_alert', ALERT_DEFAULTS.faceNotRecognisedPerWeek)
+    const r = await client.query(
+      `SELECT count(*)::int AS n FROM attendance_events
+        WHERE tenant_id = $1 AND reason_code = 'face_not_recognised'
+          AND (student_id = $2 OR employee_id = $3) AND server_time > CURRENT_TIMESTAMP - INTERVAL '7 days'`,
+      [ctx.tenantId, subject.studentId ?? null, subject.employeeId ?? null])
+    if (limit > 0 && r.rows[0].n >= limit) {
+      await raiseAlert(client, ctx, 'repeated_face_not_recognised', subject, eventId, { times: r.rows[0].n, withinDays: 7, limit })
+    }
+  }
+  if (isCheckIn && subject.employeeId) {
+    const early = await intSetting(client, ctx.tenantId, 'attendance.shift_early_minutes', ALERT_DEFAULTS.shiftEarlyMinutes)
+    // Only for someone rostered today or yesterday: with no roster there is no shift to be outside.
+    const r = await client.query(
+      `SELECT bool_or(LOCALTIMESTAMP BETWEEN s.starts_at - make_interval(mins => $3) AND s.ends_at) AS on_shift,
+              count(*)::int AS shifts
+         FROM roster_shifts s
+        WHERE s.tenant_id = $1 AND s.employee_id = $2 AND s.status <> 'cancelled'
+          AND s.work_date BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE`,
+      [ctx.tenantId, subject.employeeId, early])
+    if (r.rows[0].shifts > 0 && !r.rows[0].on_shift) {
+      await raiseAlert(client, ctx, 'manual_outside_shift', subject, eventId, { shiftsToday: r.rows[0].shifts, earlyMinutes: early })
+    }
+  }
+}
+
 function clientTime(v: unknown): Date | null {
   if (!v) return null
   const d = new Date(String(v))
@@ -217,6 +298,7 @@ export async function markStudent(client: PoolClient, ctx: CoreContext, m: Mark)
     platform: 'school', kind: 'mark', studentId: m.studentId, scheduleId: m.scheduleId, attendanceDate: m.date,
     status: m.status, attendanceId, method: capture.method, capture,
   })
+  await checkForAbuse(client, ctx, eventId, capture, { studentId: m.studentId }, false)
   return { attendanceId, eventId }
 }
 
@@ -290,6 +372,7 @@ export async function checkIn(client: PoolClient, ctx: CoreContext, c: CheckIn):
     platform: 'corporate', kind: 'check_in', employeeId: c.employeeId, checkinId, method: capture.method,
     capture, approvalState: approval,
   })
+  await checkForAbuse(client, ctx, eventId, capture, { employeeId: c.employeeId }, true)
   return { checkinId, eventId, approval }
 }
 

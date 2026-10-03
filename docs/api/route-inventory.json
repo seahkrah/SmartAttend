@@ -438,6 +438,45 @@
   },
   {
     "method": "GET",
+    "path": "/api/attendance-review/alerts",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance-review/alerts/:alertId/acknowledge",
+    "params": [
+      "alertId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance-review/approvals",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance-review/approvals/:eventId",
+    "params": [
+      "eventId"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance-review/manual",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance-review/settings",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/attendance-review/settings",
+    "params": []
+  },
+  {
+    "method": "GET",
     "path": "/api/attendance/courses/:courseId/sessions",
     "params": [
       "courseId"

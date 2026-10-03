@@ -128,6 +128,8 @@ TS_SUITES=(
   webauthn
   # Single sign-on through an OpenID Connect provider the suite runs.
   sso
+  # The manual fallback on both platforms: reasons, approval, abuse alerts.
+  manualFallback
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json
   # as every caller it leaves out, same-tenant IDOR cases, self-promotion.
   privilegeEscalation

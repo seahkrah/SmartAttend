@@ -746,6 +746,10 @@ router.get('/schedules/:scheduleId/students', requireRole('faculty'), async (req
         sa.remarks,
         sa.marked_at,
         sa.face_verified,
+        CASE WHEN sa.id IS NULL THEN NULL WHEN sa.face_verified THEN 'face' ELSE 'manual' END AS method,
+        (SELECT ev.reason_code FROM attendance_events ev
+          WHERE ev.tenant_id = sa.tenant_id AND ev.attendance_id = sa.id AND ev.kind = 'mark'
+          ORDER BY ev.server_time DESC LIMIT 1) AS manual_reason,
         (ft.id IS NOT NULL) AS has_face_enrolled
        FROM student_courses ss
        JOIN students s ON ss.student_id = s.id AND s.tenant_id = ss.tenant_id

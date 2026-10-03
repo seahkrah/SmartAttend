@@ -370,7 +370,11 @@ router.get('/me/export', selfService("the caller's own attendance, as a file"), 
 
     const rows = self.kind === 'student'
       ? await query(
-          `SELECT sa.attendance_date AS date, c.code AS context, sa.status, sa.face_verified, sa.marked_at
+          `SELECT sa.attendance_date AS date, c.code AS context, sa.status, sa.face_verified, sa.marked_at,
+                  CASE WHEN sa.face_verified THEN 'face' ELSE 'manual' END AS method,
+                  (SELECT ev.reason_code FROM attendance_events ev
+                    WHERE ev.tenant_id = sa.tenant_id AND ev.attendance_id = sa.id AND ev.kind = 'mark'
+                    ORDER BY ev.server_time DESC LIMIT 1) AS manual_reason
              FROM school_attendance sa
              LEFT JOIN class_schedules cs ON cs.id = sa.schedule_id AND cs.tenant_id = $1
              LEFT JOIN courses c ON c.id = cs.course_id AND c.tenant_id = $1
@@ -381,7 +385,11 @@ router.get('/me/export', selfService("the caller's own attendance, as a file"), 
         )
       : await query(
           `SELECT cc.check_in_time::date AS date, cc.check_in_type AS context,
-                  'present' AS status, cc.face_verified, cc.check_in_time AS marked_at
+                  'present' AS status, cc.face_verified, cc.check_in_time AS marked_at,
+                  CASE WHEN cc.face_verified THEN 'face' ELSE 'manual' END AS method,
+                  (SELECT ev.reason_code FROM attendance_events ev
+                    WHERE ev.tenant_id = cc.tenant_id AND ev.checkin_id = cc.id AND ev.kind = 'check_in'
+                    ORDER BY ev.server_time LIMIT 1) AS manual_reason
              FROM corporate_checkins cc
             WHERE cc.tenant_id = $1 AND cc.employee_id = $2
               AND cc.check_in_time > NOW() - ($3 || ' days')::interval
@@ -394,8 +402,11 @@ router.get('/me/export', selfService("the caller's own attendance, as a file"), 
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
     const csv = [
-      ['date', 'context', 'status', 'face_verified', 'recorded_at'].join(','),
-      ...rows.rows.map((x: any) => [x.date, x.context, x.status, x.face_verified, x.marked_at].map(escape).join(',')),
+      // How each was taken is in every export: manual entries are marked (brief 5.2).
+      ['date', 'context', 'status', 'face_verified', 'recorded_at', 'method', 'manual_reason'].join(','),
+      ...rows.rows.map((x: any) =>
+        [x.date, x.context, x.status, x.face_verified, x.marked_at, x.method, x.method === 'manual' ? x.manual_reason : '']
+          .map(escape).join(',')),
     ].join('\n')
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -545,7 +556,10 @@ router.get('/department/export', requireRoles(...DEPARTMENT_ROLES), async (req: 
               e.email,
               (SELECT COUNT(*)::int FROM corporate_checkins c
                 WHERE c.employee_id = e.id AND c.tenant_id = $1
-                  AND c.check_in_time > NOW() - ($2 || ' days')::interval) AS present
+                  AND c.check_in_time > NOW() - ($2 || ' days')::interval) AS present,
+              (SELECT COUNT(*)::int FROM corporate_checkins c
+                WHERE c.employee_id = e.id AND c.tenant_id = $1 AND NOT c.face_verified
+                  AND c.check_in_time > NOW() - ($2 || ' days')::interval) AS manual
          FROM employees e
          LEFT JOIN corporate_departments d ON d.id = e.department_id AND d.tenant_id = $1
         WHERE e.tenant_id = $1 AND e.is_currently_employed
@@ -557,10 +571,10 @@ router.get('/department/export', requireRoles(...DEPARTMENT_ROLES), async (req: 
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
     const csv = [
-      ['department', 'name', 'email', 'present', 'expected', 'attendance_percent'].join(','),
+      ['department', 'name', 'email', 'present', 'expected', 'attendance_percent', 'manual_checkins'].join(','),
       ...r.rows.map((x: any) => {
         const pct = days > 0 ? Math.round((x.present / days) * 1000) / 10 : 0
-        return [x.department, x.name, x.email, x.present, days, pct].map(escape).join(',')
+        return [x.department, x.name, x.email, x.present, days, pct, x.manual].map(escape).join(',')
       }),
     ].join('\n')
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')

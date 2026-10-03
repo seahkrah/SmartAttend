@@ -171,9 +171,13 @@ async function main() {
   check("and B's administrator is unchanged", adminAfter !== onlyA)
 
   // Audit phase 3, F1: an account another tenant shares keeps its role,
-  // status and details whatever one tenant does (migration 083).
+  // status and details whatever one tenant does (migrations 083, 084).
+  // An earlier suite may have left a removed membership in B: make it live,
+  // and put back whatever was there.
+  const priorB = (await owner(`SELECT status FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`,
+    [onlyA, B])).rows[0]?.status ?? null
   await owner(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')
-               ON CONFLICT DO NOTHING`, [onlyA, B])
+               ON CONFLICT (user_id, school_entity_id) DO UPDATE SET status = 'active'`, [onlyA, B])
   try {
     for (const [label, sql] of [
       ['switched off', `UPDATE users SET is_active = FALSE WHERE id = $1`],
@@ -192,8 +196,15 @@ async function main() {
       check("while an account only A has is A's to edit", mine === null, `(${mine})`)
       await owner(`UPDATE users SET full_name = rtrim(full_name) WHERE id = $1`, [solo])
     }
+    const forged = await refused(() => withTenant({ tenantId: A }, () =>
+      query(`UPDATE users SET membership_count = 1 WHERE id = $1`, [onlyA])))
+    check('and the membership count that marks it shared cannot be rewritten', forged === '42501', `(${forged ?? 'it ran'})`)
   } finally {
-    await owner(`DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`, [onlyA, B])
+    if (priorB === null) {
+      await owner(`DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`, [onlyA, B])
+    } else {
+      await owner(`UPDATE school_user_associations SET status = $3 WHERE user_id = $1 AND school_entity_id = $2`, [onlyA, B, priorB])
+    }
   }
 
   // The guard must not stop a tenant adding someone it can already see: an

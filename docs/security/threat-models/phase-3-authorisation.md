@@ -60,7 +60,8 @@ the survey had missed. Each is fixed and tested, except where marked:
   a member of, but one tenant could change its role and status for all of
   them. The routes' "belongs to another organisation" checks could not see
   other tenants under row-level security, so they never fired. The routes
-  now ask on the system pool, and a trigger refuses the rest (migration 083).
+  now ask on the system pool, and a trigger refuses the rest: each account
+  counts its live memberships (migration 084).
 - **Lecturers writing to classes they do not teach (#38).**
 - **Raising one's own pay or hours (#39)**, through pay components, payroll
   inputs, one's own contract and one's own timesheet.

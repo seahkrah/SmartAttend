@@ -25,6 +25,7 @@ import fs from 'fs'
 import path from 'path'
 import pg from 'pg'
 import { inventory, type RouteEntry } from '../scripts/routeInventory.js'
+import { keepFresh } from './freshTokens.js'
 
 const API = (process.env.API_BASE ?? 'http://127.0.0.1:5000').replace(/\/$/, '')
 const dir = process.env.E2E_FIXTURE_DIR ?? path.join(process.cwd(), '.e2e-fixtures')
@@ -111,6 +112,8 @@ async function victimRows() {
 }
 
 async function main() {
+  // The run outlives the seeds' 15-minute tokens: same sessions, fresh tokens.
+  keepFresh(callers)
   const everyRoute: RouteEntry[] = await inventory()
   const routes = everyRoute.filter((r) => r.params.length > 0)
   const { ids, counts: before } = await victimRows()

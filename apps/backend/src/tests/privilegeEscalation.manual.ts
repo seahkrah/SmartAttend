@@ -27,6 +27,7 @@ import pg from 'pg'
 import type { GuardTag } from '../auth/guards.js'
 import { issueTokens } from '../auth/authService.js'
 import { runAsSystem } from '../db/dbContext.js'
+import { keepFresh, reissue } from './freshTokens.js'
 
 const API = (process.env.API_BASE ?? 'http://127.0.0.1:5000').replace(/\/$/, '')
 const dir = process.env.E2E_FIXTURE_DIR ?? path.join(process.cwd(), '.e2e-fixtures')
@@ -451,6 +452,11 @@ async function selfDealing() {
 }
 
 async function main() {
+  // The seeds' tokens last 15 minutes and this suite runs late: same
+  // sessions, fresh tokens, for the fixtures and the callers made from them.
+  for (const k of ['token', 'facToken', 'studentToken']) school.A[k] = reissue(school.A[k])
+  for (const k of ['token', 'dirToken', 'adminToken', 'managerToken', 'empToken']) corp.A[k] = reissue(corp.A[k])
+  const stop = keepFresh(callers)
   await addCaller('guardian', 'school', 'guardian', school.A.tenantId)
   await addCaller('school IT', 'school', 'it', school.A.tenantId)
   await addCaller('corporate IT', 'corporate', 'it', corp.A.tenantId)
@@ -460,6 +466,7 @@ async function main() {
     await vertical()
     await selfDealing()
   } finally {
+    stop()
     await removeCallers()
   }
 }

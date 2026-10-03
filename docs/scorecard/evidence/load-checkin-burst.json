@@ -1,0 +1,56 @@
+{
+  "measuredAt": "2026-10-03T21:15:27.300Z",
+  "commit": "54452e370ea13df5cfb8443e76a16db4ea40103d",
+  "assumption": "docs/operations/capacity.md: N check-ins per minute for one tenant",
+  "n": 120,
+  "environment": {
+    "kind": "development machine, not production hardware",
+    "os": "Windows_NT 10.0.26300",
+    "cpus": 8,
+    "cpuModel": "Intel(R) Core(TM) i5-8350U CPU @ 1.70GHz",
+    "memoryGb": 8,
+    "node": "v22.20.0",
+    "faceWorkers": 2,
+    "apiReplicas": 1,
+    "database": "PostgreSQL 16 in Docker, same machine"
+  },
+  "targets": {
+    "manualP95Ms": 500,
+    "faceP95Ms": 4000
+  },
+  "manual": {
+    "n": 120,
+    "wallSeconds": 59.6,
+    "errors": 0,
+    "p50Ms": 47,
+    "p95Ms": 88,
+    "maxMs": 203,
+    "firstFailures": []
+  },
+  "face": {
+    "n": 120,
+    "wallSeconds": 88.3,
+    "errors": 108,
+    "p50Ms": 7867,
+    "p95Ms": 9857,
+    "maxMs": 9857,
+    "firstFailures": [
+      "verify 503 engine_unavailable",
+      "verify 503 engine_unavailable",
+      "verify 503 engine_unavailable",
+      "verify 503 engine_unavailable",
+      "verify 503 engine_unavailable"
+    ]
+  },
+  "faceSustained": {
+    "n": 30,
+    "wallSeconds": 59.2,
+    "errors": 0,
+    "p50Ms": 1145,
+    "p95Ms": 1292,
+    "maxMs": 1396,
+    "firstFailures": []
+  },
+  "workersRecoveredAfterSeconds": 139,
+  "met": false
+}

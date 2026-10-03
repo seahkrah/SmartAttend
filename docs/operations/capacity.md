@@ -47,6 +47,33 @@ add their own latency.
 
 ## Measured
 
-See the evidence file for the latest run: the commit, the machine, the
-number of workers, and p50, p95 and maximum for each path. A development
-machine is not production hardware, and the file says which it was.
+The evidence file holds the latest run: the commit, the machine, the number
+of workers, and p50, p95 and maximum for each path. A development machine is
+not production hardware, and the file says which it was.
+
+The last run was on a development laptop: 4 cores and 8 threads, 8 GB, with
+the API, PostgreSQL and two face workers all on it.
+
+| Path | Rate | Errors | p95 | Target met |
+|---|---|---|---|---|
+| Manual check-in | 120 a minute | 0 | 88 ms | yes |
+| Face check-in | 120 a minute | 108 of 120 got "use manual" | 9.9 s for the 12 that went through | **no** |
+| Face check-in | 30 a minute | 0 | 1.3 s | yes, at a quarter of N |
+
+What this says:
+
+- **The manual path carries the assumed load with ample room.**
+- **Face check-in at 120 a minute needs about four times this machine's
+  CPU for face analysis:** about 6 analyses a second, where this laptop
+  managed about 1.5 alongside everything else. For the pilot that means
+  four or more workers on hosts of their own. When the workers are full,
+  check-ins fall back to manual (503 `engine_unavailable`). That is the
+  designed behaviour, and nothing failed outright.
+- **Recovery after an overload is slow:** the workers took 139 s to answer
+  their health checks again. TensorFlow's work blocks a worker's event loop,
+  so health checks and disconnects queue behind the backlog. Moving the
+  engine into a worker thread, so the HTTP loop stays responsive, is the
+  fix. **Not done yet.**
+- **The face target is not met on this hardware.** The gate
+  `checkin-burst-load` checks only that this document and the evidence
+  exist. The evidence records `"met": false`.

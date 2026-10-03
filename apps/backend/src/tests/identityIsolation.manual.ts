@@ -180,7 +180,7 @@ async function main() {
                ON CONFLICT (user_id, school_entity_id) DO UPDATE SET status = 'active'`, [onlyA, B])
   try {
     for (const [label, sql] of [
-      ['switched off', `UPDATE users SET is_active = FALSE WHERE id = $1`],
+      ['switched on or off', `UPDATE users SET is_active = NOT is_active WHERE id = $1`],
       ['renamed', `UPDATE users SET full_name = full_name || ' (edited)' WHERE id = $1`],
     ] as const) {
       const code = await refused(() => withTenant({ tenantId: A }, () => query(sql, [onlyA])))

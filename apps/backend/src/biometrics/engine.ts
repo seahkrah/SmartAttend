@@ -77,8 +77,21 @@ export interface FaceObservation {
   width: number
 }
 
+/**
+ * Whole-image measurements for presentation-attack signals (src/biometrics/pad.ts),
+ * each 0 to 1: mean brightness, contrast (standard deviation of brightness),
+ * and sharpness (variance of the Laplacian, scaled). A printed photo or a
+ * screen held to the camera tends to be soft, flat or glaring.
+ */
+export interface FrameQuality {
+  brightness: number
+  contrast: number
+  sharpness: number
+}
+
 export interface FrameAnalysis {
   faces: FaceObservation[]
+  quality?: FrameQuality
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +216,7 @@ export async function analyzeFrame(buf: Buffer): Promise<FrameAnalysis> {
         tf.dispose(tensor)
         tensor = resized
       }
+      const quality = measure(tf, tensor)
       const detections = await faceapi
         .detectAllFaces(tensor, new faceapi.SsdMobilenetv1Options({ minConfidence: IMAGE_LIMITS.minDetectionScore }))
         .withFaceLandmarks()
@@ -219,9 +233,32 @@ export async function analyzeFrame(buf: Buffer): Promise<FrameAnalysis> {
           width: d.detection.box.width / scale,
         })
       }
-      return { faces }
+      return { faces, quality }
     } finally {
       tf.dispose(tensor)
     }
   })
+}
+
+/** Brightness, contrast and sharpness of a decoded RGB image (see FrameQuality). */
+function measure(tf: any, rgb: any): FrameQuality {
+  return tf.tidy(() => {
+    const gray = rgb.toFloat().mean(2).div(255)
+    const { mean, variance } = tf.moments(gray)
+    const kernel = tf.tensor4d([0, 1, 0, 1, -4, 1, 0, 1, 0], [3, 3, 1, 1])
+    const lap = tf.conv2d(gray.expandDims(0).expandDims(-1), kernel, 1, 'valid')
+    const lapVar = tf.moments(lap).variance
+    const [b, v, l] = [mean.dataSync()[0], variance.dataSync()[0], lapVar.dataSync()[0]]
+    return {
+      brightness: round(b),
+      contrast: round(Math.sqrt(v)),
+      // Typical camera frames give a Laplacian variance of 0.001 to 0.02 at
+      // this scale; scaled so that 0.01 reads as 1.
+      sharpness: round(Math.min(1, l / 0.01)),
+    }
+  })
+}
+
+function round(x: number): number {
+  return Math.round(x * 1000) / 1000
 }

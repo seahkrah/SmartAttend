@@ -47,6 +47,9 @@ export function FaceChallengeCapture<T>({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const framesRef = useRef<Blob[]>([]);
+  // When each frame was taken, in ms since the first: the server checks that
+  // they look like a person turning their head (presentation-attack signals).
+  const timesRef = useRef<number[]>([]);
   const [phase, setPhase] = useState<Phase>({ kind: 'camera' });
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -62,6 +65,7 @@ export function FaceChallengeCapture<T>({
 
   const start = useCallback(async () => {
     framesRef.current = [];
+    timesRef.current = [];
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return []; });
     setPhase({ kind: 'starting' });
     try {
@@ -129,6 +133,7 @@ export function FaceChallengeCapture<T>({
       return;
     }
     framesRef.current.push(blob);
+    timesRef.current.push(performance.now());
     setThumbs((t) => [...t, URL.createObjectURL(blob)]);
 
     if (phase.step + 1 < phase.steps.length) {
@@ -137,7 +142,8 @@ export function FaceChallengeCapture<T>({
     }
     setPhase({ kind: 'submitting' });
     try {
-      const result = await biometricsService.submit<T>(purpose, phase.challengeId, framesRef.current);
+      const result = await biometricsService.submit<T>(purpose, phase.challengeId, framesRef.current,
+        timesRef.current.map((t) => Math.round(t - timesRef.current[0])));
       setPhase({ kind: 'done', message: purpose === 'enroll' ? 'Enrolled.' : 'Matched.' });
       stopCamera();
       onDone(result);

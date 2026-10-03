@@ -129,9 +129,10 @@ export const biometricsService = {
   },
 
   /** Sends the captured frames. Content-Type is left for the browser to set. */
-  async submit<T>(purpose: Purpose, challengeId: string, frames: Blob[]): Promise<T> {
+  async submit<T>(purpose: Purpose, challengeId: string, frames: Blob[], frameTimes?: number[]): Promise<T> {
     const form = new FormData();
     form.append('challengeId', challengeId);
+    if (frameTimes?.length === frames.length) form.append('frameTimes', JSON.stringify(frameTimes));
     frames.forEach((f, i) => form.append('frames', f, `frame-${i + 1}.jpg`));
     try {
       const { data } = await axiosClient.post(`/biometrics/${purpose}`, form, { timeout: 90000 });

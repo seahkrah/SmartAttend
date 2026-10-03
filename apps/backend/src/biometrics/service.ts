@@ -22,7 +22,8 @@ import crypto from 'crypto'
 import type { PoolClient } from 'pg'
 import pool, { query } from '../db/connection.js'
 import type { ResolvedTenantContext } from '../auth/tenantContextMiddleware.js'
-import { type FaceObservation } from './engine.js'
+import { type FaceObservation, type FrameQuality } from './engine.js'
+import { assessPad, clampPadThreshold, PAD_THRESHOLD, type PadResult } from './pad.js'
 import { analyzeFrame, IMAGE_LIMITS, ImageRejected, EngineUnavailable } from './faceEngine.js'
 import { randomSequence, sequenceMatches, type Pose, POSES } from './pose.js'
 import {
@@ -54,23 +55,24 @@ const HR_ROLES = new Set(['admin', 'hr', 'hr_director'])
 // Settings
 // ---------------------------------------------------------------------------
 
-export interface BiometricSettings { enabled: boolean; threshold: number; configured: boolean }
+export interface BiometricSettings { enabled: boolean; threshold: number; padThreshold: number; configured: boolean }
 
 export async function getSettings(tenantId: string): Promise<BiometricSettings> {
   const r = await query(
     `SELECT setting_key, setting_value FROM tenant_settings
-      WHERE tenant_id = $1 AND setting_key IN ('biometrics.enabled', 'biometrics.match_threshold')`,
+      WHERE tenant_id = $1 AND setting_key IN ('biometrics.enabled', 'biometrics.match_threshold', 'biometrics.pad_threshold')`,
     [tenantId]
   )
   const map = Object.fromEntries(r.rows.map((x: any) => [x.setting_key, x.setting_value]))
   return {
     enabled: map['biometrics.enabled'] === 'true',
     threshold: clampThreshold(map['biometrics.match_threshold'] ?? THRESHOLDS.default),
+    padThreshold: clampPadThreshold(map['biometrics.pad_threshold'] ?? PAD_THRESHOLD.default),
     configured: templateKeyConfigured(),
   }
 }
 
-export async function saveSettings(ctx: Ctx, enabled: boolean, threshold: number): Promise<BiometricSettings> {
+export async function saveSettings(ctx: Ctx, enabled: boolean, threshold: number, padThreshold?: unknown): Promise<BiometricSettings> {
   if (!['admin', 'hr_director'].includes(ctx.roleName) && !ctx.isSuperadmin) {
     throw new BiometricError(403, 'forbidden', 'Only an administrator may change face matching settings')
   }
@@ -78,7 +80,10 @@ export async function saveSettings(ctx: Ctx, enabled: boolean, threshold: number
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    for (const [key, value] of [['biometrics.enabled', String(!!enabled)], ['biometrics.match_threshold', t.toFixed(2)]]) {
+    const writes: Array<[string, string]> = [['biometrics.enabled', String(!!enabled)], ['biometrics.match_threshold', t.toFixed(2)]]
+    // Tunable, but clamped to [0.5, 0.9]: a tenant cannot turn the check off.
+    if (padThreshold !== undefined && padThreshold !== null) writes.push(['biometrics.pad_threshold', clampPadThreshold(padThreshold).toFixed(2)])
+    for (const [key, value] of writes) {
       await client.query(
         `INSERT INTO tenant_settings (tenant_id, setting_key, setting_value, updated_at, updated_by)
          VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4)
@@ -204,18 +209,20 @@ interface EventInput {
   scheduleId?: string | null
   distance?: number | null
   threshold?: number | null
+  pad?: PadResult | null
 }
 
 async function recordEvent(runner: { query: PoolClient['query'] }, ctx: Ctx, e: EventInput): Promise<string> {
   const r = await runner.query(
     `INSERT INTO biometric_events
        (tenant_id, actor_user_id, action, outcome, reason, subject_type, subject_id,
-        challenge_id, schedule_id, distance, threshold, model)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+        challenge_id, schedule_id, distance, threshold, model, pad_score, pad_signals)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
     [ctx.tenantId, ctx.userId, e.action, e.outcome, e.reason ?? null,
      e.subject?.type ?? null, e.subject?.id ?? null, e.challengeId ?? null, e.scheduleId ?? null,
      e.distance ?? null, e.threshold ?? null,
-     ['enrolled', 'verified', 'identified'].includes(e.action) ? MODEL_ID : null]
+     ['enrolled', 'verified', 'identified'].includes(e.action) ? MODEL_ID : null,
+     e.pad ? e.pad.score : null, e.pad ? JSON.stringify({ reasons: e.pad.reasons, ...e.pad.signals }) : null]
   )
   return r.rows[0].id
 }
@@ -420,7 +427,7 @@ async function refuseIfPaused(ctx: Ctx, s: Subject): Promise<void> {
 
 interface ChallengeRow {
   id: string; purpose: Purpose; steps: Pose[]; subject_type: SubjectType | null
-  subject_id: string | null; schedule_id: string | null
+  subject_id: string | null; schedule_id: string | null; created_at: Date; consumed_at: Date
 }
 
 /**
@@ -436,7 +443,7 @@ async function consumeChallenge(ctx: Ctx, challengeId: string, purpose: Purpose)
         SET consumed_at = CURRENT_TIMESTAMP
       WHERE id = $1 AND tenant_id = $2 AND issued_to = $3 AND purpose = $4
         AND consumed_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-      RETURNING id, purpose, steps, subject_type, subject_id, schedule_id`,
+      RETURNING id, purpose, steps, subject_type, subject_id, schedule_id, created_at, consumed_at`,
     [challengeId, ctx.tenantId, ctx.userId, purpose]
   )
   if (r.rows.length === 0) {
@@ -456,13 +463,14 @@ async function consumeChallenge(ctx: Ctx, challengeId: string, purpose: Purpose)
 
 type Failure = { reason: string; message: string }
 
-interface Capture { faces: FaceObservation[] }
+interface Capture { faces: FaceObservation[]; quality: Array<FrameQuality | undefined> }
 
 async function analyzeCapture(frames: Buffer[], steps: Pose[]): Promise<Capture | Failure> {
   if (frames.length !== steps.length) {
     return { reason: 'wrong_frame_count', message: `Send exactly ${steps.length} images, one per step` }
   }
   const faces: FaceObservation[] = []
+  const quality: Array<FrameQuality | undefined> = []
   for (let i = 0; i < frames.length; i++) {
     let analysis
     try {
@@ -488,12 +496,48 @@ async function analyzeCapture(frames: Buffer[], steps: Pose[]): Promise<Capture 
       return { reason: 'face_too_small', message: `The face in image ${i + 1} is too small. Come closer to the camera.` }
     }
     faces.push(analysis.faces[0])
+    quality.push(analysis.quality)
   }
-  return { faces }
+  return { faces, quality }
 }
 
 function captureFailure(c: Capture | Failure): c is Failure {
   return (c as Failure).reason !== undefined
+}
+
+/**
+ * The capture's presentation-attack signals (pad.ts): identical frames,
+ * frame times the client reports, how soon after the challenge it arrived,
+ * and the frames' image quality, against the tenant's clamped threshold.
+ */
+async function padCheck(ctx: Ctx, ch: ChallengeRow, frames: Buffer[], capture: Capture, frameTimes: number[] | null) {
+  const hashes = frames.map((f) => crypto.createHash('sha256').update(f).digest('hex'))
+  const threshold = await query(
+    `SELECT setting_value FROM tenant_settings WHERE tenant_id = $1 AND setting_key = 'biometrics.pad_threshold'`,
+    [ctx.tenantId])
+  const pad = assessPad({
+    // From the challenge to the capture's arrival (consumption happens before
+    // analysis, which takes longer than any human floor).
+    frameTimes, elapsedMs: new Date(ch.consumed_at).getTime() - new Date(ch.created_at).getTime(), steps: ch.steps.length,
+    quality: capture.quality, duplicateFrames: new Set(hashes).size !== hashes.length,
+  }, clampPadThreshold(threshold.rows[0]?.setting_value ?? PAD_THRESHOLD.default))
+  let failure: Failure | null = null
+  if (!pad.pass) {
+    if (pad.hard === 'duplicate_frames') {
+      failure = { reason: 'duplicate_frames', message: 'The same image was sent for more than one step. Take each picture as asked.' }
+    } else if (pad.hard === 'implausible_timing') {
+      failure = { reason: 'implausible_timing', message: 'The pictures were not taken as a person turning their head would take them. Start again.' }
+    } else {
+      failure = { reason: 'presentation_attack_suspected',
+        message: `The capture looks like a photo or a screen (score ${pad.score}, needs ${pad.signals.threshold}: ${pad.reasons.join(', ')}). Try again in good light, or mark by hand.` }
+    }
+  }
+  return { pad, failure }
+}
+
+/** What a match result says (brief 5.8): never "identity verified". */
+function statement(distance: number, threshold: number): string {
+  return `face matched at distance ${Math.round(distance * 1000) / 1000} under threshold ${threshold}`
 }
 
 function checkSameAndLive(faces: FaceObservation[], steps: Pose[]): Failure | null {
@@ -511,7 +555,7 @@ function checkSameAndLive(faces: FaceObservation[], steps: Pose[]): Failure | nu
 // Enrol, verify, identify
 // ---------------------------------------------------------------------------
 
-export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[]) {
+export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[], frameTimes: number[] | null = null) {
   await requireAvailable(ctx.tenantId)
   const ch = await consumeChallenge(ctx, challengeId, 'enroll')
   const subject: Subject = { type: ch.subject_type!, id: ch.subject_id! }
@@ -519,10 +563,13 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[]) {
   const consentId = await requireConsent(ctx, subject)
 
   const capture = await analyzeCapture(frames, ch.steps)
-  const fail = captureFailure(capture) ? capture : checkSameAndLive(capture.faces, ch.steps)
+  let fail: Failure | null = captureFailure(capture) ? capture : null
+  let pad: PadResult | null = null
+  if (!fail) ({ pad, failure: fail } = await padCheck(ctx, ch, frames, capture as Capture, frameTimes))
+  if (!fail) fail = checkSameAndLive((capture as Capture).faces, ch.steps)
   if (fail) {
     await recordEvent({ query: query as any }, ctx, {
-      action: 'enrolled', outcome: 'failure', reason: fail.reason, subject, challengeId: ch.id })
+      action: 'enrolled', outcome: 'failure', reason: fail.reason, subject, challengeId: ch.id, pad })
     throw new BiometricError(422, fail.reason, fail.message)
   }
   const faces = (capture as Capture).faces
@@ -546,9 +593,9 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[]) {
        sealed.authTag, sealed.keyVersion, sealed.dekVersion, faces.length, spread(faces.map((f) => f.descriptor)), ctx.userId]
     )
     const eventId = await recordEvent(client, ctx, {
-      action: 'enrolled', outcome: 'success', subject, challengeId: ch.id })
+      action: 'enrolled', outcome: 'success', subject, challengeId: ch.id, pad })
     await client.query('COMMIT')
-    return { eventId, framesUsed: faces.length }
+    return { eventId, framesUsed: faces.length, padScore: pad?.score ?? null }
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
     throw e
@@ -572,7 +619,7 @@ async function loadTemplate(ctx: Ctx, s: Subject): Promise<Float32Array | null> 
   )
 }
 
-export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[]) {
+export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[], frameTimes: number[] | null = null) {
   const settings = await requireAvailable(ctx.tenantId)
   const ch = await consumeChallenge(ctx, challengeId, 'verify')
   const subject: Subject = { type: ch.subject_type!, id: ch.subject_id! }
@@ -584,10 +631,10 @@ export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[]) {
   const template = await loadTemplate(ctx, subject)
   if (!template) throw new BiometricError(409, 'not_enrolled', 'No face is enrolled for you')
 
-  const fail = async (f: Failure, d: number | null = null): Promise<never> => {
+  const fail = async (f: Failure, d: number | null = null, pad: PadResult | null = null): Promise<never> => {
     await recordEvent({ query: query as any }, ctx, {
       action: 'verified', outcome: 'failure', reason: f.reason, subject, challengeId: ch.id,
-      distance: d, threshold: settings.threshold })
+      distance: d, threshold: settings.threshold, pad })
     throw new BiometricError(422, f.reason, f.message)
   }
 
@@ -598,24 +645,27 @@ export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[]) {
   if (d > settings.threshold) {
     return fail({ reason: 'not_matched', message: 'The face does not match the one enrolled.' }, d)
   }
+  const { pad, failure } = await padCheck(ctx, ch, frames, capture, frameTimes)
+  if (failure) return fail(failure, d, pad)
   const other = checkSameAndLive(capture.faces, ch.steps)
-  if (other) return fail(other, d)
+  if (other) return fail(other, d, pad)
 
   const eventId = await recordEvent({ query: query as any }, ctx, {
     action: 'verified', outcome: 'success', subject, challengeId: ch.id,
-    distance: d, threshold: settings.threshold })
-  return { matchId: eventId, subject, distance: Math.round(d * 1000) / 1000, threshold: settings.threshold }
+    distance: d, threshold: settings.threshold, pad })
+  return { matchId: eventId, subject, distance: Math.round(d * 1000) / 1000, threshold: settings.threshold,
+    padScore: pad.score, statement: statement(d, settings.threshold) }
 }
 
-export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buffer[]) {
+export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buffer[], frameTimes: number[] | null = null) {
   const settings = await requireAvailable(ctx.tenantId)
   const ch = await consumeChallenge(ctx, challengeId, 'identify')
   const scheduleId = ch.schedule_id!
 
-  const fail = async (f: Failure, d: number | null = null): Promise<never> => {
+  const fail = async (f: Failure, d: number | null = null, pad: PadResult | null = null): Promise<never> => {
     await recordEvent({ query: query as any }, ctx, {
       action: 'identified', outcome: 'failure', reason: f.reason, challengeId: ch.id,
-      scheduleId, distance: d, threshold: settings.threshold })
+      scheduleId, distance: d, threshold: settings.threshold, pad })
     throw new BiometricError(422, f.reason, f.message)
   }
 
@@ -669,13 +719,15 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
   }
 
   // Identity first, then that the frames are one live, turning head.
+  const { pad, failure } = await padCheck(ctx, ch, frames, capture, frameTimes)
+  if (failure) return fail(failure, result.distance, pad)
   const other = checkSameAndLive(capture.faces, ch.steps)
-  if (other) return fail(other, result.distance)
+  if (other) return fail(other, result.distance, pad)
 
   const subject: Subject = { type: 'student', id: result.id }
   const eventId = await recordEvent({ query: query as any }, ctx, {
     action: 'identified', outcome: 'success', subject, challengeId: ch.id, scheduleId,
-    distance: result.distance, threshold: settings.threshold })
+    distance: result.distance, threshold: settings.threshold, pad })
   const student = await query(
     `SELECT id, student_id, first_name, last_name FROM students WHERE id = $1 AND tenant_id = $2`,
     [result.id, ctx.tenantId]
@@ -685,6 +737,8 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
     student: student.rows[0],
     distance: Math.round(result.distance * 1000) / 1000,
     threshold: settings.threshold,
+    padScore: pad.score,
+    statement: statement(result.distance, settings.threshold),
   }
 }
 
@@ -788,7 +842,7 @@ export async function listEvents(ctx: Ctx, opts: { limit?: number; subject?: Sub
   params.push(limit)
   const r = await query(
     `SELECT e.id, e.action, e.outcome, e.reason, e.subject_type, e.subject_id, e.distance,
-            e.threshold, e.model, e.created_at, u.full_name AS actor_name
+            e.threshold, e.model, e.pad_score, e.pad_signals, e.created_at, u.full_name AS actor_name
        FROM biometric_events e LEFT JOIN users u ON u.id = e.actor_user_id
       WHERE ${where}
       ORDER BY e.created_at DESC

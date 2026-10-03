@@ -132,6 +132,8 @@ TS_SUITES=(
   manualFallback
   # Face matching across tenants: HTTP, a copied template, the runtime role.
   biometricCrossTenant
+  # Layered presentation-attack signals and the tenant's clamped threshold.
+  faceLiveness
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

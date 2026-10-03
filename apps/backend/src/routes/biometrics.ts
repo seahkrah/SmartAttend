@@ -75,6 +75,23 @@ function frames(req: TenantRequest, res: Response, next: NextFunction) {
   upload.array('frames', 5)(req as any, res as any, (err: unknown) => (err ? fail(res, err) : next()))
 }
 
+/**
+ * When each frame was taken, as the client reports it: milliseconds since the
+ * capture began, one per frame, as a JSON array in the field "frameTimes".
+ * Optional; a capture without it scores lower (src/biometrics/pad.ts).
+ */
+function frameTimesOf(req: TenantRequest): number[] | null {
+  const raw = (req.body ?? {}).frameTimes
+  if (raw === undefined || raw === null || raw === '') return null
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (Array.isArray(v) && v.length <= 5) return v.map(Number)
+  } catch {
+    /* refused below */
+  }
+  throw new BiometricError(400, 'bad_frame_times', 'frameTimes must be a JSON array of milliseconds, one per image')
+}
+
 function framesOf(req: TenantRequest): Buffer[] {
   const files = ((req as any).files ?? []) as Array<{ buffer: Buffer }>
   if (files.length < 2) throw new BiometricError(400, 'bad_frames', 'Send between 2 and 5 images in a field named "frames"')
@@ -91,11 +108,11 @@ router.get('/settings', anyMember("whether face matching is on, and its threshol
 
 router.put('/settings', requireRoles('admin', 'hr_director'), async (req: TenantRequest, res: Response) => {
   try {
-    const { enabled, threshold } = req.body ?? {}
+    const { enabled, threshold, padThreshold } = req.body ?? {}
     if (typeof enabled !== 'boolean') {
       return res.status(400).json({ error: 'enabled must be true or false' })
     }
-    return res.json({ settings: await saveSettings(ctxOf(req), enabled, Number(threshold ?? 0.5)) })
+    return res.json({ settings: await saveSettings(ctxOf(req), enabled, Number(threshold ?? 0.5), padThreshold) })
   } catch (e) {
     return fail(res, e)
   }
@@ -168,7 +185,7 @@ router.post('/challenges', checkedInHandler("issueChallenge: enrol as authorizeS
 
 router.post('/enroll', checkedInHandler("the challenge, issued under the enrol rule, is single-use and bound to the caller"), frames, async (req: TenantRequest, res: Response) => {
   try {
-    const out = await enroll(ctxOf(req), req.body?.challengeId, framesOf(req))
+    const out = await enroll(ctxOf(req), req.body?.challengeId, framesOf(req), frameTimesOf(req))
     return res.status(201).json({ enrolled: true, ...out })
   } catch (e) {
     return fail(res, e)
@@ -177,7 +194,7 @@ router.post('/enroll', checkedInHandler("the challenge, issued under the enrol r
 
 router.post('/verify', checkedInHandler("the challenge must be the caller's own, for their own employee record"), frames, async (req: TenantRequest, res: Response) => {
   try {
-    return res.json({ matched: true, ...(await verify(ctxOf(req), req.body?.challengeId, framesOf(req))) })
+    return res.json({ matched: true, ...(await verify(ctxOf(req), req.body?.challengeId, framesOf(req), frameTimesOf(req))) })
   } catch (e) {
     return fail(res, e)
   }
@@ -185,7 +202,7 @@ router.post('/verify', checkedInHandler("the challenge must be the caller's own,
 
 router.post('/identify', checkedInHandler("the challenge must be the lecturer's own, for their class"), frames, async (req: TenantRequest, res: Response) => {
   try {
-    return res.json({ matched: true, ...(await identifyInClass(ctxOf(req), req.body?.challengeId, framesOf(req))) })
+    return res.json({ matched: true, ...(await identifyInClass(ctxOf(req), req.body?.challengeId, framesOf(req), frameTimesOf(req))) })
   } catch (e) {
     return fail(res, e)
   }

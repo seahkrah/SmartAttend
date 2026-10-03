@@ -92,6 +92,7 @@ export async function analyzeFrame(buf: Buffer): Promise<FrameAnalysis> {
       descriptor: Float32Array.from(f.descriptor ?? []),
       yaw: Number(f.yaw), score: Number(f.score), width: Number(f.width),
     })),
+    quality: body.quality ?? undefined,
   }
 }
 

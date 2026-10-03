@@ -83,9 +83,10 @@ const server = http.createServer(async (req, res) => {
     inFlight++
     try {
       const buf = await readBody(req, IMAGE_LIMITS.maxBytes)
-      const { faces } = await analyzeFrame(buf)
+      const { faces, quality } = await analyzeFrame(buf)
       return send(res, 200, {
         faces: faces.map((f) => ({ descriptor: Array.from(f.descriptor), yaw: f.yaw, score: f.score, width: f.width })),
+        quality: quality ?? null,
       })
     } catch (e) {
       if (e instanceof ImageRejected) return send(res, 422, { error: e.message, code: e.code })

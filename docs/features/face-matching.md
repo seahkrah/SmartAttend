@@ -31,6 +31,9 @@ A successful match establishes that:
 
 It does **not** establish:
 
+- resistance to an attacker who reproduces plausible frame times and image
+  quality: the presentation-attack signals raise the cost of a still photo
+  or a replayed file, nothing more;
 - resistance to a **prepared video** of the person turning their head, to a
   **deepfake**, or to a **virtual camera** injecting frames. The pose challenge
   is random (1 in 6 chance a given recording fits), but a video with both turns
@@ -40,7 +43,39 @@ It does **not** establish:
   supervised the enrolment is responsible for it being the right person, which
   is why self-enrolment is refused.
 
-Attendance records say "face matched", never "identity verified".
+5. the capture passed the layered presentation-attack signals below.
+
+Attendance records say "face matched", never "identity verified". A match
+result says "face matched at distance X under threshold Y".
+
+### Presentation-attack signals (`src/biometrics/pad.ts`)
+
+Every capture answers a challenge the server issued. The challenge is
+single-use, expires within minutes, and is bound to the person who asked, the
+tenant and the purpose. Its id is the nonce, so a capture cannot be submitted
+twice.
+
+- **Hard signals refuse the capture whatever its score:**
+  - the same image sent for more than one step (`duplicate_frames`);
+  - frame times the client reports that no one turning their head could
+    produce (`implausible_timing`): times that are not monotonic, are less
+    than 100 ms apart, or span under 300 ms per turn.
+- **Soft signals each lower a score of 1:**
+  - no frame times reported (0.15);
+  - the capture arrived sooner after the challenge than a person could
+    answer (0.15);
+  - soft, flat, or glaring or dark frames, from the image's sharpness,
+    contrast and brightness (0.2 each).
+- **The decision:** a capture passes when no hard signal fires and its score
+  reaches the tenant's `biometrics.pad_threshold` (default 0.7, clamped to
+  0.5–0.9, so it cannot be turned off).
+- **What is recorded:** each match event stores the score and the signals,
+  including the rejected ones (`presentation_attack_suspected`).
+- **The web app's role:** it sends frame times, so a real capture normally
+  scores 1. A client that sends none passes only at the default threshold.
+
+These are heuristics. They are not a trained liveness model, and no
+presentation-attack lab has measured them.
 
 ## Roles and permissions
 
@@ -100,9 +135,10 @@ being enrolled, an employee stops being employed, or the record is deleted.
 | `BIOMETRIC_TEMPLATE_KEY_VERSION` | Version stamped on new templates (default 1). |
 | `BIOMETRIC_TEMPLATE_KEY_PREVIOUS`, `..._PREVIOUS_VERSION` | Lets templates sealed under the previous key still open during a rotation. |
 | `FACE_ENGINE_CONCURRENCY` | Images analysed at once (default 2). |
+| `FACE_WORKER_URL`, `FACE_WORKER_TOKEN` | Analyse faces in the isolated worker (`docs/operations/deployment.md`); without them the engine runs in the API process, for development only. |
 
 Per tenant (`tenant_settings`): `biometrics.enabled`, `biometrics.match_threshold`
-(clamped to 0.35–0.60).
+(clamped to 0.35–0.60), `biometrics.pad_threshold` (clamped to 0.5–0.9).
 
 ## Limits and abuse controls
 
@@ -131,4 +167,9 @@ Per tenant (`tenant_settings`): `biometrics.enabled`, `biometrics.match_threshol
   order, two people, no face, two faces), identification, impostor refusal,
   single use of a match, withdrawal, employee check-in, pause after failures,
   tenant and role boundaries.
+- `src/tests/faceLiveness.manual.ts`: the challenge as nonce, each hard signal,
+  the score and the clamped threshold, and rejections logged with their signals.
+- `src/tests/faceWorkerDown.manual.ts`: the worker killed and restarted.
+- `src/tests/biometricCrossTenant.manual.ts`: another tenant's templates,
+  consents, challenges and events, over HTTP and as the runtime role.
 - Fixtures and their provenance: `apps/backend/src/tests/fixtures/faces/README.md`.

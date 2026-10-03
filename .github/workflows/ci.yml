@@ -222,6 +222,25 @@ jobs:
           APP_DB_USER=jjelotech_api APP_DB_PASSWORD="$pw" npx tsx src/scripts/createRuntimeRole.ts
           echo "APP_DATABASE_URL=postgresql://jjelotech_api:${pw}@127.0.0.1:5432/jjelotech_ci" >> "$GITHUB_ENV"
 
+      # The face engine runs in its own process, as in production (brief 5.4):
+      # no database credentials or keys in its environment, which it checks.
+      # faceWorkerDown kills it and starts it again.
+      - name: Face worker settings
+        run: |
+          echo "FACE_WORKER_URL=http://127.0.0.1:5100" >> "$GITHUB_ENV"
+          echo "FACE_WORKER_TOKEN=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "FACE_WORKER_PID_FILE=/tmp/face-worker.pid" >> "$GITHUB_ENV"
+
+      - name: Start the face worker
+        working-directory: apps/backend
+        run: |
+          env -u DATABASE_URL -u APP_DATABASE_URL -u BIOMETRIC_TEMPLATE_KEY -u KMS_LOCAL_KEK -u JWT_SECRET             nohup npx tsx src/faceWorker/server.ts > /tmp/face-worker.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -H "X-Worker-Token: $FACE_WORKER_TOKEN" http://127.0.0.1:5100/health >/dev/null && exit 0
+            sleep 1
+          done
+          echo "Face worker did not start"; cat /tmp/face-worker.log; exit 1
+
       - name: Start API
         working-directory: apps/backend
         run: |

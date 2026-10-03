@@ -5,7 +5,7 @@ import express from 'express'
 import dotenv from 'dotenv'
 import { initializeDatabase, query } from './db/connection.js'
 import { pendingMigrations } from './db/migrationStatus.js'
-import { warmUp, engineInfo } from './biometrics/engine.js'
+import { warmUp, engineInfo, usesWorker, watchWorker } from './biometrics/faceEngine.js'
 import { applyHttpSecurity } from './security/httpSecurity.js'
 import { validateProductionConfig } from './config/validateEnv.js'
 import authRoutes from './routes/auth.js'
@@ -212,7 +212,9 @@ app.get('/api/health/ready', publicRoute('readiness, for the load balancer'), as
     return res.json({
       status: 'ready',
       components: {
-        faceEngine: { state: face.state, backend: face.backend, error: face.error },
+        // With the worker (FACE_WORKER_URL), its state; it can be down while the
+        // API stays ready, because attendance falls back to manual.
+        faceEngine: { state: face.state, backend: face.backend, error: face.error, worker: face.worker ?? null },
       },
     })
   } catch {
@@ -263,7 +265,10 @@ async function startServer() {
       // Load the face networks now rather than on the first face check, so a
       // missing native library is reported at start-up, and the first person
       // to check in is not the one who waits for the models to load.
-      if (process.env.FACE_ENGINE_WARMUP !== 'off') {
+      if (usesWorker()) {
+        watchWorker()
+        console.log(`[FACE] using the face worker at ${process.env.FACE_WORKER_URL}`)
+      } else if (process.env.FACE_ENGINE_WARMUP !== 'off') {
         warmUp()
           .then(() => {
             const e = engineInfo()

@@ -116,6 +116,30 @@ rewound. Tenants can also stream their trail to a collector of their own
 (`/api/audit/streams`); `AUDIT_STREAM_INTERVAL_MS` (5 s) and
 `AUDIT_STREAM_RETRY_BASE_MS` (5 s) pace delivery.
 
+### The face worker
+
+Face analysis runs in its own process, `src/faceWorker/server.ts`. It uses
+the same image with a different command:
+
+```bash
+npx tsx src/faceWorker/server.ts
+```
+
+- **Its environment holds no database URL, template key, KMS key or JWT
+  secret.** It refuses to start if any is present. It needs only
+  `FACE_WORKER_TOKEN` (at least 32 characters, shared with the API) and,
+  optionally, `FACE_WORKER_PORT` (5100), `FACE_WORKER_HOST` (127.0.0.1) and
+  `FACE_WORKER_MAX_QUEUE` (16).
+- **The API sends it images when `FACE_WORKER_URL` is set**, with the same
+  token (`FACE_WORKER_TIMEOUT_MS`, default 15000). The API then never loads
+  TensorFlow.
+- **When the worker is down, slow or full,** face checks answer 503
+  `engine_unavailable` and attendance is taken by hand with a reason. The
+  API's readiness stays 200 and reports `faceEngine.worker.reachable: false`.
+- **To scale out,** run more workers behind one address.
+- **Without `FACE_WORKER_URL`,** the API runs the engine in its own process.
+  That is for development only.
+
 ## Health
 
 - `GET /api/health`: the process is up (liveness).

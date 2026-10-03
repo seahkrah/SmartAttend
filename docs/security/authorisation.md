@@ -70,7 +70,8 @@ An account (`users`) is shared by every tenant it belongs to. Its role, status
 and details cannot be changed from one tenant while another has the person.
 The routes refuse or change only the membership. A database trigger refuses
 the rest: each account counts its live memberships (`users.membership_count`,
-migration 084), and one counting more than one is shared. Ask `memberElsewhere`, which runs on the
+migrations 084 and 085). An account with a live membership in another tenant is
+shared. Ask `memberElsewhere`, which runs on the
 system pool: under a tenant's row-level security, other tenants' memberships
 are invisible.
 

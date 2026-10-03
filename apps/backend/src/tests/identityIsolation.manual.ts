@@ -189,6 +189,20 @@ async function main() {
     const roleCode = await refused(() => withTenant({ tenantId: A }, () =>
       query(`UPDATE users SET role_id = (SELECT id FROM roles WHERE platform_id = users.platform_id AND id <> users.role_id LIMIT 1) WHERE id = $1`, [onlyA])))
     check('nor given another role', roleCode === '42501', `(${roleCode ?? 'it ran'})`)
+    // Visible to A (created there) but live only in B: still B's (migration 085).
+    const elsewhere = (await owner(
+      `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, created_tenant_id)
+       SELECT platform_id, $1, 'Moved to B', role_id, 'x', TRUE, $2 FROM users WHERE id = $3 RETURNING id`,
+      [`moved-${Date.now()}@identity.test`, A, onlyB[0]])).rows[0].id
+    await owner(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')`, [elsewhere, B])
+    try {
+      const moved = await refused(() => withTenant({ tenantId: A }, () =>
+        query(`UPDATE users SET full_name = 'Renamed by A' WHERE id = $1`, [elsewhere])))
+      check('an account A can see but which is live only in B cannot be changed from A', moved === '42501', `(${moved ?? 'it ran'})`)
+    } finally {
+      await owner(`DELETE FROM school_user_associations WHERE user_id = $1`, [elsewhere])
+      await owner(`DELETE FROM users WHERE id = $1`, [elsewhere])
+    }
     const solo = [...ofA].find((u) => u !== onlyA && !ofB.has(u))
     if (solo) {
       const mine = await refused(() => withTenant({ tenantId: A }, () =>
@@ -197,7 +211,7 @@ async function main() {
       await owner(`UPDATE users SET full_name = rtrim(full_name) WHERE id = $1`, [solo])
     }
     const forged = await refused(() => withTenant({ tenantId: A }, () =>
-      query(`UPDATE users SET membership_count = 1 WHERE id = $1`, [onlyA])))
+      query(`UPDATE users SET membership_count = membership_count + 5 WHERE id = $1`, [onlyA])))
     check('and the membership count that marks it shared cannot be rewritten', forged === '42501', `(${forged ?? 'it ran'})`)
   } finally {
     if (priorB === null) {

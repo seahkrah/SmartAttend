@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg'
 import { toMinor, fromMinor } from './payrollService.js'
+import { checkIn as coreCheckIn, checkOut as coreCheckOut } from '../attendance/core.js'
 
 /**
  * EMS — contracts, rosters and timesheets.
@@ -1096,8 +1097,12 @@ export async function checkIn(
   client: PoolClient,
   ctx: WorkforceContext,
   employeeId: string,
-  input: { checkInType?: unknown; siteLocation?: unknown; faceMatchId?: string | null }
-): Promise<CheckInRow> {
+  input: {
+    checkInType?: unknown; siteLocation?: unknown; faceMatchId?: string | null
+    reasonCode?: unknown; reasonText?: unknown; deviceId?: unknown; clientTime?: unknown
+    idempotencyKey?: unknown; latitude?: unknown; longitude?: unknown; accuracyMetres?: unknown
+  }
+): Promise<CheckInRow & { approval: 'not_needed' | 'pending'; eventId: string }> {
   const type = input.checkInType === undefined || input.checkInType === null || input.checkInType === ''
     ? 'office'
     : String(input.checkInType)
@@ -1119,14 +1124,22 @@ export async function checkIn(
   // for this employee moments ago (validated by the route, and spendable once:
   // a unique index refuses a second use). The database refuses the flag
   // without the citation.
-  const created = await client.query(
-    `INSERT INTO corporate_checkins
-       (tenant_id, employee_id, check_in_type, check_in_time, site_location, face_verified, face_match_event_id)
-     VALUES ($1, $2, $3, LOCALTIMESTAMP, $4, $5, $6)
-     RETURNING ${CHECKIN_COLUMNS}`,
-    [ctx.tenantId, employeeId, type, site, !!input.faceMatchId, input.faceMatchId ?? null]
-  )
-  return toCheckInRow(created.rows[0])
+  // Through the attendance core (brief 5.1): a manual check-in says why,
+  // and beyond the tenant's allowance waits for a manager (5.2).
+  const str = (v: unknown) => (v === undefined || v === null || v === '' ? null : String(v))
+  const done = await coreCheckIn(client, { tenantId: ctx.tenantId, userId: ctx.userId }, {
+    employeeId, checkInType: type, siteLocation: site,
+    capture: {
+      method: input.faceMatchId ? 'face' : 'manual',
+      matchEventId: input.faceMatchId ?? null,
+      reasonCode: str(input.reasonCode), reasonText: str(input.reasonText), deviceId: str(input.deviceId),
+      clientTime: str(input.clientTime), idempotencyKey: str(input.idempotencyKey),
+      latitude: input.latitude as number, longitude: input.longitude as number, accuracyMetres: input.accuracyMetres as number,
+    },
+  })
+  const row = await client.query(
+    `SELECT ${CHECKIN_COLUMNS} FROM corporate_checkins WHERE id = $1 AND tenant_id = $2`, [done.checkinId, ctx.tenantId])
+  return { ...toCheckInRow(row.rows[0]), approval: done.approval, eventId: done.eventId }
 }
 
 /** Checks the employee out of their open check-in, now. */
@@ -1146,13 +1159,11 @@ export async function checkOut(
     )
   }
 
+  // Checking out establishes nothing about presence that the check-in did
+  // not: it is recorded as the method the check-in used.
+  await coreCheckOut(client, { tenantId: ctx.tenantId, userId: ctx.userId }, employeeId, open.id)
   const closed = await client.query(
-    `UPDATE corporate_checkins
-        SET check_out_time = LOCALTIMESTAMP
-      WHERE id = $1 AND tenant_id = $2 AND employee_id = $3 AND check_out_time IS NULL
-      RETURNING ${CHECKIN_COLUMNS}`,
-    [open.id, ctx.tenantId, employeeId]
-  )
+    `SELECT ${CHECKIN_COLUMNS} FROM corporate_checkins WHERE id = $1 AND tenant_id = $2`, [open.id, ctx.tenantId])
   return toCheckInRow(closed.rows[0])
 }
 

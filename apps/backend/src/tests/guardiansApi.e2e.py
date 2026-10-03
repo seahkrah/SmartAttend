@@ -294,6 +294,9 @@ print("-- what guardians are told --")
 day = (date.today() - timedelta(days=1 + int(RUN) % 200)).isoformat()
 co, r = call("POST", "/faculty/attendance/mark", FA, {
     "schedule_id": A['scheduleId'], "date": day,
+    # A manual register: where the school takes attendance by face (left on
+    # by faceMatchingApi), it says why (Phase 4).
+    "reason_code": "camera_failure",
     "entries": [{"student_id": S0, "status": "absent"}, {"student_id": S1, "status": "present"}]})
 check("(a lecturer marks the first child absent)", co == 200, f"({co} {r})")
 # The fixture is rebuilt for every run, so every absence notice about these

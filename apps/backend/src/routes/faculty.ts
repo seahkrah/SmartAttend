@@ -9,6 +9,7 @@ import {
   type ResolvedTenantContext,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
+import { AttendanceInputError, markStudent } from '../attendance/core.js'
 
 const router = express.Router()
 
@@ -834,22 +835,28 @@ router.post('/attendance/mark', requireRole('faculty'), async (req: TenantReques
             scheduleId: schedule_id,
           })
         }
-        await client.query(
-          `INSERT INTO school_attendance (schedule_id, student_id, marked_by_id, attendance_date, status, remarks,
-                                          face_verified, face_match_event_id, verification_method, marked_at, tenant_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
-           ON CONFLICT (schedule_id, student_id, attendance_date)
-           DO UPDATE SET status = $5, remarks = $6, face_verified = $7, face_match_event_id = $8,
-                         verification_method = $9, marked_by_id = $3, marked_at = NOW()`,
-          [schedule_id, entry.student_id, facultyId, date, entry.status.toLowerCase(), entry.remarks || null,
-           matchId !== null, matchId, matchId ? 'FACE_MATCH' : 'MANUAL', ctx.tenantId]
-        )
+        // Through the attendance core, with how presence was established: a
+        // manual mark says why (brief 5.2), per entry or for the whole call.
+        await markStudent(client, { tenantId: ctx.tenantId!, userId: ctx.userId }, {
+          scheduleId: schedule_id, studentId: entry.student_id, date, status: entry.status.toLowerCase(),
+          markerFacultyId: facultyId, remarks: entry.remarks || null,
+          capture: matchId
+            ? { method: 'face', matchEventId: matchId, deviceId: req.body.device_id }
+            : {
+                method: 'manual',
+                reasonCode: entry.reason_code ?? req.body.reason_code,
+                reasonText: entry.reason_text ?? req.body.reason_text,
+                deviceId: req.body.device_id,
+                idempotencyKey: entry.idempotency_key,
+              },
+        })
         markedCount++
       }
       await client.query('COMMIT')
     } catch (e: any) {
       await client.query('ROLLBACK').catch(() => {})
       if (e instanceof BiometricError) return res.status(e.status).json({ error: e.message, code: e.code })
+      if (e instanceof AttendanceInputError) return res.status(e.status).json({ error: e.message, code: e.code })
       if (e.code === '23505') {
         return res.status(409).json({ error: 'A face match can back only one attendance record', code: 'match_used' })
       }

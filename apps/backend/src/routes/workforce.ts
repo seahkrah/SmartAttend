@@ -36,6 +36,7 @@ import { fromMinor } from '../services/payrollService.js'
 import { rosterPublished, timesheetDecided } from '../notifications/events.js'
 import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 import { checkedInHandler, selfService } from '../auth/guards.js'
+import { AttendanceInputError } from '../attendance/core.js'
 
 /**
  * EMS — contracts, rosters and timesheets.
@@ -88,6 +89,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 function fail(res: Response, label: string, e: unknown) {
   if (e instanceof WorkforceError) return res.status(e.status).json({ error: e.message })
   if (e instanceof BiometricError) return res.status(e.status).json({ error: e.message, code: e.code })
+  if (e instanceof AttendanceInputError) return res.status(e.status).json({ error: e.message, code: e.code })
   if ((e as any)?.code === '23505' && (e as any)?.constraint === 'uq_corporate_checkins_face_match') {
     return res.status(409).json({ error: 'That face match has already been used', code: 'match_used' })
   }
@@ -948,10 +950,15 @@ router.post('/my/check-in', selfService("checks the caller in"), async (req: Ten
         subject: { type: 'employee', id: employee.id },
       })
     }
+    const b = req.body ?? {}
     const row = await checkIn(client, svcCtx(req), employee.id, {
-      checkInType: req.body?.checkInType,
-      siteLocation: req.body?.siteLocation,
+      checkInType: b.checkInType,
+      siteLocation: b.siteLocation,
       faceMatchId,
+      // Without a face: why (brief 5.2), and what the device says.
+      reasonCode: b.reasonCode, reasonText: b.reasonText, deviceId: b.deviceId, clientTime: b.clientTime,
+      idempotencyKey: b.idempotencyKey ?? req.header('idempotency-key'),
+      latitude: b.latitude, longitude: b.longitude, accuracyMetres: b.accuracyMetres,
     })
     await client.query('COMMIT')
     return res.status(201).json({ checkIn: row })

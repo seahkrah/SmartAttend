@@ -33,6 +33,7 @@ import {
   MarkAttendanceWithFaceResponse,
   AttendanceStatus,
 } from '@jjelotech/types';
+import { AttendanceInputError, markStudent } from '../attendance/core.js';
 
 /** What the service needs from the resolved request context. */
 export interface ServiceContext {
@@ -357,29 +358,23 @@ export async function markAttendanceWithFace(
     }
     const faceVerified = faceMatchId !== null;
 
-    const attendanceResult = await client.query(
-      `INSERT INTO school_attendance (
-         schedule_id, student_id, session_id, marked_by_id, attendance_date,
-         status, verification_method, face_verified, face_match_event_id,
-         remarks, tenant_id
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       RETURNING id`,
-      [
-        scheduleId,
-        req.studentId,
-        req.sessionId,
-        markedByFacultyId,
-        session.session_date,
-        attendanceStatus,
-        req.verificationMethod,
-        faceVerified,
-        faceMatchId,
-        req.notes || null,
-        ctx.tenantId,
-      ]
-    );
-
-    const attendanceId = attendanceResult.rows[0].id;
+    let attendanceId: string;
+    try {
+      ({ attendanceId } = await markStudent(client, { tenantId: ctx.tenantId, userId: ctx.userId }, {
+        scheduleId, studentId: req.studentId, date: session.session_date, status: attendanceStatus,
+        markerFacultyId: markedByFacultyId, remarks: req.notes || null, sessionId: req.sessionId,
+        verificationMethod: req.verificationMethod, insertOnly: true,
+        capture: faceMatchId
+          ? { method: 'face', matchEventId: faceMatchId, deviceId: (req as any).deviceId }
+          : { method: 'manual', reasonCode: (req as any).reasonCode, reasonText: (req as any).reasonText, deviceId: (req as any).deviceId },
+      }));
+    } catch (e: any) {
+      if (e instanceof AttendanceInputError) {
+        await client.query('ROLLBACK').catch(() => {});
+        return refuse(e.message);
+      }
+      throw e;
+    }
 
     await client.query(
       `INSERT INTO audit_logs (platform_id, tenant_id, user_id, action, entity_type, entity_id, new_values)

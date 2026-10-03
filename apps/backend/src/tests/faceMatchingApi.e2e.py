@@ -178,7 +178,9 @@ check("with a distance under the threshold", co == 200 and r['distance'] < r['th
 # =============================================== spending a match on attendance
 print("-- a match backs one attendance record --")
 DAY1, DAY2 = "2026-03-02", "2026-03-03"
+# Manual, so it says why (Phase 4): the face flag in the body is still not evidence.
 co, r = call("POST", "/faculty/attendance/mark", FA, {"schedule_id": A['scheduleId'], "date": DAY1,
+             "reason_code": "face_not_recognised",
              "entries": [{"student_id": S1, "status": "present", "face_verified": True}]})
 check("(a mark claiming a face check with no match)", co == 200, f"({co} {r})")
 co, r = call("GET", f"/faculty/schedules/{A['scheduleId']}/students?date={DAY1}", FA)
@@ -278,7 +280,9 @@ check("check-in cites the match", co == 201 and r.get('checkIn', {}).get('faceVe
 co, r = call("POST", "/workforce/my/check-out", EMP)
 co, r = call("POST", "/workforce/my/check-in", EMP, {"checkInType": "office", "faceMatchId": vmatch})
 check("the same match cannot check in twice", co == 409, f"({co} {r})")
-co, r = call("POST", "/workforce/my/check-in", EMP, {"checkInType": "office"})
+# Without a face, where the employer uses face matching, the employee says
+# why (Phase 4, brief 5.2).
+co, r = call("POST", "/workforce/my/check-in", EMP, {"checkInType": "office", "reasonCode": "camera_failure"})
 check("check-in without a face is still possible", co == 201 and r.get('checkIn', {}).get('faceVerified') is False,
       f"({co} {r})")
 co, r = call("POST", "/workforce/my/check-out", EMP)

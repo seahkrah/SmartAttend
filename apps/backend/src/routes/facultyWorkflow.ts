@@ -13,6 +13,7 @@ import {
 import { TenantScopeError } from '../db/tenantScoped.js'
 import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 import { absencesSubmitted } from '../notifications/events.js'
+import { AttendanceInputError, clearRegister, markStudent } from '../attendance/core.js'
 
 /**
  * SMS — the faculty attendance workflow.
@@ -41,6 +42,9 @@ router.use(
 function fail(res: Response, e: unknown) {
   if (e instanceof TenantScopeError) {
     return res.status(e.status).json({ error: 'Request refused', message: e.message })
+  }
+  if (e instanceof AttendanceInputError) {
+    return res.status(e.status).json({ error: e.message, code: e.code })
   }
   console.error('[FACULTY]', e)
   return res.status(500).json({ error: 'Internal error' })
@@ -322,13 +326,9 @@ router.post('/attendance/bulk-edit', async (req: TenantRequest, res: Response) =
     const target = ACTIONS[action]
     let affected = 0
 
+    const core = { tenantId: ctx.tenantId!, userId: ctx.userId }
     if (target === null) {
-      const r = await client.query(
-        `DELETE FROM school_attendance
-          WHERE tenant_id = $1 AND attendance_date = $2 AND schedule_id = ANY($3::uuid[])`,
-        [ctx.tenantId, date, schedules]
-      )
-      affected = r.rowCount ?? 0
+      affected = await clearRegister(client, core, schedules, date)
     } else {
       // Every student written here comes from the tenant-scoped roster, so a
       // bulk action cannot reach a student outside the tenant.
@@ -339,26 +339,13 @@ router.post('/attendance/bulk-edit', async (req: TenantRequest, res: Response) =
           WHERE sc.tenant_id = $1 AND sc.schedule_id = ANY($2::uuid[]) AND sc.is_active`,
         [ctx.tenantId, schedules]
       )
+      // A bulk action is a manual mark of every student: it says why, once.
       for (const row of roster.rows) {
-        const existing = await client.query(
-          `SELECT id FROM school_attendance
-            WHERE tenant_id = $1 AND student_id = $2 AND schedule_id = $3 AND attendance_date = $4`,
-          [ctx.tenantId, row.student_id, row.schedule_id, date]
-        )
-        if (existing.rows.length > 0) {
-          await client.query(
-            `UPDATE school_attendance SET status = $1, marked_by_id = $2, marked_at = CURRENT_TIMESTAMP
-              WHERE id = $3 AND tenant_id = $4`,
-            [target, markerId, existing.rows[0].id, ctx.tenantId]
-          )
-        } else {
-          await client.query(
-            `INSERT INTO school_attendance
-               (schedule_id, student_id, marked_by_id, attendance_date, status, face_verified, tenant_id)
-             VALUES ($1,$2,$3,$4,$5,false,$6)`,
-            [row.schedule_id, row.student_id, markerId, date, target, ctx.tenantId]
-          )
-        }
+        await markStudent(client, core, {
+          scheduleId: row.schedule_id, studentId: row.student_id, date, status: target as any,
+          markerFacultyId: markerId,
+          capture: { method: 'manual', reasonCode: req.body?.reason_code, reasonText: req.body?.reason_text, deviceId: req.body?.device_id },
+        })
         affected++
       }
     }
@@ -445,17 +432,11 @@ router.post('/attendance/facial-match', async (req: TenantRequest, res: Response
       subject: { type: 'student', id: studentId },
       scheduleId: schedules,
     })
-    await client.query(
-      `INSERT INTO school_attendance
-         (schedule_id, student_id, marked_by_id, attendance_date, status,
-          face_verified, face_match_event_id, verification_method, attendance_state, tenant_id)
-       VALUES ($1,$2,$3,$4,'present',TRUE,$5,'FACE_MATCH','VERIFIED',$6)
-       ON CONFLICT (schedule_id, student_id, attendance_date)
-       DO UPDATE SET status = 'present', face_verified = TRUE, face_match_event_id = EXCLUDED.face_match_event_id,
-                     marked_by_id = EXCLUDED.marked_by_id, marked_at = CURRENT_TIMESTAMP,
-                     verification_method = 'FACE_MATCH', attendance_state = 'VERIFIED'`,
-      [scheduleId, studentId, markerId, date, cited, ctx.tenantId]
-    )
+    await markStudent(client, { tenantId: ctx.tenantId!, userId: ctx.userId }, {
+      scheduleId, studentId, date, status: 'present', markerFacultyId: markerId,
+      verificationMethod: 'FACE_MATCH', attendanceState: 'VERIFIED',
+      capture: { method: 'face', matchEventId: cited, deviceId: req.body?.device_id },
+    })
     await client.query('COMMIT')
     res.json({ success: true, status: 'present', face_verified: true, face_match_id: cited })
   } catch (e: any) {

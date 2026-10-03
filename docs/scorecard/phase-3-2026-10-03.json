@@ -1,7 +1,7 @@
 {
   "phase": "phase-3",
   "date": "2026-10-03",
-  "commit": "7a402e1",
+  "commit": "c9b5c7d",
   "dirty": false,
   "environment": {
     "db": true,
@@ -9,11 +9,11 @@
     "e2e": true,
     "ci": false
   },
-  "e2e": "43 suites at 7a402e1",
-  "composite": 5.8,
+  "e2e": "43 suites at c9b5c7d",
+  "composite": 5.5,
   "baselineComposite": 5.3,
   "referenceComposite": 8.7,
-  "audit": null,
+  "audit": "audit-phase-3.json",
   "auditNote": null,
   "dimensions": [
     {
@@ -24,9 +24,10 @@
       "baseline": 6.5,
       "reference": 9,
       "raw": 10,
-      "score": 8.5,
+      "score": 7.3,
       "caps": [
-        "attestation missing: pentest (max 8.5)"
+        "attestation missing: pentest (max 8.5)",
+        "independent audit scored 7.3"
       ],
       "missingAttestations": [
         "pentest"
@@ -157,9 +158,10 @@
       "baseline": 6.5,
       "reference": 9,
       "raw": 10,
-      "score": 8.5,
+      "score": 7.5,
       "caps": [
-        "attestation missing: pentest (max 8.5)"
+        "attestation missing: pentest (max 8.5)",
+        "independent audit scored 7.5"
       ],
       "missingAttestations": [
         "pentest"
@@ -269,9 +271,9 @@
       "baseline": 7.5,
       "reference": 8.5,
       "raw": 10,
-      "score": 8.5,
+      "score": 7.5,
       "caps": [
-        "no independent audit for phase-3 (max 8.5)"
+        "independent audit scored 7.5"
       ],
       "missingAttestations": [],
       "gates": [
@@ -1036,7 +1038,7 @@
           "weight": 4,
           "title": "Face engine is a separate service with its own tests",
           "status": "fail",
-          "detail": "exit 4294963238: npm error enoent This is related to npm not being able to find a file. | npm error enoent | npm error A complete log of this run can be found in: C:\\Users\\Cogito Seah Krah\\AppData\\Local\\npm-cache\\_logs\\2026-10-03T08_52_41_129Z-debug-0.log"
+          "detail": "exit 4294963238: npm error enoent This is related to npm not being able to find a file. | npm error enoent | npm error A complete log of this run can be found in: C:\\Users\\Cogito Seah Krah\\AppData\\Local\\npm-cache\\_logs\\2026-10-03T11_03_14_454Z-debug-0.log"
         }
       ]
     },
@@ -1116,7 +1118,7 @@
           "weight": 2,
           "title": "Application code is Prettier-formatted (not only scripts/)",
           "status": "fail",
-          "detail": "exit 1: [\u001b[33mwarn\u001b[39m] apps/frontend/src/utils/stepUp.ts | [\u001b[33mwarn\u001b[39m] apps/frontend/src/utils/visualHierarchy.ts | [\u001b[33mwarn\u001b[39m] Code style issues found in 304 files. Run Prettier with --write to fix."
+          "detail": "exit 1: [\u001b[33mwarn\u001b[39m] apps/frontend/src/utils/stepUp.ts | [\u001b[33mwarn\u001b[39m] apps/frontend/src/utils/visualHierarchy.ts | [\u001b[33mwarn\u001b[39m] Code style issues found in 305 files. Run Prettier with --write to fix."
         },
         {
           "id": "strict-ts-backend",
@@ -1398,8 +1400,10 @@
       "baseline": 4,
       "reference": 8.5,
       "raw": 4,
-      "score": 4,
-      "caps": [],
+      "score": 3,
+      "caps": [
+        "independent audit scored 3"
+      ],
       "missingAttestations": [
         "soc2-iso"
       ],

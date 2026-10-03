@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
+import { checkedInHandler } from '../auth/guards.js'
+
+const retired = checkedInHandler('retired: answers 410 Gone to every caller')
 
 /**
  * Deprecated user endpoints.
@@ -28,11 +31,11 @@ const GONE = {
 }
 
 // Authenticated so the response cannot be used to probe the API anonymously.
-router.all('/', authenticateToken, (_req: Request, res: Response) => {
+router.all('/', authenticateToken, retired, (_req: Request, res: Response) => {
   res.status(410).json(GONE)
 })
 
-router.all('/:userId', authenticateToken, (_req: Request, res: Response) => {
+router.all('/:userId', authenticateToken, retired, (_req: Request, res: Response) => {
   res.status(410).json(GONE)
 })
 

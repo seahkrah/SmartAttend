@@ -137,9 +137,12 @@ export function requireRole(...allowedRoles: string[]) {
     }
 
     try {
+      // The account's role now, not the one the access token was issued
+      // with: a demoted lecturer kept these routes for up to 15 minutes
+      // (audit phase 3, F6).
       const result = await query(
-        `SELECT r.name FROM roles r WHERE r.id = $1`,
-        [req.user.roleId]
+        `SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1 AND u.is_active = TRUE`,
+        [req.user.userId]
       )
 
       if (result.rows.length === 0) {

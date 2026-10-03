@@ -25,6 +25,8 @@ import fs from 'fs'
 import path from 'path'
 import pg from 'pg'
 import type { GuardTag } from '../auth/guards.js'
+import { issueTokens } from '../auth/authService.js'
+import { runAsSystem } from '../db/dbContext.js'
 
 const API = (process.env.API_BASE ?? 'http://127.0.0.1:5000').replace(/\/$/, '')
 const dir = process.env.E2E_FIXTURE_DIR ?? path.join(process.cwd(), '.e2e-fixtures')
@@ -68,6 +70,34 @@ const callers: Caller[] = [
   { name: 'employee', token: corp.A.empToken, platform: 'corporate', role: 'employee' },
 ]
 
+// Roles the seeds have no account for: made here, removed at the end.
+const made: string[] = []
+async function addCaller(name: string, platform: 'school' | 'corporate', role: string, tenantId: string) {
+  const p = (await owner(`SELECT id FROM platforms WHERE name = $1`, [platform])).rows[0].id
+  const r = (await owner(`SELECT id FROM roles WHERE platform_id = $1 AND name = $2`, [p, role])).rows[0]
+  if (!r) throw new Error(`no ${role} role on ${platform}`)
+  const u = (await owner(
+    `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active)
+     VALUES ($1, $2, $3, $4, 'x', TRUE) RETURNING id`,
+    [p, `pe-${role}-${Date.now()}@e2e.test`, `Escalation ${role}`, r.id],
+  )).rows[0].id
+  made.push(u)
+  const table = platform === 'school' ? 'school_user_associations' : 'corporate_user_associations'
+  const fk = platform === 'school' ? 'school_entity_id' : 'corporate_entity_id'
+  await owner(`INSERT INTO ${table} (user_id, ${fk}, status) VALUES ($1, $2, 'active')`, [u, tenantId])
+  const t = await runAsSystem('e2e: a session for a caller the seeds have no account for', () =>
+    issueTokens({ id: u, platform_id: p, role_id: r.id }, { userAgent: 'privilegeEscalation' }))
+  callers.push({ name, token: t.accessToken, platform, role })
+}
+async function removeCallers() {
+  for (const u of made) {
+    await owner(`DELETE FROM school_user_associations WHERE user_id = $1`, [u]).catch(() => undefined)
+    await owner(`DELETE FROM corporate_user_associations WHERE user_id = $1`, [u]).catch(() => undefined)
+    await owner(`DELETE FROM auth_sessions WHERE user_id = $1`, [u]).catch(() => undefined)
+    await owner(`DELETE FROM users WHERE id = $1`, [u]).catch(() => undefined)
+  }
+}
+
 async function call(method: string, url: string, token: string, body?: unknown) {
   const res = await fetch(API + url, {
     method,
@@ -86,7 +116,18 @@ async function call(method: string, url: string, token: string, body?: unknown) 
 }
 
 const NOWHERE = '00000000-0000-4000-8000-000000000000'
-const fill = (p: string) => p.replace(/:(\w+)/g, (_m, name: string) => (name === 'type' ? 'student' : NOWHERE))
+// Real ids of the caller's own tenant where a parameter's name says what it
+// is, so a route's loader finds the row and the role guard behind it is the
+// one that answers. Anything else gets an id that exists nowhere.
+const REAL: Record<'school' | 'corporate', Record<string, string>> = {
+  school: {
+    studentId: school.A.students[0], courseId: school.A.courseId, scheduleId: school.A.scheduleId,
+    facultyId: school.A.facultyId, departmentId: school.A.deptId, deptId: school.A.deptId, semesterId: school.A.semId,
+  },
+  corporate: { employeeId: corp.A.empId, departmentId: corp.A.deptId, deptId: corp.A.deptId },
+}
+const fill = (p: string, platform: 'school' | 'corporate') =>
+  p.replace(/:(\w+)/g, (_m, name: string) => (name === 'type' ? 'student' : REAL[platform][name] ?? NOWHERE))
 
 /** Who the map lets through: every roles guard on the chain, and every platform guard. */
 function admits(guards: GuardTag[], c: Caller): boolean {
@@ -113,7 +154,7 @@ async function roleMatrix() {
     for (const c of callers) {
       if (admits(r.guards, c)) continue
       queue.push(async () => {
-        const res = await call(r.method, fill(r.path), c.token)
+        const res = await call(r.method, fill(r.path, c.platform), c.token)
         calls++
         const hasParam = r.path.includes(':')
         if (res.status === 403) return
@@ -261,10 +302,166 @@ async function vertical() {
   check('a tenant administrator cannot use the control plane', r.status === 403, `(${r.status})`)
 }
 
+/** The independent audit's Phase 3 findings, each as a regression. */
+async function selfDealing() {
+  console.log('-- an account other schools share (audit phase 3, F1) --')
+  const shared = (await owner(`SELECT user_id FROM students WHERE id = $1`, [school.B.students[0]])).rows[0].user_id
+  await owner(
+    `INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')
+     ON CONFLICT DO NOTHING`,
+    [shared, school.A.tenantId],
+  )
+  try {
+    const before = (await owner(`SELECT role_id, is_active, full_name FROM users WHERE id = $1`, [shared])).rows[0]
+    let r = await call('PUT', `/api/admin/users/${shared}`, school.A.token, { role: 'FACULTY' })
+    check("school A's admin cannot change the role of someone school B also has", r.status === 409, `(${r.status})`)
+    r = await call('PUT', `/api/admin/users/${shared}`, school.A.token, { is_active: false })
+    check('nor switch their account off', r.status === 409, `(${r.status})`)
+    r = await call('PATCH', `/api/auth/admin/school/users/${shared}`, school.A.token, { action: 'disable' })
+    const after = (await owner(`SELECT role_id, is_active, full_name FROM users WHERE id = $1`, [shared])).rows[0]
+    check(
+      'disabling them in A leaves the account B sees as it was',
+      after.role_id === before.role_id && after.is_active === before.is_active && after.full_name === before.full_name,
+      `(${r.status}; active ${after.is_active})`,
+    )
+  } finally {
+    await owner(`DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`, [shared, school.A.tenantId])
+    await owner(`UPDATE users SET is_active = TRUE WHERE id = $1`, [shared])
+  }
+
+  console.log('-- a lecturer and a class they do not teach (F2) --')
+  const p = (await owner(`SELECT id FROM platforms WHERE name = 'school'`)).rows[0].id
+  const facRole = (await owner(`SELECT id FROM roles WHERE platform_id = $1 AND name = 'faculty'`, [p])).rows[0].id
+  const stamp = Date.now()
+  const other = (await owner(
+    `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active)
+     VALUES ($1, $2, 'Other Lecturer', $3, 'x', TRUE) RETURNING id`,
+    [p, `pe-fac-${stamp}@e2e.test`, facRole],
+  )).rows[0].id
+  made.push(other)
+  await owner(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')`, [
+    other,
+    school.A.tenantId,
+  ])
+  const otherFaculty = (await owner(
+    `INSERT INTO faculty (user_id, employee_id, first_name, last_name, college, email, department_id, tenant_id)
+     VALUES ($1, $2, 'Other', 'Lecturer', 'Computing', $3, $4, $5) RETURNING id`,
+    [other, `PE-${stamp}`, `pe-fac-${stamp}@e2e.test`, school.A.deptId, school.A.tenantId],
+  )).rows[0].id
+  const otherToken = (await runAsSystem('e2e: a second lecturer', () =>
+    issueTokens({ id: other, platform_id: p, role_id: facRole }, { userAgent: 'privilegeEscalation' }),
+  )).accessToken
+  let sessionId: string | null = null
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const times = {
+      startTime: '23:00', endTime: '23:30',
+      attendanceOpenAt: `${today}T22:50:00Z`, attendanceCloseAt: `${today}T23:40:00Z`,
+    }
+    const opened = await call('POST', '/api/attendance/sessions', school.A.facToken, {
+      courseId: school.A.courseId,
+      sessionNumber: 9000 + Math.floor(Math.random() * 900),
+      sessionDate: today,
+      ...times,
+    })
+    sessionId = opened.json?.data?.id ?? null
+    check("the course's lecturer opens a session", opened.status === 201 && !!sessionId, `(${opened.status})`)
+    let r = await call('POST', '/api/attendance/sessions', otherToken, {
+      courseId: school.A.courseId,
+      sessionNumber: 9950,
+      sessionDate: today,
+      ...times,
+    })
+    check('another lecturer cannot open one for a course they do not teach', r.status === 403, `(${r.status})`)
+    if (sessionId) {
+      r = await call('PUT', `/api/attendance/sessions/${sessionId}`, otherToken, { location: 'Elsewhere' })
+      check('nor change it', r.status === 403, `(${r.status})`)
+      r = await call('POST', '/api/attendance/mark-with-face', otherToken, {
+        sessionId,
+        studentId: school.A.students[0],
+        verificationMethod: 'manual',
+      })
+      check('nor mark attendance in it', r.status === 403, `(${r.status})`)
+    }
+  } finally {
+    if (sessionId) await owner(`DELETE FROM course_sessions WHERE id = $1`, [sessionId]).catch(() => undefined)
+    await owner(`DELETE FROM faculty WHERE id = $1`, [otherFaculty]).catch(() => undefined)
+  }
+
+  console.log("-- one's own pay and hours (F3) --")
+  const hr = corp.A.token as string
+  const hrEmp = corp.A.hrEmpId as string
+  let r = await call('POST', `/api/payroll/employees/${hrEmp}/components`, hr, {
+    componentId: NOWHERE,
+    effectiveFrom: '2031-01-01',
+  })
+  check('HR cannot add a pay component to their own record', r.status === 403, `(${r.status})`)
+  const period = (await owner(`SELECT id FROM payroll_periods WHERE tenant_id = $1 AND status = 'open' LIMIT 1`, [
+    corp.A.tenantId,
+  ])).rows[0]?.id
+  if (period) {
+    r = await call('POST', `/api/payroll/periods/${period}/inputs`, hr, { employeeId: hrEmp, componentId: NOWHERE, amount: '100' })
+    check('nor a payroll input', r.status === 403, `(${r.status})`)
+  }
+  r = await call('POST', '/api/workforce/contracts', hr, { employeeId: hrEmp, reference: `PE-${stamp}`, jobTitle: 'Self' })
+  check('nor write their own contract', r.status === 403, `(${r.status})`)
+  const built = await call('POST', '/api/workforce/timesheets', hr, {
+    employeeId: corp.A.managerEmpId,
+    periodStart: '2031-02-03',
+    periodEnd: '2031-02-09',
+  })
+  const own = built.json?.timesheet?.id ?? built.json?.id
+  check("HR builds the manager's timesheet", !!own, `(${built.status})`)
+  if (own) {
+    try {
+      r = await call('PATCH', `/api/workforce/timesheets/${own}/days/${NOWHERE}`, corp.A.managerToken, { hours: 12 })
+      check('the manager cannot change the hours on their own timesheet', r.status === 403, `(${r.status})`)
+      await call('POST', `/api/workforce/timesheets/${own}/submit`, hr)
+      r = await call('POST', `/api/workforce/timesheets/${own}/decision`, corp.A.managerToken, { decision: 'approved' })
+      check('nor approve it, though somebody else submitted it', r.status === 403, `(${r.status})`)
+    } finally {
+      await owner(`DELETE FROM timesheet_days WHERE timesheet_id = $1`, [own]).catch(() => undefined)
+      await owner(`DELETE FROM timesheets WHERE id = $1`, [own]).catch(() => undefined)
+    }
+  }
+
+  console.log("-- other people's files (F4) --")
+  const f = new FormData()
+  f.append('category', 'other')
+  f.append('file', new Blob([Buffer.from('an employee note\n')], { type: 'text/plain' }), 'note.txt')
+  const up = await fetch(`${API}/api/files`, { method: 'POST', headers: { Authorization: `Bearer ${corp.A.empToken}` }, body: f })
+  const fileId = (await up.json().catch(() => null))?.file?.id
+  check('an employee uploads a file', up.status === 201 && !!fileId, `(${up.status})`)
+  if (fileId) {
+    try {
+      const it = callers.find((c) => c.name === 'corporate IT')!.token
+      for (const [who, token] of [['a manager', corp.A.managerToken], ['IT', it]] as const) {
+        r = await call('GET', `/api/files/${fileId}`, token)
+        check(`${who} cannot read it`, r.status === 403, `(${r.status})`)
+        r = await call('DELETE', `/api/files/${fileId}`, token)
+        check('nor delete it', r.status === 403, `(${r.status})`)
+      }
+      r = await call('GET', `/api/files/${fileId}`, corp.A.token)
+      check('HR can read it', r.status === 200, `(${r.status})`)
+    } finally {
+      await owner(`DELETE FROM file_access_log WHERE file_id = $1`, [fileId]).catch(() => undefined)
+      await owner(`DELETE FROM stored_files WHERE id = $1`, [fileId]).catch(() => undefined)
+    }
+  }
+}
+
 async function main() {
-  await roleMatrix()
-  await idor()
-  await vertical()
+  await addCaller('guardian', 'school', 'guardian', school.A.tenantId)
+  await addCaller('school IT', 'school', 'it', school.A.tenantId)
+  await addCaller('corporate IT', 'corporate', 'it', corp.A.tenantId)
+  try {
+    await roleMatrix()
+    await idor()
+    await vertical()
+    await selfDealing()
+  } finally {
+    await removeCallers()
+  }
 }
 
 main()

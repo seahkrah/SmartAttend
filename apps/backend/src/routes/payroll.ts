@@ -134,6 +134,18 @@ async function owned(table: string, ctx: Ctx, id: string): Promise<any | null> {
   return r.rows[0] ?? null
 }
 
+/**
+ * Whether an employee record is the caller's own. Payroll staff set other
+ * people's pay, never their own: compensation already refused that, but a
+ * salary component or a period input on one's own record raised pay just
+ * the same (audit phase 3, F3).
+ */
+async function isOwnRecord(ctx: Ctx, employeeId: string): Promise<boolean> {
+  if (ctx.isSuperadmin) return false
+  const mine = await callerEmployee(ctx)
+  return !!mine && mine.id === employeeId
+}
+
 function isPayrollStaff(ctx: Ctx): boolean {
   return ctx.isSuperadmin || ['hr', 'hr_director', 'admin'].includes(ctx.roleName)
 }
@@ -451,6 +463,9 @@ router.post('/employees/:employeeId/components', payrollStaff, async (req: Tenan
     const b = req.body ?? {}
     const employee = await owned('employees', ctx, String(req.params.employeeId))
     if (!employee) return notFound(res, 'Employee')
+    if (await isOwnRecord(ctx, employee.id)) {
+      return res.status(403).json({ error: 'You cannot change your own pay' })
+    }
 
     const component = await owned('salary_components', ctx, String(b.componentId ?? ''))
     if (!component) return notFound(res, 'Salary component')
@@ -495,6 +510,9 @@ router.delete('/employees/:employeeId/components/:assignmentId', payrollStaff, a
     const assignment = await owned('employee_salary_components', ctx, String(req.params.assignmentId))
     if (!assignment || assignment.employee_id !== employee.id) {
       return notFound(res, 'Assignment')
+    }
+    if (await isOwnRecord(ctx, employee.id)) {
+      return res.status(403).json({ error: 'You cannot change your own pay' })
     }
 
     const endDate = optionalDate(req.query.endDate, 'endDate')
@@ -720,6 +738,9 @@ router.post('/periods/:periodId/inputs', payrollStaff, async (req: TenantRequest
 
     const employee = await owned('employees', ctx, String(b.employeeId ?? ''))
     if (!employee) return notFound(res, 'Employee')
+    if (await isOwnRecord(ctx, employee.id)) {
+      return res.status(403).json({ error: 'You cannot change your own pay' })
+    }
     const component = await owned('salary_components', ctx, String(b.componentId ?? ''))
     if (!component) return notFound(res, 'Salary component')
 
@@ -754,6 +775,9 @@ router.delete('/periods/:periodId/inputs/:inputId', payrollStaff, async (req: Te
     const period = (req as any).period
     const input = await owned('payroll_inputs', ctx, String(req.params.inputId))
     if (!input || input.period_id !== period.id) return notFound(res, 'Payroll input')
+    if (await isOwnRecord(ctx, input.employee_id)) {
+      return res.status(403).json({ error: 'You cannot change your own pay' })
+    }
 
     await query(`DELETE FROM payroll_inputs WHERE id = $1 AND tenant_id = $2`,
       [input.id, ctx.tenantId])

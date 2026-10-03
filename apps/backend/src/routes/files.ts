@@ -24,6 +24,7 @@ import {
   subjectInTenant,
   quotaFor,
   recordAccess,
+  FILE_STAFF_ROLES,
   mayAttach,
   softDelete,
   store,
@@ -93,7 +94,7 @@ function ctxOf(req: TenantRequest): Ctx {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const staff = requireRoles('admin', 'hr', 'hr_director', 'manager', 'it')
+const staff = requireRoles(...FILE_STAFF_ROLES)
 
 function fail(res: Response, label: string, e: unknown) {
   if (e instanceof FileError) return res.status(e.status).json({ error: e.message })
@@ -277,7 +278,7 @@ function publicShape(file: any) {
 // Listing
 // ===========================================================================
 
-router.get('/', checkedInHandler("staff (admin, hr, hr_director, manager, it) see the tenant's files; anyone else what they uploaded"), async (req: TenantRequest, res: Response) => {
+router.get('/', checkedInHandler("staff (admin, hr, hr_director) see the tenant's files; anyone else what they uploaded"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const category = typeof req.query.category === 'string' ? req.query.category : null
@@ -287,7 +288,7 @@ router.get('/', checkedInHandler("staff (admin, hr, hr_director, manager, it) se
     const limit = Math.min(Number(req.query.limit) || 100, 500)
 
     const isStaff = ctx.isSuperadmin
-      || ['admin', 'hr', 'hr_director', 'manager', 'it'].includes(ctx.roleName)
+      || (FILE_STAFF_ROLES as readonly string[]).includes(ctx.roleName)
 
     // Someone who is not staff sees what they uploaded. Anything else they
     // are entitled to, they reach through the thing it is attached to.
@@ -318,7 +319,7 @@ router.get('/', checkedInHandler("staff (admin, hr, hr_director, manager, it) se
   }
 })
 
-router.get('/:fileId', checkedInHandler("mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"), async (req: TenantRequest, res: Response) => {
+router.get('/:fileId', checkedInHandler("mayRead: staff (admin, hr, hr_director), the uploader, the person the file is attached to, or a lecturer for attendance evidence"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const file = (req as any).storedFile
@@ -349,7 +350,7 @@ router.get('/:fileId', checkedInHandler("mayRead: staff (admin, hr, hr_director,
  * Every header here is load-bearing. Changing any of them turns a document
  * store into a way to run script on this application's origin.
  */
-router.get('/:fileId/download', checkedInHandler("mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"), async (req: TenantRequest, res: Response) => {
+router.get('/:fileId/download', checkedInHandler("mayRead: staff (admin, hr, hr_director), the uploader, the person the file is attached to, or a lecturer for attendance evidence"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const file = (req as any).storedFile
@@ -430,7 +431,7 @@ router.delete('/:fileId', checkedInHandler("staff, or the person who uploaded it
     const file = (req as any).storedFile
 
     const isStaff = ctx.isSuperadmin
-      || ['admin', 'hr', 'hr_director', 'manager', 'it'].includes(ctx.roleName)
+      || (FILE_STAFF_ROLES as readonly string[]).includes(ctx.roleName)
     if (!isStaff && file.uploaded_by !== ctx.userId) {
       return res.status(403).json({ error: 'This file is not yours to delete' })
     }

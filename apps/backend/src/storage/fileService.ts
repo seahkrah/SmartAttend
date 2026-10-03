@@ -345,7 +345,13 @@ export interface Reader {
   tenantId: string
 }
 
-const STAFF_ROLES = new Set(['admin', 'hr', 'hr_director', 'manager', 'it'])
+/**
+ * Who reads and removes every file in the tenant. Managers and IT staff were
+ * in this list, so a line manager could read and delete anyone's documents
+ * (audit phase 3, F4); they now see their own, like anybody else.
+ */
+export const FILE_STAFF_ROLES = ['admin', 'hr', 'hr_director'] as const
+const STAFF_ROLES = new Set<string>(FILE_STAFF_ROLES)
 
 /**
  * Whether this person may read this file.

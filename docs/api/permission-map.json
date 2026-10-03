@@ -544,6 +544,45 @@
     ]
   },
   {
+    "method": "ALL",
+    "path": "/api/admin/corporate/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone, with the replacement, to every caller"
+      }
+    ]
+  },
+  {
+    "method": "ALL",
+    "path": "/api/admin/corporate/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone, with the replacement, to every caller"
+      }
+    ]
+  },
+  {
+    "method": "ALL",
+    "path": "/api/admin/corporate/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone, with the replacement, to every caller"
+      }
+    ]
+  },
+  {
     "method": "GET",
     "path": "/api/admin/courses",
     "guards": [
@@ -714,6 +753,45 @@
       },
       {
         "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "ALL",
+    "path": "/api/admin/school/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone, with the replacement, to every caller"
+      }
+    ]
+  },
+  {
+    "method": "ALL",
+    "path": "/api/admin/school/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone, with the replacement, to every caller"
+      }
+    ]
+  },
+  {
+    "method": "ALL",
+    "path": "/api/admin/school/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone, with the replacement, to every caller"
       }
     ]
   },
@@ -5447,7 +5525,7 @@
       },
       {
         "kind": "inHandler",
-        "rule": "staff (admin, hr, hr_director, manager, it) see the tenant's files; anyone else what they uploaded"
+        "rule": "staff (admin, hr, hr_director) see the tenant's files; anyone else what they uploaded"
       }
     ]
   },
@@ -5495,7 +5573,7 @@
       },
       {
         "kind": "inHandler",
-        "rule": "mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"
+        "rule": "mayRead: staff (admin, hr, hr_director), the uploader, the person the file is attached to, or a lecturer for attendance evidence"
       }
     ]
   },
@@ -5514,9 +5592,7 @@
         "values": [
           "admin",
           "hr",
-          "hr_director",
-          "manager",
-          "it"
+          "hr_director"
         ]
       }
     ]
@@ -5533,7 +5609,7 @@
       },
       {
         "kind": "inHandler",
-        "rule": "mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"
+        "rule": "mayRead: staff (admin, hr, hr_director), the uploader, the person the file is attached to, or a lecturer for attendance evidence"
       }
     ]
   },
@@ -5568,9 +5644,7 @@
         "values": [
           "admin",
           "hr",
-          "hr_director",
-          "manager",
-          "it"
+          "hr_director"
         ]
       }
     ]
@@ -9924,6 +9998,32 @@
       {
         "kind": "public",
         "reason": "checks a client timestamp against server time"
+      }
+    ]
+  },
+  {
+    "method": "ALL",
+    "path": "/api/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone to every caller"
+      }
+    ]
+  },
+  {
+    "method": "ALL",
+    "path": "/api/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "retired: answers 410 Gone to every caller"
       }
     ]
   },

@@ -66,6 +66,8 @@ export interface PermissionEntry {
   method: string
   path: string
   guards: GuardTag[]
+  /** A guard placed after the route's handler: it never runs before the handler answers. */
+  guardAfterHandler?: true
 }
 
 /** Whether a middleware layer (app.use / router.use) runs for a path below its router. */
@@ -123,19 +125,34 @@ async function walk(): Promise<{ routes: RouteEntry[]; permissions: PermissionEn
     for (const layer of (owner as any).stack ?? []) {
       if (!layer.route) continue
       const routePaths: unknown[] = Array.isArray(layer.route.path) ? layer.route.path : [layer.route.path]
-      const own = (layer.route.stack ?? []).map((l: any) => guardOf(l.handle)).filter(Boolean) as GuardTag[]
+      // The handler is the last function on the route. A guard after it never
+      // runs before the handler answers, so it does not count, and is flagged.
+      const stack: any[] = layer.route.stack ?? []
+      const own = stack.slice(0, -1).map((l: any) => guardOf(l.handle)).filter(Boolean) as GuardTag[]
+      const guardAfterHandler = stack.length > 0 && !!guardOf(stack[stack.length - 1].handle)
       for (const rp of routePaths) {
-        if (typeof rp !== 'string') continue
-        const ways = isTop(owner) ? [{ prefix: '', tags: [] as GuardTag[] }] : reach(owner, rp)
+        // A RegExp route is in the permission map under its pattern, not in
+        // the inventory, whose paths the fuzzer fills in.
+        const regex = typeof rp !== 'string'
+        if (regex && !(rp instanceof RegExp)) continue
+        const rel = regex ? '' : (rp as string)
+        const ways = isTop(owner) ? [{ prefix: '', tags: [] as GuardTag[] }] : reach(owner, rel)
         for (const way of ways) {
-          const full = (way.prefix + rp).replace(/\/+/g, '/').replace(/(.)\/$/, '$1')
-          const guards = [...way.tags, ...tagsBefore(isTop(owner) ? appRouter : owner, layer, rp), ...own]
-          for (const method of Object.keys(layer.route.methods).filter((m) => m !== '_all')) {
-            const key = `${method.toUpperCase()} ${full}`
-            routes.set(key, { method: method.toUpperCase(), path: full, params: [...full.matchAll(/:(\w+)/g)].map((m) => m[1]) })
+          const full = regex ? `${way.prefix || ''}regexp:${String(rp)}` : (way.prefix + rel).replace(/\/+/g, '/').replace(/(.)\/$/, '$1')
+          const guards = [...way.tags, ...tagsBefore(isTop(owner) ? appRouter : owner, layer, rel), ...own]
+          for (const m of Object.keys(layer.route.methods)) {
+            // router.all serves every method: in the map as ALL, not in the
+            // inventory (there is no one method to call it with).
+            const method = m === '_all' ? 'ALL' : m.toUpperCase()
+            const key = `${method} ${full}`
+            if (!regex && m !== '_all') {
+              routes.set(key, { method, path: full, params: [...full.matchAll(/:(\w+)/g)].map((x) => x[1]) })
+            }
             // Express answers with the first route that matches, so the first
             // registration of a method and path is the one that serves it.
-            if (!permissions.has(key)) permissions.set(key, { method: method.toUpperCase(), path: full, guards })
+            if (!permissions.has(key)) {
+              permissions.set(key, { method, path: full, guards, ...(guardAfterHandler ? { guardAfterHandler: true as const } : {}) })
+            }
           }
         }
       }

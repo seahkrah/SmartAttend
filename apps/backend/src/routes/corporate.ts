@@ -12,7 +12,7 @@ import {
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
-import { emailTakenOnPlatform } from '../auth/authService.js'
+import { emailTakenOnPlatform, memberElsewhere } from '../auth/authService.js'
 import { anyMember, checkedInHandler } from '../auth/guards.js'
 
 const router = express.Router()
@@ -498,8 +498,10 @@ router.patch('/admin/employees/:employeeId/terminate', checkedInHandler("the emp
       return res.status(404).json({ error: 'Employee not found' })
     }
 
-    // Also deactivate the user account
-    await query(`UPDATE users SET is_active = false WHERE id = $1`, [result.rows[0].user_id])
+    // Also deactivate the user account, unless another employer shares it.
+    if (result.rows[0].user_id && !(await memberElsewhere(result.rows[0].user_id, (req as TenantRequest).ctx!.tenantId!, true))) {
+      await query(`UPDATE users SET is_active = false WHERE id = $1`, [result.rows[0].user_id])
+    }
 
     return res.json({ message: 'Employee terminated', data: result.rows[0] })
   } catch (err: any) {

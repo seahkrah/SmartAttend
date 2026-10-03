@@ -176,6 +176,25 @@ export async function accountsByEmail(platformId: string, email: string, exceptU
  * refuses that link from the runtime role, so the caller decides who may be
  * linked and this, on the system pool, does it.
  */
+/**
+ * Whether an account also belongs to a tenant other than this one (any
+ * membership not removed). Identity code on the system pool: under the
+ * tenant's row-level security another tenant's memberships are invisible,
+ * which is why the routes' own checks never fired (audit phase 3, F1).
+ * The account's role, active flag and details are shared by all its tenants,
+ * so one tenant may not change them while another has the person.
+ */
+export async function memberElsewhere(userId: string, tenantId: string, activeOnly = false): Promise<boolean> {
+  const r = await sys(
+    `SELECT 1 FROM user_tenant_memberships
+      WHERE user_id = $1 AND tenant_id <> $2
+        AND (CASE WHEN $3 THEN status = 'active' ELSE status <> 'removed' END)
+      LIMIT 1`,
+    [userId, tenantId, activeOnly]
+  )
+  return r.rows.length > 0
+}
+
 export async function linkExistingAccountToSchool(userId: string, tenantId: string): Promise<void> {
   await sys(
     `INSERT INTO school_user_associations (user_id, school_entity_id, status)

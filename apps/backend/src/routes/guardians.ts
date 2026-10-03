@@ -13,7 +13,7 @@ import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { handingOverLink, requireRecentAuthWhen } from '../auth/stepUp.js'
-import { accountsByEmail, linkExistingAccountToSchool } from '../auth/authService.js'
+import { accountsByEmail, linkExistingAccountToSchool, memberElsewhere } from '../auth/authService.js'
 
 /**
  * SMS — guardians, as the school's administrators manage them.
@@ -394,7 +394,9 @@ router.patch('/:guardianId', async (req: TenantRequest, res: Response) => {
     )
 
     // Their account carries the same name, phone and address; keep it true.
-    if (guardian.user_id) {
+    // A guardian who also signs in at another school shares one account with
+    // it: this school's record changes, the account does not (audit phase 3, F1).
+    if (guardian.user_id && !(await memberElsewhere(guardian.user_id, ctx.tenantId))) {
       if (changes.email && changes.email !== guardian.email?.toLowerCase()) {
         const clash = await assertEmailUsableForGuardian(changes.email, ctx.platformId, guardian.user_id)
         if (clash) {
@@ -448,11 +450,7 @@ router.delete('/:guardianId', async (req: TenantRequest, res: Response) => {
         `DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`,
         [guardian.user_id, ctx.tenantId]
       )
-      const elsewhere = await client.query(
-        `SELECT 1 FROM user_tenant_memberships WHERE user_id = $1 AND status = 'active' LIMIT 1`,
-        [guardian.user_id]
-      )
-      if (elsewhere.rowCount === 0) {
+      if (!(await memberElsewhere(guardian.user_id, ctx.tenantId, true))) {
         await client.query(
           `UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
           [guardian.user_id]

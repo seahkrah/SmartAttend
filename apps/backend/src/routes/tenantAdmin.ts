@@ -38,6 +38,7 @@
 
 import { Router, Request, Response } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
+import { checkedInHandler } from '../auth/guards.js'
 
 const router = Router()
 
@@ -60,11 +61,14 @@ function gone(replacement: string) {
 
 router.use(authenticateToken)
 
-router.all('/school/stats', gone(REPLACEMENTS.stats))
-router.all('/corporate/stats', gone(REPLACEMENTS.stats))
-router.all('/school/users', gone(REPLACEMENTS.users))
-router.all('/corporate/users', gone(REPLACEMENTS.users))
-router.all('/school/users/:userId', gone(REPLACEMENTS.users))
-router.all('/corporate/users/:userId', gone(REPLACEMENTS.users))
+// Every method answers 410 Gone, naming the replacement; nothing is read.
+const retired = checkedInHandler('retired: answers 410 Gone, with the replacement, to every caller')
+
+router.all('/school/stats', retired, gone(REPLACEMENTS.stats))
+router.all('/corporate/stats', retired, gone(REPLACEMENTS.stats))
+router.all('/school/users', retired, gone(REPLACEMENTS.users))
+router.all('/corporate/users', retired, gone(REPLACEMENTS.users))
+router.all('/school/users/:userId', retired, gone(REPLACEMENTS.users))
+router.all('/corporate/users/:userId', retired, gone(REPLACEMENTS.users))
 
 export default router

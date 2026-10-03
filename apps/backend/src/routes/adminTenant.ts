@@ -17,7 +17,7 @@ import {
   assertAllInTenant,
   TenantScopeError,
 } from '../db/tenantScoped.js'
-import { emailTakenOnPlatform } from '../auth/authService.js'
+import { emailTakenOnPlatform, memberElsewhere } from '../auth/authService.js'
 
 /**
  * Tenant administration — the per-tenant admin API the frontend's
@@ -356,6 +356,16 @@ router.put('/users/:userId', async (req: TenantRequest, res: Response) => {
     }
 
     const { name, role, is_active } = req.body ?? {}
+    // Role, status and name belong to the account, which another tenant may
+    // share (a parent at two schools): this tenant may not change them there
+    // (audit phase 3, F1). Its membership here is this tenant's to end.
+    if ((role !== undefined || typeof is_active === 'boolean' || typeof name === 'string') &&
+        (await memberElsewhere(userId, ctx.tenantId!))) {
+      return res.status(409).json({
+        error: 'Shared account',
+        message: 'This person also belongs to another organisation, so their role, status and name cannot be changed here',
+      })
+    }
     const sets: string[] = []
     const params: unknown[] = []
 
@@ -430,11 +440,9 @@ router.delete('/users/:userId', async (req: TenantRequest, res: Response) => {
       [userId, ctx.tenantId]
     )
 
-    const remaining = await query(
-      `SELECT COUNT(*)::int AS n FROM ${m.table} WHERE user_id = $1 AND status <> 'removed'`,
-      [userId]
-    )
-    if (remaining.rows[0].n === 0) {
+    // Another tenant's memberships are invisible here under row-level
+    // security, so the question is asked on the system pool.
+    if (!(await memberElsewhere(userId, ctx.tenantId!))) {
       await query(`UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [userId])
     }
 
@@ -823,7 +831,10 @@ async function decideApproval(
          ON CONFLICT DO NOTHING`,
         [approval.user_id, ctx.tenantId]
       )
-      await client.query(`UPDATE users SET is_active = TRUE WHERE id = $1`, [approval.user_id])
+      // An account another tenant shares keeps the state that tenant sees.
+      if (!(await memberElsewhere(approval.user_id, ctx.tenantId!))) {
+        await client.query(`UPDATE users SET is_active = TRUE WHERE id = $1`, [approval.user_id])
+      }
     }
 
     await client.query('COMMIT')

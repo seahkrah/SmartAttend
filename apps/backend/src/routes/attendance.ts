@@ -68,6 +68,47 @@ async function callerFacultyId(req: TenantRequest): Promise<string | null> {
   return r.rows[0]?.id ?? null
 }
 
+/**
+ * Whether a lecturer teaches a course in this tenant. The faculty role alone
+ * let any lecturer open, change and mark sessions of any course in the
+ * school (audit phase 3, F2).
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function teaches(req: TenantRequest, facultyId: string, courseId: string): Promise<boolean> {
+  const r = await query(
+    `SELECT 1 FROM faculty_courses WHERE faculty_id = $1 AND course_id = $2 AND tenant_id = $3
+     UNION ALL
+     SELECT 1 FROM class_schedules WHERE faculty_id = $1 AND course_id = $2 AND tenant_id = $3
+     LIMIT 1`,
+    [facultyId, courseId, req.ctx!.tenantId]
+  )
+  return r.rows.length > 0
+}
+
+/**
+ * The caller's faculty record, if they teach this session's course; otherwise
+ * answers and returns null. An unknown session answers `missing` (marking has
+ * always said 400 there, updating 404).
+ */
+async function lecturerOfSession(req: TenantRequest, res: Response, sessionId: string, missing = 404): Promise<string | null> {
+  const facultyId = await callerFacultyId(req)
+  if (!facultyId) {
+    res.status(403).json({ error: 'This needs a faculty record in this tenant' })
+    return null
+  }
+  const session = await getSession(svc(req), sessionId)
+  if (!session) {
+    res.status(missing).json({ success: false, error: 'Session not found' })
+    return null
+  }
+  if (session.lecturerId !== facultyId && !(await teaches(req, facultyId, session.courseId))) {
+    res.status(403).json({ error: 'You do not teach this course' })
+    return null
+  }
+  return facultyId
+}
+
 function failScope(res: Response, e: unknown, label: string): boolean {
   if (e instanceof AttendanceScopeError) {
     res.status(e.status).json({ error: e.message })
@@ -101,7 +142,37 @@ router.post('/sessions', requireRole('faculty'), async (req: TenantRequest, res:
       return
     }
 
-    const session = await createSession(svc(req), courseId, sessionData as CreateSessionRequest)
+    const facultyId = await callerFacultyId(req)
+    if (!facultyId) {
+      res.status(403).json({ error: 'This needs a faculty record in this tenant' })
+      return
+    }
+    // Another tenant's course reads as absent, as one that does not exist.
+    const course = await query(`SELECT 1 FROM courses WHERE id = $1 AND tenant_id = $2`, [String(courseId), req.ctx!.tenantId])
+    if (!UUID_RE.test(String(courseId)) || course.rows.length === 0) {
+      res.status(404).json({ error: 'Course not found' })
+      return
+    }
+    if (!(await teaches(req, facultyId, String(courseId)))) {
+      res.status(403).json({ error: 'You do not teach this course' })
+      return
+    }
+    // A lecturer opens their own sessions. Naming anyone else is refused:
+    // someone outside this tenant reads as absent.
+    const named = (sessionData as any).lecturerId
+    if (named && named !== facultyId && named !== req.ctx!.userId) {
+      const there = await query(
+        `SELECT 1 FROM faculty WHERE tenant_id = $2 AND (id::text = $1 OR user_id::text = $1)`,
+        [String(named), req.ctx!.tenantId]
+      )
+      if (there.rows.length === 0) {
+        res.status(404).json({ error: 'Faculty member not found' })
+      } else {
+        res.status(403).json({ error: 'A lecturer opens their own sessions' })
+      }
+      return
+    }
+    const session = await createSession(svc(req), courseId, { ...sessionData, lecturerId: facultyId } as CreateSessionRequest)
 
     res.status(201).json({
       success: true,
@@ -127,6 +198,7 @@ router.put('/sessions/:sessionId', requireRole('faculty'), async (req: TenantReq
     const { sessionId } = req.params
     const updates = req.body as UpdateSessionRequest
 
+    if (!(await lecturerOfSession(req, res, sessionId))) return
     const session = await updateSession(svc(req), sessionId, updates)
 
     if (!session) {
@@ -231,11 +303,8 @@ router.post('/mark-with-face', requireRole('faculty'), async (req: TenantRequest
 
     // Marking requires a faculty record in this tenant, not merely the
     // faculty role somewhere.
-    const facultyId = await callerFacultyId(req)
-    if (!facultyId) {
-      res.status(403).json({ error: 'Marking attendance requires a faculty record in this tenant' })
-      return
-    }
+    const facultyId = await lecturerOfSession(req, res, String(attendanceReq.sessionId), 400)
+    if (!facultyId) return
 
     const markResult = await markAttendanceWithFace(svc(req), attendanceReq, facultyId)
 

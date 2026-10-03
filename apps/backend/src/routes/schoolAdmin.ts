@@ -15,6 +15,7 @@ import {
 } from '../auth/tenantContextMiddleware.js'
 import { TenantScopeError } from '../db/tenantScoped.js'
 import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
+import { memberElsewhere } from '../auth/authService.js'
 
 /**
  * SMS — the school administrator's surface.
@@ -292,11 +293,9 @@ router.patch('/admin/school/users/:userId', async (req: TenantRequest, res: Resp
       }
       // The account is shared by every tenant it belongs to; one tenant may
       // not rewrite what another sees.
-      const elsewhere = await query(
-        `SELECT 1 FROM user_tenant_memberships WHERE user_id = $1 AND tenant_id <> $2 LIMIT 1`,
-        [userId, ctx.tenantId]
-      )
-      if (elsewhere.rows.length > 0) {
+      // Asked on the system pool: under the tenant's row-level security the
+      // view showed no other tenant, so this never fired (audit phase 3, F1).
+      if (await memberElsewhere(userId, ctx.tenantId)) {
         return res.status(409).json({ error: 'This person also belongs to another organisation; they can change their own details' })
       }
       const fullName = req.body.fullName === undefined ? undefined : String(req.body.fullName).trim()
@@ -340,7 +339,9 @@ router.patch('/admin/school/users/:userId', async (req: TenantRequest, res: Resp
         WHERE user_id = $2 AND school_entity_id = $3`,
       [next.assoc, userId, ctx.tenantId]
     )
-    if (next.active !== null) {
+    // The account itself only when no other tenant shares it; otherwise the
+    // membership here is all this school may change.
+    if (next.active !== null && !(await memberElsewhere(userId, ctx.tenantId))) {
       await query(`UPDATE users SET is_active = $1 WHERE id = $2`, [next.active, userId])
     }
 
@@ -473,10 +474,8 @@ router.delete('/admin/school/users/:userId', async (req: TenantRequest, res: Res
       `DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`,
       [userId, ctx.tenantId]
     )
-    const elsewhere = await client.query(
-      `SELECT 1 FROM user_tenant_memberships WHERE user_id = $1 AND status = 'active' LIMIT 1`, [userId])
     let deactivated = false
-    if (elsewhere.rows.length === 0) {
+    if (!(await memberElsewhere(userId, ctx.tenantId, true))) {
       await client.query(`UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [userId])
       deactivated = true
     }
@@ -944,7 +943,10 @@ router.patch('/admin/school/students/:id', async (req: TenantRequest, res: Respo
       )
     }
 
-    if (u.firstName || u.lastName || u.middleName !== undefined) {
+    // Name and phone are the account's; a shared account keeps what the
+    // other organisation sees (audit phase 3, F1).
+    const shared = await memberElsewhere(existing.user_id, ctx.tenantId)
+    if (!shared && (u.firstName || u.lastName || u.middleName !== undefined)) {
       const fn = u.firstName || existing.first_name
       const mn = u.middleName !== undefined ? u.middleName : existing.middle_name
       const ln = u.lastName || existing.last_name
@@ -953,7 +955,7 @@ router.patch('/admin/school/students/:id', async (req: TenantRequest, res: Respo
         existing.user_id,
       ])
     }
-    if (u.phone !== undefined) {
+    if (!shared && u.phone !== undefined) {
       await query(`UPDATE users SET phone = $1 WHERE id = $2`, [u.phone || null, existing.user_id])
     }
 
@@ -973,7 +975,9 @@ router.patch('/admin/school/students/:id/suspend', async (req: TenantRequest, re
     const student = await ownedRow('students', ctx, id)
     if (!student) return notFound(res, 'Student')
 
-    await query(`UPDATE users SET is_active = $1 WHERE id = $2`, [!suspended, student.user_id])
+    if (!(await memberElsewhere(student.user_id, ctx.tenantId))) {
+      await query(`UPDATE users SET is_active = $1 WHERE id = $2`, [!suspended, student.user_id])
+    }
     await query(
       `UPDATE school_user_associations SET status = $1
         WHERE user_id = $2 AND school_entity_id = $3`,
@@ -1011,7 +1015,9 @@ router.delete('/admin/school/students/:id', async (req: TenantRequest, res: Resp
       `DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`,
       [student.user_id, ctx.tenantId]
     )
-    await client.query(`UPDATE users SET is_active = FALSE WHERE id = $1`, [student.user_id])
+    if (!(await memberElsewhere(student.user_id, ctx.tenantId, true))) {
+      await client.query(`UPDATE users SET is_active = FALSE WHERE id = $1`, [student.user_id])
+    }
     await client.query('COMMIT')
 
     return res.json({ message: 'Student deleted successfully' })
@@ -1163,7 +1169,10 @@ router.patch('/admin/school/faculty/:id', async (req: TenantRequest, res: Respon
       )
     }
 
-    if (u.firstName || u.lastName || u.middleName !== undefined) {
+    // Name and phone are the account's; a shared account keeps what the
+    // other organisation sees (audit phase 3, F1).
+    const shared = await memberElsewhere(existing.user_id, ctx.tenantId)
+    if (!shared && (u.firstName || u.lastName || u.middleName !== undefined)) {
       const fn = u.firstName || existing.first_name
       const mn = u.middleName !== undefined ? u.middleName : existing.middle_name
       const ln = u.lastName || existing.last_name
@@ -1172,7 +1181,7 @@ router.patch('/admin/school/faculty/:id', async (req: TenantRequest, res: Respon
         existing.user_id,
       ])
     }
-    if (u.phone !== undefined) {
+    if (!shared && u.phone !== undefined) {
       await query(`UPDATE users SET phone = $1 WHERE id = $2`, [u.phone || null, existing.user_id])
     }
 
@@ -1192,7 +1201,9 @@ router.patch('/admin/school/faculty/:id/suspend', async (req: TenantRequest, res
     const faculty = await ownedRow('faculty', ctx, id)
     if (!faculty) return notFound(res, 'Faculty member')
 
-    await query(`UPDATE users SET is_active = $1 WHERE id = $2`, [!suspended, faculty.user_id])
+    if (!(await memberElsewhere(faculty.user_id, ctx.tenantId))) {
+      await query(`UPDATE users SET is_active = $1 WHERE id = $2`, [!suspended, faculty.user_id])
+    }
     await query(
       `UPDATE school_user_associations SET status = $1
         WHERE user_id = $2 AND school_entity_id = $3`,
@@ -1242,7 +1253,9 @@ router.delete('/admin/school/faculty/:id', async (req: TenantRequest, res: Respo
       `DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`,
       [faculty.user_id, ctx.tenantId]
     )
-    await client.query(`UPDATE users SET is_active = FALSE WHERE id = $1`, [faculty.user_id])
+    if (!(await memberElsewhere(faculty.user_id, ctx.tenantId, true))) {
+      await client.query(`UPDATE users SET is_active = FALSE WHERE id = $1`, [faculty.user_id])
+    }
     await client.query('COMMIT')
 
     return res.json({ message: 'Faculty member deleted successfully' })

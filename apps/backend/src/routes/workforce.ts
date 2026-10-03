@@ -168,6 +168,22 @@ function isScheduler(ctx: Ctx): boolean {
 }
 
 /** The caller's own employee record in this tenant, if they have one. */
+/**
+ * Whether an employee record is the caller's own. HR writes other people's
+ * contracts and a scheduler other people's hours: one's own contract hours,
+ * timesheet days or approval raised one's own pay (audit phase 3, F3).
+ */
+async function ownRecord(req: TenantRequest, employeeId: string): Promise<boolean> {
+  const ctx = ctxOf(req)
+  if (ctx.isSuperadmin) return false
+  const mine = await callerEmployee(ctx)
+  return !!mine && mine.id === employeeId
+}
+
+function refuseOwn(res: Response, what: string) {
+  return res.status(403).json({ error: `You cannot ${what} your own record; somebody else has to` })
+}
+
 async function callerEmployee(ctx: Ctx): Promise<any | null> {
   const r = await query(
     `SELECT * FROM employees WHERE user_id = $1 AND tenant_id = $2 LIMIT 1`,
@@ -334,6 +350,7 @@ router.post('/contracts', hrOnly, async (req: TenantRequest, res: Response) => {
 
     const employee = await owned('employees', ctx, String(b.employeeId ?? ''))
     if (!employee) return notFound(res, 'Employee')
+    if (await ownRecord(req, employee.id)) return refuseOwn(res, 'write a contract for')
 
     if (!b.reference || !b.jobTitle) {
       return res.status(400).json({ error: 'reference and jobTitle are required' })
@@ -392,6 +409,7 @@ router.patch('/contracts/:contractId', hrOnly, async (req: TenantRequest, res: R
     const ctx = ctxOf(req)
     const contract = (req as any).contract
     const b = req.body ?? {}
+    if (await ownRecord(req, contract.employee_id)) return refuseOwn(res, 'change the contract on')
 
     if (contract.status !== 'draft') {
       return res.status(409).json({
@@ -458,6 +476,7 @@ router.post('/contracts/:contractId/activate', hrOnly, async (req: TenantRequest
   try {
     const ctx = svcCtx(req)
     const contract = (req as any).contract
+    if (await ownRecord(req, contract.employee_id)) return refuseOwn(res, 'activate the contract on')
     client = await getConnection()
     await client.query('BEGIN')
     const activated = await activateContract(client, ctx, contract.id)
@@ -1109,6 +1128,7 @@ router.patch('/timesheets/:timesheetId/days/:entryId', schedulers, async (req: T
     const full = ctxOf(req)
     const timesheet = (req as any).timesheet
     const b = req.body ?? {}
+    if (await ownRecord(req, timesheet.employee_id)) return refuseOwn(res, 'change the hours on')
 
     if (!['draft', 'submitted', 'rejected'].includes(timesheet.status)) {
       return res.status(409).json({
@@ -1204,6 +1224,8 @@ router.post('/timesheets/:timesheetId/decision', schedulers, async (req: TenantR
           : `This timesheet is already ${timesheet.status}`,
       })
     }
+    // Nor by the person it is for, whoever submitted it.
+    if (await ownRecord(req, timesheet.employee_id)) return refuseOwn(res, 'decide the timesheet on')
     if (timesheet.submitted_by && timesheet.submitted_by === ctx.userId && !ctx.isSuperadmin) {
       return res.status(403).json({
         error: 'A timesheet has to be decided by somebody other than whoever submitted it',

@@ -14,7 +14,11 @@
  *      superadmin guard, and no written rule (own records only, any member,
  *      or a rule its handler enforces);
  *   5. a declaration is empty (a role guard with no roles, a rule with no
- *      words).
+ *      words);
+ *   6. a guard sits after the route's handler, where it never runs first.
+ *
+ * router.all and RegExp routes are in the map (as ALL, and under their
+ * pattern) but not in the inventory, and must be declared like the rest.
  *
  * The privilegeEscalation suite then tests the role guards the map lists.
  *
@@ -41,7 +45,11 @@ if (!process.argv.includes('--no-regen')) {
       env: { ...process.env, NODE_ENV: process.env.NODE_ENV ?? 'test' },
     })
   } catch (e) {
-    const tail = String(e.stderr ?? e.message).trim().split('\n').slice(-3).join(' | ')
+    const tail = String(e.stderr ?? e.message)
+      .trim()
+      .split('\n')
+      .slice(-3)
+      .join(' | ')
     problems.push(`permission map could not be confirmed current: ${tail}`)
   }
 }
@@ -49,7 +57,7 @@ if (!process.argv.includes('--no-regen')) {
 const map = JSON.parse(fs.readFileSync(MAP, 'utf8'))
 const inventory = JSON.parse(fs.readFileSync(INVENTORY, 'utf8'))
 const key = r => `${r.method} ${r.path}`
-const mapped = new Set(map.map(key))
+const mapped = new Set(map.filter(r => r.method !== 'ALL' && !r.path.includes('regexp:')).map(key))
 const listed = new Set(inventory.map(key))
 for (const k of listed) if (!mapped.has(k)) problems.push(`${k}: in the route inventory but not the permission map`)
 for (const k of mapped) if (!listed.has(k)) problems.push(`${k}: in the permission map but not the route inventory`)
@@ -57,13 +65,15 @@ for (const k of mapped) if (!listed.has(k)) problems.push(`${k}: in the permissi
 const text = v => typeof v === 'string' && v.trim().length >= 3
 for (const r of map) {
   const kinds = new Set(r.guards.map(g => g.kind))
+  if (r.guardAfterHandler) problems.push(`${key(r)}: a guard after the handler, where it cannot run first`)
   for (const g of r.guards) {
     if ((g.kind === 'roles' || g.kind === 'platform') && !(Array.isArray(g.values) && g.values.length)) {
       problems.push(`${key(r)}: a ${g.kind} guard with nothing in it`)
     }
     if (g.kind === 'public' && !text(g.reason)) problems.push(`${key(r)}: public with no reason`)
     if (g.kind === 'inHandler' && !text(g.rule)) problems.push(`${key(r)}: a handler rule with no words`)
-    if ((g.kind === 'self' || g.kind === 'member') && !text(g.what)) problems.push(`${key(r)}: ${g.kind} with no description`)
+    if ((g.kind === 'self' || g.kind === 'member') && !text(g.what))
+      problems.push(`${key(r)}: ${g.kind} with no description`)
   }
   if (kinds.has('public')) {
     if (kinds.has('authenticated')) problems.push(`${key(r)}: declared public but behind authentication`)
@@ -73,7 +83,8 @@ for (const r of map) {
     problems.push(`${key(r)}: neither public nor behind authentication`)
     continue
   }
-  if (![...kinds].some(k => AUTHZ.has(k))) problems.push(`${key(r)}: authenticated, but says nothing about who may call it`)
+  if (![...kinds].some(k => AUTHZ.has(k)))
+    problems.push(`${key(r)}: authenticated, but says nothing about who may call it`)
 }
 
 const count = kind => map.filter(r => r.guards.some(g => g.kind === kind)).length
@@ -85,5 +96,5 @@ if (problems.length) {
 }
 console.log(
   `permission-coverage: ok (${map.length} routes: ${count('roles')} role-guarded, ${count('superadmin')} superadmin, ` +
-    `${count('self')} own records, ${count('member')} any member, ${count('inHandler')} handler rules, ${count('public')} public)`
+    `${count('self')} own records, ${count('member')} any member, ${count('inHandler')} handler rules, ${count('public')} public)`,
 )

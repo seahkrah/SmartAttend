@@ -170,6 +170,32 @@ async function main() {
   const adminAfter = (await owner(`SELECT admin_user_id FROM school_entities WHERE id = $1`, [B])).rows[0]?.admin_user_id
   check("and B's administrator is unchanged", adminAfter !== onlyA)
 
+  // Audit phase 3, F1: an account another tenant shares keeps its role,
+  // status and details whatever one tenant does (migration 083).
+  await owner(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')
+               ON CONFLICT DO NOTHING`, [onlyA, B])
+  try {
+    for (const [label, sql] of [
+      ['switched off', `UPDATE users SET is_active = FALSE WHERE id = $1`],
+      ['renamed', `UPDATE users SET full_name = full_name || ' (edited)' WHERE id = $1`],
+    ] as const) {
+      const code = await refused(() => withTenant({ tenantId: A }, () => query(sql, [onlyA])))
+      check(`an account school B shares cannot be ${label} from A`, code === '42501', `(${code ?? 'it ran'})`)
+    }
+    const roleCode = await refused(() => withTenant({ tenantId: A }, () =>
+      query(`UPDATE users SET role_id = (SELECT id FROM roles WHERE platform_id = users.platform_id AND id <> users.role_id LIMIT 1) WHERE id = $1`, [onlyA])))
+    check('nor given another role', roleCode === '42501', `(${roleCode ?? 'it ran'})`)
+    const solo = [...ofA].find((u) => u !== onlyA && !ofB.has(u))
+    if (solo) {
+      const mine = await refused(() => withTenant({ tenantId: A }, () =>
+        query(`UPDATE users SET full_name = full_name || ' ' WHERE id = $1`, [solo])))
+      check("while an account only A has is A's to edit", mine === null, `(${mine})`)
+      await owner(`UPDATE users SET full_name = rtrim(full_name) WHERE id = $1`, [solo])
+    }
+  } finally {
+    await owner(`DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`, [onlyA, B])
+  }
+
   // The guard must not stop a tenant adding someone it can already see: an
   // account created in B can apply to B.
   const probe = (await owner(

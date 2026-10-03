@@ -306,7 +306,20 @@ async function vertical() {
 /** The independent audit's Phase 3 findings, each as a regression. */
 async function selfDealing() {
   console.log('-- an account other schools share (audit phase 3, F1) --')
-  const shared = (await owner(`SELECT user_id FROM students WHERE id = $1`, [school.B.students[0]])).rows[0].user_id
+  // A throwaway account, a member of B: what A's actions on it leave in A's
+  // audit trail must not name one of B's seeded people, whose ids the
+  // cross-tenant fuzz rightly treats as B's data.
+  const shared = (await owner(
+    `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active)
+     SELECT platform_id, $1, 'Shared Parent', role_id, 'x', TRUE FROM users
+      WHERE id = (SELECT user_id FROM students WHERE id = $2) RETURNING id`,
+    [`pe-shared-${Date.now()}@e2e.test`, school.B.students[0]],
+  )).rows[0].id
+  made.push(shared)
+  await owner(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')`, [
+    shared,
+    school.B.tenantId,
+  ])
   await owner(
     `INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')
      ON CONFLICT DO NOTHING`,
@@ -327,7 +340,6 @@ async function selfDealing() {
     )
   } finally {
     await owner(`DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`, [shared, school.A.tenantId])
-    await owner(`UPDATE users SET is_active = TRUE WHERE id = $1`, [shared])
   }
 
   console.log('-- a lecturer and a class they do not teach (F2) --')

@@ -143,6 +143,49 @@ async function main() {
     check(`${t}: A sees only A's rows`, r.rows.every((x: any) => x.t === A), `(${r.rows.filter((x: any) => x.t !== A).length} others)`)
   }
 
+  // Audit phase 2, F1: visibility follows memberships, so B must not be able
+  // to make one of A's people its member, applicant or administrator and so
+  // see them (migration 081). B's school is the target; A's person is not
+  // visible to B to begin with.
+  const onlyA = [...ofA].find((u) => !ofB.has(u))!
+  const bIsSchool = (await owner(`SELECT 1 FROM school_entities WHERE id = $1`, [B])).rowCount === 1
+  check("B is a school with someone of A's who is not B's", bIsSchool && !!onlyA)
+  for (const [label, run] of [
+    ['as a member', () => withTenant({ tenantId: B }, () =>
+      query(`INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')`, [onlyA, B]))],
+    ['as an applicant', () => withTenant({ tenantId: B }, () =>
+      query(`INSERT INTO school_user_approvals (user_id, school_entity_id, requested_role, status, requested_at)
+             VALUES ($1, $2, 'student', 'pending', CURRENT_TIMESTAMP)`, [onlyA, B]))],
+    ['as administrator', () => withTenant({ tenantId: B }, () =>
+      query(`UPDATE school_entities SET admin_user_id = $1 WHERE id = $2`, [onlyA, B]))],
+    ["by moving one of B's memberships onto them", () => withTenant({ tenantId: B }, () =>
+      query(`UPDATE school_user_associations SET user_id = $1
+              WHERE id = (SELECT id FROM school_user_associations WHERE school_entity_id = $2 LIMIT 1)`, [onlyA, B]))],
+  ] as Array<[string, () => Promise<unknown>]>) {
+    const code = await refused(run)
+    check(`B cannot take on one of A's people ${label}`, code === '42501', `(${code ?? 'it ran'})`)
+  }
+  const stillHidden = await withTenant({ tenantId: B }, () => query(`SELECT 1 FROM users WHERE id = $1`, [onlyA]))
+  check("and A's person is still invisible to B", stillHidden.rowCount === 0)
+  const adminAfter = (await owner(`SELECT admin_user_id FROM school_entities WHERE id = $1`, [B])).rows[0]?.admin_user_id
+  check("and B's administrator is unchanged", adminAfter !== onlyA)
+
+  // The guard must not stop a tenant adding someone it can already see: an
+  // account created in B can apply to B.
+  const probe = (await owner(
+    `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, created_tenant_id)
+     SELECT platform_id, $1, 'Guard probe', role_id, 'x', FALSE, $2 FROM users WHERE id = $3 RETURNING id`,
+    [`guard-${Date.now()}@identity.test`, B, onlyB[0]])).rows[0].id
+  try {
+    const ok = await refused(() => withTenant({ tenantId: B }, () =>
+      query(`INSERT INTO school_user_approvals (user_id, school_entity_id, requested_role, status, requested_at)
+             VALUES ($1, $2, 'student', 'pending', CURRENT_TIMESTAMP)`, [probe, B])))
+    check('B can still add an account it can see', ok === null, `(${ok})`)
+  } finally {
+    await owner(`DELETE FROM school_user_approvals WHERE user_id = $1`, [probe])
+    await owner(`DELETE FROM users WHERE id = $1`, [probe])
+  }
+
   console.log('-- credentials follow the account --')
   for (const t of ['auth_sessions', 'auth_tokens', 'user_mfa', 'user_mfa_recovery_codes', 'mfa_login_challenges']) {
     const r = await withTenant({ tenantId: A }, () => query(`SELECT user_id FROM ${t}`))
@@ -151,10 +194,24 @@ async function main() {
     const n = await withNoTenant(() => query(`SELECT count(*) AS n FROM ${t}`))
     check(`${t}: nothing with no tenant and nobody signed in`, Number(n.rows[0].n) === 0, `(${n.rows[0].n})`)
   }
+  // Sessions are written only by src/auth/sessions.ts on the system pool
+  // (migration 081, audit phase 2 F2): the runtime role cannot write one in
+  // any context, its own tenant's included.
   const sessionsOfB = Number((await owner(`SELECT count(*) AS n FROM auth_sessions WHERE user_id = ANY($1)`, [onlyB])).rows[0].n)
-  const revoke = await withTenant({ tenantId: A }, () =>
-    query(`UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ANY($1)`, [onlyB]))
-  check(`B's sessions (${sessionsOfB}) cannot be ended from A`, revoke.rowCount === 0, `(${revoke.rowCount})`)
+  const someOfA = [...ofA]
+  for (const [label, run] of [
+    [`B's sessions (${sessionsOfB}) ended from A`, () => withTenant({ tenantId: A }, () =>
+      query(`UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ANY($1)`, [onlyB]))],
+    ["A's own sessions ended from A", () => withTenant({ tenantId: A }, () =>
+      query(`UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ANY($1)`, [someOfA]))],
+    ['a session deleted', () => withTenant({ tenantId: A }, () =>
+      query(`DELETE FROM auth_sessions WHERE user_id = ANY($1)`, [someOfA]))],
+    ['a session created', () => withTenant({ tenantId: A }, () =>
+      query(`INSERT INTO auth_sessions (user_id) VALUES ($1)`, [someOfA[0]]))],
+  ] as Array<[string, () => Promise<unknown>]>) {
+    const code = await refused(run)
+    check(`the runtime role cannot write sessions: ${label}`, code === '42501', `(${code ?? 'it ran'})`)
+  }
   const failed = await refused(() => withTenant({ tenantId: A }, () => query(`SELECT 1 FROM auth_failed_logins LIMIT 1`)))
   check('failed sign-ins are not readable by the runtime role at all', failed === '42501', `(${failed ?? 'read'})`)
 

@@ -34,7 +34,7 @@ import {
 } from '../auth/tenantContextMiddleware.js'
 import { ErrorMessages, getUserFriendlyError, logError } from '../utils/errorMessages.js'
 import { getClientIp } from '../utils/getClientIp.js'
-import { rotateSession, revokeSession, revokeUserSessions, SessionError } from '../auth/sessions.js'
+import { endOwnSession, listUserSessions, rotateSession, revokeSession, revokeUserSessions, SessionError } from '../auth/sessions.js'
 import { passwordProblems } from '../auth/breachedPassword.js'
 import { markAuthenticated, stepUpMaxAgeSeconds } from '../auth/stepUp.js'
 import { requestPasswordReset, redeemToken, AccountTokenError } from '../auth/accountTokens.js'
@@ -489,15 +489,9 @@ router.post('/activate', accountLimiter, async (req: Request, res: Response) => 
 /** The caller's own signed-in devices. */
 router.get('/sessions', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const r = await query(
-      `SELECT id, created_at, last_used_at, expires_at, created_ip, user_agent
-         FROM auth_sessions
-        WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-        ORDER BY last_used_at DESC`,
-      [req.user!.userId]
-    )
+    const rows = await listUserSessions(req.user!.userId)
     return res.json({
-      sessions: r.rows.map((s: any) => ({
+      sessions: rows.map((s: any) => ({
         id: s.id,
         createdAt: s.created_at,
         lastUsedAt: s.last_used_at,
@@ -516,13 +510,9 @@ router.get('/sessions', authenticateToken, async (req: Request, res: Response) =
 /** Signs out one of the caller's own devices. Another user's session reads as missing. */
 router.delete('/sessions/:sessionId', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const r = await query(
-      `UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, revoked_reason = 'signed_out_by_user'
-        WHERE id::text = $1 AND user_id = $2 AND revoked_at IS NULL
-        RETURNING id`,
-      [req.params.sessionId, req.user!.userId]
-    )
-    if (r.rows.length === 0) return res.status(404).json({ error: 'Session not found' })
+    if (!(await endOwnSession(req.user!.userId, req.params.sessionId))) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
     return res.json({ message: 'Signed out of that device' })
   } catch (error) {
     logError('Revoke session', error)

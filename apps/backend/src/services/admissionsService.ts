@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { query } from '../db/connection.js'
 import { sendInvitation, unusablePasswordHash, type InvitationResult } from '../auth/accountTokens.js'
+import { emailTakenOnPlatform } from '../auth/authService.js'
 
 /**
  * SMS — admissions.
@@ -441,11 +442,7 @@ export async function enrolApplicant(
   // The applicant's email becomes the login. If the school already has a user
   // on that address the enrolment stops here rather than quietly attaching
   // the new student to somebody else's account.
-  const existing = await client.query(
-    `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND platform_id = $2`,
-    [applicant.email, ctx.platformId]
-  )
-  if ((existing.rowCount ?? 0) > 0) {
+  if (await emailTakenOnPlatform(ctx.platformId, applicant.email)) {
     throw new AdmissionsError(
       'An account already exists on this email address; resolve the duplicate before enrolling',
       409

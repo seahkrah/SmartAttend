@@ -13,6 +13,7 @@ import { sendInvitation, unusablePasswordHash, AccountTokenError } from '../auth
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { handingOverLink, requireRecentAuthWhen } from '../auth/stepUp.js'
+import { accountsByEmail, linkExistingAccountToSchool } from '../auth/authService.js'
 
 /**
  * SMS — guardians, as the school's administrators manage them.
@@ -343,26 +344,21 @@ router.get('/:guardianId', async (req: TenantRequest, res: Response) => {
  * accounts sharing an address would leave one of them unable to sign in.
  */
 async function assertEmailUsableForGuardian(
-  runner: { query: typeof query },
   email: string,
   platformId: string,
   exceptUserId: string | null
 ): Promise<any | null> {
-  const r = await runner.query(
-    `SELECT u.id, u.is_active, u.last_login, r.name AS role_name
-       FROM users u JOIN roles r ON r.id = u.role_id
-      WHERE LOWER(u.email) = LOWER($1) AND u.platform_id = $2
-        AND ($3::uuid IS NULL OR u.id <> $3::uuid)`,
-    [email, platformId, exceptUserId]
-  )
-  const other = r.rows.find((row: any) => row.role_name !== 'guardian')
+  // Across every school on the platform: a guardian may already sign in at
+  // another one, which this school cannot see (identity code; migration 074).
+  const rows = await accountsByEmail(platformId, email, exceptUserId)
+  const other = rows.find((row) => row.role_name !== 'guardian')
   if (other) {
     throw new InputError(
       'That email address already signs in to another school account, so it cannot also be a guardian login. Use a different address.',
       409
     )
   }
-  return r.rows[0] ?? null
+  return rows[0] ?? null
 }
 
 router.patch('/:guardianId', async (req: TenantRequest, res: Response) => {
@@ -400,7 +396,7 @@ router.patch('/:guardianId', async (req: TenantRequest, res: Response) => {
     // Their account carries the same name, phone and address; keep it true.
     if (guardian.user_id) {
       if (changes.email && changes.email !== guardian.email?.toLowerCase()) {
-        const clash = await assertEmailUsableForGuardian(client, changes.email, ctx.platformId, guardian.user_id)
+        const clash = await assertEmailUsableForGuardian(changes.email, ctx.platformId, guardian.user_id)
         if (clash) {
           throw new InputError('Another guardian account already uses that email address', 409)
         }
@@ -643,11 +639,13 @@ router.post('/:guardianId/invitation', requireRecentAuthWhen(handingOverLink), a
     let userId: string = guardian.user_id
     let reusedAccount = false
     if (!userId) {
-      const existing = await assertEmailUsableForGuardian(client, guardian.email, ctx.platformId, null)
+      const existing = await assertEmailUsableForGuardian(guardian.email, ctx.platformId, null)
       if (existing) {
         userId = existing.id
         reusedAccount = true
-        await client.query(`UPDATE users SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [userId])
+        // Another school's account: linked by identity code, since this
+        // school cannot see it until it is a member (migration 081).
+        await linkExistingAccountToSchool(userId, ctx.tenantId)
       } else {
         const role = await client.query(
           `SELECT id FROM roles WHERE name = 'guardian' AND platform_id = $1`, [ctx.platformId])

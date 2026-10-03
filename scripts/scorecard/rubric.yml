@@ -92,6 +92,7 @@ dimensions:
         type: e2e
         suites:
           - crossTenantAudit
+          - identityIsolation
           - legacyRoutesIsolation
           - opsRoutesIsolation
           - tenantIsolation
@@ -265,7 +266,7 @@ dimensions:
       - id: breached-password
         kind: target
         weight: 2
-        title: Breached-password check
+        title: Breached-password check present in the auth code (grep)
         type: grep
         paths:
           - apps/backend/src/auth
@@ -273,7 +274,7 @@ dimensions:
       - id: shared-rate-limit-store
         kind: target
         weight: 3
-        title: Rate-limit store shared across replicas
+        title: Shared rate-limit store present in the code (grep)
         type: grep
         paths:
           - apps/backend/src

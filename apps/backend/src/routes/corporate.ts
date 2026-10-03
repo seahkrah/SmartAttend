@@ -12,6 +12,7 @@ import {
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
+import { emailTakenOnPlatform } from '../auth/authService.js'
 
 const router = express.Router()
 
@@ -383,11 +384,7 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
     }
 
     // Check if email already exists on this platform
-    const existingUser = await query(
-      `SELECT id FROM users WHERE email = $1 AND platform_id = $2`,
-      [email, platformId]
-    )
-    if (existingUser.rows.length > 0) {
+    if (await emailTakenOnPlatform(platformId, email)) {
       return res.status(409).json({ error: 'A user with this email already exists' })
     }
 

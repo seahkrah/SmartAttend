@@ -17,6 +17,7 @@ import {
   assertAllInTenant,
   TenantScopeError,
 } from '../db/tenantScoped.js'
+import { emailTakenOnPlatform } from '../auth/authService.js'
 
 /**
  * Tenant administration — the per-tenant admin API the frontend's
@@ -288,11 +289,7 @@ router.post('/users', async (req: TenantRequest, res: Response) => {
       return res.status(400).json({ error: 'Validation failed', message: `Role ${role} does not exist on this platform` })
     }
 
-    const existing = await client.query(
-      `SELECT id FROM users WHERE platform_id = $1 AND email = $2`,
-      [ctx.platformId, email.toLowerCase()]
-    )
-    if (existing.rows.length > 0) {
+    if (await emailTakenOnPlatform(ctx.platformId, email)) {
       await client.query('ROLLBACK')
       return res.status(409).json({ error: 'Conflict', message: 'A user with that email already exists on this platform' })
     }
@@ -505,8 +502,7 @@ router.post('/users/bulk-import', async (req: TenantRequest, res: Response) => {
       // attaching it made an administrator able to pull another tenant's user
       // into their own tenant just by knowing the address, and then suspend
       // or deactivate that account.
-      const existing = await client.query(`SELECT id FROM users WHERE platform_id = $1 AND LOWER(email) = $2`, [ctx.platformId, email])
-      if (existing.rows.length > 0) { errors.push({ row: i + 1, error: 'An account already exists on that email address' }); continue }
+      if (await emailTakenOnPlatform(ctx.platformId, email)) { errors.push({ row: i + 1, error: 'An account already exists on that email address' }); continue }
 
       const created = await client.query(
         `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active, must_reset_password)

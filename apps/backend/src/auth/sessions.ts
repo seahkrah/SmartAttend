@@ -150,3 +150,26 @@ export async function sessionIsLive(sessionId: string, userId: string): Promise<
   )
   return r.rows.length > 0
 }
+
+/** A person's live sessions, for their device list. */
+export async function listUserSessions(userId: string) {
+  const r = await sys(
+    `SELECT id, created_at, last_used_at, expires_at, created_ip, user_agent
+       FROM auth_sessions
+      WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+      ORDER BY last_used_at DESC`,
+    [userId]
+  )
+  return r.rows
+}
+
+/** Ends one of the caller's own sessions; false when it is not theirs or not live. */
+export async function endOwnSession(userId: string, sessionId: string): Promise<boolean> {
+  const r = await sys(
+    `UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, revoked_reason = 'signed_out_by_user'
+      WHERE id::text = $1 AND user_id = $2 AND revoked_at IS NULL
+      RETURNING id`,
+    [sessionId, userId]
+  )
+  return r.rows.length > 0
+}

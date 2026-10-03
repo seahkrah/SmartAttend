@@ -143,6 +143,49 @@ async function recordFailure(emailNorm: string, ip?: string | null) {
   }
 }
 
+/**
+ * Whether an address already has an account on this platform. The unique key
+ * (platform, email) spans tenants, while row-level security shows a tenant
+ * only its own people (migration 074), so the answer has to come from here:
+ * otherwise the insert after a "no" fails on the key, and inside a bulk
+ * import's transaction takes every other row with it.
+ */
+export async function emailTakenOnPlatform(platformId: string, email: string, exceptUserId: string | null = null): Promise<boolean> {
+  const r = await sys(
+    `SELECT 1 FROM users WHERE platform_id = $1 AND LOWER(email) = LOWER($2) AND ($3::uuid IS NULL OR id <> $3::uuid) LIMIT 1`,
+    [platformId, String(email ?? '').trim(), exceptUserId]
+  )
+  return r.rows.length > 0
+}
+
+/** The accounts on a platform with this address, and their roles: for reusing a guardian's login across schools. */
+export async function accountsByEmail(platformId: string, email: string, exceptUserId: string | null = null) {
+  const r = await sys(
+    `SELECT u.id, u.is_active, u.last_login, r.name AS role_name
+       FROM users u JOIN roles r ON r.id = u.role_id
+      WHERE LOWER(u.email) = LOWER($1) AND u.platform_id = $2 AND ($3::uuid IS NULL OR u.id <> $3::uuid)`,
+    [String(email ?? '').trim(), platformId, exceptUserId]
+  )
+  return r.rows as Array<{ id: string; is_active: boolean; last_login: string | null; role_name: string }>
+}
+
+/**
+ * Makes an existing account (a guardian already signing in at another
+ * school) a member of this school. The one way an account the tenant could
+ * not see becomes visible to it: the membership guard (migration 081)
+ * refuses that link from the runtime role, so the caller decides who may be
+ * linked and this, on the system pool, does it.
+ */
+export async function linkExistingAccountToSchool(userId: string, tenantId: string): Promise<void> {
+  await sys(
+    `INSERT INTO school_user_associations (user_id, school_entity_id, status)
+     VALUES ($1, $2, 'active')
+     ON CONFLICT (user_id, school_entity_id) DO UPDATE SET status = 'active'`,
+    [userId, tenantId]
+  )
+  await sys(`UPDATE users SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [userId])
+}
+
 /** Records a finished sign-in on the account. */
 export async function recordSignIn(userId: string): Promise<void> {
   await sys(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [userId])

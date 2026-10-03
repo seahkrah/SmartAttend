@@ -27,7 +27,7 @@ import { randomSequence, sequenceMatches, type Pose, POSES } from './pose.js'
 import {
   MODEL_ID, THRESHOLDS, clampThreshold, distance, identify as identifyAmong, mean, spread,
 } from './matching.js'
-import { openStoredTemplate, sealTemplateForStorage, templateContext, templateKeyConfigured } from './templateCrypto.js'
+import { BiometricKeyError, openStoredTemplate, sealTemplateForStorage, templateContext, templateKeyConfigured } from './templateCrypto.js'
 
 export type SubjectType = 'student' | 'employee'
 export interface Subject { type: SubjectType; id: string }
@@ -632,14 +632,27 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
   )
   // Unwrapping the tenant's data key is cached, so a class of forty costs
   // one KMS call at most, not forty.
-  const candidates = await Promise.all(rows.rows.map(async (row: any) => ({
-    id: row.subject_id,
-    template: await openStoredTemplate(
-      ctx.tenantId,
-      { ciphertext: row.ciphertext, iv: row.iv, authTag: row.auth_tag, keyVersion: row.key_version, dekVersion: row.dek_version },
-      templateContext(ctx.tenantId, 'student', row.subject_id, row.model)
-    ),
-  })))
+  // A template that does not open under this tenant's key and this student's
+  // context (copied from another tenant or another person, or damaged) is
+  // nobody's: it is left out and reported, and the rest of the class is still
+  // identified. Before, one such row failed identification for the class.
+  const opened = await Promise.all(rows.rows.map(async (row: any) => {
+    try {
+      return {
+        id: row.subject_id as string,
+        template: await openStoredTemplate(
+          ctx.tenantId,
+          { ciphertext: row.ciphertext, iv: row.iv, authTag: row.auth_tag, keyVersion: row.key_version, dekVersion: row.dek_version },
+          templateContext(ctx.tenantId, 'student', row.subject_id, row.model)
+        ),
+      }
+    } catch (e) {
+      if (e instanceof BiometricKeyError) throw e
+      console.error(`[BIOMETRICS] template for student ${row.subject_id} in tenant ${ctx.tenantId} does not open; left out`)
+      return null
+    }
+  }))
+  const candidates = opened.filter((c): c is NonNullable<typeof c> => c !== null)
   const probe = mean(capture.faces.map((f) => f.descriptor))
   const result = identifyAmong(probe, candidates, settings.threshold)
 

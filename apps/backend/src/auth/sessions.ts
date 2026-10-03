@@ -44,15 +44,15 @@ function newToken(): string {
 
 export async function createSession(
   userId: string,
-  meta: { ip?: string | null; userAgent?: string | null } = {}
+  meta: { ip?: string | null; userAgent?: string | null; boundTenantId?: string | null } = {}
 ): Promise<{ sessionId: string; refreshToken: string }> {
   const refreshToken = newToken()
   const r = await sys(
-    `INSERT INTO auth_sessions (user_id, current_token_hash, expires_at, created_ip, user_agent)
-     VALUES ($1, $2, CURRENT_TIMESTAMP + ($3 || ' days')::interval, $4, $5)
+    `INSERT INTO auth_sessions (user_id, current_token_hash, expires_at, created_ip, user_agent, bound_tenant_id)
+     VALUES ($1, $2, CURRENT_TIMESTAMP + ($3 || ' days')::interval, $4, $5, $6)
      RETURNING id`,
     [userId, hashToken(refreshToken), String(SESSION_LIFETIME_DAYS),
-     meta.ip?.slice(0, 64) ?? null, meta.userAgent?.slice(0, 255) ?? null]
+     meta.ip?.slice(0, 64) ?? null, meta.userAgent?.slice(0, 255) ?? null, meta.boundTenantId ?? null]
   )
   // Now and then, forget sessions that ended more than thirty days ago.
   if (Math.random() < 0.02) {
@@ -141,14 +141,22 @@ export async function revokeUserSessions(userId: string, reason: string, keep?: 
 
 /** Whether a session is live and its account active. One indexed lookup. */
 export async function sessionIsLive(sessionId: string, userId: string): Promise<boolean> {
+  return (await liveSession(sessionId, userId)) !== null
+}
+
+/**
+ * A live session of this person, with the one tenant it is bound to if it
+ * was started through single sign-on; null if it has ended.
+ */
+export async function liveSession(sessionId: string, userId: string): Promise<{ boundTenantId: string | null } | null> {
   const r = await sys(
-    `SELECT 1
+    `SELECT s.bound_tenant_id
        FROM auth_sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = $1 AND s.user_id = $2 AND s.revoked_at IS NULL
         AND s.expires_at > CURRENT_TIMESTAMP AND u.is_active = TRUE`,
     [sessionId, userId]
   )
-  return r.rows.length > 0
+  return r.rows.length ? { boundTenantId: r.rows[0].bound_tenant_id ?? null } : null
 }
 
 /** A person's live sessions, for their device list. */

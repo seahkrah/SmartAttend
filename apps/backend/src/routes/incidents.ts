@@ -6,9 +6,10 @@
 import { Router, Response, NextFunction } from 'express'
 import type { ExtendedRequest } from '../types/auth.js'
 import { authenticateToken } from '../auth/middleware.js'
-import { resolveTenantContext } from '../auth/tenantContextMiddleware.js'
+import { requireRoles, resolveTenantContext } from '../auth/tenantContextMiddleware.js'
 import {
   incidentVisibility,
+  INCIDENT_ROLES,
   contextOf,
   IncidentAccessError,
   type IncidentVisibility,
@@ -64,6 +65,10 @@ router.use((req, _res, next) => {
   if (ctx?.isSuperadmin && !ctx.tenantId) return runAsSystem('control plane: a superadmin reviewing platform incidents', next)
   next()
 })
+
+// Who may see incidents at all, as a route guard the permission map can read.
+// Each handler still applies incidentVisibility for which ones.
+router.use(requireRoles(...INCIDENT_ROLES))
 
 function visibility(req: ExtendedRequest): IncidentVisibility {
   return incidentVisibility(contextOf(req))

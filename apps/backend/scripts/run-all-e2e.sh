@@ -128,6 +128,9 @@ TS_SUITES=(
   webauthn
   # Single sign-on through an OpenID Connect provider the suite runs.
   sso
+  # Inside one tenant: every role-guarded route in docs/api/permission-map.json
+  # as every caller it leaves out, same-tenant IDOR cases, self-promotion.
+  privilegeEscalation
   # Every route with a path parameter, as tenant A, with each of tenant B's
   # ids. Needs RATE_LIMIT_API_PER_MINUTE raised: it is ~20,000 requests.
   crossTenantFuzz

@@ -33,12 +33,13 @@ import { KmsError } from '../security/kms/index.js'
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { logError } from '../utils/errorMessages.js'
+import { publicRoute } from '../auth/guards.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const ssoRouter = express.Router()
 
-ssoRouter.get('/providers', loginLimiter, async (req: Request, res: Response) => {
+ssoRouter.get('/providers', publicRoute("the sign-in providers a tenant offers, for the sign-in page"), loginLimiter, async (req: Request, res: Response) => {
   try {
     return res.json({ providers: await providersForTenantCode(String(req.query.tenant ?? '')) })
   } catch (error) {
@@ -55,7 +56,7 @@ function backToLogin(res: Response, code: string, error?: unknown) {
   return res.redirect(302, `${appUrl()}/login?sso_error=${encodeURIComponent(code)}`)
 }
 
-ssoRouter.get('/:providerId/start', loginLimiter, async (req: Request, res: Response) => {
+ssoRouter.get('/:providerId/start', publicRoute("starts single sign-on with a tenant's identity provider"), loginLimiter, async (req: Request, res: Response) => {
   if (!UUID.test(req.params.providerId)) return backToLogin(res, 'unknown_provider')
   try {
     return res.redirect(302, await startSignIn(req.params.providerId))
@@ -66,7 +67,7 @@ ssoRouter.get('/:providerId/start', loginLimiter, async (req: Request, res: Resp
   }
 })
 
-ssoRouter.get('/oidc/callback', loginLimiter, async (req: Request, res: Response) => {
+ssoRouter.get('/oidc/callback', publicRoute("the identity provider returns here; state, nonce and PKCE are checked"), loginLimiter, async (req: Request, res: Response) => {
   // The provider reports its own refusals (the person cancelled, say) here.
   if (req.query.error) return backToLogin(res, 'provider_refused')
   try {
@@ -80,7 +81,7 @@ ssoRouter.get('/oidc/callback', loginLimiter, async (req: Request, res: Response
   }
 })
 
-ssoRouter.post('/saml/acs', loginLimiter, async (req: Request, res: Response) => {
+ssoRouter.post('/saml/acs', publicRoute("the identity provider posts a signed assertion here"), loginLimiter, async (req: Request, res: Response) => {
   try {
     const code = await finishSaml(req.body?.RelayState, req.body?.SAMLResponse)
     return res.redirect(302, `${appUrl()}/sso/complete#code=${encodeURIComponent(code)}`)
@@ -92,7 +93,7 @@ ssoRouter.post('/saml/acs', loginLimiter, async (req: Request, res: Response) =>
 })
 
 /** What an identity provider's administrator needs to register this service. */
-ssoRouter.get('/saml/metadata', (_req: Request, res: Response) => {
+ssoRouter.get('/saml/metadata', publicRoute("this service provider's metadata, for the identity provider"), (_req: Request, res: Response) => {
   const api = apiPublicUrl()
   res.type('application/samlmetadata+xml').send(`<?xml version="1.0"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="${samlEntityId(api)}">
@@ -103,18 +104,19 @@ ssoRouter.get('/saml/metadata', (_req: Request, res: Response) => {
 </md:EntityDescriptor>`)
 })
 
-ssoRouter.post('/complete', loginLimiter, async (req: Request, res: Response) => {
+ssoRouter.post('/complete', publicRoute("redeems the single-use handoff code from the callback"), loginLimiter, async (req: Request, res: Response) => {
   try {
-    const { userId, mfaDone } = await spendHandoff(req.body?.code)
+    // The session may act only in the tenant whose provider vouched (F5).
+    const { userId, mfaDone, tenantId } = await spendHandoff(req.body?.code)
     const user = await accountForSignIn(userId)
     if (!user) throw new SsoError('no_account', 'There is no account for that address here.')
     await assertMaySignIn(user, false)
     // Our second factor still applies, unless the tenant trusts its
     // provider's and the provider says it used one.
     if (!mfaDone && (await mfaEnabled(user.id))) {
-      return res.json({ mfaRequired: true, mfaToken: await createChallenge(user.id, getClientIp(req)) })
+      return res.json({ mfaRequired: true, mfaToken: await createChallenge(user.id, getClientIp(req), tenantId) })
     }
-    const tokens = await issueTokens(user, { ip: getClientIp(req), userAgent: String(req.headers['user-agent'] ?? '') })
+    const tokens = await issueTokens(user, { ip: getClientIp(req), userAgent: String(req.headers['user-agent'] ?? ''), boundTenantId: tenantId })
     await recordSignIn(user.id)
     return res.json({
       message: 'Login successful',

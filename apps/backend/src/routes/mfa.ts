@@ -14,6 +14,7 @@ import { loginLimiter, mfaManageLimiter } from '../security/httpSecurity.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { logError } from '../utils/errorMessages.js'
 import { runAsSystem } from '../db/dbContext.js'
+import { publicRoute, selfService } from '../auth/guards.js'
 
 // The caller's own two-factor settings and the code step of sign-in, which
 // comes before any tenant is known: system-pool work (migration 074).
@@ -56,20 +57,20 @@ function answerOf(body: any): { code?: string; recoveryCode?: string } | null {
   return null
 }
 
-router.post('/verify', loginLimiter, async (req: Request, res: Response) => {
+router.post('/verify', publicRoute("second step of sign-in; the pending-challenge token is the credential"), loginLimiter, async (req: Request, res: Response) => {
   const answer = answerOf(req.body)
   const mfaToken = typeof req.body?.mfaToken === 'string' ? req.body.mfaToken : ''
   if (!mfaToken || !answer) {
     return res.status(400).json({ error: 'Enter the code from your authenticator app.' })
   }
   try {
-    const { userId, usedRecoveryCode } = await answerChallenge(mfaToken, answer)
+    const { userId, usedRecoveryCode, boundTenantId } = await answerChallenge(mfaToken, answer)
     const user = await accountOf(userId)
     // The account may have been suspended in the minutes since the password.
     if (!user || !user.is_active) {
       return res.status(403).json({ error: 'Your account has been suspended. Please contact your administrator.', code: 'INACTIVE' })
     }
-    const tokens = await issueTokens(user, { ip: getClientIp(req), userAgent: String(req.headers['user-agent'] ?? '') })
+    const tokens = await issueTokens(user, { ip: getClientIp(req), userAgent: String(req.headers['user-agent'] ?? ''), boundTenantId })
     await sys(`UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`, [user.id])
     await sys(`DELETE FROM auth_failed_logins WHERE email_norm = $1`, [String(user.email).trim().toLowerCase()])
     const left = usedRecoveryCode
@@ -115,7 +116,7 @@ router.post('/verify', loginLimiter, async (req: Request, res: Response) => {
 // Everything below is for a signed-in person managing their own account.
 router.use(authenticateToken)
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', selfService("the caller's own two-factor status"), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId
     const r = await sys(
@@ -137,7 +138,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
-router.post('/setup', mfaManageLimiter, async (req: Request, res: Response) => {
+router.post('/setup', selfService("starts two-factor setup on the caller's own account"), mfaManageLimiter, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId
     if (await mfaEnabled(userId)) {
@@ -165,7 +166,7 @@ router.post('/setup', mfaManageLimiter, async (req: Request, res: Response) => {
   }
 })
 
-router.post('/enable', mfaManageLimiter, async (req: Request, res: Response) => {
+router.post('/enable', selfService("turns on two-factor for the caller's own account"), mfaManageLimiter, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId
     const code = typeof req.body?.code === 'string' ? req.body.code : ''
@@ -210,7 +211,7 @@ async function reauthenticate(req: Request, res: Response): Promise<boolean> {
   return true
 }
 
-router.post('/disable', mfaManageLimiter, async (req: Request, res: Response) => {
+router.post('/disable', selfService("turns off two-factor for the caller's own account"), mfaManageLimiter, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId
     if (!(await mfaEnabled(userId))) {
@@ -232,7 +233,7 @@ router.post('/disable', mfaManageLimiter, async (req: Request, res: Response) =>
   }
 })
 
-router.post('/recovery-codes', mfaManageLimiter, async (req: Request, res: Response) => {
+router.post('/recovery-codes', selfService("new recovery codes for the caller's own account"), mfaManageLimiter, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId
     if (!(await mfaEnabled(userId))) {

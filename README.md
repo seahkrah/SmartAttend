@@ -149,7 +149,8 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
   tested against a provider the test suite runs, not yet against a real
   Google Workspace, Entra ID or SAML tenant, and there is no admin screen
   for configuring providers yet (the API is there). Signing in never
-  creates an account: there is no SCIM or just-in-time provisioning.
+  creates an account: there is no SCIM or just-in-time provisioning. A
+  session started through a tenant's provider acts only in that tenant.
 - The app and the API must share a registrable domain (for example
   `app.school.lr` and `api.school.lr`) for the session cookies to be sent;
   see [docs/operations/deployment.md](docs/operations/deployment.md).
@@ -167,6 +168,12 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
   SSO secrets only (documents and other personal data come later).
   Templates sealed before per-tenant keys are not yet re-encrypted under
   them.
+- Every route declares who may call it, and CI checks that none is left
+  undeclared ([docs/security/authorisation.md](docs/security/authorisation.md)).
+  A suite calls each role-guarded route as each role that should be refused,
+  and tests one person reaching another's records. Roles inside a school are
+  still coarse: a lecturer can read any student's attendance and transcript
+  in the school, not only those they teach.
 - The audit trail is a hash chain per tenant, verified by
   `npm run audit:verify` and exportable and streamable to the tenant's own
   collector. Nothing yet runs the verifier on a schedule; that, and keeping

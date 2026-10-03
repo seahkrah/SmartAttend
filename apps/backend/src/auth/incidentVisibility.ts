@@ -20,7 +20,8 @@ import type { Request } from 'express'
  *                  something a student or lecturer is entitled to
  */
 
-const TENANT_ADMIN_ROLES = new Set(['admin', 'hr_director', 'manager', 'it', 'security_officer'])
+export const INCIDENT_ROLES = ['admin', 'hr_director', 'manager', 'it', 'security_officer'] as const
+const TENANT_ADMIN_ROLES = new Set<string>(INCIDENT_ROLES)
 
 export interface IncidentVisibility {
   /** SQL predicate over the incidents table, numbered from $1. */

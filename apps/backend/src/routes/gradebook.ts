@@ -17,6 +17,7 @@ import {
 } from '../services/gradingService.js'
 import { transcriptFor } from '../services/studentRecordsService.js'
 import { resultsPublished } from '../notifications/events.js'
+import { anyMember, checkedInHandler, selfService } from '../auth/guards.js'
 
 /**
  * SMS — the gradebook: assessments, marks, results and transcripts.
@@ -111,7 +112,7 @@ async function authorisedCourse(ctx: Ctx, courseId: string): Promise<any | null>
 // Grading schemes
 // ===========================================================================
 
-router.get('/schemes', async (req: TenantRequest, res: Response) => {
+router.get('/schemes', anyMember("the school's grading schemes"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const schemes = await query(
@@ -228,7 +229,7 @@ router.delete('/schemes/:id', registrar, async (req: TenantRequest, res: Respons
 // Assessments
 // ===========================================================================
 
-router.get('/courses/:courseId/assessments', async (req: TenantRequest, res: Response) => {
+router.get('/courses/:courseId/assessments', anyMember("a course's assessments: titles, weights and due dates, no marks"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const course = await owned('courses', ctx, req.params.courseId)
@@ -660,7 +661,7 @@ router.post('/results/:id/withhold', registrar, async (req: TenantRequest, res: 
  * from the authenticated identity is the same thing every other "my own"
  * route in this codebase does.
  */
-router.get('/my/transcript', async (req: TenantRequest, res: Response) => {
+router.get('/my/transcript', selfService("the caller's own transcript"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const mine = await query(
@@ -675,7 +676,7 @@ router.get('/my/transcript', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/students/:studentId/transcript', async (req: TenantRequest, res: Response) => {
+router.get('/students/:studentId/transcript', checkedInHandler("the student themselves, or the school's admin or lecturers"), async (req: TenantRequest, res: Response) => {
   return transcriptHandler(req, res)
 })
 

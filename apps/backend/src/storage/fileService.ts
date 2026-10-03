@@ -374,9 +374,9 @@ export async function mayRead(
     if (owned) return { allowed: true }
   }
 
-  // Faculty read what is attached to the students they teach. Deliberately
-  // not implemented as "faculty see everything": a lecturer has no reason to
-  // read another department's admission files.
+  // A lecturer reads attendance evidence, all of it in the school: not only
+  // their own students' (findings #36). Not "faculty see everything": a
+  // lecturer has no reason to read admission files.
   if (reader.roleName === 'faculty' && file.category === 'attendance_evidence') {
     return { allowed: true }
   }
@@ -416,6 +416,26 @@ export async function subjectInTenant(
     [ownerId, tenantId]
   )
   return (r.rowCount ?? 0) > 0
+}
+
+/**
+ * Whether a caller may attach a file to a subject (a student, an employee,
+ * an application, a leave request, an account). Staff may attach to anything
+ * in the tenant; a lecturer may attach attendance evidence to a student;
+ * anyone else only to their own record. Before, anyone could attach a file
+ * to anyone in the tenant, and the person attached to then saw it as theirs
+ * (findings #34).
+ */
+export async function mayAttach(
+  runner: Runner,
+  reader: Reader,
+  ownerType: string,
+  ownerId: string,
+  category: string
+): Promise<boolean> {
+  if (reader.isSuperadmin || STAFF_ROLES.has(reader.roleName)) return true
+  if (reader.roleName === 'faculty' && ownerType === 'student' && category === 'attendance_evidence') return true
+  return ownsSubject(runner, reader, ownerType, ownerId)
 }
 
 /** Whether the reader is the subject of the thing a file hangs off. */

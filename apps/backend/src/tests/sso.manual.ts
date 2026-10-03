@@ -22,6 +22,7 @@ import http from 'http'
 import type { AddressInfo } from 'net'
 import path from 'path'
 import jwt from 'jsonwebtoken'
+import pg from 'pg'
 import zlib from 'zlib'
 import { SignedXml } from 'xml-crypto'
 
@@ -154,6 +155,42 @@ async function main() {
   check('as the person the provider vouched for', done.body.user?.email === 'fac.a@e2e.test')
   const me = await api('GET', '/auth/me', undefined, done.body.accessToken)
   check('the session works', me.status === 200, `(${me.status})`)
+
+  // Audit phase 2, F5: a provider vouches for its own tenant only. The same
+  // lecturer, made a member of school B too, signs in through A's provider:
+  // that session must not reach B, although a password session would.
+  const owner = new pg.Client({ connectionString: process.env.DATABASE_URL })
+  await owner.connect()
+  const fac = (await owner.query(`SELECT id FROM users WHERE lower(email) = 'fac.a@e2e.test'`)).rows[0].id
+  await owner.query(
+    `INSERT INTO school_user_associations (user_id, school_entity_id, status) VALUES ($1, $2, 'active')
+     ON CONFLICT DO NOTHING`, [fac, seed.B.tenantId])
+  try {
+    // Which school answered: the lecturer teaches A's course and nothing in B.
+    const asking = async (token: string, tenant?: string) => {
+      const res = await fetch(`${API}/faculty/courses`, {
+        headers: { Authorization: `Bearer ${token}`, ...(tenant ? { 'X-Tenant-Id': tenant } : {}) },
+      })
+      const text = await res.text()
+      return { status: res.status, fromA: text.includes(seed.A.courseId) }
+    }
+    const twice = await signInVia(pid, 'good')
+    const bound = await api('POST', '/auth/sso/complete', { code: handoffOf(twice.cb.location) })
+    check("a member of two schools signs in through A's provider", bound.status === 200, `(${bound.status})`)
+    const here = await asking(bound.body.accessToken)
+    check('and that session acts in A without choosing', here.status === 200 && here.fromA, `(${here.status})`)
+    const there = await asking(bound.body.accessToken, seed.B.tenantId)
+    check("asking for B, it is still answered from A: B never trusted A's provider",
+      there.status === 200 && there.fromA, `(${there.status}, from A: ${there.fromA})`)
+    const viaPassword = await asking(seed.A.facToken, seed.B.tenantId)
+    check('while a session not started through SSO is answered from B (the control)',
+      viaPassword.status === 200 && !viaPassword.fromA, `(${viaPassword.status}, from A: ${viaPassword.fromA})`)
+    const unbound = await asking(seed.A.facToken)
+    check('and, belonging to two schools, has to choose one', unbound.status === 403, `(${unbound.status})`)
+  } finally {
+    await owner.query(`DELETE FROM school_user_associations WHERE user_id = $1 AND school_entity_id = $2`, [fac, seed.B.tenantId])
+    await owner.end()
+  }
   const again = await api('POST', '/auth/sso/complete', { code: handoffOf(ok.cb.location) })
   check('the one-time code works once', again.status === 400, `(${again.status})`)
   const replay = await api('GET', `/auth/sso/oidc/callback?${new URLSearchParams({ code: ok.code, state: ok.state })}`)

@@ -86,6 +86,11 @@ jobs:
         working-directory: apps/backend
         run: npx tsx src/scripts/routeInventory.ts --check
 
+      # docs/api/permission-map.json, from the guard tags on each route's
+      # middleware: every route must declare who may call it.
+      - name: Every route declares who may call it
+        run: node scripts/checks/permission-coverage.mjs
+
       - name: Install frontend
         working-directory: apps/frontend
         run: npm ci || npm install

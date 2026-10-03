@@ -8,6 +8,7 @@ import {
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import { TenantScopeError } from '../db/tenantScoped.js'
+import { selfService } from '../auth/guards.js'
 
 /**
  * Attendance self-service and department views.
@@ -71,7 +72,7 @@ async function selfRecord(ctx: any): Promise<{ kind: 'student' | 'employee'; row
 // Profile
 // ---------------------------------------------------------------------------
 
-router.get('/profile', async (req: TenantRequest, res: Response) => {
+router.get('/profile', selfService("the caller's own student or employee record"), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {
     const self = await selfRecord(ctx)
@@ -110,7 +111,7 @@ router.get('/profile', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.put('/profile', async (req: TenantRequest, res: Response) => {
+router.put('/profile', selfService("the caller's own contact details"), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   const { name, phone, avatar_url } = req.body ?? {}
   try {
@@ -159,7 +160,7 @@ router.put('/profile', async (req: TenantRequest, res: Response) => {
 // My attendance
 // ---------------------------------------------------------------------------
 
-router.get('/me/metrics', async (req: TenantRequest, res: Response) => {
+router.get('/me/metrics', selfService("the caller's own attendance figures"), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {
     const self = await selfRecord(ctx)
@@ -219,7 +220,7 @@ router.get('/me/metrics', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/me/courses', async (req: TenantRequest, res: Response) => {
+router.get('/me/courses', selfService("the caller's own courses and attendance"), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {
     if (ctx.platformKind !== 'school') {
@@ -266,7 +267,7 @@ router.get('/me/courses', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/me/discrepancies', async (req: TenantRequest, res: Response) => {
+router.get('/me/discrepancies', selfService("the caller's own reports of wrong attendance"), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {
     const status = typeof req.query.status === 'string' ? req.query.status.toUpperCase() : ''
@@ -304,7 +305,7 @@ router.get('/me/discrepancies', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/me/discrepancies', async (req: TenantRequest, res: Response) => {
+router.post('/me/discrepancies', selfService("reports a mistake in the caller's own attendance"), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   const { course_id, date_of_class, reported_status, description } = req.body ?? {}
 
@@ -354,7 +355,7 @@ router.post('/me/discrepancies', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/me/export', async (req: TenantRequest, res: Response) => {
+router.get('/me/export', selfService("the caller's own attendance, as a file"), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   const format = String(req.query.format ?? 'CSV').toUpperCase()
   if (format !== 'CSV') {

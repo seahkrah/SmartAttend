@@ -22,6 +22,7 @@ import { deliverTokens } from '../auth/cookies.js'
 import { loginLimiter, mfaManageLimiter } from '../security/httpSecurity.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { logError } from '../utils/errorMessages.js'
+import { publicRoute, selfService } from '../auth/guards.js'
 
 const router = express.Router()
 
@@ -34,7 +35,7 @@ function refuse(res: Response, error: unknown, what: string) {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-router.get('/', authenticateToken, async (req: Request, res: Response) => {
+router.get('/', selfService("the caller's own passkeys"), authenticateToken, async (req: Request, res: Response) => {
   try {
     // The runtime role: row-level security shows the caller their own.
     const r = await query(
@@ -53,7 +54,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
   }
 })
 
-router.post('/register/options', mfaManageLimiter, authenticateToken, requireRecentAuth, async (req: Request, res: Response) => {
+router.post('/register/options', selfService("registers a passkey on the caller's own account"), mfaManageLimiter, authenticateToken, requireRecentAuth, async (req: Request, res: Response) => {
   try {
     const u = await query(`SELECT id, email, full_name FROM users WHERE id = $1`, [req.user!.userId])
     if (!u.rows.length) return res.status(404).json({ error: 'No such account' })
@@ -63,7 +64,7 @@ router.post('/register/options', mfaManageLimiter, authenticateToken, requireRec
   }
 })
 
-router.post('/register/verify', mfaManageLimiter, authenticateToken, async (req: Request, res: Response) => {
+router.post('/register/verify', selfService("registers a passkey on the caller's own account"), mfaManageLimiter, authenticateToken, async (req: Request, res: Response) => {
   try {
     const p = await finishRegistration(req.user!.userId, req.user!.sessionId!, req.body?.response, req.body?.name)
     return res.status(201).json({ passkey: { id: p.id, name: p.name, createdAt: p.created_at } })
@@ -72,7 +73,7 @@ router.post('/register/verify', mfaManageLimiter, authenticateToken, async (req:
   }
 })
 
-router.delete('/:id', mfaManageLimiter, authenticateToken, requireRecentAuth, async (req: Request, res: Response) => {
+router.delete('/:id', selfService("removes one of the caller's own passkeys; another's id is not found"), mfaManageLimiter, authenticateToken, requireRecentAuth, async (req: Request, res: Response) => {
   try {
     if (!UUID.test(req.params.id)) return res.status(404).json({ error: 'Passkey not found' })
     const r = await query(`DELETE FROM webauthn_credentials WHERE id = $1 AND user_id = $2 RETURNING id`,
@@ -84,7 +85,7 @@ router.delete('/:id', mfaManageLimiter, authenticateToken, requireRecentAuth, as
   }
 })
 
-router.post('/sign-in/options', loginLimiter, async (_req: Request, res: Response) => {
+router.post('/sign-in/options', publicRoute("a single-use challenge for passkey sign-in"), loginLimiter, async (_req: Request, res: Response) => {
   try {
     return res.json(await startSignIn())
   } catch (error) {
@@ -92,7 +93,7 @@ router.post('/sign-in/options', loginLimiter, async (_req: Request, res: Respons
   }
 })
 
-router.post('/sign-in/verify', loginLimiter, async (req: Request, res: Response) => {
+router.post('/sign-in/verify', publicRoute("passkey sign-in; the signed challenge is the credential"), loginLimiter, async (req: Request, res: Response) => {
   try {
     const userId = await finishSignIn(req.body?.challengeId, req.body?.response)
     const user = await accountForSignIn(userId)
@@ -121,7 +122,7 @@ router.post('/sign-in/verify', loginLimiter, async (req: Request, res: Response)
   }
 })
 
-router.post('/step-up/options', loginLimiter, authenticateToken, async (req: Request, res: Response) => {
+router.post('/step-up/options', selfService("re-authenticates the caller with their own passkey"), loginLimiter, authenticateToken, async (req: Request, res: Response) => {
   try {
     return res.json(await startStepUp(req.user!.userId, req.user!.sessionId!))
   } catch (error) {
@@ -129,7 +130,7 @@ router.post('/step-up/options', loginLimiter, authenticateToken, async (req: Req
   }
 })
 
-router.post('/step-up/verify', loginLimiter, authenticateToken, async (req: Request, res: Response) => {
+router.post('/step-up/verify', selfService("re-authenticates the caller with their own passkey"), loginLimiter, authenticateToken, async (req: Request, res: Response) => {
   try {
     await finishStepUp(req.user!.userId, req.user!.sessionId!, req.body?.response)
     await markAuthenticated(req.user!.sessionId!)

@@ -6,6 +6,7 @@ import { enquiryLimiter } from '../security/httpSecurity.js'
 import { logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { runAsSystem } from '../db/dbContext.js'
+import { publicRoute, tagged } from '../auth/guards.js'
 
 // Enquiries come from people with no account, before any tenant exists, and
 // are read only by superadmins: platform-level (migration 075).
@@ -77,7 +78,7 @@ export function e164(value: unknown): string | null {
   return n
 }
 
-router.post('/', enquiryLimiter, async (req: Request, res: Response) => {
+router.post('/', publicRoute('a prospective school or company asks for an account; rate-limited'), enquiryLimiter, async (req: Request, res: Response) => {
   try {
     const b = req.body ?? {}
 
@@ -130,6 +131,7 @@ async function requireSuperadmin(req: TenantRequest, res: Response, next: NextFu
   if (!req.ctx?.isSuperadmin) return res.status(403).json({ error: 'Superadmin only' })
   return next()
 }
+tagged(requireSuperadmin, { kind: 'superadmin' })
 
 router.get('/', authenticateToken, resolveTenantContext, requireSuperadmin, async (req: TenantRequest, res: Response) => {
   try {

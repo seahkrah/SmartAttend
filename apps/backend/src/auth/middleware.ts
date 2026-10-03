@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express'
 import { verifyAccessToken } from './authService.js'
 import { query } from '../db/connection.js'
-import { sessionIsLive } from './sessions.js'
+import { liveSession } from './sessions.js'
 import { allowedDuringSetup } from './mfa.js'
 import { withNoTenant } from '../db/dbContext.js'
 import { ACCESS_COOKIE, cookiesOf, csrfProblem } from './cookies.js'
 import { allowedOrigins } from '../security/httpSecurity.js'
+import { tagged } from './guards.js'
 
 // Extend Express Request to include auth info
 declare global {
@@ -16,6 +17,8 @@ declare global {
         platformId: string
         roleId: string
         sessionId?: string
+        /** Set when the session was started through single sign-on: the only tenant it may act in. */
+        boundTenantId?: string | null
         role?: string        // Resolved role name
         platformType?: string // Resolved platform type
       }
@@ -60,8 +63,10 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
   if (!decoded?.sid || !decoded?.userId) {
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
+  let session: Awaited<ReturnType<typeof liveSession>>
   try {
-    if (!(await sessionIsLive(decoded.sid, decoded.userId))) {
+    session = await liveSession(decoded.sid, decoded.userId)
+    if (!session) {
       return res.status(401).json({ error: 'Your session has ended. Please sign in again.', code: 'SESSION_ENDED' })
     }
   } catch (error) {
@@ -84,6 +89,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     platformId: decoded.platformId,
     roleId: decoded.roleId,
     sessionId: decoded.sid,
+    boundTenantId: session.boundTenantId,
   }
   req.authVia = cookie ? 'cookie' : 'bearer'
   // Who is asking is known from here on, even before (or without) a tenant:
@@ -94,7 +100,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
 
 // Middleware to verify platform access
 export function verifyPlatform(requiredPlatform: 'school' | 'corporate' | 'system') {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return tagged(async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' })
     }
@@ -120,12 +126,12 @@ export function verifyPlatform(requiredPlatform: 'school' | 'corporate' | 'syste
     } catch (error) {
       return res.status(500).json({ error: 'Platform verification failed' })
     }
-  }
+  }, { kind: 'platform', values: [requiredPlatform] })
 }
 
 // Middleware to verify specific role — now actually enforces role checks
 export function requireRole(...allowedRoles: string[]) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return tagged(async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' })
     }
@@ -151,5 +157,7 @@ export function requireRole(...allowedRoles: string[]) {
     } catch (error) {
       return res.status(500).json({ error: 'Role verification failed' })
     }
-  }
+  }, { kind: 'roles', values: [...allowedRoles] })
 }
+
+tagged(authenticateToken, { kind: 'authenticated' })

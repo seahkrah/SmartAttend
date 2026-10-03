@@ -44,6 +44,7 @@ import {
   REFRESH_COOKIE, clearSessionCookies, cookiesOf, csrfTokenFor, deliverTokens, setSessionCookies,
 } from '../auth/cookies.js'
 import crypto from 'crypto'
+import { publicRoute, selfService, tagged } from '../auth/guards.js'
 
 const router = express.Router()
 
@@ -71,7 +72,7 @@ interface RoleBasedRegisterRequest extends Request {
   }
 }
 
-router.post('/register-with-role', accountLimiter, beforeSignIn, async (req: RoleBasedRegisterRequest, res: Response) => {
+router.post('/register-with-role', publicRoute("self-registration onto a platform; the account waits for approval where the role needs it"), accountLimiter, beforeSignIn, async (req: RoleBasedRegisterRequest, res: Response) => {
   try {
     const { platform, email, fullName, password, confirmPassword, phone, role, entityId } = req.body
 
@@ -304,7 +305,7 @@ function loginRefusal(res: Response, error: unknown) {
   return res.status(500).json({ error: 'Sign-in failed. Please try again.' })
 }
 
-router.post('/login', loginLimiter, async (req: LoginRequest, res: Response) => {
+router.post('/login', publicRoute("sign-in"), loginLimiter, async (req: LoginRequest, res: Response) => {
   try {
     const { platform, email, password } = req.body
 
@@ -363,7 +364,7 @@ router.post('/login', loginLimiter, async (req: LoginRequest, res: Response) => 
 // CHANGE PASSWORD ENDPOINT
 // ===========================
 
-router.post('/change-password', authenticateToken, async (req: Request, res: Response) => {
+router.post('/change-password', selfService("the caller's own password, with the current one"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: ErrorMessages.AUTH_REQUIRED })
     
@@ -423,7 +424,7 @@ router.post('/change-password', authenticateToken, async (req: Request, res: Res
  * or not the address has an account, so this cannot be used to discover who
  * has one.
  */
-router.post('/password/forgot', accountLimiter, async (req: Request, res: Response) => {
+router.post('/password/forgot', publicRoute("asks for a reset link; answers the same whether or not the account exists"), accountLimiter, async (req: Request, res: Response) => {
   const { email, platform } = req.body ?? {}
   if (typeof email !== 'string' || !email.includes('@') || email.length > 255 ||
       !['school', 'corporate'].includes(platform)) {
@@ -456,7 +457,7 @@ function tokenRefusal(res: Response, error: unknown) {
   return res.status(500).json({ error: 'Something went wrong. Please try again.' })
 }
 
-router.post('/password/reset', accountLimiter, async (req: Request, res: Response) => {
+router.post('/password/reset', publicRoute("redeems a single-use reset link"), accountLimiter, async (req: Request, res: Response) => {
   const { token, password, confirmPassword } = req.body ?? {}
   if (typeof password !== 'string' || password !== confirmPassword) {
     return res.status(400).json({ error: 'The passwords do not match' })
@@ -469,7 +470,7 @@ router.post('/password/reset', accountLimiter, async (req: Request, res: Respons
   }
 })
 
-router.post('/activate', accountLimiter, async (req: Request, res: Response) => {
+router.post('/activate', publicRoute("redeems a single-use invitation link"), accountLimiter, async (req: Request, res: Response) => {
   const { token, password, confirmPassword } = req.body ?? {}
   if (typeof password !== 'string' || password !== confirmPassword) {
     return res.status(400).json({ error: 'The passwords do not match' })
@@ -487,7 +488,7 @@ router.post('/activate', accountLimiter, async (req: Request, res: Response) => 
 // ===========================
 
 /** The caller's own signed-in devices. */
-router.get('/sessions', authenticateToken, async (req: Request, res: Response) => {
+router.get('/sessions', selfService("the caller's own signed-in devices"), authenticateToken, async (req: Request, res: Response) => {
   try {
     const rows = await listUserSessions(req.user!.userId)
     return res.json({
@@ -508,7 +509,7 @@ router.get('/sessions', authenticateToken, async (req: Request, res: Response) =
 })
 
 /** Signs out one of the caller's own devices. Another user's session reads as missing. */
-router.delete('/sessions/:sessionId', authenticateToken, async (req: Request, res: Response) => {
+router.delete('/sessions/:sessionId', selfService("ends one of the caller's own sessions; another's is not found"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!(await endOwnSession(req.user!.userId, req.params.sessionId))) {
       return res.status(404).json({ error: 'Session not found' })
@@ -538,7 +539,7 @@ interface SuperadminRegisterRequest extends Request {
 // SECURITY: Superadmin registration is gated â€” only works if:
 // 1. No superadmin exists yet (bootstrap mode), OR
 // 2. Request includes a valid SUPERADMIN_BOOTSTRAP_TOKEN from env
-router.post('/register-superadmin', accountLimiter, beforeSignIn, async (req: SuperadminRegisterRequest, res: Response) => {
+router.post('/register-superadmin', publicRoute("first superadmin only; afterwards, and always in production, the bootstrap token is required"), accountLimiter, beforeSignIn, async (req: SuperadminRegisterRequest, res: Response) => {
   try {
     const { email, fullName, password, confirmPassword } = req.body
 
@@ -665,7 +666,7 @@ interface SuperadminLoginRequest extends Request {
   }
 }
 
-router.post('/login-superadmin', loginLimiter, beforeSignIn, async (req: SuperadminLoginRequest, res: Response) => {
+router.post('/login-superadmin', publicRoute("superadmin sign-in"), loginLimiter, beforeSignIn, async (req: SuperadminLoginRequest, res: Response) => {
   try {
     const { email, password } = req.body
 
@@ -727,7 +728,7 @@ interface RefreshRequest extends Request {
  * once gets 409 on the slower one and should retry with the token the faster
  * one stored.
  */
-router.post('/refresh', refreshLimiter, async (req: RefreshRequest, res: Response) => {
+router.post('/refresh', publicRoute("exchanges a refresh token, which is the credential"), refreshLimiter, async (req: RefreshRequest, res: Response) => {
   try {
     // The browser app's refresh token is in a cookie it cannot read; API
     // clients send theirs in the body.
@@ -783,7 +784,7 @@ router.post('/refresh', refreshLimiter, async (req: RefreshRequest, res: Respons
  * sensitive actions are allowed (auth/stepUp.ts). A wrong answer counts
  * towards the same lockout as a wrong sign-in.
  */
-router.post('/step-up', loginLimiter, authenticateToken, async (req: Request, res: Response) => {
+router.post('/step-up', selfService("re-authenticates the caller with their own password or code"), loginLimiter, authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId
     const password = typeof req.body?.password === 'string' ? req.body.password : ''
@@ -813,11 +814,11 @@ router.post('/step-up', loginLimiter, authenticateToken, async (req: Request, re
  * The CSRF token of the caller's session, for a browser app that reloaded
  * and lost the one it held in memory. CORS keeps other sites from reading it.
  */
-router.get('/csrf', authenticateToken, (req: Request, res: Response) => {
+router.get('/csrf', selfService("the CSRF token for the caller's own session"), authenticateToken, (req: Request, res: Response) => {
   return res.json({ csrfToken: csrfTokenFor(req.user!.sessionId!) })
 })
 
-router.get('/me', authenticateToken, async (req: Request, res: Response) => {
+router.get('/me', selfService("the caller's own profile"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: 'User not authenticated' })
@@ -865,7 +866,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
 // UPDATE PROFILE ENDPOINT
 // ===========================
 
-router.put('/me', authenticateToken, async (req: Request, res: Response) => {
+router.put('/me', selfService("the caller's own name and phone"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
 
@@ -912,7 +913,7 @@ router.put('/me', authenticateToken, async (req: Request, res: Response) => {
 // ===========================
 
 /** Ends this session on the server; its access and refresh tokens stop working at once. */
-router.post('/logout', authenticateToken, async (req: Request, res: Response) => {
+router.post('/logout', selfService("ends the caller's own session"), authenticateToken, async (req: Request, res: Response) => {
   try {
     await revokeSession(req.user!.sessionId!, 'logout')
     clearSessionCookies(res)
@@ -924,7 +925,7 @@ router.post('/logout', authenticateToken, async (req: Request, res: Response) =>
 })
 
 /** Ends every session of the caller's, this one included. */
-router.post('/logout-all', authenticateToken, async (req: Request, res: Response) => {
+router.post('/logout-all', selfService("ends all the caller's own sessions"), authenticateToken, async (req: Request, res: Response) => {
   try {
     const ended = await revokeUserSessions(req.user!.userId, 'logout_all')
     clearSessionCookies(res)
@@ -958,6 +959,7 @@ const verifySuperadmin = async (req: Request, res: Response, next: NextFunction)
     return res.status(500).json({ error: 'Authorization error' })
   }
 }
+tagged(verifySuperadmin, { kind: 'superadmin' })
 
 // GET comprehensive superadmin dashboard (all data in one call)
 router.get('/superadmin/dashboard', authenticateToken, verifySuperadmin, async (req: Request, res: Response) => {

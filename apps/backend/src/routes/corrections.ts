@@ -9,6 +9,7 @@ import { authenticateToken } from '../auth/middleware.js'
 import {
   resolveTenantContext,
   requireTenant,
+  requireRoles,
   type ResolvedTenantContext,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
@@ -61,7 +62,7 @@ function lacksRole(req: ExtendedRequest, allowed: string[]): boolean {
  */
 router.post(
   '/school/:attendanceId',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin', 'security_officer', 'faculty'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'security_officer', 'faculty', 'superadmin'])) {
         res.status(403).json({
@@ -139,7 +140,7 @@ router.post(
  */
 router.post(
   '/corporate/:checkinId',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin', 'security_officer'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
@@ -198,7 +199,7 @@ router.post(
  */
 router.get(
   '/history/:recordId',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin', 'security_officer', 'faculty'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'security_officer', 'faculty', 'superadmin'])) {
         res.status(403).json({
@@ -239,7 +240,7 @@ router.get(
  */
 router.post(
   '/:correctionId/revert',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'superadmin'])) {
         res.status(403).json({
@@ -284,7 +285,7 @@ router.post(
  */
 router.get(
   '/active',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin', 'security_officer'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
@@ -334,7 +335,7 @@ router.get(
  */
 router.get(
   '/statistics',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin', 'security_officer'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
@@ -366,7 +367,7 @@ router.get(
  */
 router.get(
   '/by-type/:correctionType',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin', 'security_officer'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
@@ -414,7 +415,7 @@ router.get(
  */
 router.get(
   '/audit-trail',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin', 'security_officer'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'security_officer', 'superadmin'])) {
         res.status(403).json({
@@ -467,7 +468,7 @@ router.get(
  */
 router.get(
   '/compliance/silent-corrections',
-  async (req: ExtendedRequest, res: Response) => {
+  requireRoles('admin'), async (req: ExtendedRequest, res: Response) => {
     try {
       if (lacksRole(req, ['admin', 'superadmin'])) {
         res.status(403).json({

@@ -10,6 +10,7 @@ import {
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import { getSchoolStructure, requireSchoolFeature } from '../services/schoolTypes.js'
+import { anyMember, checkedInHandler } from '../auth/guards.js'
 
 /**
  * SMS — the academic structure a school is built on.
@@ -90,7 +91,7 @@ function toInt(v: unknown, fallback: number | null = null): number | null {
  * The school's type, the levels it offers, the tools that follow and, for a
  * grade school, its grades. The web app builds its menus from this.
  */
-router.get('/structure', async (req: TenantRequest, res: Response) => {
+router.get('/structure', anyMember("how the school is organised: levels, terms, programmes on or off"), async (req: TenantRequest, res: Response) => {
   try {
     const structure = await getSchoolStructure(ctxOf(req).tenantId)
     if (!structure) return notFound(res, 'School')
@@ -111,7 +112,7 @@ router.use(
 // Academic years
 // ===========================================================================
 
-router.get('/years', async (req: TenantRequest, res: Response) => {
+router.get('/years', anyMember("the school's academic years"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const result = await query(
@@ -219,7 +220,7 @@ router.delete('/years/:id', writers, async (req: TenantRequest, res: Response) =
 // Terms (semesters, grouped under a year)
 // ===========================================================================
 
-router.get('/terms', async (req: TenantRequest, res: Response) => {
+router.get('/terms', anyMember("the school's terms"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const yearId = req.query.yearId ? String(req.query.yearId) : null
@@ -328,7 +329,7 @@ router.patch('/terms/:id', writers, async (req: TenantRequest, res: Response) =>
 // Programmes
 // ===========================================================================
 
-router.get('/programmes', async (req: TenantRequest, res: Response) => {
+router.get('/programmes', anyMember("the programmes the school offers"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const result = await query(
@@ -348,7 +349,7 @@ router.get('/programmes', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/programmes/:id', async (req: TenantRequest, res: Response) => {
+router.get('/programmes/:id', anyMember("one programme and its courses"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const programme = await owned('programmes', ctx, req.params.id)
@@ -528,7 +529,7 @@ router.delete('/programmes/:id/courses/:entryId', writers, async (req: TenantReq
 // Student programme enrolment
 // ===========================================================================
 
-router.get('/students/:studentId/programme', async (req: TenantRequest, res: Response) => {
+router.get('/students/:studentId/programme', checkedInHandler("a student's programme: the student themselves, or the school's admin or lecturers"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const student = await owned('students', ctx, req.params.studentId)

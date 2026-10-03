@@ -3,7 +3,7 @@
  * Test endpoints for running failure scenarios and validating system resilience
  */
 
-import { Router, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import type { ExtendedRequest } from '../types/auth.js';
 import { authenticateToken } from '../auth/middleware.js';
 import {
@@ -19,6 +19,7 @@ import {
   runComprehensiveSimulation,
   generateSimulationReport,
 } from '../services/failureSimulationService.js';
+import { tagged } from '../auth/guards.js'
 
 const router = Router();
 
@@ -40,13 +41,13 @@ const router = Router();
  */
 router.use(authenticateToken, resolveTenantContext);
 
-router.use((req, res: Response, next: NextFunction) => {
-  if (!(req as TenantRequest).ctx?.isSuperadmin) {
+router.use(tagged((req: Request, res: Response, next: NextFunction) => {
+  if (!(req as unknown as TenantRequest).ctx?.isSuperadmin) {
     res.status(403).json({ error: 'Failure simulations are superadmin only' });
     return;
   }
   next();
-});
+}, { kind: 'superadmin' }));
 
 router.use(requireTenant);
 

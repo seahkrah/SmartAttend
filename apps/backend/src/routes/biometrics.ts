@@ -21,13 +21,14 @@
 import { Router, Response, NextFunction } from 'express'
 import multer from 'multer'
 import { authenticateToken } from '../auth/middleware.js'
-import { resolveTenantContext, requireTenant, type TenantRequest } from '../auth/tenantContextMiddleware.js'
+import { resolveTenantContext, requireTenant, requireRoles, type TenantRequest } from '../auth/tenantContextMiddleware.js'
 import {
   BiometricError, deleteTemplate, enroll, getSettings, grantConsent, identifyInClass, issueChallenge,
   listEvents, listSubjects, saveSettings, subjectStatus, verify, withdrawConsent, type Subject, type SubjectType,
 } from '../biometrics/service.js'
 import { IMAGE_LIMITS } from '../biometrics/engine.js'
 import { BiometricKeyError } from '../biometrics/templateCrypto.js'
+import { anyMember, checkedInHandler } from '../auth/guards.js'
 
 const router = Router()
 router.use(authenticateToken, resolveTenantContext, requireTenant)
@@ -80,7 +81,7 @@ function framesOf(req: TenantRequest): Buffer[] {
   return files.map((f) => f.buffer)
 }
 
-router.get('/settings', async (req: TenantRequest, res: Response) => {
+router.get('/settings', anyMember("whether face matching is on, and its threshold"), async (req: TenantRequest, res: Response) => {
   try {
     return res.json({ settings: await getSettings(ctxOf(req).tenantId) })
   } catch (e) {
@@ -88,7 +89,7 @@ router.get('/settings', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.put('/settings', async (req: TenantRequest, res: Response) => {
+router.put('/settings', requireRoles('admin', 'hr_director'), async (req: TenantRequest, res: Response) => {
   try {
     const { enabled, threshold } = req.body ?? {}
     if (typeof enabled !== 'boolean') {
@@ -100,7 +101,7 @@ router.put('/settings', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/subjects', async (req: TenantRequest, res: Response) => {
+router.get('/subjects', checkedInHandler("listSubjects: students to the school admin, employees to HR"), async (req: TenantRequest, res: Response) => {
   try {
     const type = String(req.query.type ?? '') as SubjectType
     if (type !== 'student' && type !== 'employee') {
@@ -116,7 +117,7 @@ router.get('/subjects', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/subjects/:type/:id', async (req: TenantRequest, res: Response) => {
+router.get('/subjects/:type/:id', checkedInHandler("authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; view"), async (req: TenantRequest, res: Response) => {
   try {
     return res.json(await subjectStatus(ctxOf(req), subjectOf(req)))
   } catch (e) {
@@ -124,7 +125,7 @@ router.get('/subjects/:type/:id', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/subjects/:type/:id/consent', async (req: TenantRequest, res: Response) => {
+router.post('/subjects/:type/:id/consent', checkedInHandler("authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; consent: school admin for a student, HR or the employee for an employee"), async (req: TenantRequest, res: Response) => {
   try {
     const consent = await grantConsent(ctxOf(req), subjectOf(req), req.body?.basis)
     return res.status(201).json({ consent: { grantedAt: consent.granted_at, basis: consent.basis } })
@@ -133,7 +134,7 @@ router.post('/subjects/:type/:id/consent', async (req: TenantRequest, res: Respo
   }
 })
 
-router.delete('/subjects/:type/:id/consent', async (req: TenantRequest, res: Response) => {
+router.delete('/subjects/:type/:id/consent', checkedInHandler("authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; withdrawing consent as granting it"), async (req: TenantRequest, res: Response) => {
   try {
     await withdrawConsent(ctxOf(req), subjectOf(req), req.body?.reason)
     return res.json({ withdrawn: true, templateDeleted: true })
@@ -142,7 +143,7 @@ router.delete('/subjects/:type/:id/consent', async (req: TenantRequest, res: Res
   }
 })
 
-router.delete('/subjects/:type/:id/template', async (req: TenantRequest, res: Response) => {
+router.delete('/subjects/:type/:id/template', checkedInHandler("authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; delete: school admin or HR"), async (req: TenantRequest, res: Response) => {
   try {
     await deleteTemplate(ctxOf(req), subjectOf(req))
     return res.json({ deleted: true })
@@ -151,7 +152,7 @@ router.delete('/subjects/:type/:id/template', async (req: TenantRequest, res: Re
   }
 })
 
-router.post('/challenges', async (req: TenantRequest, res: Response) => {
+router.post('/challenges', checkedInHandler("issueChallenge: enrol as authorizeSubject enrol; verify only for the caller's own employee record; identify only by a lecturer for their class"), async (req: TenantRequest, res: Response) => {
   try {
     const { purpose, subjectType, subjectId, scheduleId } = req.body ?? {}
     const subject = subjectType && subjectId ? { type: subjectType, id: String(subjectId) } as Subject : undefined
@@ -165,7 +166,7 @@ router.post('/challenges', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/enroll', frames, async (req: TenantRequest, res: Response) => {
+router.post('/enroll', checkedInHandler("the challenge, issued under the enrol rule, is single-use and bound to the caller"), frames, async (req: TenantRequest, res: Response) => {
   try {
     const out = await enroll(ctxOf(req), req.body?.challengeId, framesOf(req))
     return res.status(201).json({ enrolled: true, ...out })
@@ -174,7 +175,7 @@ router.post('/enroll', frames, async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/verify', frames, async (req: TenantRequest, res: Response) => {
+router.post('/verify', checkedInHandler("the challenge must be the caller's own, for their own employee record"), frames, async (req: TenantRequest, res: Response) => {
   try {
     return res.json({ matched: true, ...(await verify(ctxOf(req), req.body?.challengeId, framesOf(req))) })
   } catch (e) {
@@ -182,7 +183,7 @@ router.post('/verify', frames, async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/identify', frames, async (req: TenantRequest, res: Response) => {
+router.post('/identify', checkedInHandler("the challenge must be the lecturer's own, for their class"), frames, async (req: TenantRequest, res: Response) => {
   try {
     return res.json({ matched: true, ...(await identifyInClass(ctxOf(req), req.body?.challengeId, framesOf(req))) })
   } catch (e) {
@@ -190,7 +191,7 @@ router.post('/identify', frames, async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/events', async (req: TenantRequest, res: Response) => {
+router.get('/events', checkedInHandler("listEvents: the school admin or HR"), async (req: TenantRequest, res: Response) => {
   try {
     const subject = req.query.subjectType && req.query.subjectId
       ? { type: String(req.query.subjectType) as SubjectType, id: String(req.query.subjectId) }

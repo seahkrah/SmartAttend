@@ -19,6 +19,7 @@ import {
   requirePlatform,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
+import { selfService } from '../auth/guards.js'
 
 const router = Router()
 
@@ -47,7 +48,7 @@ async function getStudentFromUser(req: TenantRequest) {
 // ══════════════════════════════════════
 // GET /student/dashboard
 // ══════════════════════════════════════
-router.get('/dashboard', async (req: TenantRequest, res: Response) => {
+router.get('/dashboard', selfService("the calling student's own dashboard"), async (req: TenantRequest, res: Response) => {
   try {
     const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
@@ -139,7 +140,7 @@ router.get('/dashboard', async (req: TenantRequest, res: Response) => {
 // ══════════════════════════════════════
 // GET /student/courses
 // ══════════════════════════════════════
-router.get('/courses', async (req: TenantRequest, res: Response) => {
+router.get('/courses', selfService("the calling student's own courses"), async (req: TenantRequest, res: Response) => {
   try {
     const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
@@ -171,7 +172,7 @@ router.get('/courses', async (req: TenantRequest, res: Response) => {
 // ══════════════════════════════════════
 // GET /student/schedules
 // ══════════════════════════════════════
-router.get('/schedules', async (req: TenantRequest, res: Response) => {
+router.get('/schedules', selfService("the calling student's own timetable"), async (req: TenantRequest, res: Response) => {
   try {
     const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
@@ -201,7 +202,7 @@ router.get('/schedules', async (req: TenantRequest, res: Response) => {
 // ══════════════════════════════════════
 // GET /student/attendance
 // ══════════════════════════════════════
-router.get('/attendance', async (req: TenantRequest, res: Response) => {
+router.get('/attendance', selfService("the calling student's own attendance"), async (req: TenantRequest, res: Response) => {
   try {
     const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
@@ -278,7 +279,7 @@ router.get('/attendance', async (req: TenantRequest, res: Response) => {
 // ══════════════════════════════════════
 // GET /student/profile
 // ══════════════════════════════════════
-router.get('/profile', async (req: TenantRequest, res: Response) => {
+router.get('/profile', selfService("the calling student's own record"), async (req: TenantRequest, res: Response) => {
   try {
     const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })
@@ -307,7 +308,7 @@ router.get('/profile', async (req: TenantRequest, res: Response) => {
 // ══════════════════════════════════════
 // PUT /student/profile
 // ══════════════════════════════════════
-router.put('/profile', async (req: TenantRequest, res: Response) => {
+router.put('/profile', selfService("the calling student's own contact details"), async (req: TenantRequest, res: Response) => {
   try {
     const student = await getStudentFromUser(req)
     if (!student) return res.status(404).json({ error: 'Student record not found' })

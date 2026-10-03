@@ -25,6 +25,7 @@ import {
   toMinor,
 } from '../services/payrollService.js'
 import { payrollApproved } from '../notifications/events.js'
+import { checkedInHandler, selfService } from '../auth/guards.js'
 
 /**
  * EMS — payroll.
@@ -358,7 +359,7 @@ router.delete('/components/:componentId', payrollStaff, async (req: TenantReques
  * employee id in the path is only ever used after it has been matched against
  * the caller's tenant, and for a non-HR caller, against the caller.
  */
-router.get('/employees/:employeeId/compensation', async (req: TenantRequest, res: Response) => {
+router.get('/employees/:employeeId/compensation', checkedInHandler("payroll staff (admin, hr, hr_director) for anyone; an employee only their own; otherwise not found"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const employee = await owned('employees', ctx, String(req.params.employeeId))
@@ -1013,7 +1014,7 @@ router.get('/runs/:runId/preview/:employeeId', payrollStaff, async (req: TenantR
  * still be recalculated, and an employee who sees a draft figure has been
  * told something that is not yet true.
  */
-router.get('/my/payslips', async (req: TenantRequest, res: Response) => {
+router.get('/my/payslips', selfService("the caller's own approved and paid payslips"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const employee = await callerEmployee(ctx)
@@ -1046,7 +1047,7 @@ router.get('/my/payslips', async (req: TenantRequest, res: Response) => {
  * additionally cannot read their own before the run is approved, for the same
  * reason the list does not show it.
  */
-router.get('/payslips/:payslipId', async (req: TenantRequest, res: Response) => {
+router.get('/payslips/:payslipId', checkedInHandler("the payslip loader: payroll staff, or the employee it is for once the run is approved; otherwise not found"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const payslip = (req as any).payslip

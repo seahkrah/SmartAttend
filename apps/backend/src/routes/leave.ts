@@ -17,6 +17,7 @@ import {
   LeaveError,
 } from '../services/leaveService.js'
 import { leaveDecided, leaveRequested } from '../notifications/events.js'
+import { anyMember, checkedInHandler, selfService } from '../auth/guards.js'
 
 /**
  * EMS — leave types, balances, requests and approvals.
@@ -111,7 +112,7 @@ async function targetEmployee(ctx: Ctx, suppliedId?: string): Promise<any | null
 // Leave types
 // ===========================================================================
 
-router.get('/types', async (req: TenantRequest, res: Response) => {
+router.get('/types', anyMember("the employer's leave types"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const result = await query(
@@ -220,7 +221,7 @@ router.delete('/types/:id', hrOnly, async (req: TenantRequest, res: Response) =>
 // Balances
 // ===========================================================================
 
-router.get('/balances', async (req: TenantRequest, res: Response) => {
+router.get('/balances', checkedInHandler("targetEmployee: HR, admin and managers for anyone; anyone else only their own"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const employee = await targetEmployee(ctx, req.query.employeeId as string | undefined)
@@ -309,7 +310,7 @@ router.put('/balances', hrOnly, async (req: TenantRequest, res: Response) => {
 // Requests
 // ===========================================================================
 
-router.get('/requests', async (req: TenantRequest, res: Response) => {
+router.get('/requests', checkedInHandler("scope=all for HR, admin and managers; everyone else sees only their own requests"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const status = req.query.status ? String(req.query.status) : null
@@ -350,7 +351,7 @@ router.get('/requests', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/requests', async (req: TenantRequest, res: Response) => {
+router.post('/requests', checkedInHandler("an employee raises their own leave; HR may name another employee"), async (req: TenantRequest, res: Response) => {
   const client = await pool.connect()
   try {
     const ctx = ctxOf(req)
@@ -485,7 +486,7 @@ router.post('/requests/:id/decision', approvers, async (req: TenantRequest, res:
   }
 })
 
-router.post('/requests/:id/cancel', async (req: TenantRequest, res: Response) => {
+router.post('/requests/:id/cancel', checkedInHandler("the employee whose leave it is, or HR"), async (req: TenantRequest, res: Response) => {
   const client = await pool.connect()
   try {
     const ctx = ctxOf(req)
@@ -574,7 +575,7 @@ router.get('/calendar', approvers, async (req: TenantRequest, res: Response) => 
 })
 
 /** Dry run: what a request would cost, before committing to it. */
-router.post('/requests/preview', async (req: TenantRequest, res: Response) => {
+router.post('/requests/preview', selfService("working days in a range, and the caller's own balance"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const b = req.body ?? {}

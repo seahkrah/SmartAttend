@@ -11,6 +11,7 @@ import {
   getTenantClockDriftStats,
   getCriticalDriftEvents
 } from '../services/timeAuthorityService.js'
+import { checkedInHandler, publicRoute, selfService, tagged } from '../auth/guards.js'
 
 const router = Router()
 
@@ -40,8 +41,9 @@ async function platformOperator(req: Request, res: Response, next: NextFunction)
   if (!(await isSuperadmin(req.user.userId))) return res.status(403).json({ error: 'Superadmin access required' })
   runAsSystem('control plane: clock-drift review across tenants', next)
 }
+tagged(platformOperator, { kind: 'superadmin' })
 
-router.get('/sync', async (req: Request, res: Response) => {
+router.get('/sync', publicRoute("server time for clients to measure drift"), async (req: Request, res: Response) => {
   try {
     const serverTime = getServerTime()
     const timestamp = serverTime.getTime()
@@ -65,7 +67,7 @@ router.get('/sync', async (req: Request, res: Response) => {
  * Returns both request receipt time and response time
  * for client-side latency compensation
  */
-router.get('/sync/precise', async (req: Request, res: Response) => {
+router.get('/sync/precise', publicRoute("server time for clients to measure drift"), async (req: Request, res: Response) => {
   const requestTime = getServerTime()
 
   try {
@@ -97,7 +99,7 @@ router.get('/sync/precise', async (req: Request, res: Response) => {
  * Query params:
  * - clientTimestamp: Client's current timestamp (ISO string or ms)
  */
-router.get('/validate', async (req: Request, res: Response) => {
+router.get('/validate', publicRoute("checks a client timestamp against server time"), async (req: Request, res: Response) => {
   try {
     const clientTimeString = req.query.clientTimestamp as string
 
@@ -151,7 +153,7 @@ router.get('/validate', async (req: Request, res: Response) => {
  * 
  * Authenticated - users can see their own history
  */
-router.get('/drift/history', authenticateToken, async (req: Request, res: Response) => {
+router.get('/drift/history', authenticateToken, selfService("the caller's own clock-drift history"), async (req: Request, res: Response) => {
   try {
     const userId = req.user?.userId
     if (!userId) {
@@ -328,7 +330,7 @@ router.post('/drift/investigate', authenticateToken, platformOperator, async (re
  * 
  * Superadmin only
  */
-router.get('/status', authenticateToken, async (req: Request, res: Response) => {
+router.get('/status', authenticateToken, checkedInHandler("superadmin only"), async (req: Request, res: Response) => {
   try {
     const user = req.user
     if (!user?.userId) {

@@ -1,6 +1,7 @@
 import { Response, NextFunction, Request } from 'express'
 import { query } from '../db/connection.js'
 import { runAsSystem, withNoTenant, withTenant } from '../db/dbContext.js'
+import { tagged } from './guards.js'
 
 /**
  * Platform and tenant resolution.
@@ -103,6 +104,12 @@ export async function resolveTenantContext(
         platformKind: r.platform_kind,
       }))
     }
+
+    // A session started through single sign-on acts only in the tenant whose
+    // identity provider vouched for the person; their other memberships are
+    // not this session's to use (audit phase 2, F5).
+    const bound = req.user.boundTenantId
+    if (bound) memberships = memberships.filter((m) => m.tenantId === bound)
 
     // A user with exactly one membership is bound to it. With several, the
     // active tenant may be selected per request, but only from this list —
@@ -231,7 +238,7 @@ export function requireTenant(req: TenantRequest, res: Response, next: NextFunct
 
 /** Restricts a route to one platform. SMS access never implies EMS access. */
 export function requirePlatform(...allowed: PlatformKind[]) {
-  return (req: TenantRequest, res: Response, next: NextFunction): void => {
+  return tagged((req: TenantRequest, res: Response, next: NextFunction): void => {
     if (!req.ctx) {
       res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' })
       return
@@ -248,12 +255,12 @@ export function requirePlatform(...allowed: PlatformKind[]) {
       return
     }
     next()
-  }
+  }, { kind: 'platform', values: [...allowed] })
 }
 
 /** Restricts a route to named roles, checked against the resolved context. */
 export function requireRoles(...allowed: string[]) {
-  return (req: TenantRequest, res: Response, next: NextFunction): void => {
+  return tagged((req: TenantRequest, res: Response, next: NextFunction): void => {
     if (!req.ctx) {
       res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' })
       return
@@ -267,5 +274,20 @@ export function requireRoles(...allowed: string[]) {
       return
     }
     next()
-  }
+  }, { kind: 'roles', values: [...allowed] })
 }
+
+tagged(requireTenant, { kind: 'tenant' })
+
+/** Restricts a route to superadmins, from the resolved identity. */
+export const requireSuperadmin = tagged((req: TenantRequest, res: Response, next: NextFunction): void => {
+  if (!req.ctx) {
+    res.status(401).json({ error: 'Unauthorized', message: 'Authentication required' })
+    return
+  }
+  if (!req.ctx.isSuperadmin) {
+    res.status(403).json({ error: 'Superadmin access required' })
+    return
+  }
+  next()
+}, { kind: 'superadmin' })

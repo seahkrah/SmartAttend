@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express'
 import { authenticateToken } from '../auth/middleware.js'
-import { resolveTenantContext, requireRoles, requireTenant } from '../auth/tenantContextMiddleware.js'
+import { resolveTenantContext, requireRoles, requireSuperadmin, requireTenant } from '../auth/tenantContextMiddleware.js'
 import { query } from '../db/connection.js'
 import { verifyChain } from '../services/auditChain.js'
 import { createTarget, StreamTargetError } from '../services/auditStream.js'
@@ -27,6 +27,7 @@ import {
   auditRoleOf,
   AUDIT_ACCESS_RULES
 } from '../auth/auditAccessControl.js'
+import { checkedInHandler } from '../auth/guards.js'
 
 const router = express.Router()
 
@@ -99,7 +100,7 @@ function denied(res: Response, e: unknown): boolean {
  * - 400: Invalid parameters
  * - 500: Server error
  */
-router.get('/logs', async (req: Request, res: Response) => {
+router.get('/logs', checkedInHandler("auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"), async (req: Request, res: Response) => {
   try {
     const requestedScope = req.query.actionScope ? String(req.query.actionScope) : undefined
 
@@ -162,7 +163,7 @@ router.get('/logs', async (req: Request, res: Response) => {
  * - 404: Audit log not found
  * - 500: Server error
  */
-router.get('/logs/:id', async (req: Request, res: Response) => {
+router.get('/logs/:id', checkedInHandler("auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"), async (req: Request, res: Response) => {
   try {
     const auditId = req.params.id
 
@@ -196,7 +197,7 @@ router.get('/logs/:id', async (req: Request, res: Response) => {
  * - 403: Insufficient permissions
  * - 500: Server error
  */
-router.get('/resource/:resourceType/:resourceId/trail', async (req: Request, res: Response) => {
+router.get('/resource/:resourceType/:resourceId/trail', checkedInHandler("auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"), async (req: Request, res: Response) => {
   try {
     const resourceType = req.params.resourceType
     const resourceId = req.params.resourceId
@@ -230,7 +231,7 @@ router.get('/resource/:resourceType/:resourceId/trail', async (req: Request, res
  * - 403: Insufficient permissions (non-superadmin)
  * - 500: Server error
  */
-router.get('/summary', async (req: Request, res: Response) => {
+router.get('/summary', checkedInHandler("auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"), async (req: Request, res: Response) => {
   try {
     // Scoped by the visibility predicate rather than reserved to superadmins:
     // an administrator is entitled to their own school's history, and that is
@@ -264,7 +265,7 @@ router.get('/summary', async (req: Request, res: Response) => {
  * - 403: Insufficient permissions
  * - 500: Server error
  */
-router.get('/search', async (req: Request, res: Response) => {
+router.get('/search', checkedInHandler("auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"), async (req: Request, res: Response) => {
   try {
     const searchQuery = req.query.q ? String(req.query.q) : null
 
@@ -309,7 +310,7 @@ router.get('/search', async (req: Request, res: Response) => {
  * - 403: Insufficient permissions
  * - 500: Server error
  */
-router.get('/period', async (req: Request, res: Response) => {
+router.get('/period', checkedInHandler("auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"), async (req: Request, res: Response) => {
   try {
     // Scoped by the visibility predicate rather than reserved to superadmins:
     // an administrator is entitled to their own school's history, and that is
@@ -355,7 +356,7 @@ router.get('/period', async (req: Request, res: Response) => {
  * - 404: Audit log not found
  * - 500: Server error
  */
-router.get('/logs/:id/verify', async (req: Request, res: Response) => {
+router.get('/logs/:id/verify', checkedInHandler("auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"), async (req: Request, res: Response) => {
   try {
     // Scoped by the visibility predicate rather than reserved to superadmins:
     // an administrator is entitled to their own school's history, and that is
@@ -388,7 +389,7 @@ router.get('/logs/:id/verify', async (req: Request, res: Response) => {
  * - 403: Insufficient permissions
  * - 500: Server error
  */
-router.post('/test-immutability', async (req: Request, res: Response) => {
+router.post('/test-immutability', requireSuperadmin, async (req: Request, res: Response) => {
   try {
     if (!contextOf(req).isSuperadmin) {
       return res.status(403).json({ error: 'Superadmin access required' })
@@ -425,7 +426,7 @@ router.post('/test-immutability', async (req: Request, res: Response) => {
  * - 403: Insufficient permissions
  * - 500: Server error
  */
-router.get('/access-log', async (req: Request, res: Response) => {
+router.get('/access-log', requireSuperadmin, async (req: Request, res: Response) => {
   try {
     if (!contextOf(req).isSuperadmin) {
       return res.status(403).json({
@@ -514,7 +515,7 @@ router.get('/access-log', async (req: Request, res: Response) => {
  * - 403: Insufficient permissions
  * - 500: Server error
  */
-router.get('/access-patterns', async (req: Request, res: Response) => {
+router.get('/access-patterns', requireSuperadmin, async (req: Request, res: Response) => {
   try {
     if (!contextOf(req).isSuperadmin) {
       return res.status(403).json({ error: 'Superadmin access required' })

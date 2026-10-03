@@ -71,7 +71,7 @@ export function verifyAccessToken(token: string): any {
 /** Starts a session for a user who has proved who they are. */
 export async function issueTokens(
   user: { id: string; platform_id: string; role_id: string },
-  meta: { ip?: string | null; userAgent?: string | null } = {}
+  meta: { ip?: string | null; userAgent?: string | null; boundTenantId?: string | null } = {}
 ): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
   const { sessionId, refreshToken } = await createSession(user.id, meta)
   const mfaSetup = await mfaSetupPending(user.id, user.role_id)

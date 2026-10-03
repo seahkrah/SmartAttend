@@ -13,6 +13,7 @@ import {
 } from '../auth/tenantContextMiddleware.js'
 import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
 import { emailTakenOnPlatform } from '../auth/authService.js'
+import { anyMember, checkedInHandler } from '../auth/guards.js'
 
 const router = express.Router()
 
@@ -76,7 +77,7 @@ async function departmentInTenant(departmentId: unknown, tenantId: string): Prom
 // ═══════════════════════════════════════
 // ADMIN DASHBOARD STATS
 // ═══════════════════════════════════════
-router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
+router.get('/dashboard', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)
@@ -179,7 +180,7 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
 // ═══════════════════════════════════════
 // DEPARTMENTS CRUD
 // ═══════════════════════════════════════
-router.get('/departments', requireTenant, async (req: TenantRequest, res: Response) => {
+router.get('/departments', anyMember("the employer's department names"), requireTenant, async (req: TenantRequest, res: Response) => {
   try {
     const tenantId = req.ctx!.tenantId
 
@@ -315,7 +316,7 @@ router.delete('/departments/:id', peopleAdmins, async (req: TenantRequest, res: 
 // ═══════════════════════════════════════
 // ADMIN: Employees list (uses entity not tenant middleware)
 // ═══════════════════════════════════════
-router.get('/admin/employees', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/employees', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)
@@ -360,7 +361,7 @@ router.get('/admin/employees', authenticateToken, async (req: Request, res: Resp
 // ═══════════════════════════════════════
 // ADMIN: Create employee (admin creates user + employee in one go)
 // ═══════════════════════════════════════
-router.post('/admin/employees', authenticateToken, async (req: Request, res: Response) => {
+router.post('/admin/employees', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)
@@ -479,7 +480,7 @@ router.post('/admin/employees', authenticateToken, async (req: Request, res: Res
 // ═══════════════════════════════════════
 // ADMIN: Terminate employee
 // ═══════════════════════════════════════
-router.patch('/admin/employees/:employeeId/terminate', authenticateToken, async (req: Request, res: Response) => {
+router.patch('/admin/employees/:employeeId/terminate', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)
@@ -513,7 +514,7 @@ router.patch('/admin/employees/:employeeId/terminate', authenticateToken, async 
  * employer without working email; that is audited. Only for accounts nobody
  * has signed in to yet.
  */
-router.post('/admin/employees/:employeeId/invitation', requireRecentAuthWhen(handingOverLink), authenticateToken, async (req: Request, res: Response) => {
+router.post('/admin/employees/:employeeId/invitation', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), requireRecentAuthWhen(handingOverLink), authenticateToken, async (req: Request, res: Response) => {
   const client = await pool.connect()
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
@@ -559,7 +560,7 @@ router.post('/admin/employees/:employeeId/invitation', requireRecentAuthWhen(han
 })
 
 /** Restores an employee's access; see the school equivalent in schoolAdmin.ts. */
-router.post('/admin/employees/:employeeId/reset-access', requireRecentAuth, authenticateToken, async (req: Request, res: Response) => {
+router.post('/admin/employees/:employeeId/reset-access', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), requireRecentAuth, authenticateToken, async (req: Request, res: Response) => {
   const client = await pool.connect()
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
@@ -606,7 +607,7 @@ router.post('/admin/employees/:employeeId/reset-access', requireRecentAuth, auth
 // ═══════════════════════════════════════
 // ADMIN: Attendance overview
 // ═══════════════════════════════════════
-router.get('/admin/attendance', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/attendance', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)
@@ -657,7 +658,7 @@ router.get('/admin/attendance', authenticateToken, async (req: Request, res: Res
 // ═══════════════════════════════════════
 // ADMIN: Reports / analytics
 // ═══════════════════════════════════════
-router.get('/admin/reports', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/reports', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)
@@ -733,7 +734,7 @@ router.get('/admin/reports', authenticateToken, async (req: Request, res: Respon
 // ═══════════════════════════════════════
 // ADMIN: Entity settings (read + update)
 // ═══════════════════════════════════════
-router.get('/admin/settings', authenticateToken, async (req: Request, res: Response) => {
+router.get('/admin/settings', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)
@@ -744,7 +745,7 @@ router.get('/admin/settings', authenticateToken, async (req: Request, res: Respo
   }
 })
 
-router.put('/admin/settings', authenticateToken, async (req: Request, res: Response) => {
+router.put('/admin/settings', checkedInHandler("the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"), authenticateToken, async (req: Request, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' })
     const entity = await getCorporateEntity(req)

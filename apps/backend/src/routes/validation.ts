@@ -17,6 +17,7 @@ import { withIncidentTracking } from '../middleware/errorToIncidentMiddleware.js
 // rather than import them.
 import { runAllScenarios } from '../services/incidentScenarioService.js'
 import { runAsSystem } from '../db/dbContext.js'
+import { anyMember, tagged } from '../auth/guards.js'
 
 const router = Router()
 
@@ -56,6 +57,7 @@ function superadminOnly(req: ExtendedRequest, res: Response, next: NextFunction)
   }
   next()
 }
+tagged(superadminOnly, { kind: 'superadmin' })
 
 /**
  * Refuses a route whose storage was never created.
@@ -110,6 +112,7 @@ router.get(
  */
 router.post(
   '/scenarios',
+  superadminOnly,
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
     // An operational action on the platform, so it is reserved to
     // superadmins rather than to any tenant administrator.
@@ -203,6 +206,7 @@ router.get(
  */
 router.get(
   '/health',
+  anyMember('a static list of the validation tests, no data'),
   withIncidentTracking(async (req: ExtendedRequest, res: Response) => {
     res.json({
       success: true,

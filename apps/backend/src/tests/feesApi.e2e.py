@@ -250,7 +250,9 @@ print("-- issuing --")
 co, r = call("POST", f"/invoices/{inv_a}/issue", BT, {})
 check("tenant B cannot issue A's invoice", co == 404, f"({co} {r})")
 co, r = call("POST", f"/invoices/{inv_a}/issue", FA, {})
-check("faculty cannot issue an invoice", co == 403, f"({co} {r})")
+# 404 since findings #33: the invoice loader answers a caller with no student
+# record "not found" before the route's role guard is reached.
+check("faculty cannot issue an invoice", co in (403, 404), f"({co} {r})")
 
 co, r = call("POST", f"/invoices/{inv_a}/issue", AT, {})
 check("issue the invoice", co == 200 and r.get('invoice', {}).get('status') == 'issued',
@@ -315,7 +317,7 @@ check("a structure that has raised invoices cannot be deleted", co == 409, f"({c
 # ---------------------------------------------------------------- payment
 print("-- payments --")
 co, r = call("POST", f"/invoices/{inv_a}/payments", FA, {"amount": "10"})
-check("faculty cannot take money", co == 403, f"({co} {r})")
+check("faculty cannot take money", co in (403, 404), f"({co} {r})")
 co, r = call("POST", f"/invoices/{inv_a}/payments", BT, {"amount": "10"})
 check("tenant B cannot pay A's invoice", co == 404, f"({co} {r})")
 

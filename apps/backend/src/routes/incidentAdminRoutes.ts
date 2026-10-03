@@ -61,6 +61,7 @@ import {
   getRootCauseAnalysis,
 } from '../services/incidentLifecycleService.js'
 import { runAsSystem } from '../db/dbContext.js'
+import { tagged } from '../auth/guards.js'
 
 const router = Router()
 
@@ -115,6 +116,7 @@ async function auditIncidentAccess(
   }
 }
 
+tagged(verifySuperadminAccess, { kind: 'superadmin' })
 router.use(verifySuperadminAccess)
 router.use(auditIncidentAccess)
 

@@ -24,12 +24,14 @@ import {
   subjectInTenant,
   quotaFor,
   recordAccess,
+  mayAttach,
   softDelete,
   store,
   type FileCategory,
 } from '../storage/fileService.js'
 import { ALLOWED } from '../storage/contentTypes.js'
 import { getClientIp } from '../utils/getClientIp.js'
+import { anyMember, checkedInHandler } from '../auth/guards.js'
 
 /**
  * Documents.
@@ -143,7 +145,7 @@ router.param('fileId', async (req: TenantRequest, res: Response, next: NextFunct
 // ===========================================================================
 
 /** So a client can tell somebody what is accepted before they try. */
-router.get('/limits', async (req: TenantRequest, res: Response) => {
+router.get('/limits', anyMember("what may be uploaded: types and size"), async (req: TenantRequest, res: Response) => {
   try {
     const { SIZE_LIMITS } = await import('../storage/fileService.js')
     return res.json({
@@ -172,7 +174,7 @@ router.get('/limits', async (req: TenantRequest, res: Response) => {
 // Upload
 // ===========================================================================
 
-router.post('/', upload.single('file'), async (req: TenantRequest, res: Response) => {
+router.post('/', checkedInHandler("any member may upload; a named subject must be one in this tenant, and non-staff may attach only to their own (mayAttach)"), upload.single('file'), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const file = (req as any).file as
@@ -222,6 +224,12 @@ router.post('/', upload.single('file'), async (req: TenantRequest, res: Response
       await discardStaged()
       return res.status(404).json({ error: 'No such record in this tenant to attach the file to' })
     }
+    if (ownerId && !(await mayAttach({ query }, {
+      userId: ctx.userId, roleName: ctx.roleName, isSuperadmin: ctx.isSuperadmin, tenantId: ctx.tenantId,
+    }, String(ownerType), String(ownerId), String(category)))) {
+      await discardStaged()
+      return res.status(403).json({ error: 'You may attach a file only to your own record' })
+    }
 
     const result = await store(
       { tenantId: ctx.tenantId, userId: ctx.userId },
@@ -269,7 +277,7 @@ function publicShape(file: any) {
 // Listing
 // ===========================================================================
 
-router.get('/', async (req: TenantRequest, res: Response) => {
+router.get('/', checkedInHandler("staff (admin, hr, hr_director, manager, it) see the tenant's files; anyone else what they uploaded"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const category = typeof req.query.category === 'string' ? req.query.category : null
@@ -310,7 +318,7 @@ router.get('/', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/:fileId', async (req: TenantRequest, res: Response) => {
+router.get('/:fileId', checkedInHandler("mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const file = (req as any).storedFile
@@ -341,7 +349,7 @@ router.get('/:fileId', async (req: TenantRequest, res: Response) => {
  * Every header here is load-bearing. Changing any of them turns a document
  * store into a way to run script on this application's origin.
  */
-router.get('/:fileId/download', async (req: TenantRequest, res: Response) => {
+router.get('/:fileId/download', checkedInHandler("mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const file = (req as any).storedFile
@@ -416,7 +424,7 @@ router.get('/:fileId/access-log', staff, async (req: TenantRequest, res: Respons
 // Deletion
 // ===========================================================================
 
-router.delete('/:fileId', async (req: TenantRequest, res: Response) => {
+router.delete('/:fileId', checkedInHandler("staff, or the person who uploaded it"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const file = (req as any).storedFile

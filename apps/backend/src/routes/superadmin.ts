@@ -13,6 +13,7 @@ import {
   SCHOOL_TYPE_CATALOGUE, SCHOOL_TYPES, SchoolStructureError, applySchoolStructure, validateStructure,
 } from '../services/schoolTypes.js'
 import { requireRecentAuth } from '../auth/stepUp.js'
+import { tagged } from '../auth/guards.js'
 
 /**
  * The control plane.
@@ -84,6 +85,7 @@ async function verifySuperadmin(req: Request, res: Response, next: NextFunction)
   }
 }
 
+tagged(verifySuperadmin, { kind: 'superadmin' })
 router.use(verifySuperadmin)
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

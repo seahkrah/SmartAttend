@@ -74,6 +74,7 @@ import {
 } from './middleware/errorToIncidentMiddleware.js'
 import { templateKeyConfigured } from './biometrics/templateCrypto.js'
 import { tenantKeysConfigured } from './security/kms/dataKeys.js'
+import { publicRoute } from './auth/guards.js'
 
 dotenv.config()
 validateProductionConfig()
@@ -189,13 +190,13 @@ app.use('/api/time', timeRoutes)
 app.use(errorToIncidentHandler)
 
 // Liveness: the process is up.
-app.get('/api/health', (req, res) => {
+app.get('/api/health', publicRoute('liveness'), (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
 // Readiness: the database answers and its schema is current. A load balancer
 // or orchestrator should send traffic only while this is 200.
-app.get('/api/health/ready', async (_req, res) => {
+app.get('/api/health/ready', publicRoute('readiness, for the load balancer'), async (_req, res) => {
   try {
     await query('SELECT 1')
     const pending = await pendingMigrations()

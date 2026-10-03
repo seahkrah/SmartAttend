@@ -43,12 +43,12 @@ export async function mfaSetupPending(userId: string, roleId: string): Promise<b
 }
 
 /** Starts the code step of a sign-in. The returned token is shown once. */
-export async function createChallenge(userId: string, ip?: string | null): Promise<string> {
+export async function createChallenge(userId: string, ip?: string | null, boundTenantId: string | null = null): Promise<string> {
   const token = crypto.randomBytes(32).toString('base64url')
   await sys(
-    `INSERT INTO mfa_login_challenges (user_id, token_hash, expires_at, created_ip)
-     VALUES ($1, $2, CURRENT_TIMESTAMP + ($3 || ' minutes')::interval, $4)`,
-    [userId, hashChallengeToken(token), String(CHALLENGE_TTL_MINUTES), ip?.slice(0, 64) ?? null]
+    `INSERT INTO mfa_login_challenges (user_id, token_hash, expires_at, created_ip, bound_tenant_id)
+     VALUES ($1, $2, CURRENT_TIMESTAMP + ($3 || ' minutes')::interval, $4, $5)`,
+    [userId, hashChallengeToken(token), String(CHALLENGE_TTL_MINUTES), ip?.slice(0, 64) ?? null, boundTenantId]
   )
   // Nothing older than a day is ever consulted.
   if (Math.random() < 0.02) {
@@ -77,17 +77,17 @@ export class ChallengeError extends Error {
 export async function answerChallenge(
   token: string,
   answer: { code?: string; recoveryCode?: string }
-): Promise<{ userId: string; usedRecoveryCode: boolean }> {
+): Promise<{ userId: string; usedRecoveryCode: boolean; boundTenantId: string | null }> {
   const taken = await sys(
     `UPDATE mfa_login_challenges SET attempts = attempts + 1
       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP AND attempts < $2
-      RETURNING id, user_id, attempts`,
+      RETURNING id, user_id, attempts, bound_tenant_id`,
     [hashChallengeToken(String(token ?? '')), CHALLENGE_MAX_ATTEMPTS]
   )
   if (taken.rows.length === 0) {
     throw new ChallengeError('expired', 'This sign-in has expired. Please enter your password again.')
   }
-  const { id, user_id: userId, attempts } = taken.rows[0]
+  const { id, user_id: userId, attempts, bound_tenant_id: boundTenantId } = taken.rows[0]
   const left = CHALLENGE_MAX_ATTEMPTS - attempts
 
   const ok = answer.recoveryCode
@@ -106,7 +106,7 @@ export async function answerChallenge(
   if (spent.rows.length === 0) {
     throw new ChallengeError('expired', 'This sign-in has already been completed.')
   }
-  return { userId, usedRecoveryCode: Boolean(answer.recoveryCode) }
+  return { userId, usedRecoveryCode: Boolean(answer.recoveryCode), boundTenantId: (boundTenantId as string | null) ?? null }
 }
 
 /**

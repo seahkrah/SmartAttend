@@ -25,6 +25,7 @@ import {
 } from '../services/feesService.js'
 import { statementFor } from '../services/studentRecordsService.js'
 import { invoiceIssued, paymentReceived } from '../notifications/events.js'
+import { checkedInHandler } from '../auth/guards.js'
 
 /**
  * SMS — fees, invoices and payments.
@@ -159,10 +160,11 @@ router.param('invoiceId', async (req: TenantRequest, res: Response, next: NextFu
       const mine = await callerStudent(ctx)
       // Someone else's invoice reads as absent to a student, not as
       // forbidden: a 403 would confirm the invoice exists.
-      if (mine && mine.id !== row.student_id) return notFound(res, 'Invoice')
-      // A caller who is neither staff nor a student — faculty, say — has no
-      // invoice of their own to be shielded by. The route's own role guard is
-      // the right authority there, and it refuses.
+      // Someone with no student record here (a lecturer, say) has no invoice
+      // of their own. This used to let them through on the assumption that a
+      // role guard followed; GET /invoices/:invoiceId has none, so any
+      // lecturer could read any student's invoice (findings #33).
+      if (!mine || mine.id !== row.student_id) return notFound(res, 'Invoice')
     }
 
     ;(req as any).invoice = row
@@ -404,7 +406,7 @@ router.delete('/structures/:structureId/items/:itemId', bursar, async (req: Tena
 // Invoices
 // ===========================================================================
 
-router.get('/invoices', async (req: TenantRequest, res: Response) => {
+router.get('/invoices', checkedInHandler("the school admin sees all; a student only their own; anyone else none"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = full(req)
     const staff = isStaff(ctx)
@@ -504,7 +506,7 @@ router.post('/invoices', bursar, async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/invoices/:invoiceId', async (req: TenantRequest, res: Response) => {
+router.get('/invoices/:invoiceId', checkedInHandler("the invoice loader: the school admin, or the student it is for; otherwise not found"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const invoice = (req as any).invoice
@@ -708,7 +710,7 @@ router.get('/payments', bursar, async (req: TenantRequest, res: Response) => {
 // ===========================================================================
 
 /** A student's own statement, or a named student's for staff. */
-router.get('/statement', async (req: TenantRequest, res: Response) => {
+router.get('/statement', checkedInHandler("targetStudent: the school admin for any student; anyone else only their own record"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = full(req)
     const supplied = typeof req.query.studentId === 'string' ? req.query.studentId : undefined
@@ -729,7 +731,7 @@ router.get('/statement', async (req: TenantRequest, res: Response) => {
  * a small, fast endpoint rather than something a caller has to derive from a
  * statement.
  */
-router.get('/clearance', async (req: TenantRequest, res: Response) => {
+router.get('/clearance', checkedInHandler("targetStudent: the school admin for any student; anyone else only their own record"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = full(req)
     const supplied = typeof req.query.studentId === 'string' ? req.query.studentId : undefined

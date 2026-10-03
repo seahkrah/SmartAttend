@@ -1,0 +1,11193 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/academics/programmes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "the programmes the school offers"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/programmes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/academics/programmes/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/programmes/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "one programme and its courses"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/programmes/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/programmes/:id/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/academics/programmes/:id/courses/:entryId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/structure",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "how the school is organised: levels, terms, programmes on or off"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/student-programmes/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/students/:studentId/programme",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "a student's programme: the student themselves, or the school's admin or lecturers"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/students/:studentId/programme",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/terms",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "the school's terms"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/terms",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/terms/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/academics/years",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "the school's academic years"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/academics/years",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/academics/years/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/academics/years/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/access-requests",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/access-requests",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "a prospective school or company asks for an account; rate-limited"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/access-requests/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/analytics",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/approvals/approve",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/approvals/pending",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/approvals/reject",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/break-glass",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/courses/:courseId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/courses/:courseId/assign-faculty",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/export/tenant-report",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/incidents/:id/acknowledge",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/incidents/:id/resolve",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/incidents/:id/root-cause",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/incidents/stats/escalations",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/sso",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/sso",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admin/sso/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admin/sso/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admin/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admin/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/users/bulk-import",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applicants",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applicants",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applicants/:applicantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admissions/applicants/:applicantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId/choices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/choices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admissions/applications/:applicationId/choices/:choiceId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId/documents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/documents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admissions/applications/:applicationId/documents/:documentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admissions/applications/:applicationId/documents/:documentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/enrol",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/applications/:applicationId/events",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/applications/:applicationId/transition",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/intakes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/admissions/intakes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/admissions/intakes/:intakeId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/intakes/:intakeId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/admissions/intakes/:intakeId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/intakes/:intakeId/funnel",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/admissions/overview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/courses/:courseId/sessions",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/department/all",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "manager",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/department/export",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "manager",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/employees/:employeeId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "manager",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/mark-with-face",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own courses and attendance"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/discrepancies",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own reports of wrong attendance"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/me/discrepancies",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "reports a mistake in the caller's own attendance"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/export",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own attendance, as a file"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/me/metrics",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own attendance figures"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/notifications/send",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "manager",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/profile",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own student or employee record"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/attendance/profile",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own contact details"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/attendance/sessions",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/sessions/:sessionId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/attendance/sessions/:sessionId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/sessions/:sessionId/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/attendance/students/:studentId/courses/:courseId/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/access-log",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/access-patterns",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/chain",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/export",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/logs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/logs/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/logs/:id/verify",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/period",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/resource/:resourceType/:resourceId/trail",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/search",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/streams",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/audit/streams",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/audit/streams/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/audit/summary",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "auditVisibilityPredicate: a superadmin sees every tenant; admin, hr_director, manager and it see their tenant; anyone else sees only their own actions"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/audit/test-immutability",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/activate",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "redeems a single-use invitation link"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/approval-action",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/corporate/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/pending-approvals",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/attendance/overview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/courses/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/courses/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/departments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/departments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/departments/:departmentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth/admin/school/departments/:departmentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/enrollments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/enrollments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/enrollments/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/faculty",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/faculty",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/faculty/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/faculty/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/faculty/:id/suspend",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/reports/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/rooms",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/rooms",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/rooms/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/rooms/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/schedules",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/schedules",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/schedules/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/schedules/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth/admin/school/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/students/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/students/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/students/:id/suspend",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/admin/school/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/auth/admin/school/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/users/:userId/invitation",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/admin/school/users/:userId/reset-access",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/change-password",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "the caller's own password, with the current one"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/csrf",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "the CSRF token for the caller's own session"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "sign-in"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login-superadmin",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "superadmin sign-in"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "ends the caller's own session"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout-all",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "ends all the caller's own sessions"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "the caller's own profile"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/auth/me",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "the caller's own name and phone"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/mfa",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own two-factor status"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/disable",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "self",
+        "what": "turns off two-factor for the caller's own account"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/enable",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "self",
+        "what": "turns on two-factor for the caller's own account"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/recovery-codes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "self",
+        "what": "new recovery codes for the caller's own account"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/setup",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "self",
+        "what": "starts two-factor setup on the caller's own account"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/mfa/verify",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "second step of sign-in; the pending-challenge token is the credential"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/passkeys",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "the caller's own passkeys"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/passkeys/:id",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "removes one of the caller's own passkeys; another's id is not found"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/register/options",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "registers a passkey on the caller's own account"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/register/verify",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "registers a passkey on the caller's own account"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/sign-in/options",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "a single-use challenge for passkey sign-in"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/sign-in/verify",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "passkey sign-in; the signed challenge is the credential"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/step-up/options",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "re-authenticates the caller with their own passkey"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/passkeys/step-up/verify",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "re-authenticates the caller with their own passkey"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/password/forgot",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "asks for a reset link; answers the same whether or not the account exists"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/password/reset",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "redeems a single-use reset link"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/refresh",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "exchanges a refresh token, which is the credential"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/register-superadmin",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "first superadmin only; afterwards, and always in production, the bootstrap token is required"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/register-with-role",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "self-registration onto a platform; the account waits for approval where the role needs it"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sessions",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "the caller's own signed-in devices"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/auth/sessions/:sessionId",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "ends one of the caller's own sessions; another's is not found"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/:providerId/start",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "starts single sign-on with a tenant's identity provider"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/sso/complete",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "redeems the single-use handoff code from the callback"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/oidc/callback",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "the identity provider returns here; state, nonce and PKCE are checked"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/providers",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "the sign-in providers a tenant offers, for the sign-in page"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/sso/saml/acs",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "the identity provider posts a signed assertion here"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/sso/saml/metadata",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "this service provider's metadata, for the identity provider"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/step-up",
+    "guards": [
+      {
+        "kind": "self",
+        "what": "re-authenticates the caller with their own password or code"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/action-logs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/dashboard",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/dashboard-stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/entities",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/entity-users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/pending-approvals",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/superadmin/user-statistics",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/challenges",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "issueChallenge: enrol as authorizeSubject enrol; verify only for the caller's own employee record; identify only by a lecturer for their class"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/enroll",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the challenge, issued under the enrol rule, is single-use and bound to the caller"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/events",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "listEvents: the school admin or HR"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/identify",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the challenge must be the lecturer's own, for their class"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "member",
+        "what": "whether face matching is on, and its threshold"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/biometrics/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/subjects",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "listSubjects: students to the school admin, employees to HR"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/biometrics/subjects/:type/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; view"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/biometrics/subjects/:type/:id/consent",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; withdrawing consent as granting it"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/subjects/:type/:id/consent",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; consent: school admin for a student, HR or the employee for an employee"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/biometrics/subjects/:type/:id/template",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; delete: school admin or HR"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/verify",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the challenge must be the caller's own, for their own employee record"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/employees",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/admin/employees",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/admin/employees/:employeeId/invitation",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/admin/employees/:employeeId/reset-access",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/corporate/admin/employees/:employeeId/terminate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/reports",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/admin/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/corporate/admin/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/dashboard",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employer's own administrator: getCorporateEntity requires corporate_entities.admin_user_id to be the caller, in this tenant"
+      },
+      {
+        "kind": "authenticated"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/departments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "the employer's department names"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/departments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/corporate/departments/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/corporate/departments/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/employees",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corporate/employees",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corporate/employees/:employeeId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/corporate/employees/:employeeId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/corporate/employees/:employeeId/terminate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corrections/:correctionId/revert",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/active",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/audit-trail",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/by-type/:correctionType",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/compliance/silent-corrections",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corrections/corporate/:checkinId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/history/:recordId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "security_officer",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/corrections/school/:attendanceId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "security_officer",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/corrections/statistics",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/bulk-edit",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/attendance/draft",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/attendance/export",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/facial-match",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/attendance/history",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/lock",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/mark",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/attendance/submit",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses/:courseId/attendance-summary",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses/:courseId/qr-code",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/courses/:courseId/roster",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/dashboard",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/enrollment/add",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/enrollment/available",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/enrollment/enrolled",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/faculty/enrollment/remove",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/reports",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/schedules",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/schedules/:scheduleId/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/faculty/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/clearance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "targetStudent: the school admin for any student; anyone else only their own record"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/debtors",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/invoices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the school admin sees all; a student only their own; anyone else none"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/invoices/:invoiceId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the invoice loader: the school admin, or the student it is for; otherwise not found"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/fees/invoices/:invoiceId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices/:invoiceId/issue",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices/:invoiceId/payments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/invoices/:invoiceId/void",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/overview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/payments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/payments/:paymentId/reverse",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/statement",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "targetStudent: the school admin for any student; anyone else only their own record"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/structures",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/structures",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/fees/structures/:structureId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/fees/structures/:structureId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/fees/structures/:structureId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/fees/structures/:structureId/items",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/fees/structures/:structureId/items/:itemId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/fees/structures/:structureId/items/:itemId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "staff (admin, hr, hr_director, manager, it) see the tenant's files; anyone else what they uploaded"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/files",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "any member may upload; a named subject must be one in this tenant, and non-staff may attach only to their own (mayAttach)"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/files/:fileId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "staff, or the person who uploaded it"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/:fileId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/:fileId/access-log",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/:fileId/download",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "mayRead: staff (admin, hr, hr_director, manager, it), the uploader, the person the file is attached to, or a lecturer for attendance evidence"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/files/limits",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "member",
+        "what": "what may be uploaded: types and size"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/files/purge",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director",
+          "manager",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/classes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/grade-school/classes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/grade-school/classes/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/grade-school/classes/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/classes/:id/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/grade-school/classes/:id/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/grade-school/classes/:id/students/:studentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/subjects",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/grade-school/subjects",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/grade-school/subjects/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/grade-school/subjects/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/grade-school/subjects/:id/grades",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/teachers",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/grade-school/unplaced-students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/gradebook/assessments/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/gradebook/assessments/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/assessments/:id/scores",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/gradebook/assessments/:id/scores",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/courses/:courseId/assessments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "a course's assessments: titles, weights and due dates, no marks"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/courses/:courseId/assessments",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/courses/:courseId/results",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/courses/:courseId/results/publish",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/my/transcript",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own transcript"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/results/:id/withhold",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/schemes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "the school's grading schemes"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/gradebook/schemes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/gradebook/schemes/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/gradebook/students/:studentId/transcript",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the student themselves, or the school's admin or lecturers"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "guardian"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "guardian"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "guardian"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/fees",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "guardian"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/results",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "guardian"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardian/children/:studentId/schedule",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "guardian"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardians",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/guardians",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/guardians/:guardianId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/guardians/:guardianId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/guardians/:guardianId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/guardians/:guardianId/invitation",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/guardians/:guardianId/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/guardians/:guardianId/students/:linkId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/guardians/:guardianId/students/:linkId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/health",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "liveness"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/health/ready",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "readiness, for the load balancer"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/campaigns",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/hr/campaigns",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/hr/campaigns/:campaignId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/hr/campaigns/:campaignId/send",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/compliance/summary",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/departments/metrics",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/export/organization-report",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/members",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/members/:memberId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/hr/notifications/send",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/overview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/patterns",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/hr/today",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/incidents/:incidentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/acknowledge",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/close",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/escalate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId/escalations",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/investigate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/mitigate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/resolve",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/incidents/:incidentId/root-cause",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId/root-causes",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/:incidentId/timeline",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/critical",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/open",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/incidents/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director",
+          "manager",
+          "it",
+          "security_officer"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/balances",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "targetEmployee: HR, admin and managers for anyone; anyone else only their own"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/leave/balances",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/calendar",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/requests",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "scope=all for HR, admin and managers; everyone else sees only their own requests"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "an employee raises their own leave; HR may name another employee"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests/:id/cancel",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employee whose leave it is, or HR"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests/:id/decision",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/requests/preview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "working days in a range, and the caller's own balance"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/leave/types",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "member",
+        "what": "the employer's leave types"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/leave/types",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/leave/types/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/leave/types/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/api-latency",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/api-latency-by-endpoint",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/clock-drift",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/dashboard",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/early-signals",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/failure-rates",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/failure-reasons",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/health-status",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/problematic-records",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/summary",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/metrics/verification-mismatches",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "it"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/channels",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/channels/:channel",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/channels/:channel/test",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/dispatch",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/inbox",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own notifications"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/inbox/:notificationId/read",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "marks one of the caller's own notifications read; another's is not found"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/inbox/read-all",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "marks the caller's own notifications read"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/messages",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/messages/:messageId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/messages/:messageId/cancel",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/messages/:messageId/retry",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/overview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/preferences",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own notification preferences"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/preferences",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own notification preferences"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/suppressions",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/suppressions",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/notifications/suppressions/:suppressionId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/notifications/templates",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/notifications/templates",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/notifications/templates/:templateId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/notifications/templates/preview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/components",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/components",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/payroll/components/:componentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/payroll/components/:componentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/employees/:employeeId/compensation",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "payroll staff (admin, hr, hr_director) for anyone; an employee only their own; otherwise not found"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/employees/:employeeId/compensation",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/employees/:employeeId/components",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/payroll/employees/:employeeId/components/:assignmentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/my/payslips",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own approved and paid payslips"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/payslips/:payslipId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the payslip loader: payroll staff, or the employee it is for once the run is approved; otherwise not found"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/periods",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/periods",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/periods/:periodId/inputs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/periods/:periodId/inputs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/payroll/periods/:periodId/inputs/:inputId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/runs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/runs/:runId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/approve",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/calculate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/cancel",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/payroll/runs/:runId/pay",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/runs/:runId/preview/:employeeId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/payroll/tax-brackets",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/payroll/tax-brackets",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/faculty",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/school/faculty",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/faculty/:facultyId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/school/faculty/:facultyId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/faculty/:facultyId/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/school/faculty/:facultyId/courses/:courseId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/school/students",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/school/students/:studentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students/:studentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/school/students/:studentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students/:studentId/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/school/students/:studentId/schedules",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "faculty"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/comprehensive",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/duplicate-storm",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/network-instability",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/partial-outage",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/simulations/status",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/stress-test",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/simulations/time-drift",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      },
+      {
+        "kind": "tenant"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the calling student's own attendance"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/courses",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the calling student's own courses"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/dashboard",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the calling student's own dashboard"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/profile",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the calling student's own record"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/student/profile",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the calling student's own contact details"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/student/schedules",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the calling student's own timetable"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/admins/mapping",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/audit-logs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/audit-trail",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/break-glass",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/break-glass",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/break-glass/:grantId/close",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/diagnostics",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/entities",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/export/system-report",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/health",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/incidents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/incidents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/incidents/:incidentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/superadmin/incidents/:incidentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/incidents/override",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/locked-users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/locked-users/unlock",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/school-types",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/tenant-admins",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenant-admins",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/tenant-admins/:adminId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenant-admins/:adminId/invitation",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/tenants",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenants",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/tenants/:tenantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/tenants/:tenantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/superadmin/tenants/:tenantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/superadmin/tenants/:tenantId/lifecycle",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/superadmin/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/superadmin/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/superadmin/users/:userId/mfa",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/drift/critical",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/drift/history",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own clock-drift history"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/time/drift/investigate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/drift/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/status",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "superadmin only"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/sync",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "server time for clients to measure drift"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/sync/precise",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "server time for clients to measure drift"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/time/validate",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "checks a client timestamp against server time"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/admins/mapping",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/audit-logs",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/audit-trail",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/break-glass",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/break-glass",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/break-glass/:grantId/close",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/diagnostics",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/entities",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/export/system-report",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/health",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/incidents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/incidents",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/incidents/:incidentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/superadmin/incidents/:incidentId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/incidents/override",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/locked-users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/locked-users/unlock",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/school-types",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/stats",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/tenant-admins",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenant-admins",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/tenant-admins/:adminId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenant-admins/:adminId/invitation",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/tenants",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenants",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/tenants/:tenantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/tenants/:tenantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/superadmin/tenants/:tenantId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/superadmin/tenants/:tenantId/lifecycle",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/superadmin/users",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/superadmin/users/:userId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/superadmin/users/:userId/mfa",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/handoff/:sessionId/accept",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/validation/handoff/:sessionId/briefing",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/handoff/initiate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/validation/health",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "member",
+        "what": "a static list of the validation tests, no data"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/incidents/:incidentId/export",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/platform-readiness",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/validation/platform-readiness/latest",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/scenarios",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/validation/simulations",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "superadmin"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/contracts",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/contracts",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/workforce/contracts/:contractId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/workforce/contracts/:contractId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/contracts/:contractId/activate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/contracts/:contractId/end",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/my/attendance",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own check-ins"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/check-in",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "checks the caller in"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/check-out",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "checks the caller out"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/my/contract",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own contract"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/my/timesheets",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "the caller's own timesheets"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/roster",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "schedulers see the tenant's roster; anyone else only their own shifts"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster/:shiftId/cancel",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster/bulk",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/roster/coverage",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/roster/publish",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/shift-patterns",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/shift-patterns",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/workforce/shift-patterns/:patternId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/workforce/shift-patterns/:patternId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets/:timesheetId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the timesheet loader: schedulers, or the employee it is for; otherwise not found"
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/workforce/timesheets/:timesheetId/days/:entryId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets/:timesheetId/decision",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets/:timesheetId/export",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr_director",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets/:timesheetId/rate",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/timesheets/:timesheetId/submit",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the employee whose timesheet it is, or a scheduler"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/workforce/timesheets/preview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "hr",
+          "hr_director",
+          "admin",
+          "manager"
+        ]
+      }
+    ]
+  }
+]

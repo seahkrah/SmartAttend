@@ -35,6 +35,7 @@ import {
 import { fromMinor } from '../services/payrollService.js'
 import { rosterPublished, timesheetDecided } from '../notifications/events.js'
 import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
+import { checkedInHandler, selfService } from '../auth/guards.js'
 
 /**
  * EMS — contracts, rosters and timesheets.
@@ -296,7 +297,7 @@ router.get('/contracts', hrOnly, async (req: TenantRequest, res: Response) => {
  * Its terms, not its history: an employee reads what they are engaged on now.
  * Nothing here takes an employee id.
  */
-router.get('/my/contract', async (req: TenantRequest, res: Response) => {
+router.get('/my/contract', selfService("the caller's own contract"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const employee = await callerEmployee(ctx)
@@ -626,7 +627,7 @@ router.delete('/shift-patterns/:patternId', hrOnly, async (req: TenantRequest, r
  * employee sees their own published shifts and nothing else — not colleagues',
  * because a full rota is a map of who is in the building when.
  */
-router.get('/roster', async (req: TenantRequest, res: Response) => {
+router.get('/roster', checkedInHandler("schedulers see the tenant's roster; anyone else only their own shifts"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const from = requireDay(req.query.from, 'from')
@@ -889,7 +890,7 @@ router.get('/timesheets', schedulers, async (req: TenantRequest, res: Response) 
  * employee is whoever is signed in, and somebody with no employee record in
  * this tenant is told so rather than shown somebody else's.
  */
-router.get('/my/attendance', async (req: TenantRequest, res: Response) => {
+router.get('/my/attendance', selfService("the caller's own check-ins"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const employee = await callerEmployee(ctx)
@@ -910,7 +911,7 @@ router.get('/my/attendance', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/my/check-in', async (req: TenantRequest, res: Response) => {
+router.post('/my/check-in', selfService("checks the caller in"), async (req: TenantRequest, res: Response) => {
   let client
   try {
     const ctx = ctxOf(req)
@@ -943,7 +944,7 @@ router.post('/my/check-in', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/my/check-out', async (req: TenantRequest, res: Response) => {
+router.post('/my/check-out', selfService("checks the caller out"), async (req: TenantRequest, res: Response) => {
   let client
   try {
     const ctx = ctxOf(req)
@@ -963,7 +964,7 @@ router.post('/my/check-out', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.get('/my/timesheets', async (req: TenantRequest, res: Response) => {
+router.get('/my/timesheets', selfService("the caller's own timesheets"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const employee = await callerEmployee(ctx)
@@ -1057,7 +1058,7 @@ router.post('/timesheets', schedulers, async (req: TenantRequest, res: Response)
   }
 })
 
-router.get('/timesheets/:timesheetId', async (req: TenantRequest, res: Response) => {
+router.get('/timesheets/:timesheetId', checkedInHandler("the timesheet loader: schedulers, or the employee it is for; otherwise not found"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const timesheet = (req as any).timesheet
@@ -1150,7 +1151,7 @@ router.patch('/timesheets/:timesheetId/days/:entryId', schedulers, async (req: T
   }
 })
 
-router.post('/timesheets/:timesheetId/submit', async (req: TenantRequest, res: Response) => {
+router.post('/timesheets/:timesheetId/submit', checkedInHandler("the employee whose timesheet it is, or a scheduler"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const timesheet = (req as any).timesheet

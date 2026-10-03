@@ -20,6 +20,7 @@ import {
   resolveTenantContext,
   requireTenant,
   requirePlatform,
+  requireRoles,
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import {
@@ -83,6 +84,12 @@ function failScope(res: Response, e: unknown, label: string): boolean {
  * POST /api/attendance/sessions
  * Create a course session (Faculty only)
  */
+// Reading a class's sessions and anyone's attendance is for the school's
+// administrators and lecturers. These routes checked no role before, so a
+// student could read any classmate's attendance (findings #32); a student
+// reads their own under /api/attendance/me.
+const attendanceReaders = requireRoles('admin', 'faculty')
+
 router.post('/sessions', requireRole('faculty'), async (req: TenantRequest, res: Response) => {
   try {
     const { courseId, ...sessionData } = req.body as CreateSessionRequest & { courseId: string }
@@ -146,7 +153,7 @@ router.put('/sessions/:sessionId', requireRole('faculty'), async (req: TenantReq
  * GET /api/attendance/sessions/:sessionId
  * Get session details
  */
-router.get('/sessions/:sessionId', async (req: TenantRequest, res: Response) => {
+router.get('/sessions/:sessionId', attendanceReaders, async (req: TenantRequest, res: Response) => {
   try {
     const { sessionId } = req.params
 
@@ -174,7 +181,7 @@ router.get('/sessions/:sessionId', async (req: TenantRequest, res: Response) => 
  * GET /api/attendance/courses/:courseId/sessions
  * Get all sessions for a course
  */
-router.get('/courses/:courseId/sessions', async (req: TenantRequest, res: Response) => {
+router.get('/courses/:courseId/sessions', attendanceReaders, async (req: TenantRequest, res: Response) => {
   try {
     const { courseId } = req.params
     const { status } = req.query
@@ -264,7 +271,7 @@ router.post('/mark-with-face', requireRole('faculty'), async (req: TenantRequest
  * GET /api/attendance/sessions/:sessionId/attendance
  * Get attendance report for a session
  */
-router.get('/sessions/:sessionId/attendance', async (req: TenantRequest, res: Response) => {
+router.get('/sessions/:sessionId/attendance', attendanceReaders, async (req: TenantRequest, res: Response) => {
   try {
     const { sessionId } = req.params
 
@@ -290,6 +297,7 @@ router.get('/sessions/:sessionId/attendance', async (req: TenantRequest, res: Re
  */
 router.get(
   '/students/:studentId/courses/:courseId/attendance',
+  attendanceReaders,
   async (req: TenantRequest, res: Response) => {
     try {
       const { studentId, courseId } = req.params

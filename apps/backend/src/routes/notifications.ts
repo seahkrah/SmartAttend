@@ -20,6 +20,7 @@ import {
 import { DEFAULT_TEMPLATES, SENSITIVE_EVENTS, knownEventKeys } from '../notifications/templates.js'
 import { render, variablesIn } from '../notifications/render.js'
 import type { Channel } from '../notifications/types.js'
+import { selfService } from '../auth/guards.js'
 
 /**
  * Notifications.
@@ -111,7 +112,7 @@ function secretLike(config: Record<string, unknown>): string | null {
 // A person's own inbox
 // ===========================================================================
 
-router.get('/inbox', async (req: TenantRequest, res: Response) => {
+router.get('/inbox', selfService("the caller's own notifications"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const unreadOnly = req.query.unread === 'true'
@@ -144,7 +145,7 @@ router.get('/inbox', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.post('/inbox/:notificationId/read', async (req: TenantRequest, res: Response) => {
+router.post('/inbox/:notificationId/read', selfService("marks one of the caller's own notifications read; another's is not found"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const { notificationId } = req.params
@@ -166,7 +167,7 @@ router.post('/inbox/:notificationId/read', async (req: TenantRequest, res: Respo
   }
 })
 
-router.post('/inbox/read-all', async (req: TenantRequest, res: Response) => {
+router.post('/inbox/read-all', selfService("marks the caller's own notifications read"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const updated = await query(
@@ -193,7 +194,7 @@ router.post('/inbox/read-all', async (req: TenantRequest, res: Response) => {
  * only the rows that exist, because "no row" means "yes" and a UI that only
  * shows stored rows would show an empty page to someone receiving everything.
  */
-router.get('/preferences', async (req: TenantRequest, res: Response) => {
+router.get('/preferences', selfService("the caller's own notification preferences"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const stored = await query(
@@ -225,7 +226,7 @@ router.get('/preferences', async (req: TenantRequest, res: Response) => {
   }
 })
 
-router.put('/preferences', async (req: TenantRequest, res: Response) => {
+router.put('/preferences', selfService("the caller's own notification preferences"), async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
     const b = req.body ?? {}

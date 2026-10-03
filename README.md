@@ -171,9 +171,10 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
 - Every route declares who may call it, and CI checks that none is left
   undeclared ([docs/security/authorisation.md](docs/security/authorisation.md)).
   A suite calls each role-guarded route as each role that should be refused,
-  and tests one person reaching another's records. Roles inside a school are
-  still coarse: a lecturer can read any student's attendance and transcript
-  in the school, not only those they teach.
+  and tests one person reaching another's records. Roles are still coarse:
+  a lecturer can read any student's attendance and transcript in the school,
+  not only those they teach, and a manager sees everyone's leave, not only
+  their reports'.
 - The audit trail is a hash chain per tenant, verified by
   `npm run audit:verify` and exportable and streamable to the tenant's own
   collector. Nothing yet runs the verifier on a schedule; that, and keeping

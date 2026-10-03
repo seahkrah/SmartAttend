@@ -15,7 +15,7 @@
  * by running more workers behind one address.
  *
  *   FACE_WORKER_PORT (5100), FACE_WORKER_HOST (127.0.0.1), FACE_WORKER_TOKEN
- *   (required, at least 32 characters), FACE_WORKER_MAX_QUEUE (16),
+ *   (required, at least 32 characters), FACE_WORKER_MAX_QUEUE (8),
  *   FACE_WORKER_PID_FILE (optional: where to write the process id).
  *
  * Run: npx tsx src/faceWorker/server.ts
@@ -23,7 +23,7 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import http from 'http'
-import { analyzeFrame, engineInfo, IMAGE_LIMITS, ImageRejected, warmUp } from '../biometrics/engine.js'
+import { AnalysisCancelled, analyzeFrame, engineInfo, IMAGE_LIMITS, ImageRejected, warmUp } from '../biometrics/engine.js'
 
 const CREDENTIALS = ['DATABASE_URL', 'APP_DATABASE_URL', 'SYSTEM_DATABASE_URL', 'PGPASSWORD', 'BIOMETRIC_TEMPLATE_KEY',
   'KMS_LOCAL_KEK', 'JWT_SECRET']
@@ -40,7 +40,9 @@ if (TOKEN.length < 32) {
 
 const PORT = Number(process.env.FACE_WORKER_PORT ?? 5100)
 const HOST = process.env.FACE_WORKER_HOST ?? '127.0.0.1'
-const MAX_QUEUE = Math.max(1, Number(process.env.FACE_WORKER_MAX_QUEUE ?? 16))
+// Refused beyond this, at once: work the API would time out on is better
+// refused early, so it can fall back to manual.
+const MAX_QUEUE = Math.max(1, Number(process.env.FACE_WORKER_MAX_QUEUE ?? 8))
 let inFlight = 0
 
 function tokenOk(req: http.IncomingMessage): boolean {
@@ -59,6 +61,13 @@ function readBody(req: http.IncomingMessage, limit: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     let size = 0
+    let complete = false
+    // An upload the caller abandons never ends: without this the request held
+    // its place in the queue for good, and enough of them left the worker
+    // refusing everything (found by the check-in burst test).
+    req.on('close', () => {
+      if (!complete) reject(new Error('the caller closed the connection'))
+    })
     req.on('data', (c: Buffer) => {
       size += c.length
       if (size > limit) {
@@ -68,7 +77,10 @@ function readBody(req: http.IncomingMessage, limit: number): Promise<Buffer> {
       }
       chunks.push(c)
     })
-    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('end', () => {
+      complete = true
+      resolve(Buffer.concat(chunks))
+    })
     req.on('error', reject)
   })
 }
@@ -81,14 +93,23 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/analyze') {
     if (inFlight >= MAX_QUEUE) return send(res, 503, { error: 'The face worker is busy; try again shortly' })
     inFlight++
+    // A caller that has given up (the API timed out) is not worth analysing
+    // for: under load, that work was what kept the worker busy for minutes.
+    let gone = false
+    res.on('close', () => {
+      if (!res.writableEnded) gone = true
+    })
     try {
       const buf = await readBody(req, IMAGE_LIMITS.maxBytes)
-      const { faces, quality } = await analyzeFrame(buf)
+      if (gone) return
+      const { faces, quality } = await analyzeFrame(buf, () => !gone)
+      if (gone) return
       return send(res, 200, {
         faces: faces.map((f) => ({ descriptor: Array.from(f.descriptor), yaw: f.yaw, score: f.score, width: f.width })),
         quality: quality ?? null,
       })
     } catch (e) {
+      if (e instanceof AnalysisCancelled || gone) return
       if (e instanceof ImageRejected) return send(res, 422, { error: e.message, code: e.code })
       console.error('[FACE_WORKER] analysis failed:', (e as Error)?.message ?? e)
       return send(res, 503, { error: 'The face engine could not analyse the image' })

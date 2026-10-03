@@ -198,10 +198,14 @@ async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function analyzeFrame(buf: Buffer): Promise<FrameAnalysis> {
+/** Thrown when the caller no longer wants the result by the time it is its turn. */
+export class AnalysisCancelled extends Error {}
+
+export async function analyzeFrame(buf: Buffer, stillWanted: () => boolean = () => true): Promise<FrameAnalysis> {
   checkImage(buf)
   const { tf, faceapi } = await load()
   return withSlot(async () => {
+    if (!stillWanted()) throw new AnalysisCancelled('the caller went away')
     let tensor: any
     try {
       tensor = tf.node.decodeImage(buf, 3)

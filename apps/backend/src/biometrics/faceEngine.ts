@@ -18,7 +18,11 @@ import { checkImage, EngineUnavailable, ImageRejected, IMAGE_LIMITS, type Engine
 export { EngineUnavailable, ImageRejected, IMAGE_LIMITS }
 export type { EngineInfo, FrameAnalysis }
 
-const WORKER = (process.env.FACE_WORKER_URL ?? '').replace(/\/$/, '')
+// One or more workers, comma-separated: requests go to each in turn, and a
+// worker that cannot be reached is skipped while another is up.
+const WORKERS = (process.env.FACE_WORKER_URL ?? '').split(',').map((u) => u.trim().replace(/\/$/, '')).filter(Boolean)
+const WORKER = WORKERS[0] ?? ''
+let turn = 0
 const TOKEN = process.env.FACE_WORKER_TOKEN ?? ''
 const TIMEOUT_MS = Math.max(1000, Number(process.env.FACE_WORKER_TIMEOUT_MS ?? 15000))
 
@@ -38,11 +42,11 @@ let lastWorker: EngineInfo & { reachable: boolean; checkedAt: string | null } = 
   reachable: false, checkedAt: null,
 }
 
-async function workerFetch(pathname: string, init: RequestInit & { timeoutMs?: number } = {}) {
+async function workerFetch(pathname: string, init: RequestInit & { timeoutMs?: number; base?: string } = {}) {
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(), init.timeoutMs ?? TIMEOUT_MS)
   try {
-    return await fetch(WORKER + pathname, {
+    return await fetch((init.base ?? WORKER) + pathname, {
       ...init,
       signal: ac.signal,
       headers: { ...(init.headers ?? {}), 'X-Worker-Token': TOKEN },
@@ -73,14 +77,22 @@ export async function analyzeFrame(buf: Buffer): Promise<FrameAnalysis> {
   if (!usesWorker()) return (await localEngine()).analyzeFrame(buf)
   // Refused here, before it travels: the worker checks again.
   checkImage(buf)
-  let r: Response
-  try {
-    r = await workerFetch('/analyze', {
-      method: 'POST', body: new Uint8Array(buf), headers: { 'Content-Type': 'application/octet-stream' },
-    })
-  } catch (e) {
-    lastWorker = { ...lastWorker, state: 'failed', reachable: false, error: `worker unreachable: ${(e as Error)?.message ?? e}` }
-    throw new EngineUnavailable(e)
+  let r: Response | null = null
+  let lastError: unknown = null
+  // Each worker in turn; on a connection failure, the next one.
+  for (let tries = 0; tries < WORKERS.length && !r; tries++) {
+    const base = WORKERS[turn++ % WORKERS.length]
+    try {
+      r = await workerFetch('/analyze', {
+        base, method: 'POST', body: new Uint8Array(buf), headers: { 'Content-Type': 'application/octet-stream' },
+      })
+    } catch (e) {
+      lastError = e
+    }
+  }
+  if (!r) {
+    lastWorker = { ...lastWorker, state: 'failed', reachable: false, error: `worker unreachable: ${(lastError as Error)?.message ?? lastError}` }
+    throw new EngineUnavailable(lastError)
   }
   const body: any = await r.json().catch(() => null)
   if (r.status === 422 && body?.code) throw new ImageRejected(body.code, body.error ?? 'The image was refused')
@@ -110,7 +122,7 @@ export function engineInfo(): EngineInfo & { worker?: { url: string; reachable: 
     }
   }
   const { reachable, checkedAt, ...info } = lastWorker
-  return { ...info, worker: { url: WORKER, reachable, checkedAt } }
+  return { ...info, worker: { url: WORKERS.join(','), reachable, checkedAt } }
 }
 
 /** Keeps the readiness check current while the worker comes and goes. */

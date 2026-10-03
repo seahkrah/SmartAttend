@@ -473,10 +473,15 @@ async function analyzeCapture(frames: Buffer[], steps: Pose[]): Promise<Capture 
   }
   const faces: FaceObservation[] = []
   const quality: Array<FrameQuality | undefined> = []
+  // The frames are analysed together (across workers, when there are
+  // several), then judged in order, so the first bad frame is the one named.
+  const settled = await Promise.allSettled(frames.map((f) => analyzeFrame(f)))
   for (let i = 0; i < frames.length; i++) {
     let analysis
     try {
-      analysis = await analyzeFrame(frames[i])
+      const s = settled[i]
+      if (s.status === 'rejected') throw s.reason
+      analysis = s.value
     } catch (e) {
       if (e instanceof ImageRejected) return { reason: `image_${e.code}`, message: `Image ${i + 1}: ${e.message}` }
       // The server cannot run the engine at all: say so plainly, and let the

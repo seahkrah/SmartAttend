@@ -129,7 +129,7 @@ npx tsx src/faceWorker/server.ts
   secret.** It refuses to start if any is present. It needs only
   `FACE_WORKER_TOKEN` (at least 32 characters, shared with the API) and,
   optionally, `FACE_WORKER_PORT` (5100), `FACE_WORKER_HOST` (127.0.0.1) and
-  `FACE_WORKER_MAX_QUEUE` (16).
+  `FACE_WORKER_MAX_QUEUE` (8). It drops a request whose caller has gone, rather than analysing for nobody.
 - **The API sends it images when `FACE_WORKER_URL` is set**, with the same
   token (`FACE_WORKER_TIMEOUT_MS`, default 15000). The API then never loads
   TensorFlow.

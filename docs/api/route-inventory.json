@@ -1158,6 +1158,18 @@
   },
   {
     "method": "POST",
+    "path": "/api/biometrics/group",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/group/:groupId/confirm",
+    "params": [
+      "groupId"
+    ]
+  },
+  {
+    "method": "POST",
     "path": "/api/biometrics/identify",
     "params": []
   },

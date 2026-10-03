@@ -29,6 +29,7 @@ import { randomSequence, sequenceMatches, type Pose, POSES } from './pose.js'
 import {
   MODEL_ID, THRESHOLDS, clampThreshold, distance, identify as identifyAmong, mean, spread,
 } from './matching.js'
+import { markStudent } from '../attendance/core.js'
 import { BiometricKeyError, openStoredTemplate, sealTemplateForStorage, templateContext, templateKeyConfigured } from './templateCrypto.js'
 
 export type SubjectType = 'student' | 'employee'
@@ -328,7 +329,7 @@ export async function deleteTemplate(ctx: Ctx, s: Subject) {
 // Challenges
 // ---------------------------------------------------------------------------
 
-export type Purpose = 'enroll' | 'verify' | 'identify'
+export type Purpose = 'enroll' | 'verify' | 'identify' | 'group'
 
 export async function issueChallenge(
   ctx: Ctx,
@@ -350,7 +351,7 @@ export async function issueChallenge(
     subject = { type: 'employee', id: own }
     await requireTemplate(ctx, subject)
     await refuseIfPaused(ctx, subject)
-  } else if (purpose === 'identify') {
+  } else if (purpose === 'identify' || purpose === 'group') {
     if (ctx.roleName !== 'faculty') {
       throw new BiometricError(403, 'forbidden', 'Identification is for the lecturer taking attendance')
     }
@@ -365,7 +366,7 @@ export async function issueChallenge(
     if (teaches.rows.length === 0) throw new BiometricError(404, 'not_found', 'No such class of yours')
     scheduleId = opts.scheduleId
   } else {
-    throw new BiometricError(400, 'bad_purpose', 'purpose must be enroll, verify or identify')
+    throw new BiometricError(400, 'bad_purpose', 'purpose must be enroll, verify, identify or group')
   }
 
   const recent = await query(
@@ -377,7 +378,8 @@ export async function issueChallenge(
     throw new BiometricError(429, 'rate_limited', 'Too many face captures started. Wait a few minutes and try again.')
   }
 
-  const steps = randomSequence((n) => crypto.randomInt(n))
+  // A group capture is one photograph of the class: one frame, facing the camera.
+  const steps: Pose[] = purpose === 'group' ? ['center'] : randomSequence((n) => crypto.randomInt(n))
   const r = await query(
     `INSERT INTO biometric_challenges
        (tenant_id, issued_to, purpose, subject_type, subject_id, schedule_id, steps, expires_at)
@@ -657,21 +659,8 @@ export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[], fr
     padScore: pad.score, statement: statement(d, settings.threshold) }
 }
 
-export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buffer[], frameTimes: number[] | null = null) {
-  const settings = await requireAvailable(ctx.tenantId)
-  const ch = await consumeChallenge(ctx, challengeId, 'identify')
-  const scheduleId = ch.schedule_id!
-
-  const fail = async (f: Failure, d: number | null = null, pad: PadResult | null = null): Promise<never> => {
-    await recordEvent({ query: query as any }, ctx, {
-      action: 'identified', outcome: 'failure', reason: f.reason, challengeId: ch.id,
-      scheduleId, distance: d, threshold: settings.threshold, pad })
-    throw new BiometricError(422, f.reason, f.message)
-  }
-
-  const capture = await analyzeCapture(frames, ch.steps)
-  if (captureFailure(capture)) return fail(capture)
-
+/** This class's enrolled students, each with a template that opens. */
+async function classCandidates(ctx: Ctx, scheduleId: string) {
   // Candidates: this class's enrolled students with a current template.
   const rows = await query(
     `SELECT t.subject_id, t.ciphertext, t.iv, t.auth_tag, t.key_version, t.dek_version, t.model
@@ -703,7 +692,25 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
       return null
     }
   }))
-  const candidates = opened.filter((c): c is NonNullable<typeof c> => c !== null)
+  return opened.filter((c): c is NonNullable<typeof c> => c !== null)
+}
+
+export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buffer[], frameTimes: number[] | null = null) {
+  const settings = await requireAvailable(ctx.tenantId)
+  const ch = await consumeChallenge(ctx, challengeId, 'identify')
+  const scheduleId = ch.schedule_id!
+
+  const fail = async (f: Failure, d: number | null = null, pad: PadResult | null = null): Promise<never> => {
+    await recordEvent({ query: query as any }, ctx, {
+      action: 'identified', outcome: 'failure', reason: f.reason, challengeId: ch.id,
+      scheduleId, distance: d, threshold: settings.threshold, pad })
+    throw new BiometricError(422, f.reason, f.message)
+  }
+
+  const capture = await analyzeCapture(frames, ch.steps)
+  if (captureFailure(capture)) return fail(capture)
+
+  const candidates = await classCandidates(ctx, scheduleId)
   const probe = mean(capture.faces.map((f) => f.descriptor))
   const result = identifyAmong(probe, candidates, settings.threshold)
 
@@ -740,6 +747,135 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
     padScore: pad.score,
     statement: statement(result.distance, settings.threshold),
   }
+}
+
+// ---------------------------------------------------------------------------
+// Group capture (brief 5.4): one photograph of the class, several faces.
+// ---------------------------------------------------------------------------
+
+const GROUP_PROPOSAL_MINUTES = 10
+
+/**
+ * Proposes who is in a class photograph. Each face large enough to describe
+ * is matched against the class's enrolled students, with the same threshold
+ * and margin as one-at-a-time identification. A student matched by two faces
+ * goes to the closer one. Nothing is recorded as attendance: the lecturer
+ * confirms each proposal (confirmGroup) within ten minutes.
+ */
+export async function proposeGroup(ctx: Ctx, challengeId: string, frames: Buffer[], date?: string | null) {
+  const settings = await requireAvailable(ctx.tenantId)
+  const ch = await consumeChallenge(ctx, challengeId, 'group')
+  const scheduleId = ch.schedule_id!
+  if (frames.length !== 1) throw new BiometricError(422, 'wrong_frame_count', 'Send one photograph of the class')
+  const day = date ? String(date) : new Date().toISOString().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new BiometricError(400, 'bad_date', 'date must be YYYY-MM-DD')
+
+  let analysis
+  try {
+    analysis = await analyzeFrame(frames[0])
+  } catch (e) {
+    if (e instanceof ImageRejected) throw new BiometricError(422, `image_${e.code}`, e.message)
+    if (e instanceof EngineUnavailable) {
+      throw new BiometricError(503, 'engine_unavailable',
+        'Face matching is unavailable just now. Take attendance by hand, with the reason network_outage or camera_failure, and try face matching again later.')
+    }
+    throw e
+  }
+  const faces = analysis.faces.filter((f) => f.width >= IMAGE_LIMITS.minFaceWidth)
+  if (faces.length === 0) throw new BiometricError(422, 'no_face', 'No face large enough to recognise was found. Come closer, in good light.')
+
+  const candidates = await classCandidates(ctx, scheduleId)
+  const best = new Map<string, { face: number; distance: number }>()
+  let ambiguous = 0
+  faces.forEach((f, face) => {
+    const r = identifyAmong(f.descriptor, candidates, settings.threshold)
+    if (r.outcome === 'ambiguous') ambiguous++
+    if (r.outcome !== 'match') return
+    const held = best.get(r.id)
+    if (!held || r.distance < held.distance) best.set(r.id, { face, distance: r.distance })
+  })
+  const ids = [...best.keys()]
+  const people = ids.length
+    ? await query(`SELECT id, student_id, first_name, last_name FROM students WHERE tenant_id = $1 AND id = ANY($2::uuid[])`,
+        [ctx.tenantId, ids])
+    : { rows: [] as any[] }
+  const byId = new Map(people.rows.map((p: any) => [p.id, p]))
+  const proposals = ids.map((id, i) => ({ proposal: i + 1, studentId: id, distance: Math.round(best.get(id)!.distance * 1000) / 1000 }))
+
+  const g = await query(
+    `INSERT INTO group_captures (tenant_id, issued_to, schedule_id, challenge_id, attendance_date, proposals, faces_found, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP + ($8 || ' minutes')::interval)
+     RETURNING id, expires_at`,
+    [ctx.tenantId, ctx.userId, scheduleId, ch.id, day, JSON.stringify(proposals), faces.length, String(GROUP_PROPOSAL_MINUTES)]
+  )
+  return {
+    groupId: g.rows[0].id,
+    expiresAt: g.rows[0].expires_at,
+    facesFound: faces.length,
+    unmatched: faces.length - proposals.length,
+    ambiguous,
+    threshold: settings.threshold,
+    proposals: proposals.map((p) => ({
+      ...p,
+      student: byId.get(p.studentId) ?? null,
+      statement: statement(p.distance, settings.threshold),
+    })),
+    note: 'Nothing is recorded until you confirm each proposal.',
+  }
+}
+
+/**
+ * The lecturer confirms some of a group capture's proposals. Each confirmed
+ * one becomes a match event and a face mark, through the attendance core;
+ * the rest are discarded. A group is decided once.
+ */
+export async function confirmGroup(ctx: Ctx, groupId: string, confirmed: unknown) {
+  if (!UUID.test(String(groupId ?? ''))) throw new BiometricError(404, 'not_found', 'No such group capture')
+  const picks = Array.isArray(confirmed) ? confirmed.map(Number).filter(Number.isInteger) : []
+  const settings = await getSettings(ctx.tenantId)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const g = await client.query(
+      `SELECT * FROM group_captures
+        WHERE id = $1 AND tenant_id = $2 AND issued_to = $3 AND decided_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+        FOR UPDATE`,
+      [groupId, ctx.tenantId, ctx.userId]
+    )
+    if (!g.rows.length) throw new BiometricError(404, 'not_found', 'No such group capture of yours waiting for confirmation')
+    const group = g.rows[0]
+    const proposals: Array<{ proposal: number; studentId: string; distance: number }> = group.proposals
+    const unknown = picks.filter((n) => !proposals.some((p) => p.proposal === n))
+    if (unknown.length) throw new BiometricError(400, 'bad_proposal', `No proposal ${unknown.join(', ')} in this capture`)
+    const faculty = await client.query(`SELECT id FROM faculty WHERE user_id = $1 AND tenant_id = $2 LIMIT 1`,
+      [ctx.userId, ctx.tenantId])
+    const recorded: Array<{ proposal: number; studentId: string; matchId: string; attendanceId: string }> = []
+    for (const p of proposals.filter((x) => picks.includes(x.proposal))) {
+      const subject: Subject = { type: 'student', id: p.studentId }
+      const matchId = await recordEvent(client, ctx, {
+        action: 'identified', outcome: 'success', subject, challengeId: group.challenge_id, scheduleId: group.schedule_id,
+        distance: p.distance, threshold: settings.threshold, reason: 'group_capture_confirmed' })
+      const { attendanceId } = await markStudent(client, { tenantId: ctx.tenantId, userId: ctx.userId }, {
+        scheduleId: group.schedule_id, studentId: p.studentId, date: toDay(group.attendance_date), status: 'present',
+        markerFacultyId: faculty.rows[0]?.id ?? null, verificationMethod: 'FACE_MATCH', attendanceState: 'VERIFIED',
+        capture: { method: 'face', matchEventId: matchId },
+      })
+      recorded.push({ proposal: p.proposal, studentId: p.studentId, matchId, attendanceId })
+    }
+    await client.query(`UPDATE group_captures SET decided_at = CURRENT_TIMESTAMP WHERE id = $1 AND tenant_id = $2`,
+      [groupId, ctx.tenantId])
+    await client.query('COMMIT')
+    return { recorded, discarded: proposals.length - recorded.length }
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw e
+  } finally {
+    client.release()
+  }
+}
+
+function toDay(d: unknown): string {
+  return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10)
 }
 
 // ---------------------------------------------------------------------------

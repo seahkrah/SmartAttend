@@ -23,8 +23,8 @@ import multer from 'multer'
 import { authenticateToken } from '../auth/middleware.js'
 import { resolveTenantContext, requireTenant, requireRoles, type TenantRequest } from '../auth/tenantContextMiddleware.js'
 import {
-  BiometricError, deleteTemplate, enroll, getSettings, grantConsent, identifyInClass, issueChallenge,
-  listEvents, listSubjects, saveSettings, subjectStatus, verify, withdrawConsent, type Subject, type SubjectType,
+  BiometricError, confirmGroup, deleteTemplate, enroll, getSettings, grantConsent, identifyInClass, issueChallenge,
+  listEvents, listSubjects, proposeGroup, saveSettings, subjectStatus, verify, withdrawConsent, type Subject, type SubjectType,
 } from '../biometrics/service.js'
 import { IMAGE_LIMITS } from '../biometrics/engine.js'
 import { BiometricKeyError } from '../biometrics/templateCrypto.js'
@@ -203,6 +203,25 @@ router.post('/verify', checkedInHandler("the challenge must be the caller's own,
 router.post('/identify', checkedInHandler("the challenge must be the lecturer's own, for their class"), frames, async (req: TenantRequest, res: Response) => {
   try {
     return res.json({ matched: true, ...(await identifyInClass(ctxOf(req), req.body?.challengeId, framesOf(req), frameTimesOf(req))) })
+  } catch (e) {
+    return fail(res, e)
+  }
+})
+
+// Group capture: one photograph of the class proposes several students; the
+// lecturer confirms each before anything is recorded (brief 5.4).
+router.post('/group', checkedInHandler("the challenge must be the lecturer's own, for their class"), frames, async (req: TenantRequest, res: Response) => {
+  try {
+    const files = ((req as any).files ?? []) as Array<{ buffer: Buffer }>
+    return res.json(await proposeGroup(ctxOf(req), req.body?.challengeId, files.map((f) => f.buffer), req.body?.date))
+  } catch (e) {
+    return fail(res, e)
+  }
+})
+
+router.post('/group/:groupId/confirm', checkedInHandler("only the lecturer whose group capture it is, while it is open"), async (req: TenantRequest, res: Response) => {
+  try {
+    return res.json(await confirmGroup(ctxOf(req), req.params.groupId, req.body?.confirm))
   } catch (e) {
     return fail(res, e)
   }

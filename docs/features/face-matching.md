@@ -77,6 +77,25 @@ twice.
 These are heuristics. They are not a trained liveness model, and no
 presentation-attack lab has measured them.
 
+### Group capture
+
+A lecturer can photograph the class instead of capturing each student. The
+flow is `POST /api/biometrics/challenges` with `purpose: group`, then
+`POST /api/biometrics/group` with one frame.
+
+- **Matching:** every face large enough to describe is matched against the
+  class's enrolled students, with the same threshold and margin as
+  one-at-a-time identification. A student matched by two faces goes to the
+  closer one.
+- **Confirmation:** the result is a list of proposals, and nothing is
+  recorded. The lecturer confirms each proposal they agree with through
+  `POST /api/biometrics/group/:groupId/confirm`, within ten minutes and only
+  once. Each confirmed proposal becomes a match event and a face mark; the
+  rest are discarded.
+- **Weaker liveness:** a group photograph has no head-turn challenge, so its
+  check is weaker than a single capture's. Requiring the lecturer's
+  confirmation is what makes up for that.
+
 ## Roles and permissions
 
 | Action | Students | Employees |

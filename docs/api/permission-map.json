@@ -3862,6 +3862,38 @@
   },
   {
     "method": "POST",
+    "path": "/api/biometrics/group",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "the challenge must be the lecturer's own, for their class"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/biometrics/group/:groupId/confirm",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "only the lecturer whose group capture it is, while it is open"
+      }
+    ]
+  },
+  {
+    "method": "POST",
     "path": "/api/biometrics/identify",
     "guards": [
       {

@@ -134,6 +134,8 @@ TS_SUITES=(
   biometricCrossTenant
   # Layered presentation-attack signals and the tenant's clamped threshold.
   faceLiveness
+  # One class photograph, several faces, each confirmed by the lecturer.
+  groupCapture
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

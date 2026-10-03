@@ -66,6 +66,12 @@ async function refused(fn: () => Promise<unknown>): Promise<string | null> {
  */
 const PLATFORM_LEVEL: Record<string, string> = {}
 
+/**
+ * Tables the runtime role may write that are not under forced RLS with a
+ * policy, with why. Anything else it can write fails the check below.
+ */
+const RUNTIME_WRITABLE: Record<string, string> = {}
+
 const MEMBERS = `
   SELECT user_id FROM school_user_associations WHERE school_entity_id = $1
   UNION SELECT user_id FROM corporate_user_associations WHERE corporate_entity_id = $1
@@ -282,6 +288,42 @@ async function main() {
     `(undecided: ${undecided.join(', ')})`)
   const stale = Object.keys(PLATFORM_LEVEL).filter((t) => !uncovered.includes(t))
   check('and the platform-level list names no table that is covered or gone', stale.length === 0, `(${stale.join(', ')})`)
+
+  console.log('-- shared platform tables (migration 086) --')
+  const renameB = await withTenant({ tenantId: A }, () =>
+    query(`UPDATE tenants SET name = name || ' (renamed by A)' WHERE id = $1`, [B]))
+  check("A cannot rename B's tenant", renameB.rowCount === 0, `(${renameB.rowCount})`)
+  const ownA = await withTenant({ tenantId: A }, () => query(`UPDATE tenants SET name = name WHERE id = $1`, [A]))
+  check('A still updates its own (the entity sync writes it)', ownA.rowCount === 1, `(${ownA.rowCount})`)
+  for (const [label, sql] of [
+    ['change what a role may do', `UPDATE roles SET permissions = permissions WHERE FALSE`],
+    ['add a platform', `INSERT INTO platforms (name, display_name) VALUES ('probe', 'Probe')`],
+    ['delete a tenant', `DELETE FROM tenants WHERE id = '${B}'`],
+  ] as const) {
+    const code = label === 'delete a tenant'
+      ? ((await withTenant({ tenantId: A }, () => query(sql))).rowCount === 0 ? '42501' : null)
+      : await refused(() => withTenant({ tenantId: A }, () => query(sql)))
+    check(`the runtime role cannot ${label}`, code === '42501', `(${code ?? 'it ran'})`)
+  }
+
+  // The tenant isolation stall (docs/scorecard/stall-tenant-isolation.md):
+  // shared tables the runtime role could write with no policy at all. Every
+  // table it can write must be under forced RLS with a policy, or be listed
+  // in RUNTIME_WRITABLE with the reason, so a new one has to be decided.
+  const writable = (await owner(`
+    SELECT c.relname AS t
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind = 'r'
+       AND (has_table_privilege('jjelotech_app', c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE')
+            OR has_any_column_privilege('jjelotech_app', c.oid, 'INSERT, UPDATE'))
+       AND NOT (c.relrowsecurity AND c.relforcerowsecurity
+                AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+     ORDER BY 1`)).rows.map((r) => r.t as string)
+  const undecidedWrites = writable.filter((t) => !(t in RUNTIME_WRITABLE))
+  check('every table the runtime role can write is under a policy or listed with its reason', undecidedWrites.length === 0,
+    `(undecided: ${undecidedWrites.join(', ')})`)
+  const staleWrites = Object.keys(RUNTIME_WRITABLE).filter((t) => !writable.includes(t))
+  check('and that list names no table that is covered, read-only or gone', staleWrites.length === 0, `(${staleWrites.join(', ')})`)
 }
 
 main()

@@ -12,6 +12,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { recoverSession, endSession, isSessionlessAuthCall, redirectForMfaSetup, csrfHeader } from './sessionRefresh';
 import { isStepUpRequired, requestStepUp } from './stepUp';
+import { deviceId } from './deviceId';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -34,6 +35,8 @@ export const axiosClient: AxiosInstance = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     Object.entries(csrfHeader(config.method)).forEach(([k, v]) => config.headers.set(k, v));
+    // Which device is asking, for check-in controls and face-capture limits (brief 5.5, 5.8).
+    config.headers.set('X-Device-Id', deviceId());
 
     // The instance defaults to JSON, and axios turns a FormData body into
     // JSON when the content type says JSON — so every upload (documents,

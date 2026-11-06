@@ -71,6 +71,7 @@ const StudentSchedulePage = lazy(() => import('./pages/StudentSchedulePage'));
 const StudentSettingsPage = lazy(() => import('./pages/StudentSettingsPage'));
 const SchoolAdminDashboardPage = lazy(() => import('./pages/SchoolAdminDashboardPage'));
 const FaceMatchingAdminPage = lazy(() => import('./pages/FaceMatchingAdminPage'));
+const CheckinControlsPage = lazy(() => import('./pages/CheckinControlsPage'));
 const SchoolAdminUsersPage = lazy(() => import('./pages/SchoolAdminUsersPage'));
 const SchoolAdminApprovalsPage = lazy(() => import('./pages/SchoolAdminApprovalsPage'));
 const SchoolAdminSettingsPage = lazy(() => import('./pages/SchoolAdminSettingsPage'));
@@ -327,6 +328,7 @@ export default function App() {
                     <Route path="/analytics" element={<HRAnalyticsPanelPage />} />
                     <Route path="/leave" element={<HRLeavePage />} />
                     <Route path="/face-matching" element={<FaceMatchingAdminPage subjectType="employee" />} />
+                    <Route path="/checkin-rules" element={<CheckinControlsPage canChange={isDirector} />} />
                     <Route path="/payroll" element={<HRPayrollPage />} />
                     {/* Ending a contract and sending hours to payroll both need a
                         director; the pages withhold those controls rather than

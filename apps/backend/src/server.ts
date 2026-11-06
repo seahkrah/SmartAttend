@@ -37,6 +37,7 @@ import payrollRoutes from './routes/payroll.js'
 // EMS workforce: contracts, shift patterns, the roster, timesheets.
 import workforceRoutes from './routes/workforce.js'
 import attendanceReviewRoutes from './routes/attendanceReview.js'
+import checkinControlsRoutes from './routes/checkinControls.js'
 import attendanceSelfServiceRoutes from './routes/attendanceSelfService.js'
 import facultyRoutes from './routes/faculty.js'
 import facultyWorkflowRoutes from './routes/facultyWorkflow.js'
@@ -168,6 +169,8 @@ app.use('/api/leave', leaveRoutes)
 app.use('/api/payroll', payrollRoutes)
 app.use('/api/workforce', workforceRoutes)
 app.use('/api/attendance-review', attendanceReviewRoutes)
+// Where, from what and when employees may check in (brief 5.5).
+app.use('/api/checkin-controls', checkinControlsRoutes)
 app.use('/api/admin', tenantAdminRoutes)
 // Attendance lifecycle (draft/submit/lock/export/bulk-edit/facial-match/qr).
 // Mounted first; the original faculty router keeps its own paths.

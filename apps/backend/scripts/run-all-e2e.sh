@@ -140,6 +140,8 @@ TS_SUITES=(
   enrolmentSafeguards
   # Every face event in the audit chain; limits per device and tenant; alerts; the overview.
   biometricLimits
+  # Where, from what and when employees check in: geofence, network, devices, shifts; breaks.
+  checkinControls
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

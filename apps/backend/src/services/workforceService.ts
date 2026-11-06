@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg'
 import { toMinor, fromMinor } from './payrollService.js'
-import { checkIn as coreCheckIn, checkOut as coreCheckOut } from '../attendance/core.js'
+import { checkIn as coreCheckIn, checkOut as coreCheckOut, takeBreak } from '../attendance/core.js'
 
 /**
  * EMS — contracts, rosters and timesheets.
@@ -467,12 +467,19 @@ export async function workedHours(
   const result = await runner.query(
     `SELECT to_char(c.check_in_time::date, 'YYYY-MM-DD') AS day,
             COALESCE(SUM(
-              GREATEST(EXTRACT(EPOCH FROM (c.check_out_time - c.check_in_time)), 0)
+              GREATEST(EXTRACT(EPOCH FROM (c.check_out_time - c.check_in_time)) - b.seconds, 0)
             ) FILTER (WHERE c.checkin_state = ANY($4::text[])), 0)::float8 AS worked_seconds,
             COALESCE(SUM(
-              GREATEST(EXTRACT(EPOCH FROM (c.check_out_time - c.check_in_time)), 0)
+              GREATEST(EXTRACT(EPOCH FROM (c.check_out_time - c.check_in_time)) - b.seconds, 0)
             ) FILTER (WHERE c.checkin_state = 'FLAGGED'), 0)::float8 AS flagged_seconds
        FROM corporate_checkins c
+       -- Breaks taken inside the check-in are not worked time (brief 5.5).
+       CROSS JOIN LATERAL (
+         SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(k.ended_at, c.check_out_time) - GREATEST(k.started_at, c.check_in_time)))), 0) AS seconds
+           FROM checkin_breaks k
+          WHERE k.tenant_id = c.tenant_id AND k.checkin_id = c.id AND k.ended_at IS NOT NULL
+            AND k.ended_at > k.started_at
+       ) b
       WHERE c.tenant_id = $1
         AND c.employee_id = $2
         AND c.check_out_time IS NOT NULL
@@ -1023,8 +1030,10 @@ export interface CheckInRow {
   /** How it was taken, so a manual check-in is marked wherever it is shown (brief 5.2). */
   method: 'face' | 'manual'
   manualReason: string | null
-  /** A manual check-in beyond the tenant's allowance, waiting for a manager. */
+  /** Waiting for a manager: a manual check-in beyond the allowance, or one a check-in control flagged. */
   awaitingApproval: boolean
+  /** Why it is flagged or not counted, in words. */
+  stateReason: string | null
   /** Hours for a closed check-in; null while it is open. */
   hours: string | null
 }
@@ -1041,13 +1050,14 @@ function toCheckInRow(r: any): CheckInRow {
     method: r.face_verified === true ? 'face' : 'manual',
     manualReason: r.face_verified === true ? null : (r.manual_reason ?? null),
     awaitingApproval: r.approval_state === 'pending',
+    stateReason: r.state_reason ?? null,
     hours: r.hours === null || r.hours === undefined ? null : String(r.hours),
   }
 }
 
 const CHECKIN_COLUMNS = `
   id, check_in_type, check_in_time, check_out_time, site_location,
-  checkin_state, face_verified,
+  checkin_state, state_reason, face_verified,
   (SELECT ev.reason_code FROM attendance_events ev
     WHERE ev.tenant_id = corporate_checkins.tenant_id AND ev.checkin_id = corporate_checkins.id AND ev.kind = 'check_in'
     ORDER BY ev.server_time LIMIT 1) AS manual_reason,
@@ -1057,8 +1067,13 @@ const CHECKIN_COLUMNS = `
      FROM attendance_events ev
     WHERE ev.tenant_id = corporate_checkins.tenant_id AND ev.checkin_id = corporate_checkins.id AND ev.kind = 'check_in'
     ORDER BY ev.server_time LIMIT 1) AS approval_state,
+  -- Less its breaks, as workedHours counts it, so a row agrees with the week.
   CASE WHEN check_out_time IS NULL THEN NULL
-       ELSE ROUND((GREATEST(EXTRACT(EPOCH FROM (check_out_time - check_in_time)), 0)
+       ELSE ROUND((GREATEST(EXTRACT(EPOCH FROM (check_out_time - check_in_time)) - COALESCE((
+                     SELECT SUM(EXTRACT(EPOCH FROM (LEAST(k.ended_at, check_out_time) - GREATEST(k.started_at, check_in_time))))
+                       FROM checkin_breaks k
+                      WHERE k.tenant_id = corporate_checkins.tenant_id AND k.checkin_id = corporate_checkins.id
+                        AND k.ended_at IS NOT NULL AND k.ended_at > k.started_at), 0), 0)
                    / 3600.0)::numeric, 2)
   END AS hours`
 
@@ -1118,6 +1133,7 @@ export async function checkIn(
     checkInType?: unknown; siteLocation?: unknown; faceMatchId?: string | null
     reasonCode?: unknown; reasonText?: unknown; deviceId?: unknown; clientTime?: unknown
     idempotencyKey?: unknown; latitude?: unknown; longitude?: unknown; accuracyMetres?: unknown
+    clientIp?: string | null
   }
 ): Promise<CheckInRow & { approval: 'not_needed' | 'pending'; eventId: string }> {
   const type = input.checkInType === undefined || input.checkInType === null || input.checkInType === ''
@@ -1152,6 +1168,7 @@ export async function checkIn(
       reasonCode: str(input.reasonCode), reasonText: str(input.reasonText), deviceId: str(input.deviceId),
       clientTime: str(input.clientTime), idempotencyKey: str(input.idempotencyKey),
       latitude: input.latitude as number, longitude: input.longitude as number, accuracyMetres: input.accuracyMetres as number,
+      clientIp: input.clientIp ?? null,
     },
   })
   const row = await client.query(
@@ -1160,10 +1177,24 @@ export async function checkIn(
 }
 
 /** Checks the employee out of their open check-in, now. */
+/** Where a check-out or a break was recorded from: kept on the event, never checked. */
+export interface Whereabouts {
+  deviceId?: unknown; latitude?: unknown; longitude?: unknown; accuracyMetres?: unknown; clientIp?: string | null
+}
+
+function whereabouts(w: Whereabouts) {
+  const n = (v: unknown) => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
+  return {
+    deviceId: w.deviceId === undefined || w.deviceId === null || w.deviceId === '' ? null : String(w.deviceId),
+    latitude: n(w.latitude), longitude: n(w.longitude), accuracyMetres: n(w.accuracyMetres), clientIp: w.clientIp ?? null,
+  }
+}
+
 export async function checkOut(
   client: PoolClient,
   ctx: WorkforceContext,
-  employeeId: string
+  employeeId: string,
+  where: Whereabouts = {}
 ): Promise<CheckInRow> {
   await lockEmployee(client, ctx.tenantId, employeeId)
 
@@ -1178,14 +1209,31 @@ export async function checkOut(
 
   // Checking out establishes nothing about presence that the check-in did
   // not: it is recorded as the method the check-in used.
-  await coreCheckOut(client, { tenantId: ctx.tenantId, userId: ctx.userId }, employeeId, open.id)
+  await coreCheckOut(client, { tenantId: ctx.tenantId, userId: ctx.userId }, employeeId, open.id, whereabouts(where))
   const closed = await client.query(
     `SELECT ${CHECKIN_COLUMNS} FROM corporate_checkins WHERE id = $1 AND tenant_id = $2`, [open.id, ctx.tenantId])
   return toCheckInRow(closed.rows[0])
 }
 
+/** Starts or ends a break in the employee's open check-in. */
+export async function myBreak(
+  client: PoolClient, ctx: WorkforceContext, employeeId: string, which: 'start' | 'end', where: Whereabouts = {}
+) {
+  await lockEmployee(client, ctx.tenantId, employeeId)
+  const open = await openCheckIn(client, ctx.tenantId, employeeId)
+  if (!open) throw new WorkforceError('Check in before taking a break', 409)
+  return takeBreak(client, { tenantId: ctx.tenantId, userId: ctx.userId }, employeeId, open.id, which, whereabouts(where))
+}
+
 export interface AttendanceSummary {
   onTheClock: CheckInRow | null
+  /** When the break in progress began, if the employee is on one. */
+  onBreakSince: string | null
+  /**
+   * Whether a check-in should carry the device's position: only where the
+   * organisation checks it, so nobody else's location is collected.
+   */
+  locationWanted: boolean
   /** Open check-ins older than the window: counted nowhere, awaiting HR. */
   needsAttention: CheckInRow[]
   history: CheckInRow[]
@@ -1220,6 +1268,11 @@ export async function attendanceFor(
   const rows = history.rows.map(toCheckInRow)
 
   const open = await openCheckIn(runner, ctx.tenantId, employeeId)
+  const onBreak = open
+    ? (await runner.query(
+      `SELECT started_at FROM checkin_breaks WHERE tenant_id = $1 AND checkin_id = $2 AND ended_at IS NULL`,
+      [ctx.tenantId, open.id])).rows[0]?.started_at ?? null
+    : null
   const stale = await runner.query(
     `SELECT ${CHECKIN_COLUMNS}
        FROM corporate_checkins
@@ -1248,6 +1301,10 @@ export async function attendanceFor(
 
   return {
     onTheClock: open ? toCheckInRow(open) : null,
+    onBreakSince: onBreak,
+    locationWanted: (await runner.query(
+      `SELECT 1 FROM tenant_settings WHERE tenant_id = $1 AND setting_key = 'checkin.geofence' AND setting_value IN ('flag', 'enforce')`,
+      [ctx.tenantId])).rows.length > 0,
     needsAttention: stale.rows.map(toCheckInRow),
     history: rows,
     week: {

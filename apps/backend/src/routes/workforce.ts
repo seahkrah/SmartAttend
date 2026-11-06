@@ -17,6 +17,7 @@ import {
   buildTimesheet,
   checkIn,
   checkOut,
+  myBreak,
   contractInForce,
   endContract,
   exportTimesheet,
@@ -37,6 +38,7 @@ import { rosterPublished, timesheetDecided } from '../notifications/events.js'
 import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 import { checkedInHandler, selfService } from '../auth/guards.js'
 import { AttendanceInputError } from '../attendance/core.js'
+import { getClientIp } from '../utils/getClientIp.js'
 
 /**
  * EMS — contracts, rosters and timesheets.
@@ -85,6 +87,15 @@ const schedulers = requireRoles('hr', 'hr_director', 'admin', 'manager')
 const directors = requireRoles('hr_director', 'admin')
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Where the request came from, for the event: the device, its reported position, the address. */
+function whereFrom(req: TenantRequest) {
+  const b = req.body ?? {}
+  return {
+    deviceId: b.deviceId ?? req.header('x-device-id'), latitude: b.latitude, longitude: b.longitude,
+    accuracyMetres: b.accuracyMetres, clientIp: getClientIp(req),
+  }
+}
 
 function fail(res: Response, label: string, e: unknown) {
   if (e instanceof WorkforceError) return res.status(e.status).json({ error: e.message })
@@ -956,9 +967,9 @@ router.post('/my/check-in', selfService("checks the caller in"), async (req: Ten
       siteLocation: b.siteLocation,
       faceMatchId,
       // Without a face: why (brief 5.2), and what the device says.
-      reasonCode: b.reasonCode, reasonText: b.reasonText, deviceId: b.deviceId, clientTime: b.clientTime,
-      idempotencyKey: b.idempotencyKey ?? req.header('idempotency-key'),
-      latitude: b.latitude, longitude: b.longitude, accuracyMetres: b.accuracyMetres,
+      reasonCode: b.reasonCode, reasonText: b.reasonText, deviceId: b.deviceId ?? req.header('x-device-id'),
+      clientTime: b.clientTime, idempotencyKey: b.idempotencyKey ?? req.header('idempotency-key'),
+      latitude: b.latitude, longitude: b.longitude, accuracyMetres: b.accuracyMetres, clientIp: getClientIp(req),
     })
     await client.query('COMMIT')
     return res.status(201).json({ checkIn: row })
@@ -979,7 +990,7 @@ router.post('/my/check-out', selfService("checks the caller out"), async (req: T
 
     client = await getConnection()
     await client.query('BEGIN')
-    const row = await checkOut(client, svcCtx(req), employee.id)
+    const row = await checkOut(client, svcCtx(req), employee.id, whereFrom(req))
     await client.query('COMMIT')
     return res.json({ checkIn: row })
   } catch (e) {
@@ -989,6 +1000,27 @@ router.post('/my/check-out', selfService("checks the caller out"), async (req: T
     if (client) client.release()
   }
 })
+
+for (const which of ['start', 'end'] as const) {
+  router.post(`/my/break-${which}`, selfService(`${which === 'start' ? 'starts' : 'ends'} a break in the caller's own check-in`), async (req: TenantRequest, res: Response) => {
+    let client
+    try {
+      const ctx = ctxOf(req)
+      const employee = await callerEmployee(ctx)
+      if (!employee) return notFound(res, 'Employee record')
+      client = await getConnection()
+      await client.query('BEGIN')
+      const done = await myBreak(client, svcCtx(req), employee.id, which, whereFrom(req))
+      await client.query('COMMIT')
+      return res.status(which === 'start' ? 201 : 200).json({ break: done })
+    } catch (e) {
+      if (client) await client.query('ROLLBACK').catch(() => undefined)
+      return fail(res, which === 'start' ? 'start your break' : 'end your break', e)
+    } finally {
+      if (client) client.release()
+    }
+  })
+}
 
 router.get('/my/timesheets', selfService("the caller's own timesheets"), async (req: TenantRequest, res: Response) => {
   try {

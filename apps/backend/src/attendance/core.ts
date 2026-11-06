@@ -16,6 +16,7 @@
  * instead of recording twice.
  */
 import type { PoolClient } from 'pg'
+import { ControlRefusal, alertKindFor, detect, runControls, type ControlResult } from './controls.js'
 
 export const REASON_CODES = [
   'camera_failure', 'consent_withheld', 'enrolment_pending', 'face_not_recognised', 'network_outage', 'other',
@@ -38,6 +39,8 @@ export interface Capture {
   latitude?: number | null
   longitude?: number | null
   accuracyMetres?: number | null
+  /** The request's address, as the API saw it (TRUST_PROXY). */
+  clientIp?: string | null
 }
 
 export interface CoreContext {
@@ -106,7 +109,7 @@ export async function settleCapture(client: PoolClient, tenantId: string, c: Cap
 
 interface EventRow {
   platform: 'school' | 'corporate'
-  kind: 'mark' | 'clear' | 'check_in' | 'check_out' | 'approval'
+  kind: 'mark' | 'clear' | 'check_in' | 'check_out' | 'approval' | 'break_start' | 'break_end'
   studentId?: string | null
   employeeId?: string | null
   scheduleId?: string | null
@@ -118,6 +121,8 @@ interface EventRow {
   capture?: Capture
   approvalState?: 'not_needed' | 'pending' | 'approved' | 'rejected'
   supersedes?: string | null
+  /** What each check-in control found (controls.ts). */
+  controls?: ControlResult[] | null
 }
 
 /** A tenant's whole-number setting, or the default when unset or not a non-negative integer. */
@@ -215,18 +220,19 @@ async function writeEvent(client: PoolClient, ctx: CoreContext, e: EventRow): Pr
        (tenant_id, platform, kind, student_id, employee_id, schedule_id, attendance_date, status,
         attendance_id, checkin_id, method, device_id, client_time, drift_seconds,
         latitude, longitude, location_accuracy_m, match_event_id, reason_code, reason_text,
-        actor_user_id, approval_state, idempotency_key, supersedes_event_id)
+        actor_user_id, approval_state, idempotency_key, supersedes_event_id, client_ip, controls)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
              CASE WHEN $13::timestamptz IS NULL THEN NULL
                   ELSE EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - $13::timestamptz)) END,
-             $14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+             $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
      RETURNING id`,
     [ctx.tenantId, e.platform, e.kind, e.studentId ?? null, e.employeeId ?? null, e.scheduleId ?? null,
      e.attendanceDate ?? null, e.status ?? null, e.attendanceId ?? null, e.checkinId ?? null, e.method,
      c.deviceId ? String(c.deviceId).slice(0, 128) : null, ct,
      num(c.latitude), num(c.longitude), num(c.accuracyMetres), c.matchEventId ?? null,
      c.reasonCode ?? null, c.reasonText ?? null, ctx.userId, e.approvalState ?? 'not_needed',
-     c.idempotencyKey ? String(c.idempotencyKey).slice(0, 128) : null, e.supersedes ?? null]
+     c.idempotencyKey ? String(c.idempotencyKey).slice(0, 128) : null, e.supersedes ?? null,
+     c.clientIp ? String(c.clientIp).slice(0, 64) : null, e.controls ? JSON.stringify(e.controls) : null]
   )
   return r.rows[0].id
 }
@@ -345,7 +351,23 @@ export async function checkIn(client: PoolClient, ctx: CoreContext, c: CheckIn):
   const again = await replayed(client, ctx, c.capture.idempotencyKey)
   if (again) return { checkinId: again.checkin_id, eventId: again.id, approval: again.approval_state }
   const capture = await settleCapture(client, ctx.tenantId, c.capture)
-  let approval: CheckInResult['approval'] = 'not_needed'
+  const claim = {
+    employeeId: c.employeeId,
+    deviceId: capture.deviceId ? String(capture.deviceId).slice(0, 128) : null,
+    clientIp: capture.clientIp ?? null,
+    latitude: num(capture.latitude), longitude: num(capture.longitude), accuracyMetres: num(capture.accuracyMetres),
+    byFace: isFace(capture.method),
+  }
+  // Where, from what and when (brief 5.5): an enforced control refuses here;
+  // a flagged one holds the hours for a manager, as a manual check-in can.
+  let controls: { results: ControlResult[]; hold: ControlResult[] }
+  try {
+    controls = await runControls(client, ctx.tenantId, claim)
+  } catch (e) {
+    if (e instanceof ControlRefusal) throw new AttendanceInputError(e.message, 403, e.code)
+    throw e
+  }
+  let approval: CheckInResult['approval'] = controls.hold.length ? 'pending' : 'not_needed'
   if (isManual(capture.method) && capture.reasonCode !== FACE_NOT_IN_USE) {
     const used = await client.query(
       `SELECT count(*)::int AS n FROM attendance_events
@@ -365,14 +387,22 @@ export async function checkIn(client: PoolClient, ctx: CoreContext, c: CheckIn):
     [ctx.tenantId, c.employeeId, c.checkInType, c.siteLocation, isFace(capture.method), capture.matchEventId ?? null,
      capture.deviceId ? String(capture.deviceId).slice(0, 255) : null,
      approval === 'pending' ? 'FLAGGED' : 'VERIFIED',
-     approval === 'pending' ? 'Manual check-in awaiting a manager' : null]
+     approval !== 'pending' ? null
+       : controls.hold.length ? `Awaiting a manager: ${controls.hold.map((x) => x.code.replace(/_/g, ' ')).join(', ')}`
+         : 'Manual check-in awaiting a manager']
   )
   const checkinId = created.rows[0].id
   const eventId = await writeEvent(client, ctx, {
     platform: 'corporate', kind: 'check_in', employeeId: c.employeeId, checkinId, method: capture.method,
-    capture, approvalState: approval,
+    capture, approvalState: approval, controls: controls.results.length ? controls.results : null,
   })
   await checkForAbuse(client, ctx, eventId, capture, { employeeId: c.employeeId }, true)
+  for (const held of controls.hold) {
+    await raiseAlert(client, ctx, alertKindFor(held), { employeeId: c.employeeId }, eventId, { code: held.code, ...held.detail })
+  }
+  for (const a of await detect(client, ctx.tenantId, eventId, claim)) {
+    await raiseAlert(client, ctx, a.kind, a.subject, eventId, a.detail)
+  }
   return { checkinId, eventId, approval }
 }
 
@@ -380,19 +410,25 @@ export async function checkIn(client: PoolClient, ctx: CoreContext, c: CheckIn):
  * Closes an open check-in. A check-out establishes no more about presence
  * than the check-in did, so it carries the check-in's method and reason.
  */
-export async function checkOut(
-  client: PoolClient, ctx: CoreContext, employeeId: string, checkinId: string,
-  extra: Pick<Capture, 'deviceId' | 'clientTime' | 'idempotencyKey' | 'latitude' | 'longitude' | 'accuracyMetres'> = {}
-): Promise<string> {
+type Extra = Pick<Capture, 'deviceId' | 'clientTime' | 'idempotencyKey' | 'latitude' | 'longitude' | 'accuracyMetres' | 'clientIp'>
+
+/** A later event on a check-in carries the check-in's method and reason: it establishes no more about presence. */
+async function asCheckedIn(client: PoolClient, ctx: CoreContext, checkinId: string, extra: Extra): Promise<Capture> {
   const how = await client.query(
     `SELECT method, match_event_id, reason_code, reason_text FROM attendance_events
       WHERE tenant_id = $1 AND checkin_id = $2 AND kind = 'check_in' ORDER BY server_time LIMIT 1`,
     [ctx.tenantId, checkinId])
   const first = how.rows[0]
   // A check-in made before the core existed has no event: say so.
-  const settled: Capture = first
+  return first
     ? { ...extra, method: first.method, matchEventId: first.match_event_id, reasonCode: first.reason_code, reasonText: first.reason_text }
     : { ...extra, method: 'manual', reasonCode: 'other', reasonText: 'checked in before attendance events were recorded' }
+}
+
+export async function checkOut(
+  client: PoolClient, ctx: CoreContext, employeeId: string, checkinId: string, extra: Extra = {}
+): Promise<string> {
+  const settled = await asCheckedIn(client, ctx, checkinId, extra)
   const r = await client.query(
     `UPDATE corporate_checkins SET check_out_time = LOCALTIMESTAMP
       WHERE id = $1 AND tenant_id = $2 AND employee_id = $3 AND check_out_time IS NULL
@@ -400,10 +436,58 @@ export async function checkOut(
     [checkinId, ctx.tenantId, employeeId]
   )
   if (!r.rows.length) throw new AttendanceInputError('That check-in is not open', 409, 'not_open')
+  // A break still open at check-out ends with it.
+  const open = await client.query(
+    `UPDATE checkin_breaks SET ended_at = LOCALTIMESTAMP
+      WHERE tenant_id = $1 AND checkin_id = $2 AND ended_at IS NULL RETURNING id`, [ctx.tenantId, checkinId])
+  if (open.rows.length) {
+    await writeEvent(client, ctx, {
+      platform: 'corporate', kind: 'break_end', employeeId, checkinId, method: settled.method as Method,
+      capture: { ...settled, idempotencyKey: null },
+    })
+  }
   await writeEvent(client, ctx, {
     platform: 'corporate', kind: 'check_out', employeeId, checkinId, method: settled.method as Method, capture: settled,
   })
   return checkinId
+}
+
+/**
+ * Starts or ends a break inside an open check-in (brief 5.5). Worked hours
+ * are the check-in's span less its breaks, so a break taken is a break
+ * unpaid, as the roster's break_minutes assumes.
+ */
+export async function takeBreak(
+  client: PoolClient, ctx: CoreContext, employeeId: string, checkinId: string, which: 'start' | 'end', extra: Extra = {}
+): Promise<{ breakId: string; startedAt: string; endedAt: string | null }> {
+  const ci = await client.query(
+    `SELECT 1 FROM corporate_checkins
+      WHERE id = $1 AND tenant_id = $2 AND employee_id = $3 AND check_out_time IS NULL FOR UPDATE`,
+    [checkinId, ctx.tenantId, employeeId])
+  if (!ci.rows.length) throw new AttendanceInputError('Check in before taking a break', 409, 'not_checked_in')
+  let row
+  if (which === 'start') {
+    const r = await client.query(
+      `INSERT INTO checkin_breaks (tenant_id, checkin_id, employee_id, started_at)
+       SELECT $1, $2, $3, LOCALTIMESTAMP
+        WHERE NOT EXISTS (SELECT 1 FROM checkin_breaks WHERE tenant_id = $1 AND checkin_id = $2 AND ended_at IS NULL)
+       RETURNING id, started_at, ended_at`, [ctx.tenantId, checkinId, employeeId])
+    if (!r.rows.length) throw new AttendanceInputError('You are already on a break', 409, 'on_break')
+    row = r.rows[0]
+  } else {
+    const r = await client.query(
+      `UPDATE checkin_breaks SET ended_at = LOCALTIMESTAMP
+        WHERE tenant_id = $1 AND checkin_id = $2 AND ended_at IS NULL RETURNING id, started_at, ended_at`,
+      [ctx.tenantId, checkinId])
+    if (!r.rows.length) throw new AttendanceInputError('You are not on a break', 409, 'not_on_break')
+    row = r.rows[0]
+  }
+  const settled = await asCheckedIn(client, ctx, checkinId, extra)
+  await writeEvent(client, ctx, {
+    platform: 'corporate', kind: which === 'start' ? 'break_start' : 'break_end', employeeId, checkinId,
+    method: settled.method as Method, capture: settled,
+  })
+  return { breakId: row.id, startedAt: row.started_at, endedAt: row.ended_at }
 }
 
 /**

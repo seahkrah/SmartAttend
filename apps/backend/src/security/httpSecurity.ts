@@ -74,7 +74,7 @@ export function applyHttpSecurity(app: Express) {
     // origin may send them, and read the answers. Other origins can do
     // neither, which is what keeps the CSRF token out of their reach.
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Bootstrap-Token', 'X-CSRF-Token', 'X-Auth-Transport'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Bootstrap-Token', 'X-CSRF-Token', 'X-Auth-Transport', 'X-Device-Id', 'Idempotency-Key'],
     exposedHeaders: ['Content-Disposition', 'RateLimit', 'RateLimit-Policy', 'Retry-After'],
     maxAge: 600,
   }))

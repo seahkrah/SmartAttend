@@ -1232,6 +1232,57 @@
   },
   {
     "method": "GET",
+    "path": "/api/checkin-controls/devices",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkin-controls/devices",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/checkin-controls/devices/:id",
+    "params": [
+      "id"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/checkin-controls/settings",
+    "params": []
+  },
+  {
+    "method": "PUT",
+    "path": "/api/checkin-controls/settings",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/checkin-controls/sites",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkin-controls/sites",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/checkin-controls/sites/:siteId",
+    "params": [
+      "siteId"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/checkin-controls/sites/:siteId",
+    "params": [
+      "siteId"
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/corporate/admin/attendance",
     "params": []
   },
@@ -3216,6 +3267,16 @@
   {
     "method": "GET",
     "path": "/api/workforce/my/attendance",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/break-end",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/break-start",
     "params": []
   },
   {

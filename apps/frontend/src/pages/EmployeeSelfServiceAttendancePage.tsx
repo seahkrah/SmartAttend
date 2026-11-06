@@ -7,6 +7,7 @@ import { useToastStore } from '../components/Toast';
 import FaceChallengeCapture from '../components/face/FaceChallengeCapture';
 import { biometricsService, type VerifyResult } from '../services/biometricsService';
 import { getErrorMessage } from '../utils/errorHandler';
+import { currentPosition, deviceId } from '../utils/deviceId';
 import { LoadingOverlay } from '../components/LoadingStates';
 import { EmptyState, ErrorAlert } from '../components/ErrorDisplay';
 import {
@@ -116,16 +117,26 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
   const doCheckIn = async (faceMatchId?: string) => {
     try {
       setBusy(true);
+      // The position, with its accuracy, goes with the check-in only where
+      // the organisation checks it is at one of its sites.
+      const position = data?.locationWanted ? await currentPosition() : null;
       const row = await workforceService.checkIn({
         checkInType,
         siteLocation: site.trim() || undefined,
         faceMatchId,
+        ...(position ?? {}),
       });
-      addToast({
-        type: 'success',
-        title: `Checked in at ${timeOf(row.checkInTime)}`,
-        message: row.faceVerified ? 'Face matched.' : undefined,
-      });
+      addToast(row.awaitingApproval
+        ? {
+          type: 'warning',
+          title: `Checked in at ${timeOf(row.checkInTime)}, held for a manager`,
+          message: `${row.stateReason ?? 'A manager will review it'}. Its hours count once approved.`,
+        }
+        : {
+          type: 'success',
+          title: `Checked in at ${timeOf(row.checkInTime)}`,
+          message: row.faceVerified ? 'Face matched.' : undefined,
+        });
       setSite('');
       await load();
     } catch (e) {
@@ -139,7 +150,7 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
   const doCheckOut = async () => {
     try {
       setBusy(true);
-      const row = await workforceService.checkOut();
+      const row = await workforceService.checkOut(data?.locationWanted ? await currentPosition() : null);
       addToast({
         type: 'success',
         title: `Checked out at ${timeOf(row.checkOutTime)}`,
@@ -148,6 +159,20 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
       await load();
     } catch (e) {
       addToast({ type: 'error', title: 'Could not check you out', message: getErrorMessage(e) });
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doBreak = async (which: 'start' | 'end') => {
+    try {
+      setBusy(true);
+      await workforceService.takeBreak(which);
+      addToast({ type: 'success', title: which === 'start' ? 'Break started' : 'Break over' });
+      await load();
+    } catch (e) {
+      addToast({ type: 'error', title: which === 'start' ? 'Could not start your break' : 'Could not end your break', message: getErrorMessage(e) });
       await load();
     } finally {
       setBusy(false);
@@ -206,14 +231,33 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
                   {' · '}{open.checkInType === 'field' ? 'in the field' : 'at the office'}
                   {open.siteLocation && ` · ${open.siteLocation}`}
                 </div>
+                {open.awaitingApproval && (
+                  <div className="mt-1 text-sm font-medium text-amber-700 dark:text-amber-300">
+                    Held for a manager{open.stateReason ? `: ${open.stateReason.replace(/^Awaiting a manager: /, '')}` : ''}
+                  </div>
+                )}
+                {data?.onBreakSince && (
+                  <div className="mt-1 text-sm font-medium text-amber-700 dark:text-amber-300">
+                    On a break since {timeOf(data.onBreakSince)}: it is not counted as worked time
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => void doCheckOut()}
-                disabled={busy}
-                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-3 text-base font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
-              >
-                <LogOut className="h-5 w-5" /> Check out
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => void doBreak(data?.onBreakSince ? 'end' : 'start')}
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 rounded-xl border border-subtle px-5 py-3 text-base font-semibold text-primary hover:bg-raised disabled:opacity-50"
+                >
+                  {data?.onBreakSince ? 'End break' : 'Start break'}
+                </button>
+                <button
+                  onClick={() => void doCheckOut()}
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-3 text-base font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
+                >
+                  <LogOut className="h-5 w-5" /> Check out
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -420,6 +464,11 @@ const EmployeeSelfServiceAttendancePage: React.FC = () => {
           onClose={() => setFaceOpen(false)}
         />
       )}
+
+      <p className="text-xs text-muted">
+        This device's id is <span className="font-mono break-all">{deviceId()}</span>. If your organisation registers
+        devices for check-in, give HR this id.
+      </p>
     </div>
   );
 };

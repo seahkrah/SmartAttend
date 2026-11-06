@@ -4,7 +4,7 @@
  * `unified-core`): only apps/backend/src/attendance/ writes attendance.
  *
  * Fails if any other application file INSERTs into, UPDATEs or DELETEs from
- * school_attendance, corporate_checkins or attendance_events. Migrations,
+ * school_attendance, corporate_checkins, attendance_events or checkin_breaks. Migrations,
  * seeds, tests and scripts are excluded: they shape or fill the schema, they
  * do not record attendance.
  */
@@ -13,7 +13,7 @@ import path from 'node:path'
 import { execSync } from 'node:child_process'
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..')
-const TABLES = ['school_attendance', 'corporate_checkins', 'attendance_events']
+const TABLES = ['school_attendance', 'corporate_checkins', 'attendance_events', 'checkin_breaks']
 const WRITE = new RegExp(String.raw`\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(${TABLES.join('|')})\b`, 'gi')
 
 const files = execSync('git ls-files --cached --others --exclude-standard apps/backend/src', {

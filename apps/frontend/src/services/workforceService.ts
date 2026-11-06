@@ -235,6 +235,10 @@ export interface CheckIn {
   siteLocation: string | null;
   state: CheckInState;
   faceVerified: boolean;
+  /** Waiting for a manager before its hours count. */
+  awaitingApproval?: boolean;
+  /** Why it is flagged or not counted. */
+  stateReason?: string | null;
   /** Hours for a closed check-in; null while it is open. */
   hours: string | null;
 }
@@ -243,6 +247,10 @@ export interface MyAttendance {
   /** Null when the signed-in account has no employee record here. */
   employee: { id: string; employeeNumber: string; name: string } | null;
   onTheClock?: CheckIn | null;
+  /** When the break in progress began, if on one. */
+  onBreakSince?: string | null;
+  /** The organisation checks where people check in, so the page sends the position. */
+  locationWanted?: boolean;
   /** Open check-ins too old to close: they count for nothing until HR acts. */
   needsAttention?: CheckIn[];
   history?: CheckIn[];
@@ -268,14 +276,23 @@ export const workforceService = {
   },
 
   /** The time is the server's; nothing here sends one. */
-  async checkIn(input: { checkInType?: CheckInType; siteLocation?: string; faceMatchId?: string } = {}): Promise<CheckIn> {
+  async checkIn(input: {
+    checkInType?: CheckInType; siteLocation?: string; faceMatchId?: string;
+    latitude?: number; longitude?: number; accuracyMetres?: number;
+  } = {}): Promise<CheckIn> {
     const { data } = await axiosClient.post('/workforce/my/check-in', input);
     return data.checkIn;
   },
 
-  async checkOut(): Promise<CheckIn> {
-    const { data } = await axiosClient.post('/workforce/my/check-out', {});
+  async checkOut(position: { latitude: number; longitude: number; accuracyMetres: number } | null = null): Promise<CheckIn> {
+    const { data } = await axiosClient.post('/workforce/my/check-out', position ?? {});
     return data.checkIn;
+  },
+
+  /** Starts or ends a break in the open check-in; breaks are not worked hours. */
+  async takeBreak(which: 'start' | 'end'): Promise<{ breakId: string; startedAt: string; endedAt: string | null }> {
+    const { data } = await axiosClient.post(`/workforce/my/break-${which}`, {});
+    return data.break;
   },
 
   // -- contracts ---------------------------------------------------------

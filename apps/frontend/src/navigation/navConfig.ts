@@ -25,6 +25,7 @@ import {
   UserPlus,
   Users,
   ScanFace,
+  MapPin,
 } from 'lucide-react';
 
 /**
@@ -328,6 +329,7 @@ const corporateAdminNav: AudienceNav = {
         { label: 'Timesheets', to: '/hr/timesheets', icon: Clock, status: 'ready' },
         { label: 'Leave requests', to: '/hr/leave', icon: CalendarCheck, status: 'ready', countKey: 'leave' },
         { label: 'Face matching', to: '/hr/face-matching', icon: ScanFace, status: 'ready' },
+        { label: 'Check-in rules', to: '/hr/checkin-rules', icon: MapPin, status: 'ready' },
       ],
     },
     {
@@ -378,6 +380,7 @@ const hrNav: AudienceNav = {
         { label: 'Timesheets', to: '/hr/timesheets', icon: Clock, status: 'ready' },
         { label: 'Leave requests', to: '/hr/leave', icon: CalendarCheck, status: 'ready', countKey: 'leave' },
         { label: 'Face matching', to: '/hr/face-matching', icon: ScanFace, status: 'ready' },
+        { label: 'Check-in rules', to: '/hr/checkin-rules', icon: MapPin, status: 'ready' },
       ],
     },
     {

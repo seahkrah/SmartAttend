@@ -4057,6 +4057,234 @@
   },
   {
     "method": "GET",
+    "path": "/api/checkin-controls/devices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkin-controls/devices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/checkin-controls/devices/:id",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/checkin-controls/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/api/checkin-controls/settings",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/checkin-controls/sites",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/checkin-controls/sites",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/checkin-controls/sites/:siteId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/checkin-controls/sites/:siteId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/corporate/admin/attendance",
     "guards": [
       {
@@ -10911,6 +11139,50 @@
       {
         "kind": "self",
         "what": "the caller's own check-ins"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/break-end",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "ends a break in the caller's own check-in"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/workforce/my/break-start",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "self",
+        "what": "starts a break in the caller's own check-in"
       }
     ]
   },

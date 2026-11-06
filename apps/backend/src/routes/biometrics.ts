@@ -144,7 +144,7 @@ router.get('/subjects/:type/:id', checkedInHandler("authorizeSubject: a student'
 
 router.post('/subjects/:type/:id/consent', checkedInHandler("authorizeSubject: a student's record by the school admin, a lecturer who teaches them, or the student; an employee's by HR or the employee; consent: school admin for a student, HR or the employee for an employee"), async (req: TenantRequest, res: Response) => {
   try {
-    const consent = await grantConsent(ctxOf(req), subjectOf(req), req.body?.basis)
+    const consent = await grantConsent(ctxOf(req), subjectOf(req), req.body?.basis, req.body?.guardianId)
     return res.status(201).json({ consent: { grantedAt: consent.granted_at, basis: consent.basis } })
   } catch (e) {
     return fail(res, e)

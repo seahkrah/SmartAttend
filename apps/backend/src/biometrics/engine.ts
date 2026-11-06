@@ -220,12 +220,15 @@ export async function analyzeFrame(buf: Buffer, stillWanted: () => boolean = () 
         tf.dispose(tensor)
         tensor = resized
       }
-      const quality = measure(tf, tensor)
       const detections = await faceapi
         .detectAllFaces(tensor, new faceapi.SsdMobilenetv1Options({ minConfidence: IMAGE_LIMITS.minDetectionScore }))
         .withFaceLandmarks()
         .withFaceDescriptors()
       const faces: FaceObservation[] = []
+      // Measured on the face, not the whole frame: a white wall behind a
+      // well-lit face is not glare. The largest face, or the frame if none.
+      const largest = [...detections].sort((a: any, b: any) => b.detection.box.width - a.detection.box.width)[0]
+      const quality = measure(tf, largest ? crop(tf, tensor, largest.detection.box) : tensor)
       for (const d of detections) {
         const descriptor: Float32Array = d.descriptor
         const yaw = yawRatio(d.landmarks.positions as Point[])
@@ -244,7 +247,17 @@ export async function analyzeFrame(buf: Buffer, stillWanted: () => boolean = () 
   })
 }
 
-/** Brightness, contrast and sharpness of a decoded RGB image (see FrameQuality). */
+/** The face's box, clamped to the image, as a tensor slice. */
+function crop(tf: any, rgb: any, box: { x: number; y: number; width: number; height: number }): any {
+  const [h, w] = rgb.shape
+  const x = Math.max(0, Math.floor(box.x))
+  const y = Math.max(0, Math.floor(box.y))
+  const cw = Math.max(3, Math.min(w - x, Math.ceil(box.width)))
+  const ch = Math.max(3, Math.min(h - y, Math.ceil(box.height)))
+  return tf.slice(rgb, [y, x, 0], [ch, cw, 3])
+}
+
+/** Brightness, contrast and sharpness of a decoded RGB image or face (see FrameQuality). */
 function measure(tf: any, rgb: any): FrameQuality {
   return tf.tidy(() => {
     const gray = rgb.toFloat().mean(2).div(255)

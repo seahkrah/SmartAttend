@@ -78,6 +78,8 @@ function fail(res: Response, label: string, e: unknown) {
   if (e instanceof TenantScopeError) {
     return res.status(e.status).json({ error: e.message })
   }
+  // An input this file refused itself (birthDate), not a fault.
+  if ((e as { status?: number })?.status === 400) return res.status(400).json({ error: (e as Error).message })
   const err = e as { code?: string; constraint?: string; message?: string }
 
   // A duplicate now means duplicate *within this tenant*: the per-tenant
@@ -779,13 +781,27 @@ router.get('/admin/school/students', async (req: TenantRequest, res: Response) =
   }
 })
 
+/**
+ * A date of birth from the request: YYYY-MM-DD, not in the future, or null.
+ * It decides whether face-matching consent is the student's or a guardian's.
+ */
+function birthDate(v: unknown): string | null {
+  if (v === undefined || v === null || v === '') return null
+  const s = String(v)
+  const d = new Date(`${s}T00:00:00Z`)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(d.getTime()) || d.getTime() > Date.now() || d.getUTCFullYear() < 1900) {
+    throw Object.assign(new Error('dateOfBirth must be a past date, YYYY-MM-DD'), { status: 400 })
+  }
+  return s
+}
+
 router.post('/admin/school/students', async (req: TenantRequest, res: Response) => {
   const client = await getConnection()
   try {
     const ctx = ctxOf(req)
     const {
       studentId, firstName, middleName, lastName, phone, address,
-      college, department, status, gender, profilePhoto, enrollmentYear, classId,
+      college, department, status, gender, profilePhoto, enrollmentYear, classId, dateOfBirth,
     } = req.body
     let { email } = req.body
 
@@ -846,15 +862,15 @@ router.post('/admin/school/students', async (req: TenantRequest, res: Response) 
     const student = await client.query(
       `INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, email,
                              phone, address, college, department_id, status, gender,
-                             profile_photo_url, enrollment_year, platform_id, tenant_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+                             profile_photo_url, enrollment_year, platform_id, tenant_id, date_of_birth)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
       [
         user.rows[0].id, studentId, firstName, middleName || null, lastName, email,
         phone || null, address || null, college || '', departmentId,
         status || (gradeSchool ? 'active' : 'freshman'),
         gender || null, profilePhoto || null,
         Number.isInteger(enrollmentYear) ? enrollmentYear : new Date().getFullYear(),
-        ctx.platformId, ctx.tenantId,
+        ctx.platformId, ctx.tenantId, birthDate(dateOfBirth),
       ]
     )
 
@@ -927,6 +943,7 @@ router.patch('/admin/school/students/:id', async (req: TenantRequest, res: Respo
     if (u.phone !== undefined) set('phone', u.phone || null)
     if (u.address !== undefined) set('address', u.address || null)
     if (u.college !== undefined) set('college', u.college || '')
+    if (u.dateOfBirth !== undefined) set('date_of_birth', birthDate(u.dateOfBirth))
     if (u.status) set('status', u.status)
     if (u.gender !== undefined) set('gender', u.gender || null)
     if (u.profilePhoto) set('profile_photo_url', u.profilePhoto)

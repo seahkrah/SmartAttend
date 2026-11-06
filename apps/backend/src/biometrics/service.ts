@@ -232,20 +232,63 @@ async function recordEvent(runner: { query: PoolClient['query'] }, ctx: Ctx, e: 
 // Consent
 // ---------------------------------------------------------------------------
 
-export async function grantConsent(ctx: Ctx, s: Subject, basis: string) {
+/**
+ * Whether a student is a minor for face-matching consent: younger than the
+ * tenant's biometrics.minor_age (default 18, the age of majority in Liberia;
+ * a tenant elsewhere sets its own). With no date of birth recorded, a K-12
+ * school's student is taken to be a minor and a college's or university's an
+ * adult: the safe answer for the school, the likely one for the college.
+ */
+export async function isMinor(ctx: Ctx, studentId: string): Promise<boolean> {
+  const r = await query(
+    `SELECT s.date_of_birth, t.school_type,
+            (SELECT setting_value FROM tenant_settings
+              WHERE tenant_id = s.tenant_id AND setting_key = 'biometrics.minor_age') AS minor_age
+       FROM students s JOIN tenants t ON t.id = s.tenant_id
+      WHERE s.id = $1 AND s.tenant_id = $2`,
+    [studentId, ctx.tenantId]
+  )
+  const row = r.rows[0]
+  if (!row) return true
+  const age = Number(row.minor_age)
+  const minorAge = Number.isInteger(age) && age >= 1 && age <= 30 ? age : 18
+  if (!row.date_of_birth) return row.school_type === 'grade_school'
+  const dob = new Date(row.date_of_birth)
+  const adult = new Date(dob.getFullYear() + minorAge, dob.getMonth(), dob.getDate())
+  return adult.getTime() > Date.now()
+}
+
+export async function grantConsent(ctx: Ctx, s: Subject, basis: string, guardianId?: unknown) {
   await authorizeSubject(ctx, s, 'consent')
   const text = String(basis ?? '').trim()
   if (text.length < 5) {
     throw new BiometricError(400, 'basis_required',
       'Say how consent was obtained, for example "Signed consent form, 12 March"')
   }
+  // A minor's consent is a guardian's: it names one of the student's own
+  // linked guardians in this school (brief 5.3).
+  let guardian: string | null = null
+  if (s.type === 'student' && (await isMinor(ctx, s.id))) {
+    if (!UUID.test(String(guardianId ?? ''))) {
+      throw new BiometricError(400, 'guardian_consent_required',
+        "This student is a minor: consent must name the guardian who gave it (guardianId, one of the student's guardians)")
+    }
+    const linked = await query(
+      `SELECT 1 FROM guardian_students WHERE tenant_id = $1 AND student_id = $2 AND guardian_id = $3`,
+      [ctx.tenantId, s.id, guardianId]
+    )
+    if (!linked.rows.length) {
+      throw new BiometricError(400, 'guardian_consent_required', "That guardian is not one of this student's guardians")
+    }
+    guardian = String(guardianId)
+  }
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     const r = await client.query(
-      `INSERT INTO biometric_consents (tenant_id, subject_type, subject_id, basis, granted_by)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [ctx.tenantId, s.type, s.id, text.slice(0, 1000), ctx.userId]
+      `INSERT INTO biometric_consents (tenant_id, subject_type, subject_id, basis, granted_by, guardian_id)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [ctx.tenantId, s.type, s.id, text.slice(0, 1000), ctx.userId, guardian]
     )
     await recordEvent(client, ctx, { action: 'consent_granted', outcome: 'success', subject: s })
     await client.query('COMMIT')
@@ -547,6 +590,38 @@ function statement(distance: number, threshold: number): string {
   return `face matched at distance ${Math.round(distance * 1000) / 1000} under threshold ${threshold}`
 }
 
+/**
+ * Enrolment asks more of its frames than a check-in does (brief 5.3): a
+ * template made from a soft, dark or small face matches poorly for years.
+ */
+// Measured on the face region. 80 px: the recognition network works on a
+// 150 px aligned crop, and a face much smaller is upsampled into it.
+export const ENROL_QUALITY = { minSharpness: 0.1, minContrast: 0.08, brightness: [0.15, 0.9], minFaceWidth: 80, minScore: 0.8 }
+
+function enrolmentQuality(capture: Capture): Failure | null {
+  for (let i = 0; i < capture.faces.length; i++) {
+    const f = capture.faces[i]
+    const q = capture.quality[i]
+    const n = i + 1
+    if (f.width < ENROL_QUALITY.minFaceWidth) {
+      return { reason: 'enrolment_face_too_small', message: `The face in image ${n} is too small to enrol. Come closer.` }
+    }
+    if (f.score < ENROL_QUALITY.minScore) {
+      return { reason: 'enrolment_face_unclear', message: `The face in image ${n} is not clear enough to enrol: partly hidden or at an angle.` }
+    }
+    if (q && q.sharpness < ENROL_QUALITY.minSharpness) {
+      return { reason: 'enrolment_blurred', message: `Image ${n} is blurred. Hold still in good light.` }
+    }
+    if (q && (q.brightness < ENROL_QUALITY.brightness[0] || q.brightness > ENROL_QUALITY.brightness[1])) {
+      return { reason: 'enrolment_lighting', message: `Image ${n} is too dark or too bright. Move to even light.` }
+    }
+    if (q && q.contrast < ENROL_QUALITY.minContrast) {
+      return { reason: 'enrolment_lighting', message: `Image ${n} is too flat. Move to even light.` }
+    }
+  }
+  return null
+}
+
 function checkSameAndLive(faces: FaceObservation[], steps: Pose[]): Failure | null {
   if (spread(faces.map((f) => f.descriptor)) > THRESHOLDS.withinCapture) {
     return { reason: 'inconsistent_frames', message: 'The images are not all of the same person.' }
@@ -580,7 +655,39 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[], fr
     throw new BiometricError(422, fail.reason, fail.message)
   }
   const faces = (capture as Capture).faces
+  const poor = enrolmentQuality(capture as Capture)
+  if (poor) {
+    await recordEvent({ query: query as any }, ctx, {
+      action: 'enrolled', outcome: 'failure', reason: poor.reason, subject, challengeId: ch.id, pad })
+    throw new BiometricError(422, poor.reason, poor.message)
+  }
   const template = mean(faces.map((f) => f.descriptor))
+  // One person, one template in a tenant: a face that already matches someone
+  // else enrolled here is refused, for an administrator to look into. Not
+  // compared across tenants, which never see each other's templates.
+  const settings = await getSettings(ctx.tenantId)
+  const others = await query(
+    `SELECT subject_id, ciphertext, iv, auth_tag, key_version, dek_version, model FROM face_templates
+      WHERE tenant_id = $1 AND subject_type = $2 AND subject_id <> $3`,
+    [ctx.tenantId, subject.type, subject.id]
+  )
+  for (const row of others.rows) {
+    let other: Float32Array
+    try {
+      other = await openStoredTemplate(ctx.tenantId,
+        { ciphertext: row.ciphertext, iv: row.iv, authTag: row.auth_tag, keyVersion: row.key_version, dekVersion: row.dek_version },
+        templateContext(ctx.tenantId, subject.type, row.subject_id, row.model))
+    } catch (e) {
+      if (e instanceof BiometricKeyError) throw e
+      continue
+    }
+    if (distance(template, other) <= settings.threshold) {
+      await recordEvent({ query: query as any }, ctx, {
+        action: 'enrolled', outcome: 'failure', reason: 'duplicate_identity', subject, challengeId: ch.id, pad })
+      throw new BiometricError(409, 'duplicate_identity',
+        'This face matches someone already enrolled in this organisation. An administrator should check before it is enrolled again.')
+    }
+  }
   const sealed = await sealTemplateForStorage(
     ctx.tenantId, template, templateContext(ctx.tenantId, subject.type, subject.id, MODEL_ID))
 
@@ -950,7 +1057,9 @@ export async function listSubjects(
   params.push(limit, offset)
   const r = await query(
     `SELECT p.id, p.${code} AS code, p.first_name, p.last_name,
-            c.granted_at AS consent_granted_at, t.enrolled_at,
+            c.granted_at AS consent_granted_at, t.enrolled_at, t.model,
+            (t.id IS NOT NULL AND (t.model <> $${params.length + 1}
+              OR t.enrolled_at < CURRENT_TIMESTAMP - make_interval(months => $${params.length + 2}))) AS stale,
             COUNT(*) OVER()::int AS total
        FROM ${table} p
        LEFT JOIN biometric_consents c
@@ -961,12 +1070,22 @@ export async function listSubjects(
       WHERE p.tenant_id = $1 AND p.${active}${filter}
       ORDER BY p.last_name, p.first_name
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
+    [...params, MODEL_ID, await reenrolMonths(ctx.tenantId)]
   )
   return {
     total: r.rows[0]?.total ?? 0,
+    // Stale: made by another model version, or older than the tenant's
+    // re-enrolment interval (biometrics.reenrol_months, default 24). Each is
+    // a reminder to re-enrol (src/scripts/staleTemplates.ts lists them).
     people: r.rows.map(({ total, ...row }: any) => row),
   }
+}
+
+export async function reenrolMonths(tenantId: string): Promise<number> {
+  const r = await query(
+    `SELECT setting_value FROM tenant_settings WHERE tenant_id = $1 AND setting_key = 'biometrics.reenrol_months'`, [tenantId])
+  const v = Number(r.rows[0]?.setting_value)
+  return Number.isInteger(v) && v >= 1 && v <= 120 ? v : 24
 }
 
 export async function listEvents(ctx: Ctx, opts: { limit?: number; subject?: Subject }) {

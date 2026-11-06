@@ -136,6 +136,8 @@ TS_SUITES=(
   faceLiveness
   # One class photograph, several faces, each confirmed by the lecturer.
   groupCapture
+  # Consent for minors, enrolment quality, duplicate identity, stale templates.
+  enrolmentSafeguards
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

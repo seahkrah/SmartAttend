@@ -175,6 +175,18 @@ rebuild: [docs/decisions/2026-09-30-keep-express-platform.md](docs/decisions/202
   a lecturer can read any student's attendance and transcript in the school,
   not only those they teach, and a manager sees everyone's leave, not only
   their reports'.
+- Attendance on both platforms goes through one core that keeps an
+  append-only record of each capture. Manual entries need a reason where
+  face matching is on, can need a manager's approval, and raise alerts when
+  overused. Face analysis runs in a separate worker; when it is down,
+  attendance falls back to manual. These are not done:
+  - a kiosk mode;
+  - limiting managers' approvals to their own reports;
+  - a measured face-matching accuracy: the evaluation harness waits for a
+    licensed dataset.
+  Face check-ins at the assumed peak (120 a minute) were not met on a
+  development laptop
+  ([docs/operations/capacity.md](docs/operations/capacity.md)).
 - The audit trail is a hash chain per tenant, verified by
   `npm run audit:verify` and exportable and streamable to the tenant's own
   collector. Nothing yet runs the verifier on a schedule; that, and keeping

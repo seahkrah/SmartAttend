@@ -24,7 +24,7 @@ import { authenticateToken } from '../auth/middleware.js'
 import { resolveTenantContext, requireTenant, requireRoles, type TenantRequest } from '../auth/tenantContextMiddleware.js'
 import {
   BiometricError, confirmGroup, deleteTemplate, enroll, getSettings, grantConsent, identifyInClass, issueChallenge,
-  listEvents, listSubjects, proposeGroup, saveSettings, subjectStatus, verify, withdrawConsent, type Subject, type SubjectType,
+  listEvents, listSubjects, overview, proposeGroup, saveSettings, subjectStatus, verify, withdrawConsent, type Subject, type SubjectType,
 } from '../biometrics/service.js'
 import { IMAGE_LIMITS } from '../biometrics/engine.js'
 import { BiometricKeyError } from '../biometrics/templateCrypto.js'
@@ -176,7 +176,7 @@ router.post('/challenges', checkedInHandler("issueChallenge: enrol as authorizeS
     if (subject && subject.type !== 'student' && subject.type !== 'employee') {
       return res.status(400).json({ error: 'subjectType must be student or employee' })
     }
-    const ch = await issueChallenge(ctxOf(req), purpose, { subject, scheduleId })
+    const ch = await issueChallenge(ctxOf(req), purpose, { subject, scheduleId, deviceId: req.header('x-device-id') ?? null })
     return res.status(201).json(ch)
   } catch (e) {
     return fail(res, e)
@@ -222,6 +222,14 @@ router.post('/group', checkedInHandler("the challenge must be the lecturer's own
 router.post('/group/:groupId/confirm', checkedInHandler("only the lecturer whose group capture it is, while it is open"), async (req: TenantRequest, res: Response) => {
   try {
     return res.json(await confirmGroup(ctxOf(req), req.params.groupId, req.body?.confirm))
+  } catch (e) {
+    return fail(res, e)
+  }
+})
+
+router.get('/overview', checkedInHandler("overview: the school admin, HR or HR director"), async (req: TenantRequest, res: Response) => {
+  try {
+    return res.json(await overview(ctxOf(req)))
   } catch (e) {
     return fail(res, e)
   }

@@ -52,6 +52,14 @@ export interface VerifyResult {
 }
 
 /** The server's refusal, with its code, so screens can say the right thing. */
+export interface BiometricOverview {
+  windowDays: number;
+  daily: { day: string; action: string; outcome: string; n: number }[];
+  failureReasons: { reason: string | null; n: number }[];
+  padScores: { from: number; to: number; n: number }[];
+  openAlerts: { kind: string; n: number }[];
+}
+
 export class BiometricRefusal extends Error {
   constructor(message: string, readonly code: string | undefined, readonly status: number | undefined) {
     super(message);
@@ -73,6 +81,11 @@ export const POSE_INSTRUCTIONS: Record<FacePose, string> = {
 };
 
 export const biometricsService = {
+  async overview(): Promise<BiometricOverview> {
+    const { data } = await axiosClient.get('/biometrics/overview');
+    return data;
+  },
+
   async settings(): Promise<BiometricSettings> {
     const { data } = await axiosClient.get('/biometrics/settings');
     return data.settings;

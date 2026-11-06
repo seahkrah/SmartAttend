@@ -293,6 +293,15 @@ for _ in range(4):
     post_frames("/biometrics/verify", EMP, ch, OTHER)
 co, r, _, _ = challenge(EMP, {"purpose": "verify"})
 check("after five failed matches, face check-in pauses", co == 429 and r.get('code') == 'paused', f"({co} {r})")
+co, r = call("GET", "/attendance-review/alerts", HR)
+lock = [a for a in (r.get('alerts') or []) if a.get('kind') == 'face_lockout' and a.get('employee_id') == emp_id] if co == 200 else []
+check("and HR is alerted to the lockout, once", len(lock) == 1 and lock[0]['detail'].get('failures', 0) >= 5, f"({co} {lock})")
+co, r = call("GET", "/biometrics/overview", HR)
+check("the overview counts the failed verifications and the open alert",
+      co == 200 and any(x['action'] == 'verified' and x['outcome'] == 'failure' for x in r.get('daily', []))
+      and any(a['kind'] == 'face_lockout' for a in r.get('openAlerts', [])), f"({co} {str(r)[:200]})")
+co, r = call("GET", "/biometrics/overview", EMP)
+check("an employee cannot see the overview", co == 403, f"({co})")
 
 co, r = call("DELETE", f"/biometrics/subjects/employee/{emp_id}/consent", EMP, {"reason": "Changed my mind"})
 check("the employee withdraws their own consent", co == 200, f"({co} {r})")

@@ -138,6 +138,8 @@ TS_SUITES=(
   groupCapture
   # Consent for minors, enrolment quality, duplicate identity, stale templates.
   enrolmentSafeguards
+  # Every face event in the audit chain; limits per device and tenant; alerts; the overview.
+  biometricLimits
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

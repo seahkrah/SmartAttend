@@ -1175,6 +1175,11 @@
   },
   {
     "method": "GET",
+    "path": "/api/biometrics/overview",
+    "params": []
+  },
+  {
+    "method": "GET",
     "path": "/api/biometrics/settings",
     "params": []
   },

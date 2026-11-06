@@ -16,7 +16,7 @@ import { ConfirmDialog } from '../components/states/ConfirmDialog';
 import { EmptyState, ErrorState, LoadingState, NoAccessState } from '../components/states/PageStates';
 import {
   biometricsService, BiometricRefusal,
-  type BiometricEvent, type BiometricSettings, type SubjectType,
+  type BiometricEvent, type BiometricOverview, type BiometricSettings, type SubjectType,
 } from '../services/biometricsService';
 import { axiosClient } from '../utils/axiosClient';
 
@@ -46,6 +46,7 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
   const [people, setPeople] = useState<Person[] | null>(null);
   const [total, setTotal] = useState(0);
   const [events, setEvents] = useState<BiometricEvent[]>([]);
+  const [overview, setOverview] = useState<BiometricOverview | null>(null);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -59,11 +60,13 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [s, list, log] = await Promise.all([
+      const [s, list, log, ov] = await Promise.all([
         biometricsService.settings(),
         axiosClient.get('/biometrics/subjects', { params: { type: subjectType, search: search || undefined, limit: 100 } }),
         biometricsService.events({ limit: 30 }),
+        biometricsService.overview().catch(() => null),
       ]);
+      setOverview(ov);
       setSettings(s);
       setDraftThreshold(s.threshold);
       setPeople(list.data.people);
@@ -233,6 +236,8 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
         )}
       </section>
 
+      {overview && <OverviewSection overview={overview} />}
+
       <section className="card space-y-2" aria-labelledby="fm-log">
         <h2 id="fm-log" className="font-semibold text-primary">Recent activity</h2>
         {events.length === 0 ? (
@@ -318,3 +323,78 @@ export const FaceMatchingAdminPage: React.FC<{ subjectType: SubjectType }> = ({ 
 };
 
 export default FaceMatchingAdminPage;
+
+const ALERT_LABELS: Record<string, string> = {
+  face_lockout: 'Face check paused after repeated failed matches',
+  device_face_failures: 'One device failing to identify anyone',
+  repeated_face_not_recognised: 'One person not recognised again and again',
+  device_manual_burst: 'Many people marked by hand from one device',
+  manual_outside_shift: 'Marked by hand outside a rostered shift',
+};
+
+/** The last 30 days at a glance (brief 5.8): outcomes, why matches failed, PAD scores and open alerts. */
+function OverviewSection({ overview }: { overview: BiometricOverview }) {
+  const totals = overview.daily.reduce<Record<string, { success: number; failure: number }>>((acc, r) => {
+    const t = (acc[r.action] ??= { success: 0, failure: 0 });
+    if (r.outcome === 'success') t.success += r.n;
+    else if (r.outcome === 'failure') t.failure += r.n;
+    return acc;
+  }, {});
+  const padTotal = overview.padScores.reduce((a, b) => a + b.n, 0);
+  return (
+    <section className="card space-y-4" aria-labelledby="fm-overview">
+      <h2 id="fm-overview" className="font-semibold text-primary">Last {overview.windowDays} days</h2>
+      <div className="grid gap-4 md:grid-cols-3 text-sm">
+        <div>
+          <h3 className="font-medium text-secondary mb-1">Outcomes</h3>
+          {Object.keys(totals).length === 0 ? <p className="text-muted">No face checks yet.</p> : (
+            <ul className="space-y-1">
+              {Object.entries(totals).map(([action, t]) => (
+                <li key={action}><span className="capitalize">{action}</span>: {t.success} matched, {t.failure} not</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h3 className="font-medium text-secondary mb-1">Why checks failed</h3>
+          {overview.failureReasons.length === 0 ? <p className="text-muted">No failures.</p> : (
+            <ul className="space-y-1">
+              {overview.failureReasons.map((r) => (
+                <li key={r.reason ?? 'none'}>{(r.reason ?? 'unspecified').replace(/_/g, ' ')}: {r.n}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h3 className="font-medium text-secondary mb-1">Open alerts</h3>
+          {overview.openAlerts.length === 0 ? <p className="text-muted">None open.</p> : (
+            <ul className="space-y-1">
+              {overview.openAlerts.map((a) => (
+                <li key={a.kind}>{ALERT_LABELS[a.kind] ?? a.kind}: {a.n}</li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-muted mt-1">Acknowledge them under attendance review.</p>
+        </div>
+      </div>
+      {padTotal > 0 && (
+        <div className="text-sm">
+          <h3 className="font-medium text-secondary mb-1">Presentation-attack scores ({padTotal} captures; higher is more live)</h3>
+          <table className="text-xs">
+            <tbody>
+              {overview.padScores.map((b) => (
+                <tr key={b.from}>
+                  <td className="pr-3 tabular-nums">{b.from.toFixed(1)}–{b.to.toFixed(1)}</td>
+                  <td className="w-48">
+                    <div className="h-2 rounded bg-primary-500" style={{ width: `${Math.max(2, (b.n / padTotal) * 100)}%` }} />
+                  </td>
+                  <td className="pl-2 tabular-nums">{b.n}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}

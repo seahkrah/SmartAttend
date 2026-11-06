@@ -30,6 +30,7 @@ import {
   MODEL_ID, THRESHOLDS, clampThreshold, distance, identify as identifyAmong, mean, spread,
 } from './matching.js'
 import { markStudent } from '../attendance/core.js'
+import { auditActorClass } from '../services/domainAuditService.js'
 import { BiometricKeyError, openStoredTemplate, sealTemplateForStorage, templateContext, templateKeyConfigured } from './templateCrypto.js'
 
 export type SubjectType = 'student' | 'employee'
@@ -44,6 +45,15 @@ export class BiometricError extends Error {
 
 const CHALLENGE_TTL_SECONDS = 120
 const CHALLENGES_PER_TEN_MINUTES = 30
+/**
+ * Per device (a lecturer's tablet identifying a class of 40, a kiosk at a
+ * door) and per tenant (what the face workers can carry): set per tenant as
+ * biometrics.device_challenges_per_10min and biometrics.tenant_challenges_per_minute.
+ */
+const DEVICE_CHALLENGES_PER_TEN_MINUTES = 200
+const TENANT_CHALLENGES_PER_MINUTE = 600
+/** Failed identifications from one device in ten minutes before an alert. */
+const DEVICE_FAILURES_BEFORE_ALERT = 10
 const FAILED_MATCHES_BEFORE_PAUSE = 5
 const PAUSE_MINUTES = 15
 /** A match must be used for attendance within this long of being made. */
@@ -225,6 +235,26 @@ async function recordEvent(runner: { query: PoolClient['query'] }, ctx: Ctx, e: 
      ['enrolled', 'verified', 'identified'].includes(e.action) ? MODEL_ID : null,
      e.pad ? e.pad.score : null, e.pad ? JSON.stringify({ reasons: e.pad.reasons, ...e.pad.signals }) : null]
   )
+  // The same event in the tenant's audit trail, whose rows are hash-chained
+  // (migration 079), in the same transaction: a biometric event cannot be
+  // removed or altered without breaking the chain (brief 5.8). What is
+  // recorded is what happened and to whom, never a face or a descriptor.
+  // The scope follows the actor (check_audit_scope_actor): an administrator
+  // acts on the tenant, anyone else (a lecturer, an employee) as a user.
+  const actorClass = ctx.isSuperadmin ? 'superadmin' : auditActorClass(ctx.roleName)
+  await runner.query(
+    `INSERT INTO audit_logs
+       (actor_id, actor_role, action_type, action, action_scope, resource_type, resource_id,
+        after_state, tenant_id, platform_id)
+     VALUES ($1, $2, $3, $3, $8, 'biometric_event', $4, $5, $6, $7)`,
+    [ctx.userId, actorClass,
+     `BIOMETRIC_${e.action.toUpperCase()}_${e.outcome.toUpperCase()}`, r.rows[0].id,
+     JSON.stringify({
+       subjectType: e.subject?.type ?? null, subjectId: e.subject?.id ?? null, reason: e.reason ?? null,
+       scheduleId: e.scheduleId ?? null, distance: e.distance ?? null, threshold: e.threshold ?? null,
+       padScore: e.pad?.score ?? null,
+     }), ctx.tenantId, ctx.platformId, actorClass === 'user' ? 'USER' : 'TENANT']
+  )
   return r.rows[0].id
 }
 
@@ -377,7 +407,7 @@ export type Purpose = 'enroll' | 'verify' | 'identify' | 'group'
 export async function issueChallenge(
   ctx: Ctx,
   purpose: Purpose,
-  opts: { subject?: Subject; scheduleId?: string }
+  opts: { subject?: Subject; scheduleId?: string; deviceId?: string | null }
 ) {
   await requireAvailable(ctx.tenantId)
   let subject: Subject | null = null
@@ -420,16 +450,40 @@ export async function issueChallenge(
   if (recent.rows[0].n >= CHALLENGES_PER_TEN_MINUTES) {
     throw new BiometricError(429, 'rate_limited', 'Too many face captures started. Wait a few minutes and try again.')
   }
+  const device = opts.deviceId ? String(opts.deviceId).slice(0, 128) : null
+  const limits = await query(
+    `SELECT setting_key, setting_value FROM tenant_settings
+      WHERE tenant_id = $1 AND setting_key IN ('biometrics.device_challenges_per_10min', 'biometrics.tenant_challenges_per_minute')`,
+    [ctx.tenantId])
+  const limit = (key: string, fallback: number) => {
+    const v = Number(limits.rows.find((x: any) => x.setting_key === key)?.setting_value)
+    return Number.isInteger(v) && v > 0 ? v : fallback
+  }
+  if (device) {
+    const byDevice = await query(
+      `SELECT COUNT(*)::int AS n FROM biometric_challenges
+        WHERE tenant_id = $1 AND device_id = $2 AND created_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes'`,
+      [ctx.tenantId, device])
+    if (byDevice.rows[0].n >= limit('biometrics.device_challenges_per_10min', DEVICE_CHALLENGES_PER_TEN_MINUTES)) {
+      throw new BiometricError(429, 'device_rate_limited', 'This device has started too many face captures. Wait a few minutes, or mark by hand.')
+    }
+  }
+  const byTenant = await query(
+    `SELECT COUNT(*)::int AS n FROM biometric_challenges
+      WHERE tenant_id = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '1 minute'`, [ctx.tenantId])
+  if (byTenant.rows[0].n >= limit('biometrics.tenant_challenges_per_minute', TENANT_CHALLENGES_PER_MINUTE)) {
+    throw new BiometricError(429, 'tenant_rate_limited', 'Face matching is busy for this organisation just now. Mark by hand, or try again in a minute.')
+  }
 
   // A group capture is one photograph of the class: one frame, facing the camera.
   const steps: Pose[] = purpose === 'group' ? ['center'] : randomSequence((n) => crypto.randomInt(n))
   const r = await query(
     `INSERT INTO biometric_challenges
-       (tenant_id, issued_to, purpose, subject_type, subject_id, schedule_id, steps, expires_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7, CURRENT_TIMESTAMP + ($8 || ' seconds')::interval)
+       (tenant_id, issued_to, purpose, subject_type, subject_id, schedule_id, steps, expires_at, device_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7, CURRENT_TIMESTAMP + ($8 || ' seconds')::interval, $9)
      RETURNING id, steps, expires_at`,
     [ctx.tenantId, ctx.userId, purpose, subject?.type ?? null, subject?.id ?? null, scheduleId,
-     steps, String(CHALLENGE_TTL_SECONDS)]
+     steps, String(CHALLENGE_TTL_SECONDS), device]
   )
   return { challengeId: r.rows[0].id, steps: r.rows[0].steps as Pose[], expiresAt: r.rows[0].expires_at }
 }
@@ -453,6 +507,74 @@ async function requireTemplate(ctx: Ctx, s: Subject): Promise<void> {
   )
   if (r.rows.length === 0) {
     throw new BiometricError(409, 'not_enrolled', 'No face is enrolled for you. Ask HR to enrol you.')
+  }
+}
+
+/** Raises a face_lockout alert when this failure brings on the pause (brief 5.8). */
+async function alertIfLockedOut(ctx: Ctx, s: Subject): Promise<void> {
+  const r = await query(
+    `SELECT COUNT(*)::int AS n FROM biometric_events
+      WHERE tenant_id = $1 AND subject_type = $2 AND subject_id = $3
+        AND action = 'verified' AND outcome = 'failure'
+        AND created_at > CURRENT_TIMESTAMP - ($4 || ' minutes')::interval`,
+    [ctx.tenantId, s.type, s.id, String(PAUSE_MINUTES)])
+  if (r.rows[0].n < FAILED_MATCHES_BEFORE_PAUSE) return
+  await query(
+    `INSERT INTO attendance_alerts (tenant_id, kind, student_id, employee_id, detail)
+     VALUES ($1, 'face_lockout', $2, $3, $4) ON CONFLICT DO NOTHING`,
+    [ctx.tenantId, s.type === 'student' ? s.id : null, s.type === 'employee' ? s.id : null,
+     JSON.stringify({ failures: r.rows[0].n, withinMinutes: PAUSE_MINUTES, pausedMinutes: PAUSE_MINUTES })])
+}
+
+/** Raises a device_face_failures alert when one device keeps failing to identify anyone. */
+async function alertOnDeviceFailures(ctx: Ctx, challengeId: string): Promise<void> {
+  const r = await query(
+    `SELECT c.device_id,
+            (SELECT COUNT(*)::int FROM biometric_events e JOIN biometric_challenges c2 ON c2.id = e.challenge_id
+              WHERE e.tenant_id = $1 AND e.action = 'identified' AND e.outcome = 'failure'
+                AND c2.device_id = c.device_id AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes') AS n
+       FROM biometric_challenges c WHERE c.id = $2 AND c.tenant_id = $1 AND c.device_id IS NOT NULL`,
+    [ctx.tenantId, challengeId])
+  const row = r.rows[0]
+  if (!row || row.n < DEVICE_FAILURES_BEFORE_ALERT) return
+  await query(
+    `INSERT INTO attendance_alerts (tenant_id, kind, device_id, detail) VALUES ($1, 'device_face_failures', $2, $3)
+     ON CONFLICT DO NOTHING`,
+    [ctx.tenantId, row.device_id, JSON.stringify({ failures: row.n, withinMinutes: 10 })])
+}
+
+/**
+ * The administrator's view of face matching (brief 5.8): outcomes by day
+ * and kind over the last 30 days, the reasons for failures, the spread of
+ * presentation-attack scores, the thresholds in force and open alerts.
+ */
+export async function overview(ctx: Ctx) {
+  if (!(['admin', 'hr', 'hr_director'].includes(ctx.roleName) || ctx.isSuperadmin)) {
+    throw new BiometricError(403, 'forbidden', 'Only administrators may see the face-matching overview')
+  }
+  const daily = await query(
+    `SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, action, outcome, COUNT(*)::int AS n
+       FROM biometric_events WHERE tenant_id = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '30 days'
+      GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`, [ctx.tenantId])
+  const reasons = await query(
+    `SELECT reason, COUNT(*)::int AS n FROM biometric_events
+      WHERE tenant_id = $1 AND outcome = 'failure' AND created_at > CURRENT_TIMESTAMP - INTERVAL '30 days'
+      GROUP BY 1 ORDER BY 2 DESC`, [ctx.tenantId])
+  const pad = await query(
+    `SELECT width_bucket(pad_score, 0, 1.0001, 10) AS bucket, COUNT(*)::int AS n FROM biometric_events
+      WHERE tenant_id = $1 AND pad_score IS NOT NULL AND created_at > CURRENT_TIMESTAMP - INTERVAL '30 days'
+      GROUP BY 1 ORDER BY 1`, [ctx.tenantId])
+  const alerts = await query(
+    `SELECT kind, COUNT(*)::int AS n FROM attendance_alerts
+      WHERE tenant_id = $1 AND acknowledged_at IS NULL GROUP BY 1`, [ctx.tenantId])
+  const settings = await getSettings(ctx.tenantId)
+  return {
+    windowDays: 30,
+    settings,
+    daily: daily.rows,
+    failureReasons: reasons.rows,
+    padScores: pad.rows.map((r: any) => ({ from: (r.bucket - 1) / 10, to: r.bucket / 10, n: r.n })),
+    openAlerts: alerts.rows,
   }
 }
 
@@ -749,6 +871,7 @@ export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[], fr
     await recordEvent({ query: query as any }, ctx, {
       action: 'verified', outcome: 'failure', reason: f.reason, subject, challengeId: ch.id,
       distance: d, threshold: settings.threshold, pad })
+    await alertIfLockedOut(ctx, subject)
     throw new BiometricError(422, f.reason, f.message)
   }
 
@@ -816,6 +939,7 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
     await recordEvent({ query: query as any }, ctx, {
       action: 'identified', outcome: 'failure', reason: f.reason, challengeId: ch.id,
       scheduleId, distance: d, threshold: settings.threshold, pad })
+    await alertOnDeviceFailures(ctx, ch.id)
     throw new BiometricError(422, f.reason, f.message)
   }
 

@@ -3910,6 +3910,22 @@
   },
   {
     "method": "GET",
+    "path": "/api/biometrics/overview",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "inHandler",
+        "rule": "overview: the school admin, HR or HR director"
+      }
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/biometrics/settings",
     "guards": [
       {

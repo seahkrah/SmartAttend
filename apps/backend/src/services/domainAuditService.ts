@@ -1,6 +1,7 @@
 import { query } from '../db/connection.js'
 import { Request } from 'express'
 import { createHash } from 'crypto'
+import { isIP } from 'net'
 
 /**
  * Enhanced Audit Service (PHASE 2, STEP 2.1)
@@ -80,6 +81,33 @@ export function auditActorClass(role: string | null | undefined): 'superadmin' |
   return 'user'
 }
 
+/** ip_address is INET: an address the request could not be traced to ("unknown") is recorded as none, not a failed write. */
+function inetOrNull(ip: string | null | undefined): string | null {
+  return ip && isIP(ip) ? ip : null
+}
+
+/**
+ * An audit row written on the caller's own connection, so it commits or
+ * rolls back with the change it records: a decision that rolled back leaves
+ * no row claiming it happened, and one that committed cannot lack its row.
+ * The scope follows the actor, as check_audit_scope_actor requires.
+ */
+export async function auditIn(
+  runner: { query: (sql: string, params?: unknown[]) => Promise<any> },
+  actor: { userId: string; tenantId: string; roleName?: string | null; isSuperadmin?: boolean },
+  e: { actionType: string; resourceType: string; resourceId?: string | null; beforeState?: unknown; afterState?: unknown; ipAddress?: string | null }
+): Promise<void> {
+  const actorClass = actor.isSuperadmin ? 'superadmin' : auditActorClass(actor.roleName)
+  await runner.query(
+    `INSERT INTO audit_logs
+       (actor_id, actor_role, action_type, action, action_scope, resource_type, resource_id,
+        before_state, after_state, ip_address, tenant_id, platform_id)
+     VALUES ($1, $2, $3, $3, $4, $5, $6, $7, $8, $9, $10, (SELECT platform_id FROM users WHERE id = $1))`,
+    [actor.userId, actorClass, e.actionType, actorClass === 'user' ? 'USER' : 'TENANT', e.resourceType, e.resourceId ?? null,
+     e.beforeState === undefined ? null : JSON.stringify(e.beforeState),
+     e.afterState === undefined ? null : JSON.stringify(e.afterState), inetOrNull(e.ipAddress), actor.tenantId])
+}
+
 export async function logAudit(entry: AuditLogEntry): Promise<string> {
   try {
     const result = await query(
@@ -106,7 +134,7 @@ export async function logAudit(entry: AuditLogEntry): Promise<string> {
         entry.afterState ? JSON.stringify(entry.afterState) : null,
         entry.justification || null,
         entry.requestId || null,
-        entry.ipAddress,
+        inetOrNull(entry.ipAddress),
         entry.userAgent || null,
         entry.tenantId || null,
         entry.platformId || null

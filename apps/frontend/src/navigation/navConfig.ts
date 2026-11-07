@@ -26,6 +26,7 @@ import {
   Users,
   ScanFace,
   MapPin,
+  GitBranch,
 } from 'lucide-react';
 
 /**
@@ -319,6 +320,7 @@ const corporateAdminNav: AudienceNav = {
         { label: 'Employees', to: '/admin/corporate/employees', icon: Users, status: 'ready', countKey: 'employees' },
         { label: 'Departments', to: '/admin/corporate/departments', icon: Building2, status: 'ready' },
         { label: 'Roles & contracts', to: '/hr/contracts', icon: FileText, status: 'ready' },
+        { label: 'Reporting lines', to: '/hr/reporting-lines', icon: GitBranch, status: 'ready' },
       ],
     },
     {
@@ -371,6 +373,7 @@ const hrNav: AudienceNav = {
       label: 'Workforce',
       items: [
         { label: 'Roles & contracts', to: '/hr/contracts', icon: FileText, status: 'ready' },
+        { label: 'Reporting lines', to: '/hr/reporting-lines', icon: GitBranch, status: 'ready' },
       ],
     },
     {

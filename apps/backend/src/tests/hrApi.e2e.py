@@ -23,7 +23,7 @@ def check(n, ok, d=""):
 print("-- platform isolation --")
 co,r=call("GET","/overview",SCHOOL['token']); check("school identity refused from EMS", co==403, f"({co} {r})")
 
-A_STAFF = set(A['employees']) | {A['hrEmpId'], A['managerEmpId']}
+A_STAFF = set(A['employees']) | {A['hrEmpId'], A['managerEmpId'], A['manager2EmpId']}
 
 print("\n-- overview / metrics --")
 co,r=call("GET","/overview",A['token']); check("overview 200", co==200, f"({co} {r})")
@@ -99,7 +99,7 @@ check("the summary adds up",
 co,r=call("GET","/today",B['token'])
 check("B's today holds none of A's staff", co==200 and not ({p['employeeId'] for p in r['people']} & A_STAFF), f"({co})")
 co,r=call("GET","/today",A['managerToken'])
-check("a manager sees only their direct reports", co==200 and r.get('scope')=='direct_reports'
+check("a manager sees only the people who report to them", co==200 and r.get('scope')=='team'
       and all(p['employeeId']!=A['hrEmpId'] for p in r['people']), f"({co} {r.get('scope')})")
 co,r=call("GET","/today",A['empToken'])
 check("an employee cannot read who is at work", co==403, f"({co})")

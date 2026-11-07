@@ -18,6 +18,9 @@ import {
 } from '../services/leaveService.js'
 import { leaveDecided, leaveRequested } from '../notifications/events.js'
 import { anyMember, checkedInHandler, selfService } from '../auth/guards.js'
+import { actsFor, listFilter, reportScope } from '../auth/reportingLines.js'
+import { auditIn } from '../services/domainAuditService.js'
+import { getClientIp } from '../utils/getClientIp.js'
 
 /**
  * EMS — leave types, balances, requests and approvals.
@@ -98,14 +101,25 @@ function isHr(ctx: Ctx): boolean {
 /**
  * Resolves which employee a request is about.
  *
- * Without an id, it is the caller. With one, only HR and managers may name
- * someone else; anyone else asking about another employee gets their own
- * record rather than a refusal that would confirm the other id exists.
+ * Without an id, it is the caller. With one, HR may name anyone and a
+ * manager the people who report to them (src/auth/reportingLines.ts); a
+ * manager naming anyone else finds nobody. Anyone else asking about another
+ * employee gets their own record rather than a refusal that would confirm
+ * the other id exists.
  */
 async function targetEmployee(ctx: Ctx, suppliedId?: string): Promise<any | null> {
   if (!suppliedId) return callerEmployee(ctx)
   if (!isHr(ctx) && ctx.roleName !== 'manager') return callerEmployee(ctx)
-  return owned('employees', ctx, suppliedId)
+  const row = await owned('employees', ctx, suppliedId)
+  if (!row) return null
+  const scope = await reportScope(ctx)
+  return actsFor(scope, row.id) || row.id === scope.self ? row : null
+}
+
+/** Whether a leave request is the caller's own (refused later with its own message). */
+async function isOwnRequest(ctx: Ctx, request: { employee_id: string }): Promise<boolean> {
+  const mine = await callerEmployee(ctx)
+  return !!mine && mine.id === request.employee_id
 }
 
 // ===========================================================================
@@ -319,12 +333,19 @@ router.get('/requests', checkedInHandler("scope=all for HR, admin and managers; 
     const params: any[] = [ctx.tenantId]
     let where = 'r.tenant_id = $1'
 
-    // Only HR and managers may see beyond their own requests.
+    // Only HR and managers may see beyond their own requests, and a manager
+    // only as far as the people who report to them.
     if (scope !== 'all' || !(isHr(ctx) || ctx.roleName === 'manager')) {
       const employee = await callerEmployee(ctx)
       if (!employee) return res.json({ requests: [] })
       params.push(employee.id)
       where += ` AND r.employee_id = $${params.length}`
+    } else {
+      const ids = listFilter(await reportScope(ctx))
+      if (ids) {
+        params.push(ids)
+        where += ` AND r.employee_id = ANY($${params.length}::uuid[])`
+      }
     }
 
     if (status) {
@@ -435,6 +456,11 @@ router.post('/requests/:id/decision', approvers, async (req: TenantRequest, res:
     const ctx = ctxOf(req)
     const request = await owned('leave_requests', ctx, req.params.id)
     if (!request) return notFound(res, 'Leave request')
+    // A manager decides for the people who report to them; anyone else's
+    // request is not theirs to see (finding #41).
+    if (!actsFor(await reportScope(ctx), request.employee_id) && !(await isOwnRequest(ctx, request))) {
+      return notFound(res, 'Leave request')
+    }
 
     const { decision, note } = req.body ?? {}
     if (!['approved', 'rejected'].includes(String(decision))) {
@@ -459,17 +485,31 @@ router.post('/requests/:id/decision', approvers, async (req: TenantRequest, res:
 
     await client.query('BEGIN')
 
-    await client.query(
+    // Only while still pending, in the same statement: two decisions racing
+    // each other must not both move the balance.
+    const decided = await client.query(
       `UPDATE leave_requests
           SET status = $1, decided_by = $2, decided_at = CURRENT_TIMESTAMP,
               decision_note = $3, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $4 AND tenant_id = $5`,
+        WHERE id = $4 AND tenant_id = $5 AND status = 'pending'
+        RETURNING id`,
       [decision, ctx.userId, note || null, request.id, ctx.tenantId]
     )
+    if (!decided.rows.length) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({ error: 'This request has already been decided' })
+    }
 
     // Approving moves the days from pending to taken; rejecting releases them.
     await adjustBalance(client, ctx.tenantId, request.employee_id, request.leave_type_id, year,
       decision === 'approved' ? { pending: -total, taken: total } : { pending: -total })
+
+    await auditIn(client, ctx, {
+      actionType: decision === 'approved' ? 'LEAVE_APPROVED' : 'LEAVE_REJECTED', resourceType: 'leave_request',
+      resourceId: request.id, beforeState: { status: 'pending' },
+      afterState: { status: decision, employeeId: request.employee_id, days: total, note: note || null },
+      ipAddress: getClientIp(req),
+    })
 
     await client.query('COMMIT')
 
@@ -508,17 +548,28 @@ router.post('/requests/:id/cancel', checkedInHandler("the employee whose leave i
 
     await client.query('BEGIN')
 
-    await client.query(
+    const cancelled = await client.query(
       `UPDATE leave_requests
           SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP,
               updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1 AND tenant_id = $2`,
-      [request.id, ctx.tenantId]
+        WHERE id = $1 AND tenant_id = $2 AND status = $3
+        RETURNING id`,
+      [request.id, ctx.tenantId, request.status]
     )
+    if (!cancelled.rows.length) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({ error: 'This request changed while you were cancelling it' })
+    }
 
     // Release whichever column the days were sitting in.
     await adjustBalance(client, ctx.tenantId, request.employee_id, request.leave_type_id, year,
       request.status === 'approved' ? { taken: -total } : { pending: -total })
+
+    await auditIn(client, ctx, {
+      actionType: 'LEAVE_CANCELLED', resourceType: 'leave_request', resourceId: request.id,
+      beforeState: { status: request.status }, afterState: { status: 'cancelled', employeeId: request.employee_id, days: total },
+      ipAddress: getClientIp(req),
+    })
 
     await client.query('COMMIT')
     return res.json({ message: 'Leave cancelled' })
@@ -564,8 +615,10 @@ router.get('/calendar', approvers, async (req: TenantRequest, res: Response) => 
           AND d.leave_date BETWEEN $2 AND $3
           AND d.portion > 0
           AND r.status IN ('pending', 'approved')
+          AND ($4::uuid[] IS NULL OR d.employee_id = ANY($4::uuid[]))
         ORDER BY d.leave_date, e.last_name`,
-      [ctx.tenantId, from, to]
+      // A manager sees their own team's absences, and their own.
+      [ctx.tenantId, from, to, listFilter(await reportScope(ctx), true)]
     )
 
     return res.json({ from, to, days: result.rows })

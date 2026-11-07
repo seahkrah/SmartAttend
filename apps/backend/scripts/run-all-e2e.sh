@@ -144,6 +144,8 @@ TS_SUITES=(
   checkinControls
   # The school day by class and the term by student and class, from a known fixture.
   schoolReports
+  # Managers act for the people who report to them: leave, approvals, alerts, rosters, timesheets.
+  managerScope
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

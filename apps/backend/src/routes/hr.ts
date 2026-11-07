@@ -10,6 +10,9 @@ import {
   type TenantRequest,
 } from '../auth/tenantContextMiddleware.js'
 import { findScoped, insertScoped, TenantScopeError } from '../db/tenantScoped.js'
+import { reportsOf } from '../auth/reportingLines.js'
+import { auditIn } from '../services/domainAuditService.js'
+import { getClientIp } from '../utils/getClientIp.js'
 
 /**
  * EMS — HR command centre.
@@ -37,6 +40,17 @@ router.use(
   requirePlatform('corporate'),
   requireRoles('hr', 'hr_director', 'admin', 'manager')
 )
+
+// A manager is here for their team's day and nothing else (finding #41): the
+// organisation's analytics, members, patterns, compliance, campaigns,
+// notifications and export are HR's. Their other team views are under
+// /api/workforce and /api/leave, scoped to the people who report to them.
+router.use((req: TenantRequest, res: Response, next) => {
+  if (req.ctx?.roleName === 'manager' && !req.ctx.isSuperadmin && req.path !== '/today') {
+    return res.status(403).json({ error: 'Forbidden', message: 'This is an HR view; a manager sees their team under Today' })
+  }
+  return next()
+})
 
 function fail(res: Response, e: unknown) {
   if (e instanceof TenantScopeError) {
@@ -101,12 +115,13 @@ const LATE_GRACE_MINUTES = 10
 router.get('/today', async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {
-    let managerScope: string | null = null
+    // A manager sees everyone who reports to them, directly or not.
+    let managerScope: string[] | null = null
     if (ctx.roleName === 'manager') {
       const me = await query(`SELECT id FROM employees WHERE user_id = $1 AND tenant_id = $2`,
         [ctx.userId, ctx.tenantId])
       if (me.rows.length === 0) return res.json({ date: null, summary: {}, people: [] })
-      managerScope = me.rows[0].id
+      managerScope = await reportsOf(ctx.tenantId!, me.rows[0].id)
     }
 
     const r = await query(
@@ -116,7 +131,7 @@ router.get('/today', async (req: TenantRequest, res: Response) => {
            FROM employees e
            LEFT JOIN corporate_departments d ON d.id = e.department_id AND d.tenant_id = e.tenant_id
           WHERE e.tenant_id = $1 AND e.is_currently_employed
-            AND ($2::uuid IS NULL OR e.manager_id = $2::uuid)
+            AND ($2::uuid[] IS NULL OR e.id = ANY($2::uuid[]))
        ),
        shift AS (
          SELECT DISTINCT ON (employee_id) employee_id, starts_at, ends_at, name AS shift_name
@@ -180,7 +195,7 @@ router.get('/today', async (req: TenantRequest, res: Response) => {
     res.json({
       date: r.rows[0]?.today ?? null,
       graceMinutes: LATE_GRACE_MINUTES,
-      scope: managerScope ? 'direct_reports' : 'organisation',
+      scope: managerScope ? 'team' : 'organisation',
       summary: {
         total: people.length,
         onClock: count('on_clock'),
@@ -354,6 +369,68 @@ router.get('/members', async (req: TenantRequest, res: Response) => {
 // ---------------------------------------------------------------------------
 // GET /api/hr/members/:memberId
 // ---------------------------------------------------------------------------
+/**
+ * Sets who an employee reports to, or clears it (managerId null). This is
+ * what scopes a manager to their team (src/auth/reportingLines.ts, finding
+ * #41). Refused: someone as their own manager, a line that would loop back
+ * (the new manager already reports, directly or not, to this employee), and
+ * anyone outside this tenant. Changes are serialised per tenant, so two
+ * edits made at once cannot together make a loop; each is audited.
+ */
+router.put('/employees/:employeeId/manager', async (req: TenantRequest, res: Response) => {
+  const ctx = req.ctx!
+  if (ctx.roleName === 'manager') return res.status(403).json({ error: 'Forbidden' })
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const employeeId = req.params.employeeId
+  const raw = req.body?.managerId
+  const managerId = raw === null || raw === undefined || raw === '' ? null : String(raw)
+  if (!UUID.test(employeeId)) return res.status(404).json({ error: 'No such employee' })
+  if (managerId !== null && !UUID.test(managerId)) return res.status(404).json({ error: 'No such manager' })
+  if (managerId === employeeId) return res.status(400).json({ error: 'Nobody can be their own manager' })
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('reporting_lines:' || $1))`, [ctx.tenantId])
+    const emp = await client.query(`SELECT id, manager_id FROM employees WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+      [employeeId, ctx.tenantId])
+    if (!emp.rows.length) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'No such employee' })
+    }
+    if (managerId !== null) {
+      const mgr = await client.query(`SELECT id FROM employees WHERE id = $1 AND tenant_id = $2`, [managerId, ctx.tenantId])
+      if (!mgr.rows.length) {
+        await client.query('ROLLBACK')
+        return res.status(404).json({ error: 'No such manager' })
+      }
+      // The new manager must not already sit below this employee.
+      const below = await client.query(
+        `WITH RECURSIVE below AS (
+           SELECT id FROM employees WHERE tenant_id = $1 AND manager_id = $2
+           UNION
+           SELECT e.id FROM employees e JOIN below b ON e.manager_id = b.id WHERE e.tenant_id = $1
+         ) SELECT 1 FROM below WHERE id = $3`,
+        [ctx.tenantId, employeeId, managerId])
+      if (below.rows.length) {
+        await client.query('ROLLBACK')
+        return res.status(409).json({ error: 'That manager already reports to this employee; the line would loop' })
+      }
+    }
+    await client.query(`UPDATE employees SET manager_id = $1 WHERE id = $2 AND tenant_id = $3`, [managerId, employeeId, ctx.tenantId])
+    await auditIn(client, { userId: ctx.userId, tenantId: ctx.tenantId!, roleName: ctx.roleName, isSuperadmin: ctx.isSuperadmin }, {
+      actionType: 'REPORTING_LINE_CHANGED', resourceType: 'employee', resourceId: employeeId,
+      beforeState: { managerId: emp.rows[0].manager_id }, afterState: { managerId }, ipAddress: getClientIp(req),
+    })
+    await client.query('COMMIT')
+    return res.json({ employeeId, managerId })
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    return fail(res, e)
+  } finally {
+    client.release()
+  }
+})
+
 router.get('/members/:memberId', async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!
   try {

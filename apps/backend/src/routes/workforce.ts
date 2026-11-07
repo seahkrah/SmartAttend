@@ -39,6 +39,7 @@ import { assertUsableMatch, BiometricError } from '../biometrics/service.js'
 import { checkedInHandler, selfService } from '../auth/guards.js'
 import { AttendanceInputError } from '../attendance/core.js'
 import { getClientIp } from '../utils/getClientIp.js'
+import { actsFor, listFilter, reportScope } from '../auth/reportingLines.js'
 
 /**
  * EMS — contracts, rosters and timesheets.
@@ -180,6 +181,19 @@ function isScheduler(ctx: Ctx): boolean {
   return isHr(ctx) || ctx.roleName === 'manager'
 }
 
+/**
+ * Whether a scheduler may act for this employee: HR for anyone, a manager
+ * for the people who report to them (finding #41, src/auth/reportingLines.ts).
+ */
+async function inTeam(ctx: Ctx, employeeId: string): Promise<boolean> {
+  return actsFor(await reportScope(ctx), employeeId)
+}
+
+/** The employees a scheduler's lists may show: null for everyone. */
+async function teamFilter(ctx: Ctx, includeSelf = false): Promise<string[] | null> {
+  return listFilter(await reportScope(ctx), includeSelf)
+}
+
 /** The caller's own employee record in this tenant, if they have one. */
 /**
  * Whether an employee record is the caller's own. HR writes other people's
@@ -215,7 +229,10 @@ async function callerEmployee(ctx: Ctx): Promise<any | null> {
 async function targetEmployee(ctx: Ctx, suppliedId?: string): Promise<any | null> {
   if (!suppliedId) return callerEmployee(ctx)
   if (!isScheduler(ctx)) return callerEmployee(ctx)
-  return owned('employees', ctx, suppliedId)
+  const row = await owned('employees', ctx, suppliedId)
+  if (!row) return null
+  const mine = await callerEmployee(ctx)
+  return (await inTeam(ctx, row.id)) || mine?.id === row.id ? row : null
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +277,10 @@ router.param('shiftId', async (req: TenantRequest, res: Response, next: NextFunc
     const row = await owned('roster_shifts', ctx, id)
     if (!row) return notFound(res, 'Shift')
 
-    if (!isScheduler(ctx)) {
+    // A manager acts on their team's shifts; their own they see as an employee.
+    const scheduling = isScheduler(ctx) && (await inTeam(ctx, row.employee_id))
+    ;(req as any).inTeam = scheduling
+    if (!scheduling) {
       const mine = await callerEmployee(ctx)
       if (!mine || mine.id !== row.employee_id) return notFound(res, 'Shift')
       // An employee cannot see a shift that has not been published, even their
@@ -281,7 +301,10 @@ router.param('timesheetId', async (req: TenantRequest, res: Response, next: Next
     const row = await owned('timesheets', ctx, id)
     if (!row) return notFound(res, 'Timesheet')
 
-    if (!isScheduler(ctx)) {
+    // A manager acts on their team's timesheets; their own they see as an employee.
+    const scheduling = isScheduler(ctx) && (await inTeam(ctx, row.employee_id))
+    ;(req as any).inTeam = scheduling
+    if (!scheduling) {
       const mine = await callerEmployee(ctx)
       if (!mine || mine.id !== row.employee_id) return notFound(res, 'Timesheet')
     }
@@ -667,7 +690,8 @@ router.get('/roster', checkedInHandler("schedulers see the tenant's roster; anyo
 
     if (isScheduler(ctx)) {
       const employeeId = typeof req.query.employeeId === 'string' ? req.query.employeeId : null
-      if (employeeId && !(await owned('employees', ctx, employeeId))) {
+      const team = await teamFilter(ctx, true)
+      if (employeeId && (!(await owned('employees', ctx, employeeId)) || (team && !team.includes(employeeId)))) {
         return notFound(res, 'Employee')
       }
       const result = await query(
@@ -679,10 +703,11 @@ router.get('/roster', checkedInHandler("schedulers see the tenant's roster; anyo
           WHERE s.tenant_id = $1
             AND s.work_date BETWEEN $2::date AND $3::date
             AND ($4::uuid IS NULL OR s.employee_id = $4::uuid)
+            AND ($5::uuid[] IS NULL OR s.employee_id = ANY($5::uuid[]))
           ORDER BY s.work_date, s.start_time, e.last_name`,
-        [ctx.tenantId, from, to, employeeId]
+        [ctx.tenantId, from, to, employeeId, team]
       )
-      return res.json({ shifts: result.rows, scope: 'all' })
+      return res.json({ shifts: result.rows, scope: team ? 'team' : 'all' })
     }
 
     const mine = await callerEmployee(ctx)
@@ -710,6 +735,8 @@ router.post('/roster', schedulers, async (req: TenantRequest, res: Response) => 
   try {
     const ctx = svcCtx(req)
     const b = req.body ?? {}
+    const target = await owned('employees', ctxOf(req), String(b.employeeId ?? ''))
+    if (target && !(await inTeam(ctxOf(req), target.id))) return notFound(res, 'Employee')
     client = await getConnection()
     await client.query('BEGIN')
     const shift = await rosterShift(client, ctx, {
@@ -746,7 +773,7 @@ router.post('/roster/bulk', schedulers, async (req: TenantRequest, res: Response
     const b = req.body ?? {}
 
     const employee = await owned('employees', full, String(b.employeeId ?? ''))
-    if (!employee) return notFound(res, 'Employee')
+    if (!employee || !(await inTeam(full, employee.id))) return notFound(res, 'Employee')
 
     const from = requireDay(b.from, 'from')
     const to = requireDay(b.to, 'to')
@@ -817,7 +844,8 @@ router.post('/roster/publish', schedulers, async (req: TenantRequest, res: Respo
     const b = req.body ?? {}
     client = await getConnection()
     await client.query('BEGIN')
-    const published = await publishRoster(client, ctx, String(b.from ?? ''), String(b.to ?? ''))
+    // A manager publishes their team's shifts, not everyone's in the range.
+    const published = await publishRoster(client, ctx, String(b.from ?? ''), String(b.to ?? ''), await teamFilter(ctxOf(req)))
     await client.query('COMMIT')
 
     // After the commit: telling somebody about a shift that then rolls back is
@@ -841,6 +869,7 @@ router.post('/roster/:shiftId/cancel', schedulers, async (req: TenantRequest, re
   try {
     const ctx = ctxOf(req)
     const shift = (req as any).shift
+    if (!(req as any).inTeam) return notFound(res, 'Shift')
     const reason = String(req.body?.reason ?? '').trim()
     if (!reason) return res.status(400).json({ error: 'Cancelling a shift has to say why' })
     if (shift.status === 'cancelled') {
@@ -877,9 +906,10 @@ router.get('/roster/coverage', schedulers, async (req: TenantRequest, res: Respo
         WHERE s.tenant_id = $1
           AND s.work_date BETWEEN $2::date AND $3::date
           AND s.status <> 'cancelled'
+          AND ($4::uuid[] IS NULL OR s.employee_id = ANY($4::uuid[]))
         GROUP BY 1
         ORDER BY 1`,
-      [ctx.tenantId, from, to]
+      [ctx.tenantId, from, to, await teamFilter(ctx)]
     )
     return res.json({ days: result.rows })
   } catch (e) {
@@ -901,8 +931,9 @@ router.get('/timesheets', schedulers, async (req: TenantRequest, res: Response) 
          JOIN employees e ON e.id = t.employee_id AND e.tenant_id = t.tenant_id
         WHERE t.tenant_id = $1
           AND ($2::text IS NULL OR t.status = $2::text)
+          AND ($3::uuid[] IS NULL OR t.employee_id = ANY($3::uuid[]))
         ORDER BY t.period_start DESC, e.last_name`,
-      [ctx.tenantId, status]
+      [ctx.tenantId, status, await teamFilter(ctx)]
     )
     return res.json({ timesheets: result.rows })
   } catch (e) {
@@ -1052,7 +1083,7 @@ router.get('/timesheets/preview', schedulers, async (req: TenantRequest, res: Re
     const ctx = svcCtx(req)
     const full = ctxOf(req)
     const employee = await owned('employees', full, String(req.query.employeeId ?? ''))
-    if (!employee) return notFound(res, 'Employee')
+    if (!employee || !(await inTeam(full, employee.id))) return notFound(res, 'Employee')
 
     const built = await buildTimesheet(
       { query }, ctx, employee.id,
@@ -1093,7 +1124,7 @@ router.post('/timesheets', schedulers, async (req: TenantRequest, res: Response)
     const b = req.body ?? {}
 
     const employee = await owned('employees', full, String(b.employeeId ?? ''))
-    if (!employee) return notFound(res, 'Employee')
+    if (!employee || !(await inTeam(full, employee.id))) return notFound(res, 'Employee')
 
     const from = requireDay(b.periodStart, 'periodStart')
     const to = requireDay(b.periodEnd, 'periodEnd')
@@ -1346,6 +1377,7 @@ router.get('/timesheets/:timesheetId/rate', schedulers, async (req: TenantReques
   try {
     const ctx = svcCtx(req)
     const timesheet = (req as any).timesheet
+    if (!(req as any).inTeam) return notFound(res, 'Timesheet')
 
     const weeklyHours = timesheet.contract_id
       ? Number((await query(

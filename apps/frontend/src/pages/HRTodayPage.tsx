@@ -32,7 +32,7 @@ interface Person {
 interface Today {
   date: string | null;
   graceMinutes: number;
-  scope: 'organisation' | 'direct_reports';
+  scope: 'organisation' | 'team';
   summary: Record<string, number>;
   people: Person[];
 }
@@ -103,7 +103,7 @@ export const HRTodayPage: React.FC = () => {
           <h1 className="text-2xl font-semibold text-primary">Today</h1>
           <p className="text-sm text-secondary mt-1">
             {data.date ? new Date(data.date).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) : ''}
-            {' · '}{data.scope === 'direct_reports' ? 'your direct reports' : 'everyone employed'}
+            {' · '}{data.scope === 'team' ? 'the people who report to you' : 'everyone employed'}
             {' · '}late means more than {data.graceMinutes} minutes after the published shift start
           </p>
         </div>
@@ -146,7 +146,7 @@ export const HRTodayPage: React.FC = () => {
 
         {data.people.length === 0 ? (
           <EmptyState title="Nobody to show"
-                      description={data.scope === 'direct_reports' ? 'No employees report to you.' : 'No current employees.'} />
+                      description={data.scope === 'team' ? 'No employees report to you.' : 'No current employees.'} />
         ) : shown.length === 0 ? (
           <p className="text-sm text-muted">No one matches.</p>
         ) : (

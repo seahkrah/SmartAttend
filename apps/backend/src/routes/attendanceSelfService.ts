@@ -421,7 +421,9 @@ router.get('/me/export', selfService("the caller's own attendance, as a file"), 
 // Department views — managers and HR
 // ---------------------------------------------------------------------------
 
-const DEPARTMENT_ROLES = ['hr', 'hr_director', 'manager', 'admin'] as const
+// Every department and every employee in it: HR's view. A manager's team is
+// under /api/hr/today, /api/workforce and /api/leave (finding #41).
+const DEPARTMENT_ROLES = ['hr', 'hr_director', 'admin'] as const
 
 router.get('/department/all', requireRoles(...DEPARTMENT_ROLES), async (req: TenantRequest, res: Response) => {
   const ctx = req.ctx!

@@ -25,6 +25,19 @@ import {
   AttendanceInputError,
   decideCheckIn,
 } from '../attendance/core.js'
+import { actsFor, listFilter, reportScope } from '../auth/reportingLines.js'
+import { auditIn } from '../services/domainAuditService.js'
+import { getClientIp } from '../utils/getClientIp.js'
+
+/**
+ * A manager reviews the people who report to them (finding #41): their
+ * alerts, their manual entries, their check-ins awaiting approval. Alerts
+ * about a device rather than a person, and anything about someone outside
+ * the team, are HR's and an administrator's. null means everyone.
+ */
+async function scopeOf(req: TenantRequest): Promise<string[] | null> {
+  return listFilter(await reportScope(ctxOf(req)))
+}
 
 const router = Router()
 router.use(authenticateToken, resolveTenantContext, requireTenant)
@@ -57,8 +70,9 @@ router.get('/alerts', reviewers, async (req: TenantRequest, res: Response) => {
          LEFT JOIN students s ON s.id = a.student_id AND s.tenant_id = a.tenant_id
          LEFT JOIN employees e ON e.id = a.employee_id AND e.tenant_id = a.tenant_id
         WHERE a.tenant_id = $1 AND ($2 OR a.acknowledged_at IS NULL)
+          AND ($3::uuid[] IS NULL OR a.employee_id = ANY($3::uuid[]))
         ORDER BY a.created_at DESC LIMIT 200`,
-      [ctx.tenantId, all]
+      [ctx.tenantId, all, await scopeOf(req)]
     )
     return res.json({ alerts: r.rows })
   } catch (e) {
@@ -73,8 +87,9 @@ router.post('/alerts/:alertId/acknowledge', reviewers, async (req: TenantRequest
     const r = await query(
       `UPDATE attendance_alerts SET acknowledged_at = CURRENT_TIMESTAMP, acknowledged_by = $3
         WHERE id = $1 AND tenant_id = $2 AND acknowledged_at IS NULL
+          AND ($4::uuid[] IS NULL OR employee_id = ANY($4::uuid[]))
         RETURNING id, acknowledged_at`,
-      [req.params.alertId, ctx.tenantId, ctx.userId]
+      [req.params.alertId, ctx.tenantId, ctx.userId, await scopeOf(req)]
     )
     if (!r.rows.length) return res.status(404).json({ error: 'Alert not found, or already acknowledged' })
     return res.json({ alert: r.rows[0] })
@@ -87,6 +102,7 @@ router.post('/alerts/:alertId/acknowledge', reviewers, async (req: TenantRequest
 router.get('/manual', reviewers, async (req: TenantRequest, res: Response) => {
   try {
     const ctx = ctxOf(req)
+    const team = await scopeOf(req)
     const people = await query(
       `SELECT COALESCE(e.student_id, e.employee_id) AS person_id,
               CASE WHEN e.student_id IS NOT NULL THEN 'student' ELSE 'employee' END AS person_type,
@@ -96,9 +112,10 @@ router.get('/manual', reviewers, async (req: TenantRequest, res: Response) => {
          FROM attendance_events e
         WHERE e.tenant_id = $1 AND e.kind IN ('mark', 'check_in')
           AND e.server_time > CURRENT_TIMESTAMP - INTERVAL '30 days'
+          AND ($2::uuid[] IS NULL OR e.employee_id = ANY($2::uuid[]))
         GROUP BY 1, 2
         ORDER BY manual DESC LIMIT 200`,
-      [ctx.tenantId]
+      [ctx.tenantId, team]
     )
     const devices = await query(
       `SELECT device_id,
@@ -108,9 +125,10 @@ router.get('/manual', reviewers, async (req: TenantRequest, res: Response) => {
          FROM attendance_events
         WHERE tenant_id = $1 AND kind IN ('mark', 'check_in') AND device_id IS NOT NULL
           AND server_time > CURRENT_TIMESTAMP - INTERVAL '30 days'
+          AND ($2::uuid[] IS NULL OR employee_id = ANY($2::uuid[]))
         GROUP BY device_id
         ORDER BY manual DESC LIMIT 200`,
-      [ctx.tenantId]
+      [ctx.tenantId, team]
     )
     const share = (m: number, f: number) => (m + f === 0 ? null : Math.round((1000 * m) / (m + f)) / 10)
     return res.json({
@@ -135,8 +153,9 @@ router.get('/approvals', requirePlatform('corporate'), approvers, async (req: Te
         WHERE ev.tenant_id = $1 AND ev.kind = 'check_in' AND ev.approval_state = 'pending'
           AND NOT EXISTS (SELECT 1 FROM attendance_events d
                            WHERE d.tenant_id = ev.tenant_id AND d.kind = 'approval' AND d.supersedes_event_id = ev.id)
+          AND ($2::uuid[] IS NULL OR ev.employee_id = ANY($2::uuid[]))
         ORDER BY ev.server_time`,
-      [ctx.tenantId]
+      [ctx.tenantId, await scopeOf(req)]
     )
     return res.json({ approvals: r.rows })
   } catch (e) {
@@ -166,9 +185,20 @@ router.post('/approvals/:eventId', requirePlatform('corporate'), approvers, asyn
       if (own.rows.length && !ctx.isSuperadmin) {
         return res.status(403).json({ error: 'You cannot decide your own check-in; somebody else has to' })
       }
+      // Someone outside a manager's team is not theirs to decide.
+      const whose = await query(`SELECT employee_id FROM attendance_events WHERE id = $1 AND tenant_id = $2`,
+        [req.params.eventId, ctx.tenantId])
+      if (whose.rows.length && !actsFor(await reportScope(ctx), whose.rows[0].employee_id)) {
+        return res.status(404).json({ error: 'No such check-in awaiting approval', code: 'not_found' })
+      }
     }
     await client.query('BEGIN')
     const done = await decideCheckIn(client, { tenantId: ctx.tenantId, userId: ctx.userId }, req.params.eventId, decision, note)
+    await auditIn(client, ctx, {
+      actionType: decision === 'approved' ? 'CHECKIN_APPROVED' : 'CHECKIN_REJECTED', resourceType: 'corporate_checkin',
+      resourceId: done.checkinId, afterState: { decision, employeeId: done.employeeId, eventId: req.params.eventId, note },
+      ipAddress: getClientIp(req),
+    })
     await client.query('COMMIT')
     return res.json({ decided: decision, ...done })
   } catch (e) {

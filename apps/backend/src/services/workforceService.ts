@@ -393,7 +393,9 @@ export async function publishRoster(
   client: PoolClient,
   ctx: WorkforceContext,
   from: string,
-  to: string
+  to: string,
+  /** Only these employees' shifts (a manager's team); null for everyone. */
+  employeeIds: string[] | null = null
 ): Promise<number> {
   const start = requireDay(from, 'from')
   const end = requireDay(to, 'to')
@@ -405,8 +407,9 @@ export async function publishRoster(
       WHERE tenant_id = $1
         AND work_date BETWEEN $2::date AND $3::date
         AND status = 'scheduled'
+        AND ($4::uuid[] IS NULL OR employee_id = ANY($4::uuid[]))
       RETURNING id`,
-    [ctx.tenantId, start, end]
+    [ctx.tenantId, start, end, employeeIds]
   )
   return published.rowCount ?? 0
 }

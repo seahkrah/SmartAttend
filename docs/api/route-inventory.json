@@ -2076,6 +2076,13 @@
     "params": []
   },
   {
+    "method": "PUT",
+    "path": "/api/hr/employees/:employeeId/manager",
+    "params": [
+      "employeeId"
+    ]
+  },
+  {
     "method": "GET",
     "path": "/api/hr/export/organization-report",
     "params": []

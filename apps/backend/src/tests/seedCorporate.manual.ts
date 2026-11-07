@@ -155,6 +155,20 @@ async function main() {
        VALUES ($1,$2,$3,$4,$5,'000',$6,'2024-01-01',true,$7) RETURNING id`,
       [mgr.id, `E-${tag}MG`, 'Manager', tag, `mgr.${tag.toLowerCase()}@c2e.test`, dept.id, ent.id])).rows[0]
 
+    // A second manager, so a manager acting outside their own team can be
+    // tested (finding #41).
+    const mgr2 = (await query(
+      `INSERT INTO users (platform_id,email,full_name,role_id,password_hash,is_active)
+       VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+      [cp.id, `mgr2.${tag.toLowerCase()}@c2e.test`, `Manager2 ${tag}`, mgrRole.id, hash])).rows[0]
+    await query(`INSERT INTO corporate_user_associations (user_id, corporate_entity_id, status) VALUES ($1,$2,'active')`,
+      [mgr2.id, ent.id])
+    const mgr2Emp = (await query(
+      `INSERT INTO employees (user_id, employee_id, first_name, last_name, email, phone,
+                              department_id, date_of_joining, is_currently_employed, tenant_id)
+       VALUES ($1,$2,$3,$4,$5,'000',$6,'2024-01-01',true,$7) RETURNING id`,
+      [mgr2.id, `E-${tag}MG2`, 'Manager2', tag, `mgr2.${tag.toLowerCase()}@c2e.test`, dept.id, ent.id])).rows[0]
+
     const empIds: string[] = []
     let firstEmpUserId: string | null = null
     for (let i = 1; i <= 3; i++) {
@@ -200,6 +214,11 @@ async function main() {
     // Against a 40-hour contract that is four hours of overtime, and the two
     // excluded days are there so the suite can prove they are excluded for
     // different reasons.
+    // Reporting lines: employees 1 and 2 report to the manager, employee 3 to
+    // the second manager. HR and the managers themselves report to nobody here.
+    await query(`UPDATE employees SET manager_id = $1 WHERE id = ANY($2::uuid[])`, [mgrEmp.id, [empIds[0], empIds[1]]])
+    await query(`UPDATE employees SET manager_id = $1 WHERE id = $2`, [mgr2Emp.id, empIds[2]])
+
     const tsEmp = empIds[1]
     await query(
       `INSERT INTO employment_contracts
@@ -276,6 +295,8 @@ async function main() {
       adminToken: await generateAccessToken(admin.id, cp.id, adminRole.id),
       managerToken: await generateAccessToken(mgr.id, cp.id, mgrRole.id),
       managerEmpId: mgrEmp.id,
+      manager2Token: await generateAccessToken(mgr2.id, cp.id, mgrRole.id),
+      manager2EmpId: mgr2Emp.id,
       empToken: await generateAccessToken(firstEmpUserId!, cp.id, empRole.id),
       empId: empIds[0],
     }

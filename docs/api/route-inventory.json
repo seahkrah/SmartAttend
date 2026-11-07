@@ -790,6 +790,18 @@
   },
   {
     "method": "GET",
+    "path": "/api/auth/admin/school/reports/attendance/daily",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/reports/attendance/term/:termId",
+    "params": [
+      "termId"
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/auth/admin/school/rooms",
     "params": []
   },

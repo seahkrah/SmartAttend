@@ -142,6 +142,8 @@ TS_SUITES=(
   biometricLimits
   # Where, from what and when employees check in: geofence, network, devices, shifts; breaks.
   checkinControls
+  # The school day by class and the term by student and class, from a known fixture.
+  schoolReports
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

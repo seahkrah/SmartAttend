@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useToastStore } from '../components/Toast';
 import { getErrorMessage } from '../utils/errorHandler';
+import SchoolAttendanceSummaries from '../components/reports/SchoolAttendanceSummaries';
 
 interface AttendanceRecord {
   id: string;
@@ -88,6 +89,8 @@ const SchoolAdminReportsPage: React.FC = () => {
         <h1 className="text-2xl font-bold text-primary">Attendance Reports & Analytics</h1>
         <p className="text-sm text-secondary mt-1">Generate and export attendance reports</p>
       </div>
+
+      <SchoolAttendanceSummaries />
 
       {/* Filters */}
       <div className="bg-card rounded-lg shadow p-6 mb-6">

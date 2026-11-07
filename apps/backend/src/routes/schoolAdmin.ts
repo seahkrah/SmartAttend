@@ -16,6 +16,7 @@ import {
 import { TenantScopeError } from '../db/tenantScoped.js'
 import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
 import { memberElsewhere } from '../auth/authService.js'
+import { atRiskPercentFor, dailyByClass, isoDate, ReportInputError, termReport, toCsv } from '../reports/schoolAttendance.js'
 
 /**
  * SMS — the school administrator's surface.
@@ -1882,6 +1883,41 @@ router.get('/admin/school/attendance/overview', async (req: TenantRequest, res: 
     return res.json(result.rows)
   } catch (e) {
     return fail(res, 'get attendance overview', e)
+  }
+})
+
+// The day by class, and the term by student and class (src/reports/schoolAttendance.ts). ?format=csv for a file.
+router.get('/admin/school/reports/attendance/daily', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const date = isoDate(req.query.date ?? new Date().toISOString().slice(0, 10), 'date')
+    const out = await dailyByClass(ctx.tenantId, date)
+    if (req.query.format !== 'csv') return res.json(out)
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-${date}.csv"`)
+    return res.send(toCsv(
+      ['course_code', 'course', 'section', 'start', 'teacher', 'enrolled', 'present', 'late', 'absent', 'excused', 'unmarked', 'by_face', 'by_hand', 'register_taken'],
+      out.classes.map((c) => [c.courseCode, c.courseName, c.section, c.startTime, c.faculty, c.enrolled, c.present, c.late,
+        c.absent, c.excused, c.unmarked, c.byFace, c.byHand, c.registerTaken])))
+  } catch (e) {
+    if (e instanceof ReportInputError) return res.status(e.status).json({ error: e.message })
+    return fail(res, 'get the daily attendance summary', e)
+  }
+})
+
+router.get('/admin/school/reports/attendance/term/:termId', async (req: TenantRequest, res: Response) => {
+  try {
+    const ctx = ctxOf(req)
+    const out = await termReport(ctx.tenantId, req.params.termId, await atRiskPercentFor(ctx.tenantId, req.query.below))
+    if (req.query.format !== 'csv') return res.json(out)
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="term-attendance.csv"')
+    return res.send(toCsv(
+      ['student_number', 'name', 'sessions', 'present', 'late', 'absent', 'excused', 'unmarked', 'rate_percent', 'below'],
+      out.students.map((s) => [s.studentNumber, s.name, s.sessions, s.present, s.late, s.absent, s.excused, s.unmarked, s.ratePercent, s.below])))
+  } catch (e) {
+    if (e instanceof ReportInputError) return res.status(e.status).json({ error: e.message })
+    return fail(res, 'get the term attendance report', e)
   }
 })
 

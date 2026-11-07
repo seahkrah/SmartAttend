@@ -2782,6 +2782,54 @@
   },
   {
     "method": "GET",
+    "path": "/api/auth/admin/school/reports/attendance/daily",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/admin/school/reports/attendance/term/:termId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "school"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/auth/admin/school/rooms",
     "guards": [
       {

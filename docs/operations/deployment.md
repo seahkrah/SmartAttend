@@ -35,7 +35,9 @@ Put a TLS-terminating reverse proxy (Caddy, nginx, a cloud load balancer) in
 front of the API and web ports. Neither container serves HTTPS.
 `TRUST_PROXY=1` tells the API there is exactly one proxy in front of it, so
 it takes the client's address from that proxy's `X-Forwarded-For` and from
-nowhere else.
+nowhere else. Get it right: the address is what the check-in network
+control compares with a site's networks, what the audit trail records and
+what rate limits count. Too high a value lets a client name its own address.
 
 ### Production configuration
 
@@ -130,15 +132,32 @@ npx tsx src/faceWorker/server.ts
   `FACE_WORKER_TOKEN` (at least 32 characters, shared with the API) and,
   optionally, `FACE_WORKER_PORT` (5100), `FACE_WORKER_HOST` (127.0.0.1) and
   `FACE_WORKER_MAX_QUEUE` (8). It drops a request whose caller has gone, rather than analysing for nobody.
+- **The analysis runs in `FACE_ENGINE_PROCESSES` child processes** (default
+  2), so the worker's HTTP loop keeps answering health checks while they
+  work. Each holds a few hundred MB; size it to the host's cores and memory.
 - **The API sends it images when `FACE_WORKER_URL` is set**, with the same
   token (`FACE_WORKER_TIMEOUT_MS`, default 15000). The API then never loads
   TensorFlow.
 - **When the worker is down, slow or full,** face checks answer 503
   `engine_unavailable` and attendance is taken by hand with a reason. The
   API's readiness stays 200 and reports `faceEngine.worker.reachable: false`.
-- **To scale out,** run more workers behind one address.
+- **To scale out,** run more workers and list them in `FACE_WORKER_URL`,
+  separated by commas; the API sends each analysis to the next and skips one
+  it cannot reach. docs/operations/capacity.md says how many.
 - **Without `FACE_WORKER_URL`,** the API runs the engine in its own process.
   That is for development only.
+
+## Attendance kiosks
+
+A kiosk is a browser at a site, opened at `/kiosk` on the web app. An
+administrator creates it under Check-in rules (a site, a label, an
+attendant PIN) and types the pairing code shown, once, on the kiosk within
+15 minutes. The kiosk then holds a token in its browser storage; anyone with
+that browser profile has it, so lock the device down (a kiosk browser mode,
+no other use) and revoke a kiosk that goes missing. With the network control
+enforced, a token taken elsewhere does not work from outside the site's
+networks. Kiosk requests carry no cookies, so they need no CORS change on
+the same origin.
 
 ## Health
 

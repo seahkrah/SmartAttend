@@ -154,6 +154,7 @@ being enrolled, an employee stops being employed, or the record is deleted.
 | `BIOMETRIC_TEMPLATE_KEY_VERSION` | Version stamped on new templates (default 1). |
 | `BIOMETRIC_TEMPLATE_KEY_PREVIOUS`, `..._PREVIOUS_VERSION` | Lets templates sealed under the previous key still open during a rotation. |
 | `FACE_ENGINE_CONCURRENCY` | Images analysed at once (default 2). |
+| `FACE_ENGINE_PROCESSES` | Engine child processes in each face worker (default 2), so the worker answers health checks while they work. |
 | `FACE_WORKER_URL`, `FACE_WORKER_TOKEN` | Analyse faces in the isolated worker (`docs/operations/deployment.md`); without them the engine runs in the API process, for development only. |
 
 Per tenant (`tenant_settings`): `biometrics.enabled`, `biometrics.match_threshold`
@@ -163,9 +164,22 @@ Per tenant (`tenant_settings`): `biometrics.enabled`, `biometrics.match_threshol
 
 - Images: JPEG or PNG only, at most 2 MB, 160–4096 px per side, checked from
   the header before decoding; held in memory for the request and never stored.
-- 30 challenges per user per 10 minutes.
+- 30 challenges per user per 10 minutes; per device (`X-Device-Id`) 200 per
+  10 minutes (`biometrics.device_challenges_per_10min`); per tenant 600 a
+  minute (`biometrics.tenant_challenges_per_minute`). The device id is the
+  client's own claim, so the per-device limit slows a device, not someone
+  set on changing it; the per-person and per-tenant limits still hold.
 - After five failed check-in matches in 15 minutes, face check-in pauses for
-  that employee for 15 minutes (plain check-in still works).
+  that employee for 15 minutes (plain check-in still works), and HR is
+  alerted (`face_lockout`). One device failing to identify anyone ten times
+  in ten minutes is alerted too (`device_face_failures`).
+- Every face event is also written to the hash-chained audit log, in the
+  same transaction.
+- Administrators see 30 days of outcomes, failure reasons, PAD scores and
+  open alerts (`GET /api/biometrics/overview`, the face-matching page).
+- At a kiosk (`/kiosk`), the challenge is issued for the employee whose
+  number was typed and bound to the kiosk's device; no other kiosk can
+  answer it (`docs/operations/deployment.md`, Attendance kiosks).
 
 ## Operational requirements
 
@@ -191,4 +205,8 @@ Per tenant (`tenant_settings`): `biometrics.enabled`, `biometrics.match_threshol
 - `src/tests/faceWorkerDown.manual.ts`: the worker killed and restarted.
 - `src/tests/biometricCrossTenant.manual.ts`: another tenant's templates,
   consents, challenges and events, over HTTP and as the runtime role.
+- `src/tests/biometricLimits.manual.ts`: the audit-chain rows, the device and
+  tenant limits, the device-failure alert and the overview's roles.
+- `src/tests/kiosk.manual.ts` and `apps/frontend/e2e/kiosk.spec.ts`: face
+  check-in at a kiosk, the latter in a browser with a fake camera.
 - Fixtures and their provenance: `apps/backend/src/tests/fixtures/faces/README.md`.

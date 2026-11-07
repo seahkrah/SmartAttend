@@ -1003,7 +1003,7 @@ router.post('/my/check-in', selfService("checks the caller in"), async (req: Ten
       latitude: b.latitude, longitude: b.longitude, accuracyMetres: b.accuracyMetres, clientIp: getClientIp(req),
     })
     await client.query('COMMIT')
-    return res.status(201).json({ checkIn: row })
+    return res.status(row.replayed ? 200 : 201).json({ checkIn: row })
   } catch (e) {
     if (client) await client.query('ROLLBACK').catch(() => undefined)
     return fail(res, 'check you in', e)

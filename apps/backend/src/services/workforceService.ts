@@ -1139,7 +1139,7 @@ export async function checkIn(
     clientIp?: string | null
     kioskSiteId?: string | null
   }
-): Promise<CheckInRow & { approval: 'not_needed' | 'pending'; eventId: string }> {
+): Promise<CheckInRow & { approval: 'not_needed' | 'pending'; eventId: string; replayed?: boolean }> {
   const type = input.checkInType === undefined || input.checkInType === null || input.checkInType === ''
     ? 'office'
     : String(input.checkInType)
@@ -1151,6 +1151,22 @@ export async function checkIn(
     : String(input.siteLocation).trim().slice(0, 255) || null
 
   await lockEmployee(client, ctx.tenantId, employeeId)
+
+  // A retry with the same idempotency key answers with the check-in it made,
+  // rather than "already checked in". After the lock, so two copies of one
+  // request sent at once are answered in turn: the first records, the second
+  // finds it.
+  if (input.idempotencyKey !== undefined && input.idempotencyKey !== null && input.idempotencyKey !== '') {
+    const prior = await client.query(
+      `SELECT id, checkin_id, approval_state FROM attendance_events
+        WHERE tenant_id = $1 AND idempotency_key = $2 AND kind = 'check_in' AND employee_id = $3`,
+      [ctx.tenantId, String(input.idempotencyKey).slice(0, 128), employeeId])
+    if (prior.rows.length) {
+      const row = await client.query(
+        `SELECT ${CHECKIN_COLUMNS} FROM corporate_checkins WHERE id = $1 AND tenant_id = $2`, [prior.rows[0].checkin_id, ctx.tenantId])
+      return { ...toCheckInRow(row.rows[0]), approval: prior.rows[0].approval_state, eventId: prior.rows[0].id, replayed: true }
+    }
+  }
 
   const open = await openCheckIn(client, ctx.tenantId, employeeId)
   if (open) {

@@ -259,6 +259,20 @@ async function main() {
     check('that is an impossible-travel alert', travel.length === 1 && travel[0].detail?.kmh > 300, `(${JSON.stringify(travel)})`)
     await out(emp, ACCRA)
 
+    console.log('-- a retried check-in --')
+    const key = `retry-${RUN}`
+    const [k1, k2] = await Promise.all([inn(emp, { idempotencyKey: key }), inn(emp, { idempotencyKey: key })])
+    const ids = [k1.json?.checkIn?.id, k2.json?.checkIn?.id]
+    check('the same check-in sent twice at once: one recorded, both answered with it',
+      JSON.stringify([k1.status, k2.status].sort()) === '[200,201]' && !!ids[0] && ids[0] === ids[1], `(${k1.status} ${k2.status} ${ids})`)
+    r = await inn(emp, { idempotencyKey: key })
+    check('and again later: still that check-in, not "already checked in"', r.status === 200 && r.json?.checkIn?.id === ids[0], `(${r.status})`)
+    const events = (await owner(`SELECT count(*)::int AS n FROM attendance_events WHERE tenant_id = $1 AND idempotency_key = $2`, [T, key])).rows[0].n
+    check('one event under that key', events === 1, `(${events})`)
+    r = await inn(emp)
+    check('a new check-in without the key is still refused while checked in', r.status === 409, `(${r.status})`)
+    await out(emp)
+
     console.log('-- breaks --')
     r = await call('POST', '/api/workforce/my/break-start', emp)
     check('no break without checking in', r.status === 409, `(${r.status})`)

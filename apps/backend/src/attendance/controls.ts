@@ -49,6 +49,12 @@ export interface Claim {
   accuracyMetres: number | null
   /** A face match backs the check-in. */
   byFace: boolean
+  /**
+   * The site a kiosk is registered to. A kiosk reports no position: it is
+   * placed where it was installed, and fails the geofence if that site has
+   * been retired.
+   */
+  kioskSiteId?: string | null
 }
 
 export const CONTROL_DEFAULTS = {
@@ -78,6 +84,7 @@ const MESSAGES: Record<string, string> = {
   no_device_id: 'This device is not identified. Use the app on a registered device.',
   unregistered_device: 'This device is not registered for your check-in. Ask HR to register it.',
   outside_shift_window: 'You are not rostered to work now.',
+  kiosk_site_retired: "This kiosk's site is no longer in use. Ask an administrator.",
 }
 
 export class ControlRefusal extends Error {
@@ -204,7 +211,12 @@ export async function runControls(
     : []
 
   const geo = modeOf(s, 'geofence')
-  if (geo !== 'off') {
+  if (geo !== 'off' && claim.kioskSiteId) {
+    const k = sites.find((x: any) => x.id === claim.kioskSiteId)
+    results.push(k
+      ? { control: 'geofence', mode: geo, ok: true, code: 'kiosk_site', detail: { site: k.name, siteId: k.id } }
+      : { control: 'geofence', mode: geo, ok: false, code: 'kiosk_site_retired', detail: { siteId: claim.kioskSiteId } })
+  } else if (geo !== 'off') {
     if (!sites.length) results.push({ control: 'geofence', mode: geo, ok: true, code: 'no_sites' })
     else {
       const g = geofence(claim, sites, intOf(s, 'checkin.max_accuracy_m', CONTROL_DEFAULTS.maxAccuracyMetres))

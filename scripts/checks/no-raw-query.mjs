@@ -58,6 +58,7 @@ const SYSTEM_ALLOWED = new Set([
   'apps/backend/src/auth/sso/service.ts', // single sign-on: the provider's answer before anyone is known
   'apps/backend/src/security/rateLimitStore.ts', // rate-limit counters shared across replicas, not tenant data
   'apps/backend/src/routes/mfa.ts', // the code step of sign-in and the caller's own settings
+  'apps/backend/src/kiosk/auth.ts', // a kiosk's pairing code or token names its tenant before any session exists
   // Platform-level records (migration 075).
   'apps/backend/src/services/incidentService.ts', // errors become platform incidents, whatever the tenant
   'apps/backend/src/routes/accessRequests.ts', // enquiries before any tenant exists; superadmin reads
@@ -77,6 +78,7 @@ const SYSTEM_ALLOWED_PREFIX = f =>
 
 const WITH_TENANT_ALLOWED = new Set([
   'apps/backend/src/auth/tenantContextMiddleware.ts', // the tenant comes from membership or break-glass
+  'apps/backend/src/kiosk/auth.ts', // the tenant comes from the kiosk's token, as a session's does from membership
   'apps/backend/src/db/dbContext.ts',
 ])
 

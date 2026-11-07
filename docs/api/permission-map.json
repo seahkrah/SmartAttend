@@ -7928,6 +7928,192 @@
   },
   {
     "method": "GET",
+    "path": "/api/kiosk/admin/devices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/admin/devices",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/kiosk/admin/devices/:kioskId",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/admin/devices/:kioskId/pairing-code",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/admin/devices/:kioskId/pin",
+    "guards": [
+      {
+        "kind": "authenticated"
+      },
+      {
+        "kind": "tenant"
+      },
+      {
+        "kind": "platform",
+        "values": [
+          "corporate"
+        ]
+      },
+      {
+        "kind": "roles",
+        "values": [
+          "admin",
+          "hr_director"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/face/challenge",
+    "guards": [
+      {
+        "kind": "kiosk",
+        "what": "a paired kiosk: one employee at a time, by the number they type, at its own site"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/face/verify",
+    "guards": [
+      {
+        "kind": "kiosk",
+        "what": "a paired kiosk: one employee at a time, by the number they type, at its own site"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/lookup",
+    "guards": [
+      {
+        "kind": "kiosk",
+        "what": "a paired kiosk: one employee at a time, by the number they type, at its own site"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/pair",
+    "guards": [
+      {
+        "kind": "public",
+        "reason": "a pairing code, shown once to an administrator and valid for 15 minutes, is the credential"
+      }
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/punch",
+    "guards": [
+      {
+        "kind": "kiosk",
+        "what": "a paired kiosk: one employee at a time, by the number they type, at its own site"
+      }
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/api/kiosk/session",
+    "guards": [
+      {
+        "kind": "kiosk",
+        "what": "a paired kiosk: one employee at a time, by the number they type, at its own site"
+      }
+    ]
+  },
+  {
+    "method": "GET",
     "path": "/api/leave/balances",
     "guards": [
       {

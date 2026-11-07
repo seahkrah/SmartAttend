@@ -41,6 +41,8 @@ export interface Capture {
   accuracyMetres?: number | null
   /** The request's address, as the API saw it (TRUST_PROXY). */
   clientIp?: string | null
+  /** The site of the kiosk the capture was made at (controls.ts). */
+  kioskSiteId?: string | null
 }
 
 export interface CoreContext {
@@ -357,6 +359,7 @@ export async function checkIn(client: PoolClient, ctx: CoreContext, c: CheckIn):
     clientIp: capture.clientIp ?? null,
     latitude: num(capture.latitude), longitude: num(capture.longitude), accuracyMetres: num(capture.accuracyMetres),
     byFace: isFace(capture.method),
+    kioskSiteId: capture.kioskSiteId ?? null,
   }
   // Where, from what and when (brief 5.5): an enforced control refuses here;
   // a flagged one holds the hours for a manager, as a manual check-in can.

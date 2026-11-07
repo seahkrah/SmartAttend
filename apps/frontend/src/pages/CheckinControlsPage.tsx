@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../components/states/ConfirmDialog';
 import { EmptyState, ErrorState, LoadingState, NoAccessState } from '../components/states/PageStates';
 import { axiosClient } from '../utils/axiosClient';
 import { deviceId } from '../utils/deviceId';
+import KioskAdminSection from '../components/kiosk/KioskAdminSection';
 
 type Mode = 'off' | 'flag' | 'enforce';
 interface Settings {
@@ -236,6 +237,8 @@ const CheckinControlsPage: React.FC<{ canChange: boolean }> = ({ canChange }) =>
           </form>
         )}
       </section>
+
+      <KioskAdminSection canChange={canChange} sites={sites} />
 
       <ConfirmDialog
         open={!!retire}

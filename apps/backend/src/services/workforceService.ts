@@ -1137,6 +1137,7 @@ export async function checkIn(
     reasonCode?: unknown; reasonText?: unknown; deviceId?: unknown; clientTime?: unknown
     idempotencyKey?: unknown; latitude?: unknown; longitude?: unknown; accuracyMetres?: unknown
     clientIp?: string | null
+    kioskSiteId?: string | null
   }
 ): Promise<CheckInRow & { approval: 'not_needed' | 'pending'; eventId: string }> {
   const type = input.checkInType === undefined || input.checkInType === null || input.checkInType === ''
@@ -1171,7 +1172,7 @@ export async function checkIn(
       reasonCode: str(input.reasonCode), reasonText: str(input.reasonText), deviceId: str(input.deviceId),
       clientTime: str(input.clientTime), idempotencyKey: str(input.idempotencyKey),
       latitude: input.latitude as number, longitude: input.longitude as number, accuracyMetres: input.accuracyMetres as number,
-      clientIp: input.clientIp ?? null,
+      clientIp: input.clientIp ?? null, kioskSiteId: input.kioskSiteId ?? null,
     },
   })
   const row = await client.query(
@@ -1183,6 +1184,8 @@ export async function checkIn(
 /** Where a check-out or a break was recorded from: kept on the event, never checked. */
 export interface Whereabouts {
   deviceId?: unknown; latitude?: unknown; longitude?: unknown; accuracyMetres?: unknown; clientIp?: string | null
+  /** A retried check-out (a kiosk's) answers with the first one's result instead of failing. */
+  idempotencyKey?: string | null
 }
 
 function whereabouts(w: Whereabouts) {
@@ -1190,6 +1193,7 @@ function whereabouts(w: Whereabouts) {
   return {
     deviceId: w.deviceId === undefined || w.deviceId === null || w.deviceId === '' ? null : String(w.deviceId),
     latitude: n(w.latitude), longitude: n(w.longitude), accuracyMetres: n(w.accuracyMetres), clientIp: w.clientIp ?? null,
+    idempotencyKey: w.idempotencyKey ?? null,
   }
 }
 

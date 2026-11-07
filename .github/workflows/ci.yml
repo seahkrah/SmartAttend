@@ -270,6 +270,118 @@ jobs:
         if: failure()
         run: cat /tmp/api.log || true
 
+  # The attendance kiosk in a real browser (rubric gate `kiosk`), on its own
+  # fresh database: migrations from empty, the runtime role, the face worker
+  # and the API, seeded here and nowhere else. The camera is fake (a canvas
+  # stream showing the synthetic person); the face match is the server's.
+  kiosk-browser:
+    name: Kiosk (browser)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jjelo
+          POSTGRES_PASSWORD: jjelo
+          POSTGRES_DB: jjelotech_kiosk
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://jjelo:jjelo@127.0.0.1:5432/jjelotech_kiosk
+      JWT_SECRET: ci-only-not-a-real-secret
+      NODE_ENV: test
+      PORT: '5000'
+      FILE_STORAGE_ROOT: /tmp/ci-file-storage
+      FILE_STORAGE_BACKEND: local
+      API_BASE: http://127.0.0.1:5000
+      E2E_FIXTURE_DIR: /tmp/e2e-fixtures
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Throwaway keys
+        run: |
+          echo "BIOMETRIC_TEMPLATE_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "KMS_LOCAL_KEK=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "FACE_WORKER_URL=http://127.0.0.1:5100" >> "$GITHUB_ENV"
+          echo "FACE_WORKER_TOKEN=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+
+      - name: Install shared types
+        working-directory: packages/types
+        run: (npm ci || npm install) && npm run build
+
+      - name: Install backend
+        working-directory: apps/backend
+        run: npm ci || npm install
+
+      - name: Apply migrations to an empty database
+        working-directory: apps/backend
+        run: npx tsx src/db/migrate.ts
+
+      - name: Runtime database role
+        working-directory: apps/backend
+        run: |
+          pw=$(openssl rand -hex 24)
+          APP_DB_USER=jjelotech_api APP_DB_PASSWORD="$pw" npx tsx src/scripts/createRuntimeRole.ts
+          echo "APP_DATABASE_URL=postgresql://jjelotech_api:${pw}@127.0.0.1:5432/jjelotech_kiosk" >> "$GITHUB_ENV"
+
+      - name: Start the face worker and the API
+        working-directory: apps/backend
+        run: |
+          env -u DATABASE_URL -u APP_DATABASE_URL -u BIOMETRIC_TEMPLATE_KEY -u KMS_LOCAL_KEK -u JWT_SECRET \
+            nohup npx tsx src/faceWorker/server.ts > /tmp/face-worker.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -H "X-Worker-Token: $FACE_WORKER_TOKEN" http://127.0.0.1:5100/health >/dev/null && break
+            sleep 1
+          done
+          nohup npx tsx src/server.ts > /tmp/api.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl -sf http://127.0.0.1:5000/api/health >/dev/null && exit 0
+            sleep 1
+          done
+          echo "API did not become healthy"; cat /tmp/api.log; exit 1
+
+      - name: Seed
+        working-directory: apps/backend
+        run: |
+          mkdir -p "$E2E_FIXTURE_DIR"
+          npx tsx src/tests/seedCorporate.manual.ts > /tmp/seed-corp.log 2>&1 || { tail -30 /tmp/seed-corp.log; exit 1; }
+          grep -E '^\{' /tmp/seed-corp.log > "$E2E_FIXTURE_DIR/corp.json"
+
+      - name: Install frontend and Chromium
+        working-directory: apps/frontend
+        run: |
+          npm ci || npm install
+          npx playwright install --with-deps chromium
+
+      - name: Kiosk browser test
+        working-directory: apps/frontend
+        run: npx playwright test e2e/kiosk.spec.ts
+
+      - name: Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/frontend/playwright-report
+          if-no-files-found: ignore
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          cat /tmp/api.log || true
+          cat /tmp/face-worker.log || true
+
   # Production dependencies only, failing on high or critical. Moderate
   # findings are tracked in docs/security/findings.md.
   deps-audit:

@@ -19,8 +19,20 @@ import {
   biometricsService, BiometricRefusal, POSE_INSTRUCTIONS, type Purpose, type SubjectType,
 } from '../../services/biometricsService';
 
+/**
+ * Where challenges come from and answers go. By default the signed-in user's
+ * /api/biometrics; a kiosk supplies its own, with its own token.
+ */
+export interface FaceApi {
+  challenge: (purpose: Purpose, opts: { subjectType?: SubjectType; subjectId?: string; scheduleId?: string })
+    => Promise<{ challengeId: string; steps: FacePose[]; expiresAt: string }>;
+  submit: <T>(purpose: Purpose, challengeId: string, frames: Blob[], frameTimes: number[]) => Promise<T>;
+}
+
 interface Props<T> {
   purpose: Purpose;
+  /** Defaults to biometricsService. */
+  api?: FaceApi;
   title: string;
   subtitle?: string;
   subjectType?: SubjectType;
@@ -42,7 +54,7 @@ type Phase =
 const NOT_RETRYABLE = new Set(['no_consent', 'not_enrolled', 'disabled', 'not_configured', 'forbidden', 'not_found', 'paused']);
 
 export function FaceChallengeCapture<T>({
-  purpose, title, subtitle, subjectType, subjectId, scheduleId, onDone, onClose,
+  purpose, title, subtitle, subjectType, subjectId, scheduleId, onDone, onClose, api = biometricsService as FaceApi,
 }: Props<T>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -69,7 +81,7 @@ export function FaceChallengeCapture<T>({
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return []; });
     setPhase({ kind: 'starting' });
     try {
-      const ch = await biometricsService.challenge(purpose, { subjectType, subjectId, scheduleId });
+      const ch = await api.challenge(purpose, { subjectType, subjectId, scheduleId });
       setPhase({
         kind: 'capturing', challengeId: ch.challengeId, steps: ch.steps,
         expiresAt: new Date(ch.expiresAt).getTime(), step: 0,
@@ -78,7 +90,7 @@ export function FaceChallengeCapture<T>({
       const r = e as BiometricRefusal;
       setPhase({ kind: 'refused', message: r.message, retryable: !NOT_RETRYABLE.has(r.code ?? '') });
     }
-  }, [purpose, subjectType, subjectId, scheduleId]);
+  }, [purpose, subjectType, subjectId, scheduleId, api]);
 
   // Camera on mount, off on unmount.
   useEffect(() => {
@@ -142,7 +154,7 @@ export function FaceChallengeCapture<T>({
     }
     setPhase({ kind: 'submitting' });
     try {
-      const result = await biometricsService.submit<T>(purpose, phase.challengeId, framesRef.current,
+      const result = await api.submit<T>(purpose, phase.challengeId, framesRef.current,
         timesRef.current.map((t) => Math.round(t - timesRef.current[0])));
       setPhase({ kind: 'done', message: purpose === 'enroll' ? 'Enrolled.' : 'Matched.' });
       stopCamera();

@@ -146,6 +146,8 @@ TS_SUITES=(
   schoolReports
   # Managers act for the people who report to them: leave, approvals, alerts, rosters, timesheets.
   managerScope
+  # Kiosks: pairing, restricted token, PIN and face punches, controls, idempotency, revocation.
+  kiosk
   # The face worker killed and restarted: the API falls back to manual.
   faceWorkerDown
   # Inside one tenant: every role-guarded route in docs/api/permission-map.json

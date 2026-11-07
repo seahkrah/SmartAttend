@@ -88,6 +88,7 @@ function collectNavItems(src) {
  * unreachable page is the defect this gate exists to catch.
  */
 const UNLISTED = new Map([
+  ['/kiosk', 'a shared attendance screen opened on the kiosk device itself, paired with a code, not from any menu'],
   ['/', 'the public landing page'],
   ['/login', 'reached before there is a menu'],
   ['/login-superadmin', 'reached before there is a menu'],

@@ -72,11 +72,17 @@ for (const r of map) {
     }
     if (g.kind === 'public' && !text(g.reason)) problems.push(`${key(r)}: public with no reason`)
     if (g.kind === 'inHandler' && !text(g.rule)) problems.push(`${key(r)}: a handler rule with no words`)
-    if ((g.kind === 'self' || g.kind === 'member') && !text(g.what))
+    if ((g.kind === 'self' || g.kind === 'member' || g.kind === 'kiosk') && !text(g.what))
       problems.push(`${key(r)}: ${g.kind} with no description`)
   }
   if (kinds.has('public')) {
     if (kinds.has('authenticated')) problems.push(`${key(r)}: declared public but behind authentication`)
+    continue
+  }
+  // A paired kiosk's token is its authentication, and the kiosk routes are
+  // all it reaches (src/kiosk/auth.ts): it says who may call them.
+  if (kinds.has('kiosk')) {
+    if (kinds.has('authenticated')) problems.push(`${key(r)}: a kiosk route behind a user session as well`)
     continue
   }
   if (!kinds.has('authenticated')) {
@@ -96,5 +102,5 @@ if (problems.length) {
 }
 console.log(
   `permission-coverage: ok (${map.length} routes: ${count('roles')} role-guarded, ${count('superadmin')} superadmin, ` +
-    `${count('self')} own records, ${count('member')} any member, ${count('inHandler')} handler rules, ${count('public')} public)`,
+    `${count('self')} own records, ${count('member')} any member, ${count('inHandler')} handler rules, ${count('kiosk')} kiosk, ${count('public')} public)`,
 )

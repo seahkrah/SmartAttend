@@ -2225,6 +2225,67 @@
   },
   {
     "method": "GET",
+    "path": "/api/kiosk/admin/devices",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/admin/devices",
+    "params": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/kiosk/admin/devices/:kioskId",
+    "params": [
+      "kioskId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/admin/devices/:kioskId/pairing-code",
+    "params": [
+      "kioskId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/admin/devices/:kioskId/pin",
+    "params": [
+      "kioskId"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/face/challenge",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/face/verify",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/lookup",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/pair",
+    "params": []
+  },
+  {
+    "method": "POST",
+    "path": "/api/kiosk/punch",
+    "params": []
+  },
+  {
+    "method": "GET",
+    "path": "/api/kiosk/session",
+    "params": []
+  },
+  {
+    "method": "GET",
     "path": "/api/leave/balances",
     "params": []
   },

@@ -25,6 +25,8 @@ export type GuardTag =
   | { kind: 'self'; what: string }
   | { kind: 'member'; what: string }
   | { kind: 'inHandler'; rule: string }
+  /** A paired kiosk's token (src/kiosk/auth.ts), on the kiosk routes only. */
+  | { kind: 'kiosk'; what: string }
 
 const GUARD = Symbol.for('jjelotech.guard')
 

@@ -73,6 +73,7 @@ const SchoolAdminDashboardPage = lazy(() => import('./pages/SchoolAdminDashboard
 const FaceMatchingAdminPage = lazy(() => import('./pages/FaceMatchingAdminPage'));
 const CheckinControlsPage = lazy(() => import('./pages/CheckinControlsPage'));
 const ReportingLinesPage = lazy(() => import('./pages/ReportingLinesPage'));
+const KioskPage = lazy(() => import('./pages/KioskPage'));
 const SchoolAdminUsersPage = lazy(() => import('./pages/SchoolAdminUsersPage'));
 const SchoolAdminApprovalsPage = lazy(() => import('./pages/SchoolAdminApprovalsPage'));
 const SchoolAdminSettingsPage = lazy(() => import('./pages/SchoolAdminSettingsPage'));
@@ -145,6 +146,8 @@ export default function App() {
         {/* Public Routes */}
         <Route path="/" element={<DarkSurface><LandingPage /></DarkSurface>} />
         <Route path="/login" element={<DarkSurface><LoginPage /></DarkSurface>} />
+        {/* A shared attendance screen, with its own kiosk token rather than a sign-in. */}
+        <Route path="/kiosk" element={<KioskPage />} />
         <Route path="/sso/complete" element={<DarkSurface><SsoCompletePage /></DarkSurface>} />
         <Route path="/login-superadmin" element={<DarkSurface><SuperadminLoginPage /></DarkSurface>} />
         <Route path="/register" element={<DarkSurface><RegisterPage /></DarkSurface>} />

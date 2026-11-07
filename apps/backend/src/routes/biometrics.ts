@@ -40,6 +40,17 @@ const upload = multer({
   limits: { fileSize: IMAGE_LIMITS.maxBytes, files: 5, fields: 5, fieldSize: 1024 },
 })
 
+/**
+ * The device a phone or browser says it is. Kiosk device ids are the
+ * server's own ("kiosk-..."), used only on the kiosk routes: one sent here is
+ * ignored, so a phone cannot spend a kiosk's capture budget or count as the
+ * kiosk for the face-check pause (audit F4, F12).
+ */
+function clientDevice(req: TenantRequest): string | null {
+  const v = req.header('x-device-id')
+  return v && !/^kiosk-/i.test(v) ? v : null
+}
+
 function ctxOf(req: TenantRequest) {
   return req.ctx as NonNullable<TenantRequest['ctx']> & { tenantId: string }
 }
@@ -176,7 +187,7 @@ router.post('/challenges', checkedInHandler("issueChallenge: enrol as authorizeS
     if (subject && subject.type !== 'student' && subject.type !== 'employee') {
       return res.status(400).json({ error: 'subjectType must be student or employee' })
     }
-    const ch = await issueChallenge(ctxOf(req), purpose, { subject, scheduleId, deviceId: req.header('x-device-id') ?? null })
+    const ch = await issueChallenge(ctxOf(req), purpose, { subject, scheduleId, deviceId: clientDevice(req) })
     return res.status(201).json(ch)
   } catch (e) {
     return fail(res, e)

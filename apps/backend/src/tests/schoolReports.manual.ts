@@ -9,10 +9,11 @@
  *
  *   Term "R" 2025-09-01 .. 2025-12-19. Class X meets Mon and Wed ("1,3"),
  *   class Y Tue ("2"), both in R; class Z Mon, in a course with no term.
- *   X: P1, P2, P3 enrolled; P4 dropped.  Y: P1, P2, P4, P5.  Z: P1.
+ *   X: P1, P2, P3 enrolled; P4 dropped; P6 joined on 09-02.  Y: P1, P2, P4, P5.  Z: P1.
+ *   (Everyone else enrolled on 2025-08-01.)
  *
  *   X Mon 09-01   P1 present (face)  P2 late  P3 absent
- *   X Wed 09-03   P1 present  P2 excused  P3 -  P4 present (dropped, but marked)
+ *   X Wed 09-03   P1 present  P2 excused  P3 -  P6 -  P4 present (dropped, but marked)
  *   X Mon 09-08   no marks: the register was not taken
  *   Y Tue 09-02   P1 absent  P2 present  P4 present  P5 excused
  *   X Mon 2026-01-05   P1 present (outside R)
@@ -22,7 +23,8 @@
  *               P3 2, 1 absent, 1 unmarked: 0%, below
  *               P4 2, 2 present: 100%
  *               P5 1, 1 excused: no rate, not below
- *   By class:   X 2 sessions, 7 seats, 4 attended, 1 excused: 4/6 = 66.7%
+ *               P6 1 (the 09-01 session was before they joined), unmarked: 0%, below
+ *   By class:   X 2 sessions, 8 seats, 4 attended, 1 excused: 4/7 = 57.1%
  *               Y 1 session, 4 seats, 2 attended, 1 excused: 2/3 = 66.7%
  *
  * Needs a running API (API_BASE) and the e2e fixtures. Suite "schoolReports"
@@ -112,9 +114,9 @@ async function main() {
     const X = await schedule(await course('X', made.term!), '1,3', '08:00')
     const Y = await schedule(await course('Y', made.term!), '2', '09:00')
     const Z = await schedule(await course('Z', null), '1', '10:00')
-    const names = ['Ada', 'Ben', '=HYPERLINK("http://x.test","click")', 'Dee, Jr', 'Eve']
+    const names = ['Ada', 'Ben', '=HYPERLINK("http://x.test","click")', 'Dee, Jr', 'Eve', 'Fay']
     const P: string[] = []
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < names.length; i++) {
       // An account that cannot sign in: the report needs a student, not a login.
       const user = (await owner(
         `INSERT INTO users (platform_id, email, full_name, role_id, password_hash, is_active)
@@ -128,11 +130,13 @@ async function main() {
       P.push(id)
       made.students.push(id)
     }
-    const enrol = (s: string, sid: string, status = 'enrolled') => owner(
-      `INSERT INTO student_courses (schedule_id, student_id, status, tenant_id) VALUES ($1, $2, $3, $4)`, [s, sid, status, T])
+    const enrol = (s: string, sid: string, status = 'enrolled', on = '2025-08-01') => owner(
+      `INSERT INTO student_courses (schedule_id, student_id, status, enrolled_at, tenant_id) VALUES ($1, $2, $3, $4, $5)`,
+      [s, sid, status, on, T])
     await enrol(X, P[0]); await enrol(X, P[1]); await enrol(X, P[2]); await enrol(X, P[3], 'dropped')
     await enrol(Y, P[0]); await enrol(Y, P[1]); await enrol(Y, P[3]); await enrol(Y, P[4])
     await enrol(Z, P[0])
+    await enrol(X, P[5], 'enrolled', '2025-09-02')
     const facUser = (await owner(`SELECT user_id FROM faculty WHERE id = $1`, [A.facultyId])).rows[0].user_id
     const mark = async (s: string, sid: string, date: string, status: string, face = false) => {
       // A face mark cites the match the server made (chk_school_attendance_face_cited): a fixture match event.
@@ -179,10 +183,14 @@ async function main() {
     const y = cls(Y)
     check('on the Tuesday: 4 enrolled, 2 present, 1 absent, 1 excused', y?.enrolled === 4 && y?.present === 2 && y?.absent === 1
       && y?.excused === 1 && y?.unmarked === 0, `(${JSON.stringify(y)})`)
+    r = await call(`${BASE}/daily?date=2025-09-03`, admin)
+    x = cls(X)
+    check("on the Wednesday: 4 enrolled that day (P6 has joined), 2 unmarked, though a dropped student's mark is there (audit P3)",
+      x?.enrolled === 4 && x?.unmarked === 2 && x?.present === 2 && x?.excused === 1, `(${JSON.stringify(x)})`)
     r = await call(`${BASE}/daily?date=2025-09-08`, admin)
     x = cls(X)
     check('a Monday with no marks: the class met and its register was not taken', x?.meetsToday === true && x?.registerTaken === false
-      && x?.unmarked === 3 && r.json?.totals?.registersNotTaken >= 1, `(${JSON.stringify(x)})`)
+      && x?.unmarked === 4 && r.json?.totals?.registersNotTaken >= 1, `(${JSON.stringify(x)})`)
     r = await call(`${BASE}/daily?date=2026-01-05`, admin)
     x = cls(X)
     check('after the term, the class does not meet, but a mark made then is still shown', x?.meetsToday === false && x?.present === 1,
@@ -213,11 +221,14 @@ async function main() {
     check('P5: only excused, so no rate and not below', st(4)?.sessions === 1 && st(4)?.ratePercent === null && st(4)?.below === false,
       `(${JSON.stringify(st(4))})`)
     check('the mark after the term is not in it', st(0)?.present === 2)
-    check('the term has exactly these five students', r.json?.students?.length === 5 && r.json?.totals?.students === 5
-      && r.json?.totals?.below === 2, `(${r.json?.students?.length} ${JSON.stringify(r.json?.totals)})`)
+    check('P6, who joined after the first session: only the session since counts (audit P3)',
+      st(5)?.sessions === 1 && st(5)?.unmarked === 1 && st(5)?.ratePercent === 0 && st(5)?.below === true,
+      `(${JSON.stringify(st(5))})`)
+    check('the term has exactly these six students', r.json?.students?.length === 6 && r.json?.totals?.students === 6
+      && r.json?.totals?.below === 3, `(${r.json?.students?.length} ${JSON.stringify(r.json?.totals)})`)
     const c = (id: string) => (r.json?.classes ?? []).find((k: any) => k.scheduleId === id)
-    check('class X: 2 sessions (the untaken register is not one), 4 students, 66.7%',
-      c(X)?.sessions === 2 && c(X)?.students === 4 && c(X)?.ratePercent === 66.7, `(${JSON.stringify(c(X))})`)
+    check('class X: 2 sessions (the untaken register is not one), 5 students, 57.1%',
+      c(X)?.sessions === 2 && c(X)?.students === 5 && c(X)?.ratePercent === 57.1, `(${JSON.stringify(c(X))})`)
     check('class Y: 1 session, 4 students, 66.7%', c(Y)?.sessions === 1 && c(Y)?.students === 4 && c(Y)?.ratePercent === 66.7,
       `(${JSON.stringify(c(Y))})`)
     check('a class outside the term is not in it', !c(Z) && r.json?.totals?.sessions === 3, `(${JSON.stringify(r.json?.totals)})`)
@@ -248,7 +259,7 @@ async function main() {
       `(${evil})`)
     const comma = lines.find((l) => l.startsWith(`RPT-${RUN}-4,`)) ?? ''
     check('a name with a comma is quoted', comma.startsWith(`RPT-${RUN}-4,"Dee, Jr R4",2,`), `(${comma})`)
-    check('as many rows as students, and nothing else', lines.filter((l) => l).length === 6, `(${lines.length})`)
+    check('as many rows as students, and nothing else', lines.filter((l) => l).length === 7, `(${lines.length})`)
     r = await call(`${BASE}/daily?date=2025-09-01&format=csv`, admin)
     check('the day downloads as CSV, named for the date', r.status === 200 && /attendance-2025-09-01\.csv/.test(r.disposition)
       && r.text.includes(`X-${RUN},Report course X,`), `(${r.status} ${r.disposition})`)

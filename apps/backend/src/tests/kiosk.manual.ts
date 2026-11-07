@@ -25,6 +25,21 @@ import fs from 'fs'
 import path from 'path'
 import pg from 'pg'
 import { reissue } from './freshTokens.js'
+import { issueTokens } from '../auth/authService.js'
+import { runAsSystem } from '../db/dbContext.js'
+
+/** A session of the employee's own, for what they do on their own phone. */
+async function sessionFor(userId: string): Promise<string> {
+  const c = new pg.Client({ connectionString: process.env.DATABASE_URL })
+  await c.connect()
+  try {
+    const u = (await c.query(`SELECT platform_id, role_id FROM users WHERE id = $1`, [userId])).rows[0]
+    return (await runAsSystem('kiosk suite: the employee signs in on their phone', () =>
+      issueTokens({ id: userId, platform_id: u.platform_id, role_id: u.role_id }, { userAgent: 'kiosk suite' }))).accessToken
+  } finally {
+    await c.end()
+  }
+}
 
 const API = (process.env.API_BASE ?? 'http://127.0.0.1:5000').replace(/\/$/, '')
 const dir = process.env.E2E_FIXTURE_DIR ?? path.join(process.cwd(), '.e2e-fixtures')
@@ -242,11 +257,30 @@ async function main() {
     r = await frames('/api/kiosk/face/verify', K, { challengeId: ch.json?.challengeId, employeeCode: code1 }, (ch.json?.steps ?? []).map((p: string) => MIRROR[p]))
     const matchId = r.json?.matchId
     check('the employee is matched at the kiosk', r.status === 200 && !!matchId, `(${r.status} ${JSON.stringify(r.json).slice(0, 160)})`)
+    const empUser = (await owner(`SELECT user_id FROM employees WHERE id = $1`, [e1])).rows[0].user_id as string
+    const phone = await sessionFor(empUser)
+    r = await call('POST', '/api/workforce/my/check-in', bearer(phone), { checkInType: 'office', faceMatchId: matchId })
+    check("a match made at the kiosk cannot be spent on the employee's own phone (audit F2)",
+      r.status === 409 && r.json?.code === 'match_unusable', `(${r.status} ${r.json?.code})`)
     r = await call('POST', '/api/kiosk/punch', K, { employeeCode: code1, action: 'in', faceMatchId: matchId })
     check('and checked in by face, with no PIN', r.status === 201 && r.json?.checkIn?.faceVerified === true, `(${r.status} ${JSON.stringify(r.json)})`)
+    r = await call('POST', '/api/kiosk/punch', K, { employeeCode: code1, action: 'out', faceMatchId: 'x' })
+    check('a check-out citing any string as a face match, with no PIN, is refused (audit F1)',
+      r.status === 400 && r.json?.code === 'match_required', `(${r.status} ${r.json?.code})`)
+    r = await call('POST', '/api/kiosk/punch', K, { employeeCode: code1, action: 'out', faceMatchId: matchId })
+    check('as is one citing the match already spent on the check-in', r.status === 409 && r.json?.code === 'match_used',
+      `(${r.status} ${r.json?.code})`)
+    check('and the employee is still checked in', (await call('POST', '/api/kiosk/lookup', K, { employeeCode: code1 })).json?.onTheClock === true)
     await call('POST', '/api/kiosk/punch', K, { employeeCode: code1, action: 'out', pin: '1357' })
     r = await call('POST', '/api/kiosk/punch', K, { employeeCode: code1, action: 'in', faceMatchId: matchId })
     check('a match is spent once', r.status === 409 && r.json?.code === 'match_used', `(${r.status} ${r.json?.code})`)
+    // A match the employee made on their phone (no kiosk challenge behind it).
+    const phoneMatch = (await owner(
+      `INSERT INTO biometric_events (tenant_id, actor_user_id, action, outcome, subject_type, subject_id)
+       VALUES ($1, $2, 'verified', 'success', 'employee', $3) RETURNING id`, [T, empUser, e1])).rows[0].id
+    r = await call('POST', '/api/kiosk/punch', K, { employeeCode: code1, action: 'in', faceMatchId: phoneMatch })
+    check('a match made anywhere but this kiosk is refused at it (audit F2)', r.status === 409 && r.json?.code === 'match_unusable',
+      `(${r.status} ${r.json?.code})`)
     ch = await call('POST', '/api/kiosk/face/challenge', K, { employeeCode: code1 })
     await sleep(800)
     r = await frames('/api/kiosk/face/verify', K, { challengeId: ch.json?.challengeId, employeeCode: code1 }, ['other-a.jpg', 'other-a-m.jpg', 'other-b.jpg'].slice(0, (ch.json?.steps ?? []).length))
@@ -254,6 +288,43 @@ async function main() {
     const fe = (await owner(`SELECT count(*)::int AS n FROM biometric_events WHERE tenant_id = $1 AND subject_id = $2 AND action = 'verified'
       AND challenge_id IN (SELECT id FROM biometric_challenges WHERE device_id = $3)`, [T, e1, stored.device_id])).rows[0].n
     check('the kiosk\'s face checks are in the biometric log', fe >= 2, `(${fe})`)
+    const bioAudit = (await owner(`SELECT after_state FROM audit_logs WHERE tenant_id = $1 AND resource_type = 'biometric_event'
+      AND after_state->>'deviceId' = $2 LIMIT 1`, [T, stored.device_id])).rows[0]
+    check('and the audit trail names the kiosk they were made at (audit F4)', !!bioAudit, `(${JSON.stringify(bioAudit)})`)
+
+    // The pause is per channel (audit F4). Five failures on the employee's phone:
+    const fail = (challengeId: string | null) => owner(
+      `INSERT INTO biometric_events (tenant_id, actor_user_id, action, outcome, reason, subject_type, subject_id, challenge_id)
+       VALUES ($1, $2, 'verified', 'failure', 'not_matched', 'employee', $3, $4)`, [T, empUser, e1, challengeId])
+    for (let i = 0; i < 5; i++) await fail(null)
+    r = await call('POST', '/api/biometrics/challenges', bearer(phone), { purpose: 'verify' })
+    check('five failures on the phone pause face check-in on the phone', r.status === 429 && r.json?.code === 'paused', `(${r.status} ${r.json?.code})`)
+    r = await call('POST', '/api/kiosk/face/challenge', K, { employeeCode: code1 })
+    check('but not at the kiosk, so someone at a kiosk cannot be locked out from afar, nor the reverse', r.status === 201,
+      `(${r.status} ${r.json?.code})`)
+    // One failure at this kiosk already (the other face); four more:
+    for (let i = 0; i < 4; i++) {
+      const c4 = await call('POST', '/api/kiosk/face/challenge', K, { employeeCode: code1 })
+      await fail(c4.json?.challengeId)
+    }
+    r = await call('POST', '/api/kiosk/face/challenge', K, { employeeCode: code1 })
+    check('five failures at the kiosk pause face check-in there (the attendant can still check them in)',
+      r.status === 429 && r.json?.code === 'paused', `(${r.status} ${r.json?.code})`)
+
+    // Twelve wrong PINs at once at the other kiosk: at most five compared (audit F5).
+    const burst = await Promise.all(Array.from({ length: 12 }, (_, i) => call('POST', '/api/kiosk/punch', kioskAuth(otherTok),
+      { employeeCode: code1, action: 'in', pin: String(2000 + i), reasonCode: 'camera_failure' })))
+    const wrong = burst.filter((x) => x.json?.code === 'wrong_pin').length
+    const locked = burst.filter((x) => x.json?.code === 'pin_locked').length
+    check('twelve wrong PINs sent at once: at most five are compared, the rest find it locked (audit F5)',
+      wrong <= 5 && wrong + locked === 12, `(${wrong} wrong, ${locked} locked)`)
+    const otherDevice = (await owner(`SELECT device_id FROM kiosks WHERE id = $1`, [other.kiosk.id])).rows[0].device_id
+    check('and the lock raises an alert', (await owner(`SELECT count(*)::int AS n FROM attendance_alerts WHERE tenant_id = $1
+      AND kind = 'kiosk_pin_locked' AND device_id = $2`, [T, otherDevice])).rows[0].n === 1)
+    r = await call('POST', '/api/kiosk/punch', kioskAuth(otherTok), { employeeCode: code1, action: 'in', pin: '1111', reasonCode: 'camera_failure' })
+    check('while locked, even the right PIN waits', r.status === 429 && r.json?.code === 'pin_locked', `(${r.status} ${r.json?.code})`)
+    check('pairing is in the audit trail (audit F14)', (await owner(`SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id = $1
+      AND action_type = 'KIOSK_PAIRED' AND resource_id = $2`, [T, other.kiosk.id])).rows[0].n === 1)
 
     console.log('-- revocation --')
     r = await call('DELETE', `/api/kiosk/admin/devices/${kiosk.id}`, bearer(hr))
@@ -276,6 +347,8 @@ async function main() {
     await owner(`DELETE FROM face_templates WHERE tenant_id = $1 AND subject_type = 'employee' AND subject_id = $2`, [T, e1]).catch(() => undefined)
     await owner(`UPDATE biometric_consents SET withdrawn_at = CURRENT_TIMESTAMP WHERE tenant_id = $1 AND subject_id = $2 AND withdrawn_at IS NULL`, [T, e1])
       .catch(() => undefined)
+    await owner(`DELETE FROM attendance_alerts WHERE tenant_id = $1 AND device_id IN (SELECT device_id FROM kiosks WHERE id = ANY($2))`,
+      [T, made.kiosks])
     await owner(`UPDATE kiosks SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP), token_hash = NULL, pairing_hash = NULL, pairing_expires_at = NULL
       WHERE id = ANY($1)`, [made.kiosks])
     await owner(`UPDATE attendance_devices SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP) WHERE device_id LIKE 'kiosk-%'

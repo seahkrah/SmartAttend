@@ -9,8 +9,9 @@
  *     manager and raises an alert; what was found is kept on the event.
  *   - Network: the request's address against the sites' CIDRs; a forged
  *     X-Forwarded-For is not believed.
- *   - Device: none, unregistered, someone else's, revoked; one's own and a
- *     shared kiosk pass.
+ *   - Device: none, unregistered, someone else's, revoked, and a shared
+ *     device's id sent from self-service are refused; one's own passes (a
+ *     shared registration counts only through a kiosk's token: kiosk suite).
  *   - Shift window: not rostered passes; outside a rostered shift does not.
  *   - Buddy punching and impossible travel raise alerts.
  *   - Breaks: one at a time, only while checked in, closed at check-out, and
@@ -67,7 +68,7 @@ const HQ = { latitude: 6.3005, longitude: -10.7969 }
 const at = (metresNorth: number, accuracyMetres: number | null = 15) =>
   ({ latitude: HQ.latitude + metresNorth / 111195, longitude: HQ.longitude, accuracyMetres })
 const ACCRA = { latitude: 5.6037, longitude: -0.187, accuracyMetres: 15 }
-const NEW_KINDS = ['buddy_punching', 'impossible_travel', 'outside_geofence', 'outside_network', 'unregistered_device', 'outside_shift_window']
+const NEW_KINDS = ['buddy_punching', 'impossible_travel', 'outside_geofence', 'outside_network', 'unregistered_device', 'outside_shift_window', 'checkout_flagged']
 
 async function main() {
   const A = corp.A
@@ -114,6 +115,11 @@ async function main() {
     check('a mode that is not off, flag or enforce is refused', r.status === 400, `(${r.status})`)
     r = await controls({ maxAccuracyMetres: 2 })
     check('an accuracy limit below 5 m is refused', r.status === 400, `(${r.status})`)
+    const activeSites = (await owner(`SELECT count(*)::int AS n FROM checkin_sites WHERE tenant_id = $1 AND is_active`, [T])).rows[0].n
+    if (activeSites === 0) {
+      r = await controls({ geofence: 'enforce' })
+      check('refusing outside sites when there are none is refused, not saved (audit F11)', r.status === 400, `(${r.status})`)
+    }
     r = await call('POST', '/api/checkin-controls/sites', admin, { name: `HQ ${RUN}`, latitude: 95, longitude: 0 })
     check('a site off the globe is refused', r.status === 400, `(${r.status})`)
     r = await call('POST', '/api/checkin-controls/sites', admin, { name: `HQ ${RUN}`, ...HQ, allowedCidrs: ['example.com'] })
@@ -168,6 +174,18 @@ async function main() {
     check("with it off, it is not: nobody's location is collected for nothing", r.json?.locationWanted === false,
       `(${r.json?.locationWanted})`)
 
+    console.log('-- check-out --')
+    await controls({ geofence: 'flag' })
+    r = await inn(emp, at(0))
+    check('(checked in at the site)', r.status === 201, `(${r.status} ${r.json?.code})`)
+    r = await out(emp, at(5000))
+    check('a check-out from 5 km away is still recorded (never refused: that would leave the check-in open)', r.status === 200,
+      `(${r.status})`)
+    const co = (await alertsOf('checkout_flagged', empId))[0]
+    check('but raises a check-out alert, saying the geofence failed (audit F9)', !!co
+      && (co.detail?.failed ?? []).some((f: any) => f.control === 'geofence' && f.code === 'outside_geofence'), `(${JSON.stringify(co)})`)
+    await controls({ geofence: 'off' })
+
     console.log('-- network --')
     await controls({ network: 'enforce' })
     r = await inn(emp, {}, { 'X-Forwarded-For': '203.0.113.5' })
@@ -204,9 +222,11 @@ async function main() {
     check('someone else cannot', r.status === 403 && r.json?.code === 'unregistered_device', `(${r.status} ${r.json?.code})`)
     r = await call('POST', '/api/checkin-controls/devices', admin, { deviceId: kiosk, label: 'Lobby kiosk' })
     check('(a shared kiosk is registered)', r.status === 201 && r.json?.device?.employeeId === null, `(${r.status})`)
+    // A shared registration counts only through a paired kiosk's token
+    // (kiosk suite): its id copied into any other request is not enough (audit F6).
     r = await inn(mgr, {}, { 'X-Device-Id': kiosk })
-    check('anyone checks in at a shared kiosk', r.status === 201, `(${r.status} ${r.json?.code})`)
-    await out(mgr)
+    check("a shared device's id does not pass for a self-service check-in", r.status === 403 && r.json?.code === 'unregistered_device',
+      `(${r.status} ${r.json?.code})`)
     r = await call('DELETE', `/api/checkin-controls/devices/${phoneRow?.id}`, admin)
     check('(the admin revokes the phone)', r.status === 200, `(${r.status})`)
     r = await inn(emp, {}, { 'X-Device-Id': phone })
@@ -250,7 +270,8 @@ async function main() {
     await out(emp)
     await inn(mgr, {}, { 'X-Device-Id': kiosk })
     await out(mgr)
-    check('a shared kiosk is not buddy punching', (await alertsOf('buddy_punching')).every((a: any) => a.device_id !== kiosk))
+    check("a shared device's id sent from self-service is still buddy punching",
+      (await alertsOf('buddy_punching', mgrId)).some((a: any) => a.device_id === kiosk))
     await inn(emp, at(0))
     await out(emp, at(0))
     r = await inn(emp, ACCRA)
@@ -267,8 +288,14 @@ async function main() {
       JSON.stringify([k1.status, k2.status].sort()) === '[200,201]' && !!ids[0] && ids[0] === ids[1], `(${k1.status} ${k2.status} ${ids})`)
     r = await inn(emp, { idempotencyKey: key })
     check('and again later: still that check-in, not "already checked in"', r.status === 200 && r.json?.checkIn?.id === ids[0], `(${r.status})`)
-    const events = (await owner(`SELECT count(*)::int AS n FROM attendance_events WHERE tenant_id = $1 AND idempotency_key = $2`, [T, key])).rows[0].n
+    // Stored inside the caller's namespace (self:<user id>:<key>).
+    const events = (await owner(`SELECT count(*)::int AS n FROM attendance_events WHERE tenant_id = $1 AND idempotency_key LIKE $2`,
+      [T, `self:%:${key}`])).rows[0].n
     check('one event under that key', events === 1, `(${events})`)
+    r = await inn(mgr, { idempotencyKey: key })
+    check("someone else sending the same key gets their own check-in, never the first person's",
+      r.status === 201 && !!r.json?.checkIn?.id && r.json?.checkIn?.id !== ids[0], `(${r.status} ${r.json?.checkIn?.id})`)
+    await out(mgr)
     r = await inn(emp)
     check('a new check-in without the key is still refused while checked in', r.status === 409, `(${r.status})`)
     await out(emp)

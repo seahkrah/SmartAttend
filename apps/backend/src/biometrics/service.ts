@@ -242,6 +242,12 @@ async function recordEvent(runner: { query: PoolClient['query'] }, ctx: Ctx, e: 
   // The scope follows the actor (check_audit_scope_actor): an administrator
   // acts on the tenant, anyone else (a lecturer, an employee) as a user.
   const actorClass = ctx.isSuperadmin ? 'superadmin' : auditActorClass(ctx.roleName)
+  // The device the capture came from (a kiosk's, or what a phone said it
+  // was), so a face check made at a kiosk says so in the trail (audit F4).
+  const device = e.challengeId
+    ? (await runner.query(`SELECT device_id FROM biometric_challenges WHERE id = $1 AND tenant_id = $2`,
+      [e.challengeId, ctx.tenantId])).rows[0]?.device_id ?? null
+    : null
   await runner.query(
     `INSERT INTO audit_logs
        (actor_id, actor_role, action_type, action, action_scope, resource_type, resource_id,
@@ -252,10 +258,31 @@ async function recordEvent(runner: { query: PoolClient['query'] }, ctx: Ctx, e: 
      JSON.stringify({
        subjectType: e.subject?.type ?? null, subjectId: e.subject?.id ?? null, reason: e.reason ?? null,
        scheduleId: e.scheduleId ?? null, distance: e.distance ?? null, threshold: e.threshold ?? null,
-       padScore: e.pad?.score ?? null,
+       padScore: e.pad?.score ?? null, challengeId: e.challengeId ?? null, deviceId: device,
      }), ctx.tenantId, ctx.platformId, actorClass === 'user' ? 'USER' : 'TENANT']
   )
   return r.rows[0].id
+}
+
+/**
+ * recordEvent in a transaction of its own, for callers not already in one:
+ * the event and its audit row commit together or not at all (audit F3).
+ * Before, these callers passed the pool's autocommit query, so each insert
+ * committed on its own and an event could exist without its audit row.
+ */
+async function recordEventAtomic(ctx: Ctx, e: EventInput): Promise<string> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const id = await recordEvent(client, ctx, e)
+    await client.query('COMMIT')
+    return id
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    throw err
+  } finally {
+    client.release()
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +450,7 @@ export async function issueChallenge(
     if (!own) throw new BiometricError(404, 'not_found', 'You have no employee record here')
     subject = { type: 'employee', id: own }
     await requireTemplate(ctx, subject)
-    await refuseIfPaused(ctx, subject)
+    await refuseIfPaused(ctx, subject, opts.deviceId ?? null)
   } else if (purpose === 'identify' || purpose === 'group') {
     if (ctx.roleName !== 'faculty') {
       throw new BiometricError(403, 'forbidden', 'Identification is for the lecturer taking attendance')
@@ -442,50 +469,63 @@ export async function issueChallenge(
     throw new BiometricError(400, 'bad_purpose', 'purpose must be enroll, verify, identify or group')
   }
 
-  const recent = await query(
-    `SELECT COUNT(*)::int AS n FROM biometric_challenges
-      WHERE issued_to = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes'`,
-    [ctx.userId]
-  )
-  if (recent.rows[0].n >= CHALLENGES_PER_TEN_MINUTES) {
-    throw new BiometricError(429, 'rate_limited', 'Too many face captures started. Wait a few minutes and try again.')
-  }
-  const device = opts.deviceId ? String(opts.deviceId).slice(0, 128) : null
-  const limits = await query(
-    `SELECT setting_key, setting_value FROM tenant_settings
-      WHERE tenant_id = $1 AND setting_key IN ('biometrics.device_challenges_per_10min', 'biometrics.tenant_challenges_per_minute')`,
-    [ctx.tenantId])
-  const limit = (key: string, fallback: number) => {
-    const v = Number(limits.rows.find((x: any) => x.setting_key === key)?.setting_value)
-    return Number.isInteger(v) && v > 0 ? v : fallback
-  }
-  if (device) {
-    const byDevice = await query(
+  // Counted and inserted under a per-tenant lock, so requests sent at once
+  // cannot all pass a limit before any of them is recorded (audit F12).
+  const c = await pool.connect()
+  try {
+    await c.query('BEGIN')
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext('biometric_challenges:' || $1))`, [ctx.tenantId])
+    const recent = await c.query(
       `SELECT COUNT(*)::int AS n FROM biometric_challenges
-        WHERE tenant_id = $1 AND device_id = $2 AND created_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes'`,
-      [ctx.tenantId, device])
-    if (byDevice.rows[0].n >= limit('biometrics.device_challenges_per_10min', DEVICE_CHALLENGES_PER_TEN_MINUTES)) {
-      throw new BiometricError(429, 'device_rate_limited', 'This device has started too many face captures. Wait a few minutes, or mark by hand.')
+        WHERE issued_to = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes'`,
+      [ctx.userId]
+    )
+    if (recent.rows[0].n >= CHALLENGES_PER_TEN_MINUTES) {
+      throw new BiometricError(429, 'rate_limited', 'Too many face captures started. Wait a few minutes and try again.')
     }
-  }
-  const byTenant = await query(
-    `SELECT COUNT(*)::int AS n FROM biometric_challenges
-      WHERE tenant_id = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '1 minute'`, [ctx.tenantId])
-  if (byTenant.rows[0].n >= limit('biometrics.tenant_challenges_per_minute', TENANT_CHALLENGES_PER_MINUTE)) {
-    throw new BiometricError(429, 'tenant_rate_limited', 'Face matching is busy for this organisation just now. Mark by hand, or try again in a minute.')
-  }
+    const device = opts.deviceId ? String(opts.deviceId).slice(0, 128) : null
+    const limits = await c.query(
+      `SELECT setting_key, setting_value FROM tenant_settings
+        WHERE tenant_id = $1 AND setting_key IN ('biometrics.device_challenges_per_10min', 'biometrics.tenant_challenges_per_minute')`,
+      [ctx.tenantId])
+    const limit = (key: string, fallback: number) => {
+      const v = Number(limits.rows.find((x: any) => x.setting_key === key)?.setting_value)
+      return Number.isInteger(v) && v > 0 ? v : fallback
+    }
+    if (device) {
+      const byDevice = await c.query(
+        `SELECT COUNT(*)::int AS n FROM biometric_challenges
+          WHERE tenant_id = $1 AND device_id = $2 AND created_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes'`,
+        [ctx.tenantId, device])
+      if (byDevice.rows[0].n >= limit('biometrics.device_challenges_per_10min', DEVICE_CHALLENGES_PER_TEN_MINUTES)) {
+        throw new BiometricError(429, 'device_rate_limited', 'This device has started too many face captures. Wait a few minutes, or mark by hand.')
+      }
+    }
+    const byTenant = await c.query(
+      `SELECT COUNT(*)::int AS n FROM biometric_challenges
+        WHERE tenant_id = $1 AND created_at > CURRENT_TIMESTAMP - INTERVAL '1 minute'`, [ctx.tenantId])
+    if (byTenant.rows[0].n >= limit('biometrics.tenant_challenges_per_minute', TENANT_CHALLENGES_PER_MINUTE)) {
+      throw new BiometricError(429, 'tenant_rate_limited', 'Face matching is busy for this organisation just now. Mark by hand, or try again in a minute.')
+    }
 
-  // A group capture is one photograph of the class: one frame, facing the camera.
-  const steps: Pose[] = purpose === 'group' ? ['center'] : randomSequence((n) => crypto.randomInt(n))
-  const r = await query(
-    `INSERT INTO biometric_challenges
-       (tenant_id, issued_to, purpose, subject_type, subject_id, schedule_id, steps, expires_at, device_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7, CURRENT_TIMESTAMP + ($8 || ' seconds')::interval, $9)
-     RETURNING id, steps, expires_at`,
-    [ctx.tenantId, ctx.userId, purpose, subject?.type ?? null, subject?.id ?? null, scheduleId,
-     steps, String(CHALLENGE_TTL_SECONDS), device]
-  )
-  return { challengeId: r.rows[0].id, steps: r.rows[0].steps as Pose[], expiresAt: r.rows[0].expires_at }
+    // A group capture is one photograph of the class: one frame, facing the camera.
+    const steps: Pose[] = purpose === 'group' ? ['center'] : randomSequence((n) => crypto.randomInt(n))
+    const r = await c.query(
+      `INSERT INTO biometric_challenges
+         (tenant_id, issued_to, purpose, subject_type, subject_id, schedule_id, steps, expires_at, device_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, CURRENT_TIMESTAMP + ($8 || ' seconds')::interval, $9)
+       RETURNING id, steps, expires_at`,
+      [ctx.tenantId, ctx.userId, purpose, subject?.type ?? null, subject?.id ?? null, scheduleId,
+       steps, String(CHALLENGE_TTL_SECONDS), device]
+    )
+    await c.query('COMMIT')
+    return { challengeId: r.rows[0].id, steps: r.rows[0].steps as Pose[], expiresAt: r.rows[0].expires_at }
+  } catch (err) {
+    await c.query('ROLLBACK').catch(() => undefined)
+    throw err
+  } finally {
+    c.release()
+  }
 }
 
 async function requireConsent(ctx: Ctx, s: Subject): Promise<string> {
@@ -511,19 +551,17 @@ async function requireTemplate(ctx: Ctx, s: Subject): Promise<void> {
 }
 
 /** Raises a face_lockout alert when this failure brings on the pause (brief 5.8). */
-async function alertIfLockedOut(ctx: Ctx, s: Subject): Promise<void> {
-  const r = await query(
-    `SELECT COUNT(*)::int AS n FROM biometric_events
-      WHERE tenant_id = $1 AND subject_type = $2 AND subject_id = $3
-        AND action = 'verified' AND outcome = 'failure'
-        AND created_at > CURRENT_TIMESTAMP - ($4 || ' minutes')::interval`,
-    [ctx.tenantId, s.type, s.id, String(PAUSE_MINUTES)])
-  if (r.rows[0].n < FAILED_MATCHES_BEFORE_PAUSE) return
+async function alertIfLockedOut(ctx: Ctx, s: Subject, challengeId: string): Promise<void> {
+  const ch = await query(`SELECT device_id FROM biometric_challenges WHERE id = $1 AND tenant_id = $2`, [challengeId, ctx.tenantId])
+  const kiosk = await kioskDevice(ctx, ch.rows[0]?.device_id ?? null)
+  const n = await failuresInChannel(ctx, s, kiosk)
+  if (n < FAILED_MATCHES_BEFORE_PAUSE) return
+  // At a kiosk the alert names it: the failures may not have been the employee's own.
   await query(
-    `INSERT INTO attendance_alerts (tenant_id, kind, student_id, employee_id, detail)
-     VALUES ($1, 'face_lockout', $2, $3, $4) ON CONFLICT DO NOTHING`,
-    [ctx.tenantId, s.type === 'student' ? s.id : null, s.type === 'employee' ? s.id : null,
-     JSON.stringify({ failures: r.rows[0].n, withinMinutes: PAUSE_MINUTES, pausedMinutes: PAUSE_MINUTES })])
+    `INSERT INTO attendance_alerts (tenant_id, kind, student_id, employee_id, device_id, detail)
+     VALUES ($1, 'face_lockout', $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+    [ctx.tenantId, s.type === 'student' ? s.id : null, s.type === 'employee' ? s.id : null, kiosk,
+     JSON.stringify({ failures: n, withinMinutes: PAUSE_MINUTES, pausedMinutes: PAUSE_MINUTES, atKiosk: !!kiosk })])
 }
 
 /** Raises a device_face_failures alert when one device keeps failing to identify anyone. */
@@ -578,15 +616,36 @@ export async function overview(ctx: Ctx) {
   }
 }
 
-async function refuseIfPaused(ctx: Ctx, s: Subject): Promise<void> {
+/** The device id, if it is one of the tenant's kiosks; null for anything else. */
+async function kioskDevice(ctx: Ctx, deviceId: string | null | undefined): Promise<string | null> {
+  if (!deviceId) return null
+  const r = await query(`SELECT 1 FROM kiosks WHERE tenant_id = $1 AND device_id = $2`, [ctx.tenantId, deviceId])
+  return r.rows.length ? deviceId : null
+}
+
+/**
+ * Failed verifications for a person in the pause window, counted per
+ * channel (audit F4): at a kiosk, only that kiosk's; anywhere else, only
+ * those not made at a kiosk. Someone at a kiosk typing a colleague's number
+ * and failing can pause face check-in for that colleague at that kiosk (the
+ * attendant can still check them in), not on the colleague's own phone.
+ */
+async function failuresInChannel(ctx: Ctx, s: Subject, kiosk: string | null): Promise<number> {
   const r = await query(
-    `SELECT COUNT(*)::int AS n FROM biometric_events
-      WHERE tenant_id = $1 AND subject_type = $2 AND subject_id = $3
-        AND action = 'verified' AND outcome = 'failure'
-        AND created_at > CURRENT_TIMESTAMP - ($4 || ' minutes')::interval`,
-    [ctx.tenantId, s.type, s.id, String(PAUSE_MINUTES)]
-  )
-  if (r.rows[0].n >= FAILED_MATCHES_BEFORE_PAUSE) {
+    `SELECT COUNT(*)::int AS n FROM biometric_events e
+       LEFT JOIN biometric_challenges c ON c.id = e.challenge_id AND c.tenant_id = e.tenant_id
+      WHERE e.tenant_id = $1 AND e.subject_type = $2 AND e.subject_id = $3
+        AND e.action = 'verified' AND e.outcome = 'failure'
+        AND e.created_at > CURRENT_TIMESTAMP - ($4 || ' minutes')::interval
+        AND CASE WHEN $5::text IS NULL
+                 THEN NOT EXISTS (SELECT 1 FROM kiosks k WHERE k.tenant_id = e.tenant_id AND k.device_id = c.device_id)
+                 ELSE c.device_id = $5::text END`,
+    [ctx.tenantId, s.type, s.id, String(PAUSE_MINUTES), kiosk])
+  return r.rows[0].n
+}
+
+async function refuseIfPaused(ctx: Ctx, s: Subject, deviceId: string | null = null): Promise<void> {
+  if ((await failuresInChannel(ctx, s, await kioskDevice(ctx, deviceId))) >= FAILED_MATCHES_BEFORE_PAUSE) {
     throw new BiometricError(429, 'paused',
       `Face check-in is paused for ${PAUSE_MINUTES} minutes after repeated failed matches. Check in without it, or try later.`)
   }
@@ -594,7 +653,7 @@ async function refuseIfPaused(ctx: Ctx, s: Subject): Promise<void> {
 
 interface ChallengeRow {
   id: string; purpose: Purpose; steps: Pose[]; subject_type: SubjectType | null
-  subject_id: string | null; schedule_id: string | null; created_at: Date; consumed_at: Date
+  subject_id: string | null; schedule_id: string | null; created_at: Date; consumed_at: Date; device_id: string | null
 }
 
 /**
@@ -610,7 +669,7 @@ async function consumeChallenge(ctx: Ctx, challengeId: string, purpose: Purpose)
         SET consumed_at = CURRENT_TIMESTAMP
       WHERE id = $1 AND tenant_id = $2 AND issued_to = $3 AND purpose = $4
         AND consumed_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-      RETURNING id, purpose, steps, subject_type, subject_id, schedule_id, created_at, consumed_at`,
+      RETURNING id, purpose, steps, subject_type, subject_id, schedule_id, created_at, consumed_at, device_id`,
     [challengeId, ctx.tenantId, ctx.userId, purpose]
   )
   if (r.rows.length === 0) {
@@ -772,14 +831,14 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[], fr
   if (!fail) ({ pad, failure: fail } = await padCheck(ctx, ch, frames, capture as Capture, frameTimes))
   if (!fail) fail = checkSameAndLive((capture as Capture).faces, ch.steps)
   if (fail) {
-    await recordEvent({ query: query as any }, ctx, {
+    await recordEventAtomic(ctx, {
       action: 'enrolled', outcome: 'failure', reason: fail.reason, subject, challengeId: ch.id, pad })
     throw new BiometricError(422, fail.reason, fail.message)
   }
   const faces = (capture as Capture).faces
   const poor = enrolmentQuality(capture as Capture)
   if (poor) {
-    await recordEvent({ query: query as any }, ctx, {
+    await recordEventAtomic(ctx, {
       action: 'enrolled', outcome: 'failure', reason: poor.reason, subject, challengeId: ch.id, pad })
     throw new BiometricError(422, poor.reason, poor.message)
   }
@@ -804,7 +863,7 @@ export async function enroll(ctx: Ctx, challengeId: string, frames: Buffer[], fr
       continue
     }
     if (distance(template, other) <= settings.threshold) {
-      await recordEvent({ query: query as any }, ctx, {
+      await recordEventAtomic(ctx, {
         action: 'enrolled', outcome: 'failure', reason: 'duplicate_identity', subject, challengeId: ch.id, pad })
       throw new BiometricError(409, 'duplicate_identity',
         'This face matches someone already enrolled in this organisation. An administrator should check before it is enrolled again.')
@@ -863,15 +922,15 @@ export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[], fr
   if ((await ownEmployeeId(ctx)) !== subject.id) {
     throw new BiometricError(403, 'forbidden', 'You can only check yourself in')
   }
-  await refuseIfPaused(ctx, subject)
+  await refuseIfPaused(ctx, subject, ch.device_id)
   const template = await loadTemplate(ctx, subject)
   if (!template) throw new BiometricError(409, 'not_enrolled', 'No face is enrolled for you')
 
   const fail = async (f: Failure, d: number | null = null, pad: PadResult | null = null): Promise<never> => {
-    await recordEvent({ query: query as any }, ctx, {
+    await recordEventAtomic(ctx, {
       action: 'verified', outcome: 'failure', reason: f.reason, subject, challengeId: ch.id,
       distance: d, threshold: settings.threshold, pad })
-    await alertIfLockedOut(ctx, subject)
+    await alertIfLockedOut(ctx, subject, ch.id)
     throw new BiometricError(422, f.reason, f.message)
   }
 
@@ -887,7 +946,7 @@ export async function verify(ctx: Ctx, challengeId: string, frames: Buffer[], fr
   const other = checkSameAndLive(capture.faces, ch.steps)
   if (other) return fail(other, d, pad)
 
-  const eventId = await recordEvent({ query: query as any }, ctx, {
+  const eventId = await recordEventAtomic(ctx, {
     action: 'verified', outcome: 'success', subject, challengeId: ch.id,
     distance: d, threshold: settings.threshold, pad })
   return { matchId: eventId, subject, distance: Math.round(d * 1000) / 1000, threshold: settings.threshold,
@@ -936,7 +995,7 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
   const scheduleId = ch.schedule_id!
 
   const fail = async (f: Failure, d: number | null = null, pad: PadResult | null = null): Promise<never> => {
-    await recordEvent({ query: query as any }, ctx, {
+    await recordEventAtomic(ctx, {
       action: 'identified', outcome: 'failure', reason: f.reason, challengeId: ch.id,
       scheduleId, distance: d, threshold: settings.threshold, pad })
     await alertOnDeviceFailures(ctx, ch.id)
@@ -968,7 +1027,7 @@ export async function identifyInClass(ctx: Ctx, challengeId: string, frames: Buf
   if (other) return fail(other, result.distance, pad)
 
   const subject: Subject = { type: 'student', id: result.id }
-  const eventId = await recordEvent({ query: query as any }, ctx, {
+  const eventId = await recordEventAtomic(ctx, {
     action: 'identified', outcome: 'success', subject, challengeId: ch.id, scheduleId,
     distance: result.distance, threshold: settings.threshold, pad })
   const student = await query(
@@ -1128,7 +1187,16 @@ export async function assertUsableMatch(
   runner: { query: PoolClient['query'] },
   ctx: Ctx,
   matchId: unknown,
-  expect: { action: 'verified' | 'identified'; subject: Subject; scheduleId?: string | string[] }
+  expect: {
+    action: 'verified' | 'identified'; subject: Subject; scheduleId?: string | string[]
+    /**
+     * Where the match may have been made (audit F2). A kiosk passes its
+     * device id: only a match from a challenge that kiosk was issued will do.
+     * Anywhere else passes nothing: a match made at a kiosk will not do, so a
+     * match cannot be carried between a phone and a kiosk either way.
+     */
+    kioskDevice?: string | null
+  }
 ): Promise<string> {
   const schedules = expect.scheduleId === undefined ? null
     : Array.isArray(expect.scheduleId) ? expect.scheduleId : [expect.scheduleId]
@@ -1136,19 +1204,36 @@ export async function assertUsableMatch(
     throw new BiometricError(400, 'match_required', 'A face match id is required')
   }
   const r = await runner.query(
-    `SELECT id FROM biometric_events
-      WHERE id = $1 AND tenant_id = $2 AND actor_user_id = $3 AND action = $4 AND outcome = 'success'
-        AND subject_type = $5 AND subject_id = $6
-        AND ($7::uuid[] IS NULL OR schedule_id = ANY($7::uuid[]))
-        AND created_at > CURRENT_TIMESTAMP - ($8 || ' seconds')::interval`,
+    `SELECT e.id FROM biometric_events e
+       LEFT JOIN biometric_challenges c ON c.id = e.challenge_id AND c.tenant_id = e.tenant_id
+      WHERE e.id = $1 AND e.tenant_id = $2 AND e.actor_user_id = $3 AND e.action = $4 AND e.outcome = 'success'
+        AND e.subject_type = $5 AND e.subject_id = $6
+        AND ($7::uuid[] IS NULL OR e.schedule_id = ANY($7::uuid[]))
+        AND e.created_at > CURRENT_TIMESTAMP - ($8 || ' seconds')::interval
+        AND CASE WHEN $9::text IS NULL
+                 THEN NOT EXISTS (SELECT 1 FROM kiosks k WHERE k.tenant_id = e.tenant_id AND k.device_id = c.device_id)
+                 ELSE c.device_id IS NOT DISTINCT FROM $9::text END`,
     [matchId, ctx.tenantId, ctx.userId, expect.action, expect.subject.type, expect.subject.id,
-     schedules, String(MATCH_USABLE_SECONDS)]
+     schedules, String(MATCH_USABLE_SECONDS), expect.kioskDevice ?? null]
   )
   if (r.rows.length === 0) {
     throw new BiometricError(409, 'match_unusable',
       'That face match is not valid for this record, or has expired. Capture again.')
   }
   return r.rows[0].id
+}
+
+/**
+ * Spends a face match: the second spend, on anything, is refused (audit F1).
+ * In the caller's transaction, so a spend that rolls back is not spent.
+ */
+export async function spendMatch(
+  runner: { query: PoolClient['query'] }, tenantId: string, matchId: string, spentFor: string
+): Promise<void> {
+  const r = await runner.query(
+    `INSERT INTO face_match_spends (match_event_id, tenant_id, spent_for) VALUES ($1, $2, $3)
+     ON CONFLICT (match_event_id) DO NOTHING RETURNING match_event_id`, [matchId, tenantId, spentFor])
+  if (!r.rows.length) throw new BiometricError(409, 'match_used', 'That face match has already been used')
 }
 
 /**

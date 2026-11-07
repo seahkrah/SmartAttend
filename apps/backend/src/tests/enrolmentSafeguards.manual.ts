@@ -150,6 +150,15 @@ async function main() {
     r = await call('POST', `/api/biometrics/subjects/student/${s1}/consent`, admin, { basis: 'Signed consent form' })
     check('at a college or university, as an adult', r.status === 201, `(${r.status} ${r.json?.code})`)
 
+    // The date of birth decides who must consent, so changing it is in the audit trail (audit P5).
+    r = await call('PATCH', `/api/auth/admin/school/students/${s1}`, admin, { dateOfBirth: '2015-03-01' })
+    const dobAudit = (await owner(
+      `SELECT before_state, after_state FROM audit_logs WHERE tenant_id = $1 AND action_type = 'STUDENT_DATE_OF_BIRTH_CHANGED'
+          AND resource_id = $2 ORDER BY created_at DESC LIMIT 1`, [tenant, s1])).rows[0]
+    check("changing a student's date of birth is audited, before and after", r.status === 200
+      && dobAudit?.before_state?.dateOfBirth === null && dobAudit?.after_state?.dateOfBirth === '2015-03-01',
+      `(${r.status} ${JSON.stringify(dobAudit)})`)
+
     console.log('-- enrolment quality --')
     r = await call('POST', `/api/biometrics/subjects/student/${s0}/consent`, admin, { basis: 'Signed consent form' })
     r = await enrol(admin, s0, { center: await degraded('synthetic-center.jpg', 'small') })

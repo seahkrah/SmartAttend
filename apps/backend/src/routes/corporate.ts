@@ -14,6 +14,7 @@ import {
 import { handingOverLink, requireRecentAuth, requireRecentAuthWhen } from '../auth/stepUp.js'
 import { emailTakenOnPlatform, memberElsewhere } from '../auth/authService.js'
 import { anyMember, checkedInHandler } from '../auth/guards.js'
+import { listFilter, reportScope } from '../auth/reportingLines.js'
 
 const router = express.Router()
 
@@ -796,6 +797,13 @@ router.get('/employees', peopleReaders, async (req: TenantRequest, res: Response
       params.push(departmentId)
     }
 
+    // A manager sees their team and themselves, as everywhere else (#41, audit F8).
+    const team = listFilter(await reportScope(req.ctx as any), true)
+    if (team) {
+      sql += ` AND e.id = ANY($${params.length + 1}::uuid[])`
+      params.push(team)
+    }
+
     sql += ` AND e.is_currently_employed = true ORDER BY e.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
     params.push(limit, offset)
 
@@ -833,6 +841,11 @@ router.get('/employees/:employeeId', peopleReaders, async (req: TenantRequest, r
     )
 
     if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Employee not found' })
+    }
+    // Someone outside a manager's team reads as absent (#41, audit F8).
+    const team = listFilter(await reportScope(req.ctx as any), true)
+    if (team && !team.includes(result.rows[0].id)) {
       return res.status(404).json({ error: 'Employee not found' })
     }
 

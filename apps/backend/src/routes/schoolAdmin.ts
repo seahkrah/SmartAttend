@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { logAudit } from '../services/domainAuditService.js'
+import { auditIn, logAudit } from '../services/domainAuditService.js'
 import { getClientIp } from '../utils/getClientIp.js'
 import { Router, Response } from 'express'
 import { query, getConnection } from '../db/connection.js'
@@ -954,11 +954,30 @@ router.patch('/admin/school/students/:id', async (req: TenantRequest, res: Respo
 
     if (fields.length > 0) {
       values.push(id, ctx.tenantId)
-      await query(
-        `UPDATE students SET ${fields.join(', ')}
-          WHERE id = $${values.length - 1} AND tenant_id = $${values.length}`,
-        values
-      )
+      // A date of birth decides whether face-matching consent must come from a
+      // guardian (isMinor), so changing it is audited with the change (audit P5).
+      const client = await getConnection()
+      try {
+        await client.query('BEGIN')
+        await client.query(
+          `UPDATE students SET ${fields.join(', ')}
+            WHERE id = $${values.length - 1} AND tenant_id = $${values.length}`,
+          values
+        )
+        if (u.dateOfBirth !== undefined) {
+          await auditIn(client, ctx, {
+            actionType: 'STUDENT_DATE_OF_BIRTH_CHANGED', resourceType: 'student', resourceId: id,
+            beforeState: { dateOfBirth: existing.date_of_birth ?? null }, afterState: { dateOfBirth: birthDate(u.dateOfBirth) },
+            ipAddress: getClientIp(req),
+          })
+        }
+        await client.query('COMMIT')
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => undefined)
+        throw err
+      } finally {
+        client.release()
+      }
     }
 
     // Name and phone are the account's; a shared account keeps what the

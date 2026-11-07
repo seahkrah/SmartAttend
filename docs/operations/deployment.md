@@ -37,7 +37,13 @@ front of the API and web ports. Neither container serves HTTPS.
 it takes the client's address from that proxy's `X-Forwarded-For` and from
 nowhere else. Get it right: the address is what the check-in network
 control compares with a site's networks, what the audit trail records and
-what rate limits count. Too high a value lets a client name its own address.
+what rate limits count. Too high a value lets a client name its own address,
+and `TRUST_PROXY=true` (every hop) is refused at start-up for that reason.
+
+`/api/health/ready` reports the build (commit, start time) outside
+production; in production only with `HEALTH_SHOW_BUILD=true`, since the
+exact commit helps an attacker. The face worker's `/health`, behind its
+token, always reports it.
 
 ### Production configuration
 

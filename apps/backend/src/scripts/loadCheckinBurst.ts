@@ -356,6 +356,9 @@ async function main() {
     await owner(`DELETE FROM employees WHERE id = ANY($1::uuid[])`, [emps]).catch(() => undefined)
     await owner(`DELETE FROM corporate_user_associations WHERE user_id = ANY($1::uuid[])`, [ids]).catch(() => undefined)
     await owner(`DELETE FROM auth_sessions WHERE user_id = ANY($1::uuid[])`, [ids]).catch(() => undefined)
+    // Their face checks are in the hash-chained audit trail, which cannot be
+    // changed, so the accounts cannot be deleted: they are switched off.
+    await owner(`UPDATE users SET is_active = FALSE WHERE id = ANY($1::uuid[])`, [ids]).catch(() => undefined)
     await owner(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [ids]).catch(() => undefined)
   }
 }

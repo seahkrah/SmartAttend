@@ -47,6 +47,12 @@ export function trustProxySetting(): boolean | number | string {
   const raw = (process.env.TRUST_PROXY ?? '').trim()
   if (!raw || raw === 'false' || raw === '0') return false
   if (/^\d+$/.test(raw)) return parseInt(raw, 10)
+  // "true" would trust every hop, so any client could name its own address,
+  // which the network check-in control, the audit trail and rate limits all
+  // believe (audit P1). Refused at start-up rather than guessed at.
+  if (/^(true|yes|on)$/i.test(raw)) {
+    throw new Error('TRUST_PROXY must be the number of proxies in front of the API (e.g. 1) or their addresses, not "true"')
+  }
   return raw
 }
 

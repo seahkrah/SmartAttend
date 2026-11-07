@@ -89,6 +89,11 @@ const directors = requireRoles('hr_director', 'admin')
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** An idempotency key as stored: the client's, inside the caller's own namespace. */
+function selfKey(userId: string, raw: unknown): string | null {
+  return raw === undefined || raw === null || raw === '' ? null : `self:${userId}:${String(raw)}`.slice(0, 128)
+}
+
 /** Where the request came from, for the event: the device, its reported position, the address. */
 function whereFrom(req: TenantRequest) {
   const b = req.body ?? {}
@@ -999,7 +1004,9 @@ router.post('/my/check-in', selfService("checks the caller in"), async (req: Ten
       faceMatchId,
       // Without a face: why (brief 5.2), and what the device says.
       reasonCode: b.reasonCode, reasonText: b.reasonText, deviceId: b.deviceId ?? req.header('x-device-id'),
-      clientTime: b.clientTime, idempotencyKey: b.idempotencyKey ?? req.header('idempotency-key'),
+      // A client's key is its own: namespaced by the caller, so it cannot
+      // meet another person's or a kiosk's (audit F7).
+      clientTime: b.clientTime, idempotencyKey: selfKey(ctx.userId, b.idempotencyKey ?? req.header('idempotency-key')),
       latitude: b.latitude, longitude: b.longitude, accuracyMetres: b.accuracyMetres, clientIp: getClientIp(req),
     })
     await client.query('COMMIT')

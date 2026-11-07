@@ -23,3 +23,13 @@ const dirty = fromEnv ? false : (() => {
 })()
 
 export const BUILD = Object.freeze({ commit, dirty, startedAt: new Date().toISOString() })
+
+/**
+ * The build, for the public readiness answer. Outside production it is
+ * always shown; in production only with HEALTH_SHOW_BUILD=true, since the
+ * exact commit tells an attacker which code to study (audit F15). The face
+ * worker's /health, behind its token, always shows it.
+ */
+export function publicBuild(): typeof BUILD | undefined {
+  return process.env.NODE_ENV !== 'production' || process.env.HEALTH_SHOW_BUILD === 'true' ? BUILD : undefined
+}

@@ -78,6 +78,8 @@ const ALERT_FOR: Record<ControlName, string> = {
 
 const MESSAGES: Record<string, string> = {
   no_location: 'Your location is needed to check in here. Allow location access and try again.',
+  no_sites: 'Check-in needs a site, and none is set up. Ask HR.',
+  no_networks: "Check-in needs a site's network, and none is set up. Ask HR.",
   location_imprecise: 'Your location is too imprecise to place you at a site. Move to open sky or turn on precise location.',
   outside_geofence: 'You are not at one of your organisation\'s sites.',
   outside_network: 'Check in from your organisation\'s network.',
@@ -201,33 +203,74 @@ export function validCidr(raw: string): boolean {
 export async function runControls(
   client: PoolClient, tenantId: string, claim: Claim
 ): Promise<{ results: ControlResult[]; hold: ControlResult[] }> {
+  const results = await evaluateControls(client, tenantId, claim)
+  const refused = results.find((x) => !x.ok && x.mode === 'enforce')
+  if (refused) throw new ControlRefusal(refused.code, results)
+  return { results, hold: results.filter((x) => !x.ok && x.mode === 'flag') }
+}
+
+/**
+ * What a check-out found (audit F9): the geofence and network, where they
+ * are on, and whether it comes long after the employee's rostered shift
+ * ended (checkin.checkout_late_minutes, default 60, when the shift window is
+ * on). A check-out is never refused, since that would leave the check-in open
+ * and count nothing; what fails is returned for an alert and the event.
+ */
+export async function checkOutFindings(client: PoolClient, tenantId: string, claim: Claim): Promise<ControlResult[]> {
+  const results = await evaluateControls(client, tenantId, claim, ['geofence', 'network'])
+  const s = await settings(client, tenantId)
+  const win = modeOf(s, 'shift_window')
+  if (win !== 'off') {
+    const late = intOf(s, 'checkin.checkout_late_minutes', 60)
+    const r = await client.query(
+      `SELECT bool_or(LOCALTIMESTAMP <= s.ends_at + make_interval(mins => $3)) AS in_time, count(*)::int AS shifts
+         FROM roster_shifts s
+        WHERE s.tenant_id = $1 AND s.employee_id = $2 AND s.status <> 'cancelled'
+          AND s.work_date BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE`,
+      [tenantId, claim.employeeId, late])
+    if (r.rows[0].shifts > 0) {
+      results.push(r.rows[0].in_time
+        ? { control: 'shift_window', mode: win, ok: true, code: 'within_shift' }
+        : { control: 'shift_window', mode: win, ok: false, code: 'after_shift', detail: { lateMinutes: late } })
+    }
+  }
+  return results
+}
+
+/** Each control's finding for a claim, without deciding anything; `only` limits which. */
+async function evaluateControls(
+  client: PoolClient, tenantId: string, claim: Claim, only?: ControlName[]
+): Promise<ControlResult[]> {
   const s = await settings(client, tenantId)
   const results: ControlResult[] = []
-  const sitesNeeded = modeOf(s, 'geofence') !== 'off' || modeOf(s, 'network') !== 'off'
+  const want = (c: ControlName) => !only || only.includes(c)
+  const sitesNeeded = (want('geofence') && modeOf(s, 'geofence') !== 'off') || (want('network') && modeOf(s, 'network') !== 'off')
   const sites = sitesNeeded
     ? (await client.query(
       `SELECT id, name, latitude::float8 AS latitude, longitude::float8 AS longitude, radius_m, allowed_cidrs
          FROM checkin_sites WHERE tenant_id = $1 AND is_active`, [tenantId])).rows
     : []
 
-  const geo = modeOf(s, 'geofence')
+  const geo = want('geofence') ? modeOf(s, 'geofence') : 'off'
   if (geo !== 'off' && claim.kioskSiteId) {
     const k = sites.find((x: any) => x.id === claim.kioskSiteId)
     results.push(k
       ? { control: 'geofence', mode: geo, ok: true, code: 'kiosk_site', detail: { site: k.name, siteId: k.id } }
       : { control: 'geofence', mode: geo, ok: false, code: 'kiosk_site_retired', detail: { siteId: claim.kioskSiteId } })
   } else if (geo !== 'off') {
-    if (!sites.length) results.push({ control: 'geofence', mode: geo, ok: true, code: 'no_sites' })
+    // Refusing outside sites when there are none fails closed (audit F11);
+    // flagging with none lets the check-in through and says why.
+    if (!sites.length) results.push({ control: 'geofence', mode: geo, ok: geo !== 'enforce', code: 'no_sites' })
     else {
       const g = geofence(claim, sites, intOf(s, 'checkin.max_accuracy_m', CONTROL_DEFAULTS.maxAccuracyMetres))
       results.push({ control: 'geofence', mode: geo, ...g })
     }
   }
 
-  const net = modeOf(s, 'network')
+  const net = want('network') ? modeOf(s, 'network') : 'off'
   if (net !== 'off') {
     const cidrs = sites.flatMap((x: any) => x.allowed_cidrs ?? [])
-    if (!cidrs.length) results.push({ control: 'network', mode: net, ok: true, code: 'no_networks' })
+    if (!cidrs.length) results.push({ control: 'network', mode: net, ok: net !== 'enforce', code: 'no_networks' })
     else {
       const ok = inNetworks(claim.clientIp, cidrs)
       results.push({ control: 'network', mode: net, ok, code: ok ? 'inside' : 'outside_network',
@@ -235,16 +278,20 @@ export async function runControls(
     }
   }
 
-  const dev = modeOf(s, 'device')
+  const dev = want('device') ? modeOf(s, 'device') : 'off'
   if (dev !== 'off') {
     if (!claim.deviceId) results.push({ control: 'device', mode: dev, ok: false, code: 'no_device_id' })
     else {
+      // A shared registration counts only for a kiosk, whose identity is its
+      // token: anyone can copy a shared device's id out of its browser and
+      // send it from home (audit F6). Elsewhere the device must be registered
+      // to this employee.
       const r = await client.query(
         `SELECT employee_id FROM attendance_devices
           WHERE tenant_id = $1 AND device_id = $2 AND revoked_at IS NULL
-            AND (employee_id = $3 OR employee_id IS NULL)
+            AND (employee_id = $3 OR (employee_id IS NULL AND $4))
           ORDER BY employee_id NULLS LAST LIMIT 1`,
-        [tenantId, claim.deviceId, claim.employeeId])
+        [tenantId, claim.deviceId, claim.employeeId, !!claim.kioskSiteId])
       const row = r.rows[0]
       results.push(row
         ? { control: 'device', mode: dev, ok: true, code: row.employee_id ? 'registered' : 'shared_kiosk' }
@@ -252,7 +299,7 @@ export async function runControls(
     }
   }
 
-  const win = modeOf(s, 'shift_window')
+  const win = want('shift_window') ? modeOf(s, 'shift_window') : 'off'
   if (win !== 'off') {
     const early = intOf(s, 'attendance.shift_early_minutes', CONTROL_DEFAULTS.shiftEarlyMinutes)
     const late = intOf(s, 'checkin.shift_late_minutes', CONTROL_DEFAULTS.shiftLateMinutes)
@@ -272,9 +319,7 @@ export async function runControls(
           detail: { earlyMinutes: early, lateMinutes: late } })
   }
 
-  const refused = results.find((x) => !x.ok && x.mode === 'enforce')
-  if (refused) throw new ControlRefusal(refused.code, results)
-  return { results, hold: results.filter((x) => !x.ok && x.mode === 'flag') }
+  return results
 }
 
 export function alertKindFor(r: ControlResult): string {
@@ -291,23 +336,21 @@ export async function detect(
   const s = await settings(client, tenantId)
   const out: { kind: string; subject: { employeeId?: string; deviceId?: string }; detail: Record<string, unknown> }[] = []
 
-  if (claim.deviceId && !claim.byFace) {
-    const shared = await client.query(
-      `SELECT 1 FROM attendance_devices WHERE tenant_id = $1 AND device_id = $2 AND employee_id IS NULL AND revoked_at IS NULL`,
-      [tenantId, claim.deviceId])
-    if (!shared.rows.length) {
-      const seconds = intOf(s, 'checkin.buddy_seconds', CONTROL_DEFAULTS.buddySeconds)
-      const r = await client.query(
-        `SELECT array_agg(DISTINCT employee_id) AS others FROM attendance_events
-          WHERE tenant_id = $1 AND device_id = $2 AND kind = 'check_in' AND employee_id <> $3 AND id <> $4
-            AND method NOT IN ('face', 'offline_face')
-            AND server_time > CURRENT_TIMESTAMP - make_interval(secs => $5)`,
-        [tenantId, claim.deviceId, claim.employeeId, eventId, seconds])
-      const others: string[] = r.rows[0].others ?? []
-      if (seconds > 0 && others.length) {
-        out.push({ kind: 'buddy_punching', subject: { employeeId: claim.employeeId, deviceId: claim.deviceId },
-          detail: { otherEmployees: others, withinSeconds: seconds } })
-      }
+  // At a kiosk an attendant checking several people in is the point; on any
+  // other device several people within moments is buddy punching, whatever
+  // the device id claims to be (audit F6).
+  if (claim.deviceId && !claim.byFace && !claim.kioskSiteId) {
+    const seconds = intOf(s, 'checkin.buddy_seconds', CONTROL_DEFAULTS.buddySeconds)
+    const r = await client.query(
+      `SELECT array_agg(DISTINCT employee_id) AS others FROM attendance_events
+        WHERE tenant_id = $1 AND device_id = $2 AND kind = 'check_in' AND employee_id <> $3 AND id <> $4
+          AND method NOT IN ('face', 'offline_face')
+          AND server_time > CURRENT_TIMESTAMP - make_interval(secs => $5)`,
+      [tenantId, claim.deviceId, claim.employeeId, eventId, seconds])
+    const others: string[] = r.rows[0].others ?? []
+    if (seconds > 0 && others.length) {
+      out.push({ kind: 'buddy_punching', subject: { employeeId: claim.employeeId, deviceId: claim.deviceId },
+        detail: { otherEmployees: others, withinSeconds: seconds } })
     }
   }
 

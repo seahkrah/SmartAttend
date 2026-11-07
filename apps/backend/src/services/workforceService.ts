@@ -1202,6 +1202,8 @@ export interface Whereabouts {
   deviceId?: unknown; latitude?: unknown; longitude?: unknown; accuracyMetres?: unknown; clientIp?: string | null
   /** A retried check-out (a kiosk's) answers with the first one's result instead of failing. */
   idempotencyKey?: string | null
+  /** The site of the kiosk this was recorded at (controls.ts). */
+  kioskSiteId?: string | null
 }
 
 function whereabouts(w: Whereabouts) {
@@ -1209,7 +1211,7 @@ function whereabouts(w: Whereabouts) {
   return {
     deviceId: w.deviceId === undefined || w.deviceId === null || w.deviceId === '' ? null : String(w.deviceId),
     latitude: n(w.latitude), longitude: n(w.longitude), accuracyMetres: n(w.accuracyMetres), clientIp: w.clientIp ?? null,
-    idempotencyKey: w.idempotencyKey ?? null,
+    idempotencyKey: w.idempotencyKey ?? null, kioskSiteId: w.kioskSiteId ?? null,
   }
 }
 

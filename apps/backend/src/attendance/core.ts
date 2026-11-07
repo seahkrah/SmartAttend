@@ -16,7 +16,7 @@
  * instead of recording twice.
  */
 import type { PoolClient } from 'pg'
-import { ControlRefusal, alertKindFor, detect, runControls, type ControlResult } from './controls.js'
+import { ControlRefusal, alertKindFor, checkOutFindings, detect, runControls, type ControlResult } from './controls.js'
 
 export const REASON_CODES = [
   'camera_failure', 'consent_withheld', 'enrolment_pending', 'face_not_recognised', 'network_outage', 'other',
@@ -244,13 +244,25 @@ function num(v: unknown): number | null {
   return v === null || v === undefined || v === '' || !Number.isFinite(n) ? null : n
 }
 
-/** A capture already recorded under this key, if the client is retrying. */
-async function replayed(client: PoolClient, ctx: CoreContext, key: string | null | undefined) {
+/**
+ * A capture already recorded under this key, if the client is retrying. Only
+ * the same kind of capture for the same person replays: a key that belongs
+ * to someone else's capture is refused, never answered with it (audit F7).
+ */
+async function replayed(
+  client: PoolClient, ctx: CoreContext, key: string | null | undefined,
+  who: { kind: 'mark' | 'check_in'; studentId?: string | null; employeeId?: string | null }
+) {
   if (!key) return null
   const r = await client.query(
-    `SELECT id, attendance_id, checkin_id, approval_state FROM attendance_events
+    `SELECT id, attendance_id, checkin_id, approval_state, kind, student_id, employee_id FROM attendance_events
       WHERE tenant_id = $1 AND idempotency_key = $2`, [ctx.tenantId, String(key).slice(0, 128)])
-  return r.rows[0] ?? null
+  const row = r.rows[0]
+  if (!row) return null
+  const same = row.kind === who.kind
+    && (who.studentId ? row.student_id === who.studentId : row.employee_id === who.employeeId)
+  if (!same) throw new AttendanceInputError('That idempotency key was used for a different capture', 409, 'key_reused')
+  return row
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +288,7 @@ export interface Mark {
 
 /** Records one student's attendance for one class on one day. */
 export async function markStudent(client: PoolClient, ctx: CoreContext, m: Mark): Promise<{ attendanceId: string; eventId: string }> {
-  const again = await replayed(client, ctx, m.capture.idempotencyKey)
+  const again = await replayed(client, ctx, m.capture.idempotencyKey, { kind: 'mark', studentId: m.studentId })
   if (again) return { attendanceId: again.attendance_id, eventId: again.id }
   const capture = await settleCapture(client, ctx.tenantId, m.capture)
   const byFace = isFace(capture.method)
@@ -350,7 +362,7 @@ export interface CheckInResult {
  * manager: its hours count as flagged, not worked, until approved.
  */
 export async function checkIn(client: PoolClient, ctx: CoreContext, c: CheckIn): Promise<CheckInResult> {
-  const again = await replayed(client, ctx, c.capture.idempotencyKey)
+  const again = await replayed(client, ctx, c.capture.idempotencyKey, { kind: 'check_in', employeeId: c.employeeId })
   if (again) return { checkinId: again.checkin_id, eventId: again.id, approval: again.approval_state }
   const capture = await settleCapture(client, ctx.tenantId, c.capture)
   const claim = {
@@ -413,7 +425,7 @@ export async function checkIn(client: PoolClient, ctx: CoreContext, c: CheckIn):
  * Closes an open check-in. A check-out establishes no more about presence
  * than the check-in did, so it carries the check-in's method and reason.
  */
-type Extra = Pick<Capture, 'deviceId' | 'clientTime' | 'idempotencyKey' | 'latitude' | 'longitude' | 'accuracyMetres' | 'clientIp'>
+type Extra = Pick<Capture, 'deviceId' | 'clientTime' | 'idempotencyKey' | 'latitude' | 'longitude' | 'accuracyMetres' | 'clientIp' | 'kioskSiteId'>
 
 /** A later event on a check-in carries the check-in's method and reason: it establishes no more about presence. */
 async function asCheckedIn(client: PoolClient, ctx: CoreContext, checkinId: string, extra: Extra): Promise<Capture> {
@@ -449,9 +461,22 @@ export async function checkOut(
       capture: { ...settled, idempotencyKey: null },
     })
   }
-  await writeEvent(client, ctx, {
-    platform: 'corporate', kind: 'check_out', employeeId, checkinId, method: settled.method as Method, capture: settled,
+  // Where the check-out came from, and whether it is long after the shift:
+  // recorded on the event, and alerted when something fails (audit F9).
+  const findings = await checkOutFindings(client, ctx.tenantId, {
+    employeeId, deviceId: extra.deviceId ? String(extra.deviceId).slice(0, 128) : null, clientIp: extra.clientIp ?? null,
+    latitude: num(extra.latitude), longitude: num(extra.longitude), accuracyMetres: num(extra.accuracyMetres),
+    byFace: false, kioskSiteId: extra.kioskSiteId ?? null,
   })
+  const eventId = await writeEvent(client, ctx, {
+    platform: 'corporate', kind: 'check_out', employeeId, checkinId, method: settled.method as Method, capture: settled,
+    controls: findings.length ? findings : null,
+  })
+  const failed = findings.filter((x) => !x.ok)
+  if (failed.length) {
+    await raiseAlert(client, ctx, 'checkout_flagged', { employeeId }, eventId,
+      { checkinId, failed: failed.map((x) => ({ control: x.control, code: x.code, ...x.detail })) })
+  }
   return checkinId
 }
 

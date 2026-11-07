@@ -78,7 +78,7 @@ import {
 import { templateKeyConfigured } from './biometrics/templateCrypto.js'
 import { tenantKeysConfigured } from './security/kms/dataKeys.js'
 import { publicRoute } from './auth/guards.js'
-import { BUILD } from './utils/buildInfo.js'
+import { publicBuild } from './utils/buildInfo.js'
 
 dotenv.config()
 validateProductionConfig()
@@ -219,7 +219,7 @@ app.get('/api/health/ready', publicRoute('readiness, for the load balancer'), as
     const face = engineInfo()
     return res.json({
       status: 'ready',
-      build: BUILD,
+      build: publicBuild(),
       components: {
         // With the worker (FACE_WORKER_URL), its state; it can be down while the
         // API stays ready, because attendance falls back to manual.

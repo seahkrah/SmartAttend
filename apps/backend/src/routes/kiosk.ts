@@ -38,7 +38,7 @@ import {
 import { publicRoute } from '../auth/guards.js'
 import { query, getConnection } from '../db/connection.js'
 import { asEmployee, kioskAuth, newPairingCode, pair, PAIRING_MINUTES, sha256, type KioskRequest } from '../kiosk/auth.js'
-import { assertUsableMatch, BiometricError, getSettings, issueChallenge, verify } from '../biometrics/service.js'
+import { assertUsableMatch, BiometricError, getSettings, issueChallenge, spendMatch, verify } from '../biometrics/service.js'
 import { IMAGE_LIMITS } from '../biometrics/engine.js'
 import { checkIn, checkOut, WorkforceError } from '../services/workforceService.js'
 import { AttendanceInputError, REASON_CODES } from '../attendance/core.js'
@@ -236,7 +236,7 @@ export const kioskRouter = Router()
 kioskRouter.post('/pair', publicRoute('a pairing code, shown once to an administrator and valid for 15 minutes, is the credential'),
   async (req: TenantRequest, res: Response) => {
     try {
-      const done = await pair(req.body?.code)
+      const done = await pair(req.body?.code, getClientIp(req))
       if (!done) return res.status(401).json({ error: 'That pairing code is not valid, or has expired', code: 'bad_pairing_code' })
       return res.status(201).json({ token: done.token, kiosk: { id: done.kiosk.id, label: done.kiosk.label } })
     } catch (e) {
@@ -357,22 +357,39 @@ kioskRouter.post('/face/verify', (req, res, next) => {
 })
 
 /**
- * The attendant's PIN, for a check-in or out without a face. Five wrong in a
- * row lock the PIN for 15 minutes, for the whole kiosk.
+ * The attendant's PIN, for a check-in or out without a face.
+ *
+ * Each attempt first takes a slot (pin_failures + 1) in one statement that
+ * refuses while locked, so attempts sent at once cannot all be compared
+ * before the lock lands (audit F5). A right PIN gives the slot back. Every
+ * fifth wrong one locks the PIN, for 15 minutes the first time and twice as
+ * long each time after, up to a day, and raises an alert; only a right PIN
+ * or an administrator's new PIN clears the count.
  */
-async function checkPin(k: { id: string; tenantId: string }, pin: unknown): Promise<void> {
-  const r = await query(
-    `SELECT pin_hash, (pin_locked_until > CURRENT_TIMESTAMP) AS locked FROM kiosks WHERE id = $1 AND tenant_id = $2`, [k.id, k.tenantId])
-  if (r.rows[0]?.locked) throw new AttendanceInputError('Too many wrong PINs. The attendant PIN is locked for a while.', 429, 'pin_locked')
-  if (PIN.test(String(pin ?? '')) && (await bcrypt.compare(String(pin), r.rows[0].pin_hash))) {
-    await query(`UPDATE kiosks SET pin_failures = 0 WHERE id = $1 AND tenant_id = $2`, [k.id, k.tenantId])
+async function checkPin(k: { id: string; tenantId: string; deviceId: string }, pin: unknown): Promise<void> {
+  // The slot that would be the fifth (tenth, ...) wrong one sets the lock as
+  // it is taken, before its PIN is compared, so no attempt can slip in while
+  // it is being compared; if it turns out right, the lock is lifted again.
+  const slot = await query(
+    `UPDATE kiosks SET pin_failures = pin_failures + 1,
+            pin_locked_until = CASE WHEN (pin_failures + 1) % $3 = 0
+              THEN CURRENT_TIMESTAMP + make_interval(mins => LEAST(1440, $4 * power(2, (pin_failures + 1) / $3 - 1))::int)
+              ELSE pin_locked_until END
+      WHERE id = $1 AND tenant_id = $2 AND (pin_locked_until IS NULL OR pin_locked_until <= CURRENT_TIMESTAMP)
+      RETURNING pin_hash, pin_failures, (pin_failures % $3 = 0) AS locks, pin_locked_until`,
+    [k.id, k.tenantId, PIN_FAILURES_BEFORE_LOCK, PIN_LOCK_MINUTES])
+  if (!slot.rows.length) throw new AttendanceInputError('Too many wrong PINs. The attendant PIN is locked for a while.', 429, 'pin_locked')
+  if (PIN.test(String(pin ?? '')) && (await bcrypt.compare(String(pin), slot.rows[0].pin_hash))) {
+    await query(`UPDATE kiosks SET pin_failures = 0, pin_locked_until = NULL WHERE id = $1 AND tenant_id = $2`, [k.id, k.tenantId])
     return
   }
-  // The fifth wrong PIN in a row locks it and starts the count again.
-  await query(
-    `UPDATE kiosks SET pin_failures = CASE WHEN pin_failures + 1 >= $3 THEN 0 ELSE pin_failures + 1 END,
-            pin_locked_until = CASE WHEN pin_failures + 1 >= $3 THEN CURRENT_TIMESTAMP + make_interval(mins => $4) ELSE pin_locked_until END
-      WHERE id = $1 AND tenant_id = $2`, [k.id, k.tenantId, PIN_FAILURES_BEFORE_LOCK, PIN_LOCK_MINUTES])
+  const failures = Number(slot.rows[0].pin_failures)
+  if (slot.rows[0].locks) {
+    const minutes = Math.min(24 * 60, PIN_LOCK_MINUTES * 2 ** (failures / PIN_FAILURES_BEFORE_LOCK - 1))
+    await query(
+      `INSERT INTO attendance_alerts (tenant_id, kind, device_id, detail) VALUES ($1, 'kiosk_pin_locked', $2, $3) ON CONFLICT DO NOTHING`,
+      [k.tenantId, k.deviceId, JSON.stringify({ kioskId: k.id, wrongPins: failures, lockedMinutes: minutes })])
+  }
   throw new AttendanceInputError('That PIN is not right', 403, 'wrong_pin')
 }
 
@@ -385,20 +402,27 @@ kioskRouter.post('/punch', async (req: KioskRequest, res: Response) => {
     if (action !== 'in' && action !== 'out') return res.status(400).json({ error: "action must be 'in' or 'out'" })
     const emp = await employeeByCode(req, b.employeeCode)
     const key = b.idempotencyKey ?? req.header('idempotency-key') ?? null
-    const idem = key ? `kiosk:${k.id}:${String(key).slice(0, 100)}` : null
+    // Stored at most 128 characters long, so looked up the same way.
+    const idem = key ? `kiosk:${k.id}:${String(key)}`.slice(0, 128) : null
 
-    // A retry answers with the first result rather than recording twice.
+    // A retry answers with the first result rather than recording twice; the
+    // same key for another person or the other action is a different request.
     if (idem) {
       const prior = await query(
         `SELECT e.kind, e.checkin_id, e.employee_id, e.approval_state FROM attendance_events e
           WHERE e.tenant_id = $1 AND e.idempotency_key = $2`, [k.tenantId, idem])
       if (prior.rows.length) {
         const p = prior.rows[0]
-        if (p.employee_id !== emp.id) return res.status(409).json({ error: 'That key was used for someone else', code: 'key_reused' })
-        return res.json({ replayed: true, action: p.kind === 'check_out' ? 'out' : 'in', checkinId: p.checkin_id, approval: p.approval_state })
+        const priorAction = p.kind === 'check_out' ? 'out' : 'in'
+        if (p.employee_id !== emp.id || priorAction !== action) {
+          return res.status(409).json({ error: 'That key was used for a different punch', code: 'key_reused' })
+        }
+        return res.json({ replayed: true, action: priorAction, checkinId: p.checkin_id, approval: p.approval_state })
       }
     }
 
+    // A face match, in or out, is checked and spent, and must come from this
+    // kiosk; without one, the attendant's PIN (audit F1, F2).
     const faceMatchId = b.faceMatchId ? String(b.faceMatchId) : null
     if (!faceMatchId) await checkPin(k, b.pin)
 
@@ -407,11 +431,13 @@ kioskRouter.post('/punch', async (req: KioskRequest, res: Response) => {
     const site = await query(`SELECT name FROM checkin_sites WHERE id = $1 AND tenant_id = $2`, [k.siteId, k.tenantId])
     const result = await asEmployee(k, emp.userId, async () => {
       await client!.query('BEGIN')
+      let match: string | null = null
+      if (faceMatchId) {
+        match = await assertUsableMatch(client!, ctx, faceMatchId,
+          { action: 'verified', subject: { type: 'employee', id: emp.id }, kioskDevice: k.deviceId })
+        await spendMatch(client!, k.tenantId, match, action === 'in' ? 'kiosk_check_in' : 'kiosk_check_out')
+      }
       if (action === 'in') {
-        let match: string | null = null
-        if (faceMatchId) {
-          match = await assertUsableMatch(client!, ctx, faceMatchId, { action: 'verified', subject: { type: 'employee', id: emp.id } })
-        }
         const row = await checkIn(client!, { tenantId: k.tenantId, userId: emp.userId, platformId: emp.platformId }, emp.id, {
           checkInType: 'office', siteLocation: site.rows[0]?.name ?? k.label, faceMatchId: match,
           reasonCode: faceMatchId ? null : b.reasonCode, reasonText: faceMatchId ? null : (b.reasonText ? `${b.reasonText}` : null),
@@ -421,7 +447,7 @@ kioskRouter.post('/punch', async (req: KioskRequest, res: Response) => {
         return { action: 'in', checkIn: row, approval: row.approval }
       }
       const row = await checkOut(client!, { tenantId: k.tenantId, userId: emp.userId, platformId: emp.platformId }, emp.id,
-        { deviceId: k.deviceId, clientIp: getClientIp(req), idempotencyKey: idem })
+        { deviceId: k.deviceId, clientIp: getClientIp(req), idempotencyKey: idem, kioskSiteId: k.siteId })
       await client!.query('COMMIT')
       return { action: 'out', checkIn: row }
     })

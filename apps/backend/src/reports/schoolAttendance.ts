@@ -15,7 +15,9 @@
  *   - Present and late count as attended. Excused is neither attended nor
  *     missed: it leaves the denominator. A student enrolled in a session but
  *     with no mark is "unmarked", shown, and counted as not attended, since
- *     nobody recorded them there.
+ *     nobody recorded them there. Enrolled means enrolled on that date: a
+ *     session before a student joined the class (student_courses.enrolled_at)
+ *     is not one they missed.
  *   - The attendance rate is attended / (sessions - excused).
  *
  * A student is "below" when their rate is under the school's
@@ -92,8 +94,17 @@ export async function dailyByClass(tenantId: string, date: string) {
             to_char(cs.start_time, 'HH24:MI') AS "startTime",
             NULLIF(trim(CONCAT(f.first_name, ' ', f.last_name)), '') AS faculty,
             bool_or(w.meets) AS "meetsToday",
+            -- Enrolled on that date: joined by then (enrolled_at), and still enrolled.
             (SELECT count(*)::int FROM student_courses sc
-              WHERE sc.schedule_id = cs.id AND sc.tenant_id = cs.tenant_id AND sc.status = 'enrolled') AS enrolled,
+              WHERE sc.schedule_id = cs.id AND sc.tenant_id = cs.tenant_id AND sc.status = 'enrolled'
+                AND sc.enrolled_at::date <= $2::date) AS enrolled,
+            -- Of those, the ones with no mark that day. Counted, not subtracted,
+            -- so a mark for someone who has since dropped does not hide one.
+            (SELECT count(*)::int FROM student_courses sc
+              WHERE sc.schedule_id = cs.id AND sc.tenant_id = cs.tenant_id AND sc.status = 'enrolled'
+                AND sc.enrolled_at::date <= $2::date
+                AND NOT EXISTS (SELECT 1 FROM school_attendance m WHERE m.tenant_id = cs.tenant_id AND m.schedule_id = cs.id
+                                  AND m.student_id = sc.student_id AND m.attendance_date = $2::date)) AS unmarked,
             count(sa.id) FILTER (WHERE sa.status = 'present')::int AS present,
             count(sa.id) FILTER (WHERE sa.status = 'late')::int AS late,
             count(sa.id) FILTER (WHERE sa.status = 'absent')::int AS absent,
@@ -106,15 +117,14 @@ export async function dailyByClass(tenantId: string, date: string) {
        JOIN courses c ON c.id = cs.course_id AND c.tenant_id = cs.tenant_id
        LEFT JOIN faculty f ON f.id = cs.faculty_id AND f.tenant_id = cs.tenant_id
        LEFT JOIN school_attendance sa ON sa.schedule_id = cs.id AND sa.tenant_id = cs.tenant_id AND sa.attendance_date = $2::date
-      GROUP BY cs.id, c.code, c.name, cs.section, cs.start_time, f.first_name, f.last_name
+      GROUP BY cs.id, cs.tenant_id, c.code, c.name, cs.section, cs.start_time, f.first_name, f.last_name
       ORDER BY cs.start_time NULLS LAST, c.code, cs.section`,
     [tenantId, date])
   const classes: DailyClassRow[] = r.rows.map((x: any) => ({
     scheduleId: x.scheduleId, courseCode: x.courseCode, courseName: x.courseName, section: x.section,
     startTime: x.startTime, faculty: x.faculty, meetsToday: x.meetsToday,
     enrolled: x.enrolled, present: x.present, late: x.late, absent: x.absent, excused: x.excused,
-    // A mark for someone no longer enrolled is still a mark; unmarked never goes below zero.
-    unmarked: Math.max(0, x.enrolled - x.marked), byFace: x.byFace, byHand: x.byHand, registerTaken: x.marked > 0,
+    unmarked: x.unmarked, byFace: x.byFace, byHand: x.byHand, registerTaken: x.marked > 0,
   }))
   const sum = (k: keyof DailyClassRow) => classes.reduce((a, c) => a + (c[k] as number), 0)
   return {
@@ -175,6 +185,9 @@ export async function termReport(tenantId: string, termId: string, atRiskPercent
         JOIN student_courses sc ON sc.schedule_id = s.schedule_id AND sc.tenant_id = $1 AND sc.status = 'enrolled'
         LEFT JOIN school_attendance sa ON sa.tenant_id = $1 AND sa.schedule_id = s.schedule_id
               AND sa.attendance_date = s.attendance_date AND sa.student_id = sc.student_id
+       -- A session before the student joined the class is not theirs to miss
+       -- (enrolled_at); one they were marked in still counts.
+       WHERE sc.enrolled_at::date <= s.attendance_date OR sa.id IS NOT NULL
       UNION ALL
       -- Marked, but no longer enrolled: the mark still happened.
       SELECT sa.schedule_id, sa.attendance_date, sa.student_id, sa.status

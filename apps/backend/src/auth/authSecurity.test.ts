@@ -86,6 +86,13 @@ describe('CORS and proxy settings', () => {
     expect(trustProxySetting()).toBe(false)
     process.env.TRUST_PROXY = '1'
     expect(trustProxySetting()).toBe(1)
+    process.env.TRUST_PROXY = '10.0.0.0/8'
+    expect(trustProxySetting()).toBe('10.0.0.0/8')
+    // Trusting every hop would let any client name its own address (audit P1).
+    for (const v of ['true', 'TRUE', 'yes', 'on']) {
+      process.env.TRUST_PROXY = v
+      expect(() => trustProxySetting()).toThrow(/number of proxies/)
+    }
     if (saved === undefined) delete process.env.TRUST_PROXY
     else process.env.TRUST_PROXY = saved
   })

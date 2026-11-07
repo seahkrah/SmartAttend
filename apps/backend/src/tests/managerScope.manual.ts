@@ -289,6 +289,17 @@ async function main() {
     r = await call('POST', `/api/workforce/timesheets/${ts3}/decision`, mgr2, { decision: 'approved' })
     check('Manager A2 reaches it (a draft cannot be approved yet)', r.status !== 404, `(${r.status} ${r.json?.error})`)
 
+    console.log('-- the employee directory --')
+    r = await call('GET', '/api/corporate/employees?limit=200', mgr)
+    const dir = (r.json?.data ?? []).map((x: any) => x.id)
+    check("a manager's directory: their team and themselves, not employee 3, not HR (audit F8)",
+      r.status === 200 && dir.includes(e1) && dir.includes(e2) && dir.includes(m1) && !dir.includes(e3) && !dir.includes(A.hrEmpId),
+      `(${r.status} ${dir.length})`)
+    r = await call('GET', `/api/corporate/employees/${e3}`, mgr)
+    check("and employee 3's record reads as absent", r.status === 404, `(${r.status})`)
+    r = await call('GET', '/api/corporate/employees?limit=200', hr)
+    check('HR still sees everyone', r.status === 200 && (r.json?.data ?? []).some((x: any) => x.id === e3), `(${r.status})`)
+
     console.log("-- HR's views --")
     for (const p of ['/api/hr/members', '/api/hr/overview', '/api/hr/patterns', '/api/hr/compliance/summary', '/api/hr/campaigns',
       '/api/attendance/department/all', '/api/attendance/department/export?format=CSV']) {

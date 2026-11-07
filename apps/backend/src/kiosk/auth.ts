@@ -14,6 +14,7 @@
  * for both in scripts/checks/no-raw-query.mjs.
  */
 import { createHash, randomBytes, randomInt } from 'crypto'
+import { isIP } from 'net'
 import type { NextFunction, Response } from 'express'
 import { query } from '../db/connection.js'
 import { runAsSystem, withTenant } from '../db/dbContext.js'
@@ -53,15 +54,31 @@ export function normalisePairingCode(raw: unknown): string | null {
 }
 
 /** Pairs a device: the code is spent, a fresh token replaces any earlier one. */
-export async function pair(rawCode: unknown): Promise<{ token: string; kiosk: { id: string; label: string; tenantId: string } } | null> {
+export async function pair(
+  rawCode: unknown, clientIp: string | null = null
+): Promise<{ token: string; kiosk: { id: string; label: string; tenantId: string } } | null> {
   const code = normalisePairingCode(rawCode)
   if (!code) return null
   const token = randomBytes(32).toString('base64url')
+  // The pairing and its audit row in one statement (audit F14): which kiosk
+  // paired, when and from what address, under the administrator who created
+  // it, since the device has no identity of its own until this succeeds.
   const r = await runAsSystem('kiosk pairing: the code names its kiosk before any session', () => query(
-    `UPDATE kiosks SET token_hash = $2, pairing_hash = NULL, pairing_expires_at = NULL, paired_at = CURRENT_TIMESTAMP
-      WHERE pairing_hash = $1 AND pairing_expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL
-      RETURNING id, label, tenant_id`,
-    [sha256(code), sha256(token)]))
+    `WITH k AS (
+       UPDATE kiosks SET token_hash = $2, pairing_hash = NULL, pairing_expires_at = NULL, paired_at = CURRENT_TIMESTAMP
+        WHERE pairing_hash = $1 AND pairing_expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL
+        RETURNING id, label, tenant_id, created_by
+     ), a AS (
+       INSERT INTO audit_logs (actor_id, actor_role, action_type, action, action_scope, resource_type, resource_id,
+                               after_state, ip_address, tenant_id, platform_id)
+       SELECT k.created_by, 'tenant_admin', 'KIOSK_PAIRED', 'KIOSK_PAIRED', 'TENANT', 'kiosk', k.id,
+              jsonb_build_object('label', k.label, 'pairedFrom', $3::text), $4::inet, k.tenant_id,
+              (SELECT platform_id FROM users WHERE id = k.created_by)
+         FROM k
+       RETURNING id
+     )
+     SELECT k.id, k.label, k.tenant_id FROM k, a`,
+    [sha256(code), sha256(token), clientIp, clientIp && isIP(clientIp) ? clientIp : null]))
   const row = r.rows[0]
   return row ? { token, kiosk: { id: row.id, label: row.label, tenantId: row.tenant_id } } : null
 }

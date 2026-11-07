@@ -79,7 +79,8 @@ async function main() {
   const dirTok = reissue(A.dirToken)
   const adminB = reissue(corp.B.adminToken)
   const emp1 = reissue(A.empToken)
-  const e1 = A.employees[0] as string
+  // Employee 2: earlier suites in a full run drive employee 1 into the face pause (faceMatchingApi), and face events are append-only.
+  const e1 = A.employees[1] as string
   const code1 = (await owner(`SELECT employee_id FROM employees WHERE id = $1`, [e1])).rows[0].employee_id as string
   const codeB = (await owner(`SELECT employee_id FROM employees WHERE id = $1`, [corp.B.employees[0]])).rows[0].employee_id as string
   const before = (await owner(
@@ -157,7 +158,7 @@ async function main() {
     check('a made-up token does not either', r.status === 401, `(${r.status})`)
     r = await call('POST', '/api/kiosk/lookup', K, { employeeCode: code1 })
     check('the kiosk finds an employee by number, with their first name and initial only', r.status === 200
-      && /^Emp1 A\.$/.test(r.json?.employee?.displayName) && Object.keys(r.json?.employee ?? {}).length === 1, `(${r.status} ${JSON.stringify(r.json)})`)
+      && /^Emp2 A\.$/.test(r.json?.employee?.displayName) && Object.keys(r.json?.employee ?? {}).length === 1, `(${r.status} ${JSON.stringify(r.json)})`)
     r = await call('POST', '/api/kiosk/lookup', K, { employeeCode: codeB })
     check("another tenant's employee number finds nobody", r.status === 404, `(${r.status})`)
     r = await call('POST', '/api/kiosk/punch', K, { employeeCode: codeB, action: 'in', pin: '2468', reasonCode: 'camera_failure' })
@@ -223,7 +224,7 @@ async function main() {
     const en = await call('POST', '/api/biometrics/challenges', bearer(hr), { purpose: 'enroll', subjectType: 'employee', subjectId: e1 })
     await sleep(800)
     r = await frames('/api/biometrics/enroll', bearer(hr), { challengeId: en.json?.challengeId }, (en.json?.steps ?? []).map((p: string) => POSES[p]))
-    check('(HR enrols employee 1)', r.status === 201, `(${r.status} ${JSON.stringify(r.json).slice(0, 120)})`)
+    check('(HR enrols employee 2)', r.status === 201, `(${r.status} ${JSON.stringify(r.json).slice(0, 120)})`)
     r = await call('POST', '/api/kiosk/lookup', K, { employeeCode: code1 })
     check('now the kiosk offers face', r.json?.faceAvailable === true, `(${JSON.stringify(r.json)})`)
     let ch = await call('POST', '/api/kiosk/face/challenge', K, { employeeCode: code1 })

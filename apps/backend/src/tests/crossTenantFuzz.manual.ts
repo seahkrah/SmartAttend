@@ -48,7 +48,11 @@ const callers = [
 // end the callers' own sessions, and the public enquiry form is limited per
 // address; they are covered by their own suites. Path-parameter fuzzing
 // still reaches every route.
-const NO_INJECTION = /^\/api\/(auth|access-requests)(\/|$)/
+// The kiosk's own routes (not /api/kiosk/admin) answer only a kiosk token and
+// refuse every user session with 401, so a user injecting ids proves nothing
+// there; another tenant's employee number at a kiosk is tested by the kiosk
+// suite.
+const NO_INJECTION = /^\/api\/(auth|access-requests)(\/|$)|^\/api\/kiosk\/(?!admin\/)/
 
 // Answers that change on their own between any two calls, so "same as for an
 // id that exists nowhere" cannot be decided by comparing them. Each was

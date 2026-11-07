@@ -201,12 +201,16 @@ router.patch('/sites/:siteId', admins, async (req: TenantRequest, res: Response)
     const v = siteInput(req.body ?? {}, true)
     const before = await query(`SELECT ${SITE_COLUMNS} FROM checkin_sites WHERE id = $1 AND tenant_id = $2`, [req.params.siteId, ctx.tenantId])
     if (!before.rows.length) throw new Bad('No such site', 404)
-    const keys = Object.keys(v)
-    if (!keys.length) return res.json({ site: before.rows[0] })
+    if (!Object.keys(v).length) return res.json({ site: before.rows[0] })
+    // One fixed statement: a field not sent keeps its value (no SQL is built from the request).
     const r = await query(
-      `UPDATE checkin_sites SET ${keys.map((k, i) => `${k} = $${i + 3}`).join(', ')}, updated_at = CURRENT_TIMESTAMP
+      `UPDATE checkin_sites
+          SET name = COALESCE($3, name), latitude = COALESCE($4, latitude), longitude = COALESCE($5, longitude),
+              radius_m = COALESCE($6, radius_m), allowed_cidrs = COALESCE($7::text[], allowed_cidrs),
+              is_active = COALESCE($8, is_active), updated_at = CURRENT_TIMESTAMP
         WHERE id = $1 AND tenant_id = $2 RETURNING ${SITE_COLUMNS}`,
-      [req.params.siteId, ctx.tenantId, ...keys.map((k) => v[k])])
+      [req.params.siteId, ctx.tenantId, v.name ?? null, v.latitude ?? null, v.longitude ?? null, v.radius_m ?? null,
+       v.allowed_cidrs ?? null, v.is_active ?? null])
     await audit(req, 'CHECKIN_SITE_CHANGED', 'checkin_site', req.params.siteId, r.rows[0], before.rows[0])
     return res.json({ site: r.rows[0] })
   } catch (e) {

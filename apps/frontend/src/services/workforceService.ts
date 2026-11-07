@@ -291,7 +291,8 @@ export const workforceService = {
 
   /** Starts or ends a break in the open check-in; breaks are not worked hours. */
   async takeBreak(which: 'start' | 'end'): Promise<{ breakId: string; startedAt: string; endedAt: string | null }> {
-    const { data } = await axiosClient.post(`/workforce/my/break-${which}`, {});
+    // Spelled out, so the API check can match each call to its route.
+    const { data } = await axiosClient.post(which === 'start' ? '/workforce/my/break-start' : '/workforce/my/break-end', {});
     return data.break;
   },
 

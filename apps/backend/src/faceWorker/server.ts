@@ -33,6 +33,7 @@ import fs from 'fs'
 import http from 'http'
 import { fileURLToPath } from 'url'
 import { IMAGE_LIMITS, ImageRejected, checkImage } from '../biometrics/engine.js'
+import { BUILD } from '../utils/buildInfo.js'
 
 const CREDENTIALS = ['DATABASE_URL', 'APP_DATABASE_URL', 'SYSTEM_DATABASE_URL', 'PGPASSWORD', 'BIOMETRIC_TEMPLATE_KEY',
   'KMS_LOCAL_KEK', 'JWT_SECRET']
@@ -194,6 +195,7 @@ function health() {
   const info = (ready[0]?.info ?? {}) as Record<string, unknown>
   return {
     ...info,
+    build: BUILD,
     state: ready.length ? 'ready' : engines.some((e) => e.state === 'loading') ? 'not_loaded' : 'failed',
     error: ready.length ? null : (engines.find((e) => e.error)?.error ?? null),
     engines: { ready: ready.length, loading: engines.filter((e) => e.state === 'loading').length, total: engines.length },

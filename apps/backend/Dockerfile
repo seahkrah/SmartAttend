@@ -35,6 +35,10 @@ RUN cd apps/backend \
 
 FROM node:20-bookworm-slim
 ENV NODE_ENV=production PORT=5000
+# The commit this image was built from, reported by /api/health/ready and the
+# face worker's /health (src/utils/buildInfo.ts): docker build --build-arg GIT_COMMIT=$(git rev-parse HEAD)
+ARG GIT_COMMIT=
+ENV GIT_COMMIT=$GIT_COMMIT
 # The base image lags Debian's security updates; take them. The server runs
 # `node` and nothing else, so npm, npx and corepack (and the dependency tree
 # npm bundles, which the image scan flags) are removed rather than patched.

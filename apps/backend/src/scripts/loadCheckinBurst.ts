@@ -11,7 +11,13 @@
  *   - face: each verifies their face (challenge, three frames, 1:1 match) and
  *     checks in citing the match. Each is enrolled first, by HR, with the
  *     synthetic test face.
- * Reports p50, p95 and max per path and whether the capacity targets were met.
+ * Reports, per path: the most requests in flight at once, throughput, error
+ * rate, p50, p95, p99 and max, and the database during the burst (connections
+ * active and waiting on locks, sampled every 250 ms; commits, rollbacks and
+ * deadlocks from pg_stat_database). A duplicate phase then sends each manual
+ * check-in twice at once, with one idempotency key and without one, and
+ * counts what was stored. Whether the capacity targets were met is computed
+ * from the bursts.
  * With --write, saves the result to
  * docs/scorecard/evidence/load-checkin-burst.json.
  * The throwaway employees are removed afterwards.
@@ -80,13 +86,60 @@ const pct = (xs: number[], p: number) => {
   return s.length ? Math.round(s[Math.min(s.length - 1, Math.floor(s.length * p))]) : null
 }
 
+/**
+ * The database while a burst runs: this database's connections that are
+ * active and that wait on a lock, sampled every 250 ms (the most of each),
+ * and pg_stat_database's commits, rollbacks and deadlocks over the burst.
+ */
+async function dbWatch() {
+  const c = new pg.Client({ connectionString: process.env.DATABASE_URL })
+  await c.connect()
+  const stats = async () => (await c.query(
+    `SELECT xact_commit::bigint AS commits, xact_rollback::bigint AS rollbacks, deadlocks::bigint AS deadlocks
+       FROM pg_stat_database WHERE datname = current_database()`)).rows[0]
+  const before = await stats()
+  let maxActive = 0
+  let maxWaitingOnLocks = 0
+  let maxConnections = 0
+  let samples = 0
+  const timer = setInterval(async () => {
+    try {
+      const r = (await c.query(
+        `SELECT count(*)::int AS connections,
+                count(*) FILTER (WHERE state = 'active')::int AS active,
+                count(*) FILTER (WHERE wait_event_type = 'Lock')::int AS waiting
+           FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()`)).rows[0]
+      samples++
+      maxConnections = Math.max(maxConnections, r.connections)
+      maxActive = Math.max(maxActive, r.active)
+      maxWaitingOnLocks = Math.max(maxWaitingOnLocks, r.waiting)
+    } catch { /* a sample missed is a sample missed */ }
+  }, 250)
+  return async () => {
+    clearInterval(timer)
+    const after = await stats()
+    await c.end()
+    return {
+      samples, maxConnections, maxActive, maxWaitingOnLocks,
+      commits: Number(after.commits) - Number(before.commits),
+      rollbacks: Number(after.rollbacks) - Number(before.rollbacks),
+      deadlocks: Number(after.deadlocks) - Number(before.deadlocks),
+    }
+  }
+}
+
 /** Runs `jobs` spread evenly over one minute; returns each one's latency and outcome. */
 async function burst(jobs: Array<() => Promise<boolean>>) {
   const why: string[] = []
   const gap = 60_000 / jobs.length
   const t0 = Date.now()
+  let inFlight = 0
+  let maxInFlight = 0
+  const stopWatch = await dbWatch()
   const results = await Promise.all(jobs.map((job, i) => new Promise<{ ms: number; ok: boolean }>((resolve) => {
     setTimeout(async () => {
+      inFlight++
+      maxInFlight = Math.max(maxInFlight, inFlight)
       const t = performance.now()
       let ok = false
       try {
@@ -95,13 +148,20 @@ async function burst(jobs: Array<() => Promise<boolean>>) {
         ok = false
         if (why.length < 5) why.push(String((e as Error)?.message ?? e).slice(0, 160))
       }
+      inFlight--
       resolve({ ms: performance.now() - t, ok })
     }, i * gap)
   })))
+  const database = await stopWatch()
+  const wall = (Date.now() - t0) / 1000
   const ok = results.filter((r) => r.ok).map((r) => r.ms)
+  const errors = results.filter((r) => !r.ok).length
   return {
-    n: jobs.length, wallSeconds: Math.round((Date.now() - t0) / 100) / 10, errors: results.filter((r) => !r.ok).length,
-    p50Ms: pct(ok, 0.5), p95Ms: pct(ok, 0.95), maxMs: ok.length ? Math.round(Math.max(...ok)) : null,
+    n: jobs.length, offeredPerMinute: jobs.length, wallSeconds: Math.round(wall * 10) / 10,
+    maxInFlight, throughputPerSecond: Math.round((ok.length / wall) * 100) / 100,
+    errors, errorRatePercent: Math.round((errors / jobs.length) * 1000) / 10,
+    p50Ms: pct(ok, 0.5), p95Ms: pct(ok, 0.95), p99Ms: pct(ok, 0.99), maxMs: ok.length ? Math.round(Math.max(...ok)) : null,
+    database,
     firstFailures: why,
   }
 }
@@ -144,6 +204,42 @@ async function main() {
     const manual = await burst(made.map((m) => async () =>
       (await call('POST', '/api/workforce/my/check-in', m.token, { checkInType: 'office', reasonCode: 'camera_failure' })).status === 201))
     for (const m of made) await call('POST', '/api/workforce/my/check-out', m.token)
+
+    // Duplicates: each employee's check-in sent twice at once, with one
+    // idempotency key, then twice at once without one. Exactly one check-in
+    // each must be stored either way.
+    console.log(`duplicates: ${N} check-ins sent twice at once, with and without a key`)
+    const emps = made.map((m) => m.employeeId)
+    const counted = async () => (await owner(
+      `SELECT (SELECT count(*)::int FROM corporate_checkins WHERE tenant_id = $1 AND employee_id = ANY($2::uuid[])) AS checkins,
+              (SELECT count(*)::int FROM attendance_events WHERE tenant_id = $1 AND employee_id = ANY($2::uuid[]) AND kind = 'check_in') AS events`,
+      [tenant, emps])).rows[0]
+    const beforeDup = await counted()
+    const withKey = await Promise.all(made.map(async (m, i) => {
+      const body = { checkInType: 'office', reasonCode: 'camera_failure', idempotencyKey: `dup-${run}-${i}` }
+      const [a, b] = await Promise.all([call('POST', '/api/workforce/my/check-in', m.token, body),
+        call('POST', '/api/workforce/my/check-in', m.token, body)])
+      return { codes: [a.status, b.status].sort().join('+'), same: !!a.json?.checkIn?.id && a.json?.checkIn?.id === b.json?.checkIn?.id }
+    }))
+    for (const m of made) await call('POST', '/api/workforce/my/check-out', m.token)
+    const noKey = await Promise.all(made.map(async (m) => {
+      const body = { checkInType: 'office', reasonCode: 'camera_failure' }
+      const [a, b] = await Promise.all([call('POST', '/api/workforce/my/check-in', m.token, body),
+        call('POST', '/api/workforce/my/check-in', m.token, body)])
+      return [a.status, b.status].sort().join('+')
+    }))
+    for (const m of made) await call('POST', '/api/workforce/my/check-out', m.token)
+    const afterDup = await counted()
+    // What the two rounds stored: one check-in, and one event, per employee per round.
+    const stored = { checkins: afterDup.checkins - beforeDup.checkins, events: afterDup.events - beforeDup.events }
+    const tally = (xs: string[]) => xs.reduce<Record<string, number>>((a, x) => ({ ...a, [x]: (a[x] ?? 0) + 1 }), {})
+    const duplicates = {
+      sentTwiceAtOnce: N * 2,
+      withKey: { responses: tally(withKey.map((x) => x.codes)), bothAnsweredWithTheSameCheckIn: withKey.filter((x) => x.same).length },
+      withoutKey: { responses: tally(noKey) },
+      stored: { checkIns: stored.checkins, events: stored.events, expected: N * 2 },
+      ok: stored.checkins === N * 2 && stored.events === N * 2 && withKey.every((x) => x.same),
+    }
 
     // Enrolment is set-up, not what is measured. One employee is enrolled
     // through the API; the same face is then sealed for each of the others
@@ -209,27 +305,34 @@ async function main() {
 
     const workers = (process.env.FACE_WORKER_URL ?? '').split(',').filter(Boolean).length
     let commit = 'unknown'
+    let dirty: boolean | null = null
     try {
       commit = execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8' }).trim()
+      dirty = execSync('git status --porcelain --untracked-files=no', { cwd: ROOT, encoding: 'utf8' }).trim() !== ''
     } catch { /* not a checkout */ }
+    const postgres = (await owner(`SELECT current_setting('server_version') AS v`)).rows[0].v
     const result = {
       measuredAt: new Date().toISOString(),
       commit,
+      dirtyTree: dirty,
+      command: `npx tsx src/scripts/loadCheckinBurst.ts ${process.argv.slice(2).join(' ')}`.trim(),
       assumption: 'docs/operations/capacity.md: N check-ins per minute for one tenant',
       n: N,
       environment: {
         kind: 'development machine, not production hardware',
         os: `${os.type()} ${os.release()}`, cpus: os.cpus().length, cpuModel: os.cpus()[0]?.model ?? null,
         memoryGb: Math.round(os.totalmem() / 1e9), node: process.version,
-        faceWorkers: workers || 'in-process engine', apiReplicas: 1, database: 'PostgreSQL 16 in Docker, same machine',
+        faceWorkers: workers || 'in-process engine', engineProcessesPerWorker: Number(process.env.FACE_ENGINE_PROCESSES ?? 2),
+        apiReplicas: 1, database: `PostgreSQL ${postgres} in Docker, same machine`,
       },
       targets: TARGET,
       manual,
+      duplicates,
       face,
       faceSustained: sustained,
       workersRecoveredAfterSeconds: recoverySeconds,
       met: manual.errors === 0 && face.errors === 0 && (manual.p95Ms ?? Infinity) < TARGET.manualP95Ms
-        && (face.p95Ms ?? Infinity) < TARGET.faceP95Ms,
+        && (face.p95Ms ?? Infinity) < TARGET.faceP95Ms && duplicates.ok,
     }
     console.log(JSON.stringify(result, null, 2))
     if (process.argv.includes('--write')) {

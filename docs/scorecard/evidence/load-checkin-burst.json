@@ -1,6 +1,8 @@
 {
-  "measuredAt": "2026-10-03T21:15:27.300Z",
-  "commit": "54452e370ea13df5cfb8443e76a16db4ea40103d",
+  "measuredAt": "2026-11-07T11:14:53.264Z",
+  "commit": "c53a40150787e8193faf7d044c2401488c028632",
+  "dirtyTree": true,
+  "command": "npx tsx src/scripts/loadCheckinBurst.ts --n 120 --sustain 30 --write",
   "assumption": "docs/operations/capacity.md: N check-ins per minute for one tenant",
   "n": 120,
   "environment": {
@@ -10,9 +12,10 @@
     "cpuModel": "Intel(R) Core(TM) i5-8350U CPU @ 1.70GHz",
     "memoryGb": 8,
     "node": "v22.20.0",
-    "faceWorkers": 2,
+    "faceWorkers": 1,
+    "engineProcessesPerWorker": 2,
     "apiReplicas": 1,
-    "database": "PostgreSQL 16 in Docker, same machine"
+    "database": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) in Docker, same machine"
   },
   "targets": {
     "manualP95Ms": 500,
@@ -20,20 +23,68 @@
   },
   "manual": {
     "n": 120,
+    "offeredPerMinute": 120,
     "wallSeconds": 59.6,
+    "maxInFlight": 1,
+    "throughputPerSecond": 2.01,
     "errors": 0,
-    "p50Ms": 47,
-    "p95Ms": 88,
-    "maxMs": 203,
+    "errorRatePercent": 0,
+    "p50Ms": 100,
+    "p95Ms": 198,
+    "p99Ms": 261,
+    "maxMs": 262,
+    "database": {
+      "samples": 231,
+      "maxConnections": 4,
+      "maxActive": 1,
+      "maxWaitingOnLocks": 0,
+      "commits": 1498,
+      "rollbacks": 0,
+      "deadlocks": 0
+    },
     "firstFailures": []
+  },
+  "duplicates": {
+    "sentTwiceAtOnce": 240,
+    "withKey": {
+      "responses": {
+        "200+201": 120
+      },
+      "bothAnsweredWithTheSameCheckIn": 120
+    },
+    "withoutKey": {
+      "responses": {
+        "201+409": 120
+      }
+    },
+    "stored": {
+      "checkIns": 240,
+      "events": 240,
+      "expected": 240
+    },
+    "ok": true
   },
   "face": {
     "n": 120,
-    "wallSeconds": 88.3,
-    "errors": 108,
-    "p50Ms": 7867,
-    "p95Ms": 9857,
-    "maxMs": 9857,
+    "offeredPerMinute": 120,
+    "wallSeconds": 64.4,
+    "maxInFlight": 10,
+    "throughputPerSecond": 0.05,
+    "errors": 117,
+    "errorRatePercent": 97.5,
+    "p50Ms": 3266,
+    "p95Ms": 4467,
+    "p99Ms": 4467,
+    "maxMs": 4467,
+    "database": {
+      "samples": 246,
+      "maxConnections": 26,
+      "maxActive": 4,
+      "maxWaitingOnLocks": 0,
+      "commits": 3993,
+      "rollbacks": 0,
+      "deadlocks": 0
+    },
     "firstFailures": [
       "verify 503 engine_unavailable",
       "verify 503 engine_unavailable",
@@ -44,13 +95,27 @@
   },
   "faceSustained": {
     "n": 30,
-    "wallSeconds": 59.2,
+    "offeredPerMinute": 30,
+    "wallSeconds": 60.2,
+    "maxInFlight": 2,
+    "throughputPerSecond": 0.5,
     "errors": 0,
-    "p50Ms": 1145,
-    "p95Ms": 1292,
-    "maxMs": 1396,
+    "errorRatePercent": 0,
+    "p50Ms": 2582,
+    "p95Ms": 3642,
+    "p99Ms": 3766,
+    "maxMs": 3766,
+    "database": {
+      "samples": 232,
+      "maxConnections": 6,
+      "maxActive": 2,
+      "maxWaitingOnLocks": 0,
+      "commits": 1752,
+      "rollbacks": 16,
+      "deadlocks": 0
+    },
     "firstFailures": []
   },
-  "workersRecoveredAfterSeconds": 139,
+  "workersRecoveredAfterSeconds": 0,
   "met": false
 }
